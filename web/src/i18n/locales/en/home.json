@@ -1,0 +1,15 @@
+{
+  "heroTitle": "What should we build in {{project}}?",
+  "promptExplore": "Explore and understand the code",
+  "promptExploreFull": "Explore and understand the code: map the repo architecture and key entry points.",
+  "promptBuild": "Build a feature, app, or tool",
+  "promptBuildFull": "Build a feature, app, or tool: design and implement a practical plan.",
+  "promptReview": "Review code and suggest changes",
+  "promptReviewFull": "Review code and suggest changes: review the current diff with actionable feedback.",
+  "promptFix": "Fix issues and failures",
+  "promptFixFull": "Fix issues and failures: find the root cause and outline fix steps.",
+  "you": "You",
+  "assistant": "Codex",
+  "loadingHistory": "Loading session…",
+  "historyError": "Failed to load session: {{error}}"
+}

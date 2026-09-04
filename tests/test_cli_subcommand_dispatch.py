@@ -1,0 +1,184 @@
+import sys
+from unittest import mock
+
+import pytest
+
+import codex_pro.__main__ as m
+
+
+def _exit_with_code(rc: int) -> SystemExit:
+    """Mock ``sys.exit`` so it actually exits.
+
+    ``sys.exit(rc)`` is just ``raise SystemExit(rc)``; mocking it without
+    raising swallows the call, and ``_dispatch`` falls through into the
+    post-branch tail — which calls ``asyncio.run(run(...))`` and starts the
+    real Agent with its gateway. The test then hangs on a port LISTEN.
+    Several branches in ``_dispatch`` were susceptible to this regression;
+    the fix is to mock exit with a side effect that throws, the same way the
+    real ``sys.exit`` does. ``lambda`` is needed (not the exception class)
+    because ``side_effect=SystemExit`` ignores the rc argument and raises
+    ``SystemExit()``.
+    """
+    raise SystemExit(rc)
+
+
+def test_cli_subcommand_routes_to_run_cli_attach():
+    from codex_pro.cli.attach_client import ConnectionInfo
+
+    argv = ["codex-pro", "cli", "--port", "9001", "--user", "alice", "--token", "t"]
+    with mock.patch.object(sys, "argv", argv), \
+         mock.patch("codex_pro.cli.attach_client.run_cli_attach", return_value=0) as run, \
+         mock.patch("codex_pro.cli.attach_client.resolve_connection",
+                    return_value=ConnectionInfo(
+                        port=9000, model="MiniMax-M3", context_max=1_000_000,
+                    )) as rd, \
+         mock.patch("sys.exit", side_effect=_exit_with_code) as ex:
+        with pytest.raises(SystemExit) as exc:
+            m._dispatch()
+    assert exc.value.code == 0
+    # Exactly one config read per invocation: the dispatch resolves everything
+    # (port, token, api_prefix, save_dir) from this single call.
+    rd.assert_called_once()
+    run.assert_called_once()
+    # --port 覆盖默认；host 恒为本机
+    kwargs = run.call_args.kwargs
+    assert kwargs["host"] == "127.0.0.1"
+    assert kwargs["port"] == 9001
+    assert kwargs["user_id"] == "alice"
+    assert kwargs["token"] == "t"
+    assert kwargs["renderer"] == "inline"
+    assert kwargs["initial_status"] == {
+        "model": "MiniMax-M3", "context_used": 0, "context_max": 1_000_000,
+    }
+    ex.assert_called_once_with(0)
+
+
+def test_existing_commands_unaffected():
+    # 裸 codex-pro 仍走 run 分支（不抛 SystemExit 到 cli 分支）
+    parser = m._build_parser()
+    ns = parser.parse_args(["cli", "--port", "9001"])
+    assert ns.command == "cli"
+    assert ns.port == 9001
+
+
+def test_cli_renderer_defaults_inline_and_tui_is_opt_in():
+    parser = m._build_parser()
+    assert parser.parse_args(["cli"]).renderer == "inline"
+    assert parser.parse_args(["cli", "--inline"]).renderer == "inline"
+    assert parser.parse_args(["cli", "--tui"]).renderer == "tui"
+    with pytest.raises(SystemExit):
+        parser.parse_args(["cli", "--inline", "--tui"])
+
+
+def test_resolve_defaults_falls_back_on_load_failure(monkeypatch):
+    from codex_pro.cli import attach_client
+
+    def _boom(*a, **k):
+        raise RuntimeError("no config")
+
+    monkeypatch.setattr("codex_pro.config.loader.load_config", _boom)
+    host, port, ws_path, token = attach_client.resolve_defaults(None, None)
+    assert host == "127.0.0.1"
+    assert port == 58123
+    assert ws_path == "/ws"
+    assert token == ""
+
+
+def test_resolve_defaults_host_pinned_to_loopback(monkeypatch):
+    from codex_pro.cli import attach_client
+
+    class _Auth:
+        api_tokens = ["secret-token"]
+
+    class _Gw:
+        port = 8123
+        ws_path = "/socket"
+        auth = _Auth()
+
+    class _Cfg:
+        gateway = _Gw()
+
+    monkeypatch.setattr("codex_pro.config.loader.load_config", lambda **k: _Cfg())
+    host, port, ws_path, token = attach_client.resolve_defaults("/tmp/x.yaml", None)
+    assert host == "127.0.0.1"
+    assert port == 8123
+    assert ws_path == "/socket"
+    assert token == "secret-token"
+
+
+# ── status / cost / deps propagate a stable exit code via sys.exit ────────────
+
+
+def test_status_dispatch_exits_with_show_status_rc():
+    argv = ["codex-pro", "status", "--json"]
+    with mock.patch.object(sys, "argv", argv), \
+         mock.patch("codex_pro.cli.status.show_status", return_value=3) as fn, \
+         mock.patch("sys.exit", side_effect=_exit_with_code) as ex:
+        with pytest.raises(SystemExit) as exc:
+            m._dispatch()
+    assert exc.value.code == 3
+    assert fn.call_args.kwargs["as_json"] is True
+    ex.assert_called_once_with(3)
+
+
+def test_cost_dispatch_exits_with_show_cost_rc():
+    argv = ["codex-pro", "cost", "--json", "--days", "5"]
+    with mock.patch.object(sys, "argv", argv), \
+         mock.patch("codex_pro.cli.cost.show_cost", return_value=1) as fn, \
+         mock.patch("sys.exit", side_effect=_exit_with_code) as ex:
+        with pytest.raises(SystemExit) as exc:
+            m._dispatch()
+    assert exc.value.code == 1
+    assert fn.call_args.kwargs["as_json"] is True
+    assert fn.call_args.kwargs["days"] == 5
+    ex.assert_called_once_with(1)
+
+
+def test_deps_dispatch_exits_with_deps_main_rc():
+    argv = ["codex-pro", "deps", "status", "--json"]
+    with mock.patch.object(sys, "argv", argv), \
+         mock.patch("codex_pro.dependencies.cli.main", return_value=1) as fn, \
+         mock.patch("sys.exit", side_effect=_exit_with_code) as ex:
+        with pytest.raises(SystemExit) as exc:
+            m._dispatch()
+    assert exc.value.code == 1
+    # --json passes through argparse.REMAINDER verbatim to the inner parser.
+    assert fn.call_args.args[0] == ["status", "--json"]
+    ex.assert_called_once_with(1)
+
+
+def test_status_parser_has_json_flag():
+    parser = m._build_parser()
+    ns = parser.parse_args(["status", "--json"])
+    assert ns.json is True
+
+
+def test_plugin_and_checkpoint_parsers_have_json_flag():
+    parser = m._build_parser()
+    assert parser.parse_args(["plugin", "list", "--json"]).json is True
+    assert parser.parse_args(["checkpoint", "list", "--json"]).json is True
+    assert parser.parse_args(["setup", "doctor", "--json"]).json is True
+
+
+class TestPromptAbortExitCode:
+    """A cancelled prompt reaching main() exits 130, never 0.
+
+    PromptAborted replaced the old sys.exit(0) inside the prompt helpers, so
+    main() is the last line of defence: any command that lets the abort escape
+    reports the shell's "interrupted" status instead of success, and prints a
+    one-line notice rather than a traceback.
+    """
+
+    def test_abort_becomes_130(self, capsys):
+        from codex_pro.cli.prompt import PromptAborted
+
+        with mock.patch.object(m, "_dispatch", side_effect=PromptAborted("EOFError")):
+            with pytest.raises(SystemExit) as exc:
+                m.main()
+        assert exc.value.code == 130
+        assert "Cancelled" in capsys.readouterr().err
+
+    def test_other_errors_still_propagate(self):
+        with mock.patch.object(m, "_dispatch", side_effect=RuntimeError("boom")):
+            with pytest.raises(RuntimeError):
+                m.main()

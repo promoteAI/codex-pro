@@ -1,0 +1,406 @@
+"""Discord channel — WebSocket gateway + REST API."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import time
+from typing import Any
+
+import aiohttp
+from loguru import logger
+
+from codex_pro.bus.events import OutboundEvent
+from codex_pro.bus.queue import MessageBus
+from codex_pro.channels.base import BaseChannel, SendResult
+from codex_pro.config.schema import DiscordChannelConfig
+from codex_pro.utils.text import split_message
+
+_GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json"
+_API_BASE = "https://discord.com/api/v10"
+_MAX_TEXT = 2000
+_INTENTS = (1 << 0) | (1 << 9) | (1 << 15)  # GUILDS | GUILD_MESSAGES | MESSAGE_CONTENT
+_RECONNECT_BACKOFFS = [2, 5, 10, 30, 60]
+_RATE_LIMIT_BACKOFF = 300
+
+
+class DiscordChannel(BaseChannel):
+    name = "discord"
+    supports_edit = True
+    supports_reactions = True
+
+    def __init__(self, config: DiscordChannelConfig, bus: MessageBus):
+        super().__init__(config, bus)
+        self._token = config.token
+        self._group_policy = config.group_policy
+        self._session: aiohttp.ClientSession | None = None
+        self._ws: aiohttp.ClientWebSocketResponse | None = None
+        self._ws_task: asyncio.Task | None = None
+        self._heartbeat_task: asyncio.Task | None = None
+        self._heartbeat_interval: float = 41.25
+        self._heartbeat_ack_received: bool = True
+        self._seq: int | None = None
+        self._session_id: str = ""
+        self._bot_id: str = ""
+        self._resume_url: str = ""
+        self._typing_tasks: dict[str, asyncio.Task] = {}
+        self._rate_limited_until: float = 0
+
+    async def start(self) -> None:
+        self._session = aiohttp.ClientSession(headers={
+            "Authorization": f"Bot {self._token}",
+        })
+        self._running = True
+        self.bus.subscribe_outbound(self.name, self.send)
+        self._ws_task = asyncio.create_task(self._ws_loop())
+        logger.info("Discord channel started")
+
+    async def stop(self) -> None:
+        self._running = False
+        for task in self._typing_tasks.values():
+            task.cancel()
+        self._typing_tasks.clear()
+        if self._heartbeat_task:
+            self._heartbeat_task.cancel()
+        if self._ws_task:
+            self._ws_task.cancel()
+            try:
+                await self._ws_task
+            except asyncio.CancelledError:
+                # stop() requested the websocket-loop cancellation and merely
+                # reaps its expected terminal state here.
+                pass
+        if self._ws and not self._ws.closed:
+            await self._ws.close()
+        if self._session:
+            await self._session.close()
+
+    async def send(self, event: OutboundEvent) -> SendResult | None:
+        text = event.text or ""
+        if not text or not self._session:
+            return None
+        url = f"{_API_BASE}/channels/{event.chat_id}/messages"
+        first_result: SendResult | None = None
+        has_failure = False
+        for chunk in _chunk_text(text, _MAX_TEXT):
+            payload: dict[str, Any] = {"content": chunk}
+            if event.reply_to_id:
+                payload["message_reference"] = {"message_id": event.reply_to_id}
+            send_result = await self._post_message(url, payload)
+            if (
+                not send_result.success
+                and "message_reference" in payload
+                and any(code in send_result.error for code in ("50035", "10008"))
+            ):
+                logger.debug("Discord reply anchor gone, resending without it: {}", send_result.error)
+                payload.pop("message_reference", None)
+                send_result = await self._post_message(url, payload)
+            if first_result is None:
+                first_result = send_result
+            if not send_result.success:
+                has_failure = True
+        if first_result and has_failure and first_result.success:
+            first_result = SendResult(success=False, error="one or more chunks failed")
+        return first_result
+
+    async def _post_message(self, url: str, payload: dict[str, Any]) -> SendResult:
+        try:
+            async with self._session.post(url, json=payload) as resp:
+                if resp.status >= 400:
+                    body = await resp.text()
+                    logger.warning("Discord send failed ({}): {}", resp.status, body[:200])
+                    return SendResult(success=False, error=body[:200])
+                data = await resp.json()
+                return SendResult(success=True, message_id=str(data.get("id", "")))
+        except Exception as e:
+            logger.error("Discord send error: {}", e)
+            return SendResult(success=False, error=str(e))
+
+    async def edit_message(
+        self,
+        chat_id: str,
+        message_id: str,
+        text: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+        finalize: bool = False,
+    ) -> SendResult:
+        if not text or not self._session:
+            return SendResult(success=False, message_id=message_id, error="empty text or missing session")
+        if len(text) > _MAX_TEXT:
+            return SendResult(success=False, message_id=message_id, error="message exceeds Discord edit limit")
+        url = f"{_API_BASE}/channels/{chat_id}/messages/{message_id}"
+        try:
+            async with self._session.patch(url, json={"content": text}) as resp:
+                if resp.status >= 400:
+                    body = await resp.text()
+                    logger.warning("Discord edit failed ({}): {}", resp.status, body[:200])
+                    return SendResult(success=False, message_id=message_id, error=body[:200])
+                data = await resp.json()
+                return SendResult(success=True, message_id=str(data.get("id") or message_id))
+        except Exception as e:
+            logger.error("Discord edit error: {}", e)
+            return SendResult(success=False, message_id=message_id, error=str(e))
+
+    async def send_typing(self, chat_id: str, metadata: dict[str, Any] | None = None) -> None:
+        if not self._session or chat_id in self._typing_tasks:
+            return
+
+        async def _typing_loop() -> None:
+            try:
+                while self._running and self._session:
+                    async with self._session.post(f"{_API_BASE}/channels/{chat_id}/typing") as resp:
+                        if resp.status >= 400:
+                            break
+                    await asyncio.sleep(8)
+            except asyncio.CancelledError:
+                # Cancellation is the normal stop_typing/channel-shutdown signal
+                # for this private refresh loop.
+                pass
+
+        self._typing_tasks[chat_id] = asyncio.create_task(_typing_loop())
+
+    async def stop_typing(self, chat_id: str) -> None:
+        task = self._typing_tasks.pop(chat_id, None)
+        if task:
+            task.cancel()
+
+    async def send_reaction(self, chat_id: str, message_id: str, emoji: str, metadata: dict[str, Any] | None = None) -> SendResult:
+        if not getattr(self.config, "reactions_enabled", True) or not self._session:
+            return SendResult(success=False, error="reactions disabled or no session")
+        from urllib.parse import quote
+        encoded_emoji = quote(emoji)
+        url = f"{_API_BASE}/channels/{chat_id}/messages/{message_id}/reactions/{encoded_emoji}/@me"
+        try:
+            async with self._session.put(url) as resp:
+                if resp.status >= 400:
+                    body = await resp.text()
+                    return SendResult(success=False, error=body[:200])
+                return SendResult(success=True)
+        except Exception as e:
+            return SendResult(success=False, error=str(e))
+
+    async def remove_reaction(self, chat_id: str, message_id: str, emoji: str, metadata: dict[str, Any] | None = None) -> SendResult:
+        if not getattr(self.config, "reactions_enabled", True) or not self._session:
+            return SendResult(success=False, error="reactions disabled or no session")
+        from urllib.parse import quote
+        encoded_emoji = quote(emoji)
+        url = f"{_API_BASE}/channels/{chat_id}/messages/{message_id}/reactions/{encoded_emoji}/@me"
+        try:
+            async with self._session.delete(url) as resp:
+                if resp.status >= 400:
+                    body = await resp.text()
+                    return SendResult(success=False, error=body[:200])
+                return SendResult(success=True)
+        except Exception as e:
+            return SendResult(success=False, error=str(e))
+
+    async def delete_message(self, chat_id: str, message_id: str, metadata: dict[str, Any] | None = None) -> SendResult:
+        if not self._session:
+            return SendResult(success=False, error="no session")
+        url = f"{_API_BASE}/channels/{chat_id}/messages/{message_id}"
+        try:
+            async with self._session.delete(url) as resp:
+                if resp.status >= 400:
+                    body = await resp.text()
+                    return SendResult(success=False, error=body[:200])
+                return SendResult(success=True)
+        except Exception as e:
+            return SendResult(success=False, error=str(e))
+
+    async def send_voice(self, chat_id: str, audio_source: str, metadata: dict[str, Any] | None = None) -> SendResult:
+        if not self._session:
+            return SendResult(success=False, error="no session")
+        url = f"{_API_BASE}/channels/{chat_id}/messages"
+        try:
+            from pathlib import Path
+            path = Path(audio_source)
+            if path.exists():
+                data = aiohttp.FormData()
+                data.add_field("files[0]", path.open("rb"), filename=path.name, content_type="audio/ogg")
+                data.add_field("payload_json", json.dumps({"flags": 8192}))
+                async with self._session.post(url, data=data) as resp:
+                    if resp.status >= 400:
+                        body = await resp.text()
+                        return SendResult(success=False, error=body[:200])
+                    result = await resp.json()
+                    return SendResult(success=True, message_id=str(result.get("id", "")))
+            else:
+                return SendResult(success=False, error="audio file not found")
+        except Exception as e:
+            return SendResult(success=False, error=str(e))
+
+    # ── WebSocket lifecycle ──────────────────────────────────────────────────
+
+    async def _ws_loop(self) -> None:
+        backoff_idx = 0
+        while self._running:
+            wait_until = self._rate_limited_until - time.time()
+            if wait_until > 0:
+                logger.info("Discord rate-limited, waiting {:.0f}s", wait_until)
+                await asyncio.sleep(wait_until)
+            try:
+                await self._connect_and_listen()
+                backoff_idx = 0
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("Discord WS error: {}", e)
+            if self._running:
+                delay = _RECONNECT_BACKOFFS[min(backoff_idx, len(_RECONNECT_BACKOFFS) - 1)]
+                logger.info("Discord reconnecting in {}s", delay)
+                await asyncio.sleep(delay)
+                backoff_idx += 1
+
+    async def _connect_and_listen(self) -> None:
+        if not self._session:
+            return
+        url = self._resume_url or _GATEWAY_URL
+        try:
+            self._ws = await self._session.ws_connect(url)
+        except Exception:
+            if url != _GATEWAY_URL:
+                self._resume_url = ""
+            raise
+
+        async for msg in self._ws:
+            if msg.type == aiohttp.WSMsgType.TEXT:
+                await self._handle_ws_message(json.loads(msg.data))
+            elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                break
+
+        close_code = self._ws.close_code if self._ws else None
+        if close_code == 4008:
+            logger.warning("Discord rate-limited (4008), backing off {}s", _RATE_LIMIT_BACKOFF)
+            self._rate_limited_until = time.time() + _RATE_LIMIT_BACKOFF
+        elif close_code == 4014:
+            logger.error("Discord: disallowed intents (4014), cannot reconnect")
+            self._running = False
+
+    async def _handle_ws_message(self, data: dict[str, Any]) -> None:
+        op = data.get("op")
+        seq = data.get("s")
+        if seq is not None:
+            self._seq = seq
+        t = data.get("t")
+        d = data.get("d", {})
+
+        if op == 10:  # HELLO
+            self._heartbeat_interval = d.get("heartbeat_interval", 41250) / 1000
+            if self._heartbeat_task:
+                self._heartbeat_task.cancel()
+            self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+            if self._session_id:
+                await self._send_ws({"op": 6, "d": {
+                    "token": self._token, "session_id": self._session_id, "seq": self._seq,
+                }})
+            else:
+                await self._send_ws({"op": 2, "d": {
+                    "token": self._token, "intents": _INTENTS,
+                    "properties": {"os": "linux", "browser": "codex-pro", "device": "codex-pro"},
+                }})
+        elif op == 0:  # DISPATCH
+            if t == "READY":
+                self._session_id = d.get("session_id", "")
+                self._resume_url = d.get("resume_gateway_url", "")
+                user = d.get("user", {})
+                self._bot_id = str(user.get("id", ""))
+                logger.info("Discord ready as {}", user.get("username", ""))
+            elif t == "MESSAGE_CREATE":
+                await self._on_message(d)
+        elif op == 7:  # RECONNECT
+            if self._ws and not self._ws.closed:
+                await self._ws.close()
+        elif op == 9:  # INVALID SESSION
+            self._session_id = ""
+            if self._ws and not self._ws.closed:
+                await self._ws.close()
+        elif op == 11:  # HEARTBEAT ACK
+            self._heartbeat_ack_received = True
+
+    async def _on_message(self, d: dict[str, Any]) -> None:
+        author = d.get("author", {})
+        if author.get("bot"):
+            return
+        sender_id = str(author.get("id", ""))
+        channel_id = str(d.get("channel_id", ""))
+        content = d.get("content", "")
+        guild_id = d.get("guild_id")
+
+        if guild_id and self._group_policy == "mention":
+            if f"<@{self._bot_id}>" not in content and f"<@!{self._bot_id}>" not in content:
+                ref = d.get("referenced_message")
+                if not (ref and str(ref.get("author", {}).get("id", "")) == self._bot_id):
+                    return
+            content = content.replace(f"<@{self._bot_id}>", "").replace(f"<@!{self._bot_id}>", "").strip()
+
+        media: list[dict[str, str]] = []
+        for att in d.get("attachments", []):
+            url = att.get("url", "")
+            ct = att.get("content_type", "")
+            filename = att.get("filename", "")
+            if ct.startswith("image"):
+                media.append({"type": "image", "url": url, "filename": filename})
+            elif ct.startswith("audio"):
+                media.append({"type": "audio", "url": url, "filename": filename})
+            elif ct.startswith("video"):
+                media.append({"type": "video", "url": url, "filename": filename})
+            else:
+                media.append({"type": "file", "url": url, "filename": filename})
+
+        # Allow messages with only attachments (no text content)
+        if not content and not media:
+            return
+
+        # 引用上下文：Discord 在 referenced_message 带上被引用消息，解析其原文/作者
+        # 交给 pipeline 统一注入（reply_to_id 仍是本条消息的出站锚点）。
+        reply_to_text = reply_to_sender = None
+        reply_to_is_own = False
+        ref = d.get("referenced_message") or {}
+        if ref:
+            reply_to_text = ref.get("content") or None
+            ref_author = ref.get("author", {})
+            reply_to_sender = (
+                ref_author.get("global_name")
+                or ref_author.get("username")
+                or str(ref_author.get("id", "")) or None
+            )
+            reply_to_is_own = str(ref_author.get("id", "")) == self._bot_id
+
+        await self._handle_message(
+            sender_id=sender_id,
+            chat_id=channel_id,
+            text=content,
+            media=media if media else None,
+            reply_to_id=str(d.get("id", "")),
+            reply_to_text=reply_to_text,
+            reply_to_sender=reply_to_sender,
+            reply_to_is_own=reply_to_is_own,
+            thread_id=d.get("thread", {}).get("id") if d.get("thread") else None,
+            metadata={"guild_id": guild_id or ""},
+            is_group=bool(guild_id),
+        )
+
+    async def _heartbeat_loop(self) -> None:
+        try:
+            while self._running and self._ws and not self._ws.closed:
+                if not self._heartbeat_ack_received:
+                    logger.warning("Discord: heartbeat ACK not received, reconnecting")
+                    if self._ws and not self._ws.closed:
+                        await self._ws.close()
+                    break
+                self._heartbeat_ack_received = False
+                await self._send_ws({"op": 1, "d": self._seq})
+                await asyncio.sleep(self._heartbeat_interval)
+        except asyncio.CancelledError:
+            # Websocket teardown cancels the private heartbeat loop; the parent
+            # reconnect/stop path owns any resulting connection transition.
+            pass
+
+    async def _send_ws(self, data: dict[str, Any]) -> None:
+        if self._ws and not self._ws.closed:
+            await self._ws.send_json(data)
+
+
+def _chunk_text(text: str, limit: int) -> list[str]:
+    return split_message(text, limit)

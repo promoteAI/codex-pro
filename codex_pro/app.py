@@ -1,0 +1,817 @@
+"""Application composition root — bootstraps all subsystems and manages their lifecycle.
+
+This module is the single place that wires config → storage → providers → bus →
+agent → plugins → evolution → channels → gateway, and the single place that
+knows the correct start/stop ordering. Entry points (``__main__``, CLI
+subcommands, tests) should import from here instead of from the script module.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import signal
+import sys
+from contextlib import AsyncExitStack
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from codex_pro.config.schema import Config
+
+from loguru import logger
+
+
+def configure_logging(level: str) -> None:
+    from codex_pro.observability.log_buffer import install_log_buffer
+
+    logger.remove()
+    logger.add(sys.stderr, level=level, format="<green>{time:HH:mm:ss}</green> | <level>{level:<7}</level> | {message}")
+    # Buffer records in memory so the dashboard's /api/logs endpoint has history
+    # to serve; the stderr sink alone keeps nothing queryable.
+    install_log_buffer(level=level)
+
+
+@dataclass
+class BootstrapResult:
+    config: Any = None
+    config_file: Path | None = None
+    workspace: Path = field(default_factory=lambda: Path("."))
+    storage: Any = None
+    bus: Any = None
+    router: Any = None
+    provider: Any = None
+    agent: Any = None
+    channels: Any = None
+    scheduler: Any = None
+    health: Any = None
+    instance_lock: Any = None
+    task_dispatcher: Any = None
+
+
+async def bootstrap(
+    config_path: str | None = None,
+    overrides: dict[str, Any] | None = None,
+    on_cli_exit: Callable[[], None] | None = None,
+    *,
+    single_instance: bool = False,
+    force: bool = False,
+    role: str = "run",
+) -> BootstrapResult:
+    """Shared bootstrap: config → storage → providers → bus → agent → channels.
+
+    When ``single_instance`` is set (the channel-consuming entrypoints), the
+    workspace lock is acquired *before* opening SQLite or running migrations, so
+    a second process against the same workspace bails out here instead of
+    concurrently initializing the database. On conflict this raises
+    :class:`InstanceLockError` before any resource is opened — nothing to leak.
+    ``force`` / ``runtime.single_instance=false`` disable the guard."""
+    from codex_pro.agent.loop import AgentLoop
+    from codex_pro.bus.queue import MessageBus
+    from codex_pro.channels.manager import ChannelManager
+    from codex_pro.config.loader import load_config, resolve_config_file
+    from codex_pro.models.provider import LLMProvider
+    from codex_pro.models.providers import create_provider
+    from codex_pro.models.router import ModelRouter
+    from codex_pro.observability.monitor import HealthChecker
+    from codex_pro.scheduler.delivery import build_scheduled_job_handler
+    from codex_pro.storage.sqlite import SQLiteBackend
+
+    from codex_pro.cli.workspace import resolve_effective_workspace
+
+    # 不带 -c 时用 workspace 作查找目录,避免子命令回退到 ~/.codex-pro 的全局
+    # 配置(与 run_gateway 的预解析、cost/config 命令行为保持一致)。
+    search_dir = overrides.get("workspace") if overrides else None
+    config_file = resolve_config_file(config_path, search_dir=search_dir)
+    config = load_config(config_path=config_file, overrides=overrides)
+    configure_logging(config.observability.log_level)
+
+    # 唯一权威解析:显式 -w(overrides["workspace"])按 cwd 解析,否则相对
+    # workspace 按配置文件所在目录解析,与所有子命令保持同一份规则。
+    ws = resolve_effective_workspace(
+        config,
+        str(config_file) if config_file else None,
+        overrides.get("workspace") if overrides else None,
+    )
+    ws.mkdir(parents=True, exist_ok=True)
+
+    # Acquire the single-instance lock before opening SQLite / running migrations
+    # so a duplicate process bails out here rather than concurrently initializing
+    # the database. Raising before any resource is opened means nothing to leak.
+    async with AsyncExitStack() as stack:
+
+        async def _rollback(name: str, coro_factory: Any) -> None:
+            # Guard each teardown so one failing rollback step cannot abort
+            # the unwind of the others (mirrors AppRuntime._stop_step).
+            try:
+                await coro_factory()
+            except Exception as e:
+                logger.warning("Bootstrap rollback: error cleaning up {}: {}", name, e)
+
+        instance_lock: Any = None
+        if single_instance and config.runtime.single_instance and not force:
+            from codex_pro.runtime_lock import acquire_instance_lock
+
+            instance_lock = acquire_instance_lock(ws, role=role)
+
+            async def _release_lock() -> None:
+                # InstanceLock.release() is sync and no-arg; wrap it so the
+                # guarded _rollback path can await it like the other teardowns.
+                instance_lock.release()
+
+            # Registered first (before storage/bus/etc.) so the lock still
+            # unwinds LAST under LIFO, now via the guarded rollback path.
+            stack.push_async_callback(_rollback, "lock", _release_lock)
+
+        storage = SQLiteBackend(ws / config.storage.database_path)
+        await storage.initialize()
+        stack.push_async_callback(_rollback, "storage", storage.close)
+
+        bus = MessageBus(
+            max_queue_size=config.bus.max_queue_size,
+            max_concurrency=config.bus.max_concurrency,
+        )
+
+        from codex_pro.bus.rate_limiter import SessionRateLimiter
+
+        bus.set_rate_limiter(
+            SessionRateLimiter(
+                rpm=config.rate_limit.session_rpm,
+                burst=config.rate_limit.session_burst,
+            )
+        )
+        stack.push_async_callback(_rollback, "bus", bus.stop)
+        router = ModelRouter(
+            config.models,
+            default_context_window=config.session.context_window_tokens,
+        )
+        provider: LLMProvider | None = None
+        provider_errors: list[str] = []
+
+        for pc in config.models.providers:
+            try:
+                p = create_provider(pc, default_model=config.models.default_model)
+                router.register_provider(pc.name, p)
+                if provider is None:
+                    provider = p
+                logger.info("Registered provider: {}", pc.name)
+            except Exception as e:
+                provider_errors.append(f"{pc.name or '<unnamed>'}: {e}")
+                logger.warning("Failed to create provider '{}': {}", pc.name, e)
+
+        if provider is None:
+            from codex_pro.models.stub import StubProvider
+
+            if config.models.providers:
+                details = "; ".join(provider_errors) or "all configured providers were skipped"
+                stub_message = f"[No LLM provider could be initialized. Check provider SDK/API key. Details: {details}]"
+                logger.error("No providers initialized — using stub: {}", details)
+            else:
+                stub_message = "[No LLM provider configured. Set up a provider in codex-pro.yaml]"
+                logger.error("No providers configured — using stub")
+
+            provider = StubProvider(stub_message)
+            router.register_provider("stub", provider)
+
+        from codex_pro.scheduler.service import Scheduler, ScheduledJob, TriggerKind
+
+        scheduler: Scheduler | None = None
+        if config.scheduler.enabled:
+            inspection_runner = None
+            insp_cfg = config.agent.inspection
+            if insp_cfg.enabled:
+                from codex_pro.agent.inspection.store import InspectStore
+                from codex_pro.agent.inspection.tick import run_inspection_tick
+
+                insp_store = InspectStore(
+                    ws / insp_cfg.inspect_file,
+                    ws / "data" / "inspect_state.json",
+                )
+
+                async def inspection_runner():
+                    await run_inspection_tick(insp_store, insp_cfg, bus)
+
+            scheduler = Scheduler(
+                store_path=ws / "data" / "scheduler.json",
+                on_job=build_scheduled_job_handler(bus, inspection_runner=inspection_runner),
+                max_concurrent=config.scheduler.max_concurrent_jobs,
+            )
+            if insp_cfg.enabled and not any(j.name == "__inspection_tick__" for j in scheduler.list_jobs()):
+                scheduler.add_job(
+                    ScheduledJob(
+                        name="__inspection_tick__",
+                        trigger=TriggerKind.INTERVAL,
+                        interval_ms=insp_cfg.tick_interval_sec * 1000,
+                        payload={"_inspection_tick": True},
+                    )
+                )
+
+        if scheduler is not None:
+            stack.push_async_callback(_rollback, "scheduler", scheduler.stop)
+        from codex_pro.tasks.manager import TaskManager
+        from codex_pro.tasks.workflow import WorkflowEngine
+
+        task_manager = TaskManager(storage)
+        workflow_engine = WorkflowEngine(storage, task_manager)
+
+        agent = AgentLoop(
+            bus=bus,
+            config=config,
+            provider=provider,
+            workspace=ws,
+            router=router,
+            scheduler=scheduler,
+            storage=storage,
+            task_manager=task_manager,
+            workflow_engine=workflow_engine,
+        )
+
+        stack.push_async_callback(_rollback, "agent", agent.stop)
+        # Bridges queued board tasks to the agent for execution (the task subsystem
+        # has no executor of its own — the agent is the executor). Polls QUEUED tasks
+        # and dispatches each as an inbound event on its own isolated session.
+        from codex_pro.tasks.dispatcher import TaskDispatcher, new_owner_id
+
+        dispatcher_owner_id = new_owner_id()
+        task_dispatcher = TaskDispatcher(
+            bus,
+            task_manager,
+            owner_id=dispatcher_owner_id,
+            interrupt_manager=agent.interrupt,
+        )
+        # Release the concurrency slot only when the whole turn reaches a terminal
+        # state (decision d), not merely after the inbound publish.
+        task_manager.add_terminal_listener(task_dispatcher._on_task_terminal)
+
+        # Plugin system — discover and activate plugins
+        from codex_pro.plugins.manager import PluginManager
+
+        plugin_manager = PluginManager(
+            config=config,
+            workspace=ws,
+            bus=bus,
+            tool_registry=agent.tools,
+            provider=provider,
+        )
+        await plugin_manager.discover_and_load()
+        agent.set_plugin_manager(plugin_manager)
+
+        # Checkpoint safety net — snapshot workspace before write tools (fail-open)
+        try:
+            from codex_pro.checkpoint.hook import install_checkpoint
+
+            install_checkpoint(config, ws, plugin_manager.hooks)
+        except Exception as e:
+            logger.debug("checkpoint install failed (fail-open): {}", e)
+
+        # Post-write validation — lint the written file, feed errors back (fail-open)
+        try:
+            from codex_pro.validation.hook import install_validation
+
+            install_validation(config, ws, plugin_manager.hooks)
+        except Exception as e:
+            logger.debug("validation install failed (fail-open): {}", e)
+
+        # Self-evolving skill harness. Requires the skills system: every
+        # promotion path writes through skill_store, which is None when
+        # skills.enabled is false.
+        if config.evolution.enabled and agent.skill_store is None:
+            logger.info("Evolution engine skipped: skills system is disabled")
+        elif config.evolution.enabled:
+            try:
+                from codex_pro.evaluation.dataset import EvalDataset
+                from codex_pro.evaluation.runner import EvalRunner
+                from codex_pro.evolution.engine import EvolutionEngine
+
+                dataset_path = ws / config.evolution.eval_dataset_path
+                if not dataset_path.is_absolute():
+                    dataset_path = (ws / config.evolution.eval_dataset_path).resolve()
+
+                def _load_eval_dataset() -> EvalDataset:
+                    return EvalDataset.from_path(dataset_path)
+
+                def _make_eval_runner() -> EvalRunner:
+                    return EvalRunner(
+                        agent,
+                        parallel=config.evolution.eval_parallel,
+                        timeout=config.evolution.eval_timeout_seconds,
+                        provider=provider,
+                    )
+
+                reflection_module = None
+                try:
+                    from codex_pro.agent.planning.reflection import ReflectionModule
+
+                    reflection_module = ReflectionModule(provider.chat_with_retry)
+                except Exception as e:
+                    logger.debug("Reflection module unavailable for evolution: {}", e)
+
+                evolution_engine = EvolutionEngine(
+                    config=config.evolution,
+                    workspace=ws,
+                    storage=storage,
+                    provider=provider,
+                    skill_store=agent.skill_store,
+                    eval_runner_factory=_make_eval_runner,
+                    eval_dataset_loader=_load_eval_dataset,
+                    hooks=plugin_manager.hooks,
+                    reflection=reflection_module,
+                    router=router,
+                )
+                agent.set_evolution_engine(evolution_engine)
+                logger.info("Evolution engine attached (trigger={})", config.evolution.trigger_mode)
+            except Exception as e:
+                logger.warning("Failed to attach evolution engine: {}", e)
+
+        channels = ChannelManager(config.channels, bus, on_cli_exit=on_cli_exit)
+        stack.push_async_callback(_rollback, "channels", channels.stop_all)
+        # Wire the real heartbeat config so verbosity (key_milestones/every_tool/
+        # silent) actually takes effect at runtime; the manager otherwise defaults.
+        channels._heartbeat_cfg = config.agent.heartbeat
+        # Let send_file ask a channel whether it can actually upload a file
+        # (BaseChannel.supports_files) instead of reporting "File sent" for an
+        # attachment the channel silently drops. Wired here rather than passed
+        # into discover_tools because the manager is built after the agent; the
+        # tool holds a late-bound callable, so the order does not matter.
+        _send_file_tool = agent.tools.get("send_file")
+        if _send_file_tool is not None:
+            _send_file_tool._channel_lookup = channels.get_channel
+        _artifact_deliver_tool = agent.tools.get("artifact_deliver")
+        if _artifact_deliver_tool is not None:
+            _artifact_deliver_tool._channel_lookup = channels.get_channel
+        health = HealthChecker(check_interval=config.observability.health_check_interval_seconds)
+
+        from codex_pro.observability.monitor import ComponentHealth as CH
+
+        async def _check_bus() -> CH:
+            return CH.HEALTHY if bus.pending_inbound < 900 else CH.DEGRADED
+
+        async def _check_agent() -> CH:
+            return CH.HEALTHY if agent.is_running else CH.UNHEALTHY
+
+        async def _check_storage() -> CH:
+            return CH.HEALTHY if storage.is_connected else CH.UNHEALTHY
+
+        health.register_check("bus", _check_bus)
+        health.register_check("agent", _check_agent)
+        health.register_check("storage", _check_storage)
+
+        async def _session_cleanup() -> CH:
+            count = await agent.sessions.cleanup_expired()
+            if count:
+                logger.info("Cleaned up {} expired sessions", count)
+            return CH.HEALTHY
+
+        health.register_check("session_cleanup", _session_cleanup)
+
+        result = BootstrapResult(
+            config=config,
+            config_file=config_file,
+            workspace=ws,
+            storage=storage,
+            bus=bus,
+            router=router,
+            provider=provider,
+            agent=agent,
+            channels=channels,
+            scheduler=scheduler,
+            health=health,
+            instance_lock=instance_lock,
+            task_dispatcher=task_dispatcher,
+        )
+        # Success: hand ownership to AppRuntime. pop_all() detaches the
+        # registered teardowns so exiting this block is a no-op; AppRuntime.stop()
+        # then unwinds them at steady-state shutdown. On any exception above,
+        # __aexit__ instead runs them in LIFO order — lock and connection freed.
+        stack.pop_all()
+        return result
+
+
+def install_signal_handler(shutdown: asyncio.Event) -> None:
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, shutdown.set)
+        except NotImplementedError:
+            # Proactor/event loops without signal support rely on their normal
+            # KeyboardInterrupt shutdown path instead.
+            pass
+
+
+def _is_supervised() -> bool:
+    """Best-effort: is this process managed by a supervisor that respawns it?
+
+    systemd sets INVOCATION_ID; our launchd/systemd unit templates set
+    _CODEX_PRO_SUPERVISED=1. If neither is present we assume a foreground run,
+    where a self-exit would leave the service dead — so the watchdog degrades to
+    warn-only rather than exiting.
+    """
+    import os
+
+    return bool(os.environ.get("INVOCATION_ID") or os.environ.get("_CODEX_PRO_SUPERVISED"))
+
+
+def build_loop_watchdog(ctx: "BootstrapResult") -> "Any | None":
+    """Construct a LoopWatchdog from config, or None when disabled."""
+    obs = ctx.config.observability
+    if not getattr(obs, "loop_watchdog_enabled", True):
+        return None
+    from codex_pro.observability.loop_watchdog import LoopWatchdog
+    from codex_pro.observability.restart_guard import RestartGuard
+
+    guard = RestartGuard(
+        ctx.workspace / "data" / "watchdog_restarts.json",
+        max_restarts=obs.loop_watchdog_max_restarts_per_hour,
+    )
+    return LoopWatchdog(
+        warn_seconds=obs.loop_watchdog_warn_seconds,
+        kill_seconds=obs.loop_watchdog_kill_seconds,
+        check_interval_seconds=obs.loop_watchdog_check_interval_seconds,
+        restart_guard=guard,
+        supervised=_is_supervised(),
+        dump_path=ctx.workspace / ctx.config.storage.logs_dir / "loop_freeze.log",
+    )
+
+
+class AppRuntime:
+    """Owns the ordered start/stop lifecycle of all optional components.
+
+    ``stop()`` guards every step so a failure in one component (e.g. a stop
+    timeout in the agent loop) can never prevent later steps — in particular
+    the storage close — from running.
+    """
+
+    def __init__(self, ctx: BootstrapResult):
+        self._ctx = ctx
+        self._gateway: Any = None
+        self._started = False
+        self._instance_lock: Any = None
+
+    @property
+    def gateway(self) -> Any:
+        return self._gateway
+
+    async def start(self) -> bool:
+        """Start all components. Returns False if there is nothing to serve
+        (no active channels and gateway disabled), in which case the caller
+        should call ``stop()`` and exit.
+
+        The workspace single-instance lock is acquired in ``bootstrap`` (before
+        SQLite is opened), not here — this runtime only owns releasing it on
+        ``stop()`` via ``ctx.instance_lock``."""
+        ctx = self._ctx
+        self._instance_lock = ctx.instance_lock
+        self._started = True
+        await ctx.bus.start()
+        await ctx.agent.start()
+        await ctx.channels.start_all()
+
+        if not ctx.channels.active_channels and not ctx.config.gateway.enabled:
+            logger.error(
+                "No active input channels. Run in an interactive terminal, enable gateway, "
+                "or configure another channel."
+            )
+            return False
+
+        if ctx.scheduler:
+            await ctx.scheduler.start()
+        if ctx.task_dispatcher:
+            # Reclaim tasks a crashed previous instance left stranded at RUNNING
+            # (foreign owner or expired lease) BEFORE we start dispatching, so
+            # they re-enter the queue instead of blocking forever.
+            reclaimed = await ctx.agent.task_manager.reclaim_expired_running(
+                current_owner_id=ctx.task_dispatcher._owner_id
+            )
+            if reclaimed:
+                logger.info("Reclaimed {} orphaned RUNNING task(s) at startup", len(reclaimed))
+            await ctx.task_dispatcher.start()
+        await ctx.health.start()
+
+        if ctx.config.gateway.enabled:
+            from codex_pro.gateway.server import GatewayServer
+
+            self._gateway = GatewayServer(
+                config=ctx.config.gateway,
+                bus=ctx.bus,
+                channel_manager=ctx.channels,
+                session_manager=ctx.agent.sessions,
+                workspace=ctx.workspace,
+                agent_loop=ctx.agent,
+                a2a_config=ctx.config.a2a,
+                config_path=ctx.config_file or (ctx.workspace / "codex-pro.yaml"),
+            )
+            # Say so when the SPA is absent. A supervised gateway skips the
+            # on-demand build by design, so without this line the only clue is
+            # the stripped-down page itself.
+            if self._gateway._resolve_web_dir() is None:
+                logger.info(
+                    "Serving the built-in playground (full web UI not built). "
+                    "Run `codex-pro web build` in an interactive terminal to build it."
+                )
+            await self._gateway.start()
+            # Push real-time task changes to subscribed dashboard clients. Every
+            # task state change funnels through TaskManager, so wiring the sink
+            # here covers all writers (API, dispatcher, agent writeback, TaskTool)
+            # without instrumenting each call site. Emission is best-effort and
+            # never blocks a task operation.
+            task_manager = getattr(ctx.agent, "task_manager", None)
+            if task_manager is not None:
+                task_manager.set_event_sink(self._gateway.web_ws.broadcast)
+            # Same for scheduled jobs. Cron runs fire with no user action, so
+            # without this the cron page could only ever show state as of its
+            # last manual load — the `cron` WS channel was declared but nothing
+            # ever emitted into it.
+            if ctx.scheduler is not None:
+                ctx.scheduler.set_event_sink(self._gateway.web_ws.broadcast)
+            memory_service = getattr(ctx.agent, "_memory_service", None)
+            if memory_service is not None:
+                memory_service.set_event_sink(self._gateway.web_ws.broadcast)
+            if ctx.agent.skill_store is not None:
+                ctx.agent.skill_store.set_event_sink(self._gateway.web_ws.broadcast)
+            ctx.agent.cost_tracker.set_event_sink(self._gateway.web_ws.broadcast)
+            ctx.agent.turn_runs.set_event_sink(self._gateway.web_ws.broadcast)
+            ctx.channels.set_event_sink(self._gateway.web_ws.broadcast)
+            logger.info("Gateway started on {}:{}", ctx.config.gateway.host, ctx.config.gateway.port)
+        return True
+
+    async def stop(self) -> None:
+        if not self._started:
+            return
+        self._started = False
+        ctx = self._ctx
+        await self._stop_step("health", ctx.health.stop())
+        if ctx.scheduler:
+            await self._stop_step("scheduler", ctx.scheduler.stop())
+        if ctx.task_dispatcher:
+            await self._stop_step("task_dispatcher", ctx.task_dispatcher.stop())
+        # Stop admission and drain/cancel every queued/in-flight turn while all
+        # three sides of the delivery path are still alive: AgentLoop produces
+        # the terminal event, ChannelManager transports it, and Gateway resolves
+        # HTTP waiters / live WebSockets.  Tearing down either transport first
+        # made the drain report a misleading ACCEPTED/NO_HANDLER result and left
+        # an already-accepted caller with no reply.
+        await self._stop_step("bus", ctx.bus.stop())
+        if self._gateway:
+            await self._stop_step("gateway", self._gateway.stop())
+            self._gateway = None
+        await self._stop_step("channels", ctx.channels.stop_all())
+        await self._stop_step("agent", ctx.agent.stop())
+        await self._stop_step("storage", ctx.storage.close())
+        if self._instance_lock is not None:
+            try:
+                self._instance_lock.release()
+            except Exception as e:
+                logger.warning("Error releasing instance lock: {}", e)
+            self._instance_lock = None
+
+    @staticmethod
+    async def _stop_step(name: str, coro: Any) -> None:
+        try:
+            await coro
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.warning("Error stopping {}: {}", name, e)
+
+
+async def run(config_path: str | None = None, workspace: str | None = None, force: bool = False) -> None:
+    """Run the full agent (``codex-pro run``)."""
+    if config_path is None and workspace:
+        from codex_pro.config.loader import resolve_config_file
+
+        config_path = str(resolve_config_file(search_dir=workspace) or "")
+    overrides = {"workspace": workspace} if workspace else None
+    shutdown = asyncio.Event()
+    from codex_pro.runtime_lock import InstanceLockError
+
+    try:
+        ctx = await bootstrap(
+            config_path=config_path,
+            overrides=overrides,
+            on_cli_exit=shutdown.set,
+            single_instance=True,
+            force=force,
+            role="run",
+        )
+    except InstanceLockError as e:
+        logger.error(e.message)
+        return
+
+    logger.info("Codex Pro starting — workspace: {}", ctx.workspace)
+
+    install_signal_handler(shutdown)
+    runtime = AppRuntime(ctx)
+    watchdog = build_loop_watchdog(ctx)
+    try:
+        if not await runtime.start():
+            return
+        if watchdog is not None:
+            watchdog.start()
+        logger.info("Codex Pro ready — channels: {}", ctx.channels.active_channels)
+        await shutdown.wait()
+        logger.info("Shutting down...")
+    finally:
+        if watchdog is not None:
+            await watchdog.stop()
+        await runtime.stop()
+    logger.info("Codex Pro stopped")
+
+
+def _apply_gateway_profile_default(config: "Config", config_path: str | None) -> None:
+    """Tighten the gateway entrypoint to ``public_gateway`` when the user did
+    not explicitly choose a ``security.profile``. Explicit config is respected.
+
+    NOTE: profile tightening must be injected into ``bootstrap`` overrides
+    *before* the agent loop registers its tools — see ``run_gateway``. This
+    helper only re-asserts the field on the resolved config as a guard; on its
+    own it does not re-filter an already-built tool registry."""
+    from codex_pro.config.loader import profile_explicitly_set
+
+    if not profile_explicitly_set(config_path):
+        config.security.profile = "public_gateway"
+        logger.warning(
+            "Gateway 入口未显式配置 security.profile，已默认切到 public_gateway 收紧档；"
+            "如需放开请在配置中显式设置 security.profile"
+        )
+
+
+def _gateway_profile_override(config_path: str | None) -> dict[str, Any]:
+    """Build the bootstrap override that tightens the gateway security profile
+    when the user did not set one explicitly. Returning an override (rather than
+    mutating config post-bootstrap) is what makes registration-time tool
+    filtering see ``public_gateway`` — otherwise high-risk tools (exec,
+    write_file, patch, workflow, ...) would already be registered and would
+    remain callable, since native tools have no per-call profile gate."""
+    from codex_pro.config.loader import (
+        _load_yaml_file,
+        profile_explicitly_set,
+        resolve_config_file,
+    )
+
+    if profile_explicitly_set(config_path):
+        return {}
+
+    # If the user asked for a broad tool profile (full/coding) but left
+    # security.profile implicit, the public_gateway downgrade will silently strip
+    # exec/write_file/execute_code/patch — the tools that profile was meant to
+    # grant. Surface that conflict loudly rather than as a soft "已收紧" note, and
+    # point at the exact fix. (This is the failure that made a document-generation
+    # task come back empty with no clue why.)
+    tools_profile = ""
+    try:
+        path = resolve_config_file(config_path)
+        user_yaml = _load_yaml_file(path if path and path.exists() else None)
+        tools_section = user_yaml.get("tools")
+        if isinstance(tools_section, dict):
+            tools_profile = str(tools_section.get("profile") or "")
+    except Exception as e:  # best-effort: never let the warning path break boot
+        logger.debug("Could not read tools.profile for gateway conflict check: {}", e)
+
+    if tools_profile in ("full", "coding"):
+        logger.warning(
+            "配置冲突：tools.profile={} 想启用全部/编码类工具，但 Gateway 入口未显式配置 "
+            "security.profile，已默认切到 public_gateway 收紧档，会关闭 "
+            "exec/execute_code/write_file/edit_file/patch/process 等高危工具——"
+            "full/coding 的相应能力将失效。如需恢复：在配置中显式设置 "
+            "security.profile: personal_cli（仅限可信私人部署，全工具生效）。"
+            "公网部署应保留 public_gateway，并使用 artifact_create/append/finalize/deliver "
+            "生成用户产物；不要为文档任务放开通用 write_file/exec。",
+            tools_profile,
+        )
+    else:
+        logger.warning(
+            "Gateway 入口未显式配置 security.profile，已默认切到 public_gateway 收紧档；"
+            "如需放开请在配置中显式设置 security.profile"
+        )
+    return {"security": {"profile": "public_gateway"}}
+
+
+def _gateway_port_in_use(host: str, port: int) -> str | None:
+    """尽力（best-effort）探测 ``host:port`` 是否已被占用；占用时返回一条
+    面向用户的友好提示，否则 None。
+
+    这是一个尽力预检，非权威判定：权威判定在 ``GatewayServer.start()`` 的
+    EADDRINUSE 包装（server.py），它对真实 bind 失败给出同样的提示。本函数
+    对 ``0.0.0.0`` / ``::`` 仅探测 ``127.0.0.1``，因此可能漏报 IPv6 或指定
+    网卡地址的占用——那种情况仍会走到 start() 的 EADDRINUSE 兜底。用一个
+    throwaway socket（SO_REUSEADDR off）探测，尽量贴近 aiohttp 的 bind 行为。
+    Port 0 是 ephemeral 哨兵——永不「占用」，跳过探测。
+
+    Windows 上 Hyper-V / WinNAT 排除端口范围会以 WSAEACCES (10013) 拒绝 bind，
+    这与「端口已被其它进程占用」不同，见 ``format_gateway_port_bind_error``。"""
+    if not port:
+        return None
+    import socket
+
+    from codex_pro.gateway.port_bind import format_gateway_port_bind_error
+
+    probe_host = "127.0.0.1" if host in ("", "0.0.0.0", "::") else host
+    family = socket.AF_INET6 if ":" in probe_host else socket.AF_INET
+    with socket.socket(family, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind((probe_host, port))
+        except OSError as exc:
+            return format_gateway_port_bind_error(host, port, exc)
+    return None
+
+
+async def run_gateway(
+    config_path: str | None = None,
+    host: str | None = None,
+    port: int | None = None,
+    workspace: str | None = None,
+    force: bool = False,
+) -> None:
+    """Run in gateway mode (``codex-pro gateway``) — same lifecycle as ``run``
+    with the gateway force-enabled, so health checks and the scheduler are
+    started here too."""
+    if config_path is None and workspace:
+        from codex_pro.config.loader import resolve_config_file
+
+        config_path = str(resolve_config_file(search_dir=workspace) or "")
+
+    # Preflight the listen port BEFORE bootstrap(), so an occupied port (a
+    # resident gateway already running) exits with a friendly hint and never
+    # leaves a half-built storage handle open (bootstrap creates SQLiteBackend;
+    # AppRuntime.stop() is a no-op before start(), so a post-bootstrap bail
+    # would leak the connection). Resolve host/port from args first, else config.
+    from codex_pro.config.loader import load_config, resolve_config_file
+
+    _cfg_file = resolve_config_file(config_path)
+    _cfg = load_config(config_path=_cfg_file)
+    pre_host = host or _cfg.gateway.host
+    # port=0 is the "pick an ephemeral port" sentinel and must survive: use the
+    # config port only when --port was omitted (None), not when it is 0.
+    pre_port = port if port is not None else _cfg.gateway.port
+    bind_err = _gateway_port_in_use(pre_host, pre_port)
+    if bind_err:
+        logger.error(bind_err)
+        return
+
+    # Mark this process as the gateway so `codex-pro gateway stop/restart`
+    # issued from inside it (agent exec tool) can refuse — with the service
+    # manager's KeepAlive/Restart=always that would be a kill/respawn loop.
+    import os as _os
+
+    _os.environ["_CODEX_PRO_GATEWAY"] = "1"
+
+    overrides: dict[str, Any] = {"workspace": workspace} if workspace else {}
+    # Force gateway on and tighten the security profile *before* bootstrap so the
+    # agent loop registers tools under the effective gateway policy. Applying
+    # these after bootstrap would leave already-registered high-risk tools in the
+    # registry (see _gateway_profile_override).
+    overrides.setdefault("gateway", {})["enabled"] = True
+    profile_override = _gateway_profile_override(config_path)
+    if profile_override:
+        overrides["security"] = {**overrides.get("security", {}), **profile_override["security"]}
+    shutdown = asyncio.Event()
+    from codex_pro.runtime_lock import InstanceLockError
+
+    try:
+        ctx = await bootstrap(
+            config_path=config_path,
+            overrides=overrides or None,
+            on_cli_exit=shutdown.set,
+            single_instance=True,
+            force=force,
+            role="gateway",
+        )
+    except InstanceLockError as e:
+        logger.error(e.message)
+        return
+    # Build the SPA if this process is the kind that may: an interactive
+    # foreground gateway. A supervised one returns None here and serves whatever
+    # artifact exists, because blocking a systemd unit on `pnpm build` would keep
+    # the port closed for minutes.
+    try:
+        from codex_pro.gateway.web_build import describe_outcome, maybe_build_web
+
+        outcome = maybe_build_web()
+        if outcome is not None:
+            logger.info(describe_outcome(outcome))
+    except Exception as e:  # noqa: BLE001 - never block startup on the frontend
+        logger.warning("Dashboard build skipped: {}", e)
+
+    ctx.config.gateway.enabled = True
+    if host:
+        ctx.config.gateway.host = host
+    # Apply --port when provided, including 0 (ephemeral). Only None means
+    # "not passed"; `if port` would drop the dynamic-port request.
+    if port is not None:
+        ctx.config.gateway.port = port
+
+    install_signal_handler(shutdown)
+    runtime = AppRuntime(ctx)
+    watchdog = build_loop_watchdog(ctx)
+
+    try:
+        if not await runtime.start():
+            return
+        if watchdog is not None:
+            watchdog.start()
+        logger.info("Gateway listening on {}:{}", ctx.config.gateway.host, ctx.config.gateway.port)
+        await shutdown.wait()
+    finally:
+        if watchdog is not None:
+            await watchdog.stop()
+        await runtime.stop()

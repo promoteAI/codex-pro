@@ -1,0 +1,308 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+# Every job only needs to read the checked-out repository. Keep the default
+# GITHUB_TOKEN read-only so adding a third-party step cannot silently widen it.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      # Install the pinned ruff from the dev extra instead of a bare
+      # `pip install ruff` (which floats to the latest release). This keeps the
+      # ruff version in one place — [project.optional-dependencies] dev — so CI
+      # and local `pip install -e ".[dev]"` always run the same linter.
+      - name: Install ruff (pinned via dev extra)
+        run: pip install -e ".[dev]"
+
+      - name: Run ruff
+        run: ruff check .
+
+      # scripts/install.sh is how most users get Codex Pro, yet it had no
+      # automated checking of any kind. shellcheck is preinstalled on the
+      # ubuntu runners. -x follows sourced files; SC1091 would otherwise flag
+      # files that only exist on a user's machine.
+      - name: Lint shell scripts
+        run: |
+          for f in scripts/*.sh; do
+            echo "== $f"
+            bash -n "$f"
+            shellcheck -x -e SC1091 "$f"
+          done
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[all,dev]"
+
+      - name: Run tests
+        # --cov activates the coverage gate (fail_under) defined in pyproject.toml,
+        # so a drop below the baseline fails CI instead of passing silently.
+        run: python -m pytest tests/ -v --cov
+
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install project (all extras + dev) and pip-audit
+        run: |
+          # setuptools/wheel are venv bootstrap tools, not project deps; upgrade
+          # them so pip-audit isn't flagged by CVEs in the runner's stale version.
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -e ".[all,dev]" pip-audit
+
+      - name: Audit all installed Python dependencies
+        # The project itself is an unpublished editable checkout; skip only that
+        # local entry while auditing every installed direct/transitive dependency.
+        run: pip-audit --skip-editable
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: "10.34.5"
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Audit production web UI dependencies
+        # Audit the frozen lockfile's runtime graph. Excluding dev-only build/test
+        # tools avoids turning unrelated tooling advisories into release blockers.
+        working-directory: web
+        run: pnpm audit --prod --audit-level=high
+
+  # The web UI is built from source on first use (and by
+  # scripts/publish.sh when producing a wheel), so a broken web/ reaches users.
+  # Nothing in CI compiled the frontend before this job: TypeScript errors and
+  # a lockfile drifting out of sync with package.json both landed on master with
+  # CI fully green.
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        # The on-demand builder accepts an existing pnpm or bootstraps a pinned
+        # fallback. Testing the current supported majors catches lockfile and
+        # dependency-build-policy differences before users hit them.
+        pnpm-version: [10, 11]
+    env:
+      # Stop pnpm from honouring package.json's "packageManager" pin and
+      # re-downloading pnpm 10, which would collapse both matrix legs onto the
+      # same version and defeat this job. The setting was renamed in v11
+      # (managePackageManagerVersions -> pmOnFail), so set both names: pnpm
+      # ignores an unknown *config* variable, unlike an unknown CLI flag.
+      npm_config_manage_package_manager_versions: "false"
+      pnpm_config_pm_on_fail: "ignore"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ matrix.pnpm-version }}
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Show pnpm version actually in use
+        working-directory: web
+        run: pnpm --version
+
+      # Mirrors what the installer does. No fallback to a loose `pnpm install`:
+      # web/package.json pins nothing (all caret ranges), so the lockfile is the
+      # only thing keeping the build reproducible, and drift must fail here
+      # rather than on each user's machine.
+      - name: Install frontend dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web UI
+        working-directory: web
+        run: pnpm build
+
+      - name: Verify build output
+        run: test -f web/dist/index.html
+
+      - name: Run frontend tests
+        working-directory: web
+        run: pnpm test --run
+
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install docs dependencies
+        run: pip install -e ".[docs]"
+
+      - name: Generate config reference
+        run: python -m codex_pro.config.docgen --output-dir docs/reference --lang both
+
+      - name: Build docs (strict)
+        run: mkdocs build --strict
+
+  # Exercise the complete release path without publishing: build the web UI,
+  # produce an sdist and a wheel from it, inspect both archives, then install and
+  # execute the wheel outside the checkout. This catches packaging-hook and
+  # MANIFEST regressions that editable installs and the web UI job cannot.
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: "10.34.5"
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web UI
+        working-directory: web
+        run: pnpm build
+
+      - name: Build sdist and wheel from the sdist
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Verify distribution contents
+        run: |
+          python - <<'PY'
+          import sys
+          import tarfile
+          import zipfile
+          from pathlib import Path, PurePosixPath
+
+          marker = "codex_pro/_bundled/web/index.html"
+          wheels = sorted(Path("dist").glob("*.whl"))
+          sdists = sorted(Path("dist").glob("*.tar.gz"))
+          if len(wheels) != 1 or len(sdists) != 1:
+              sys.exit(
+                  "ERROR: expected exactly one wheel and one sdist, found "
+                  f"{[path.name for path in wheels + sdists]}"
+              )
+
+          failures = []
+          for artifact in wheels + sdists:
+              if artifact.suffix == ".whl":
+                  with zipfile.ZipFile(artifact) as archive:
+                      names = set(archive.namelist())
+              else:
+                  with tarfile.open(artifact) as archive:
+                      # Strip the conventional <name>-<version>/ sdist root.
+                      names = {name.split("/", 1)[-1] for name in archive.getnames()}
+
+              if marker not in names:
+                  failures.append(f"{artifact.name} is missing {marker}")
+
+              stray = [name for name in names if "node_modules" in PurePosixPath(name).parts]
+              if stray:
+                  failures.append(
+                      f"{artifact.name} contains {len(stray)} node_modules entries; "
+                      f"first: {stray[0]}"
+                  )
+
+          if failures:
+              sys.exit("ERROR: " + "\nERROR: ".join(failures))
+          print("Verified " + ", ".join(path.name for path in wheels + sdists))
+          PY
+
+      - name: Install wheel and run smoke checks
+        run: |
+          SMOKE_VENV="${RUNNER_TEMP}/codex-pro-wheel-smoke"
+          python -m venv "$SMOKE_VENV"
+          "$SMOKE_VENV/bin/python" -m pip install dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$SMOKE_VENV/bin/python" - <<'PY'
+          from importlib.metadata import version
+          from importlib.resources import files
+          from codex_pro import __version__
+
+          web_ui = files("codex_pro").joinpath("_bundled/web/index.html")
+          if not web_ui.is_file():
+              raise SystemExit(f"installed wheel is missing web UI: {web_ui}")
+          installed_version = version("codex-pro")
+          if __version__ != installed_version:
+              raise SystemExit(
+                  f"codex_pro.__version__={__version__!r} does not match "
+                  f"installed metadata {installed_version!r}"
+              )
+          print(f"installed codex-pro {installed_version} with web UI")
+          PY
+          "$SMOKE_VENV/bin/codex-pro" --help >/dev/null
+
+      - name: Upload verified distributions
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codex-pro-dist
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7

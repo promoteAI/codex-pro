@@ -1,0 +1,194 @@
+"""Consolidation worker — safely consolidates session history in the background.
+
+Fixes the race condition where the old approach passed a mutable session object
+to a background task. This worker re-acquires the session lock and reloads
+the session, ensuring no concurrent mutation.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Callable, Coroutine
+from typing import Any
+
+from loguru import logger
+
+from codex_pro.memory.consolidator import MemoryConsolidator
+from codex_pro.session.manager import SessionManager
+
+
+class ConsolidationWorker:
+    """Schedules and runs session consolidation safely."""
+
+    def __init__(
+        self,
+        sessions: SessionManager,
+        consolidator: MemoryConsolidator,
+        *,
+        sleep_consolidation: bool = False,
+    ):
+        self._sessions = sessions
+        self._consolidator = consolidator
+        self._sleep_consolidation = sleep_consolidation
+        self._pending: set[str] = set()
+        self._lock = asyncio.Lock()
+
+    async def schedule(
+        self,
+        session_key: str,
+        spawn_fn: Callable[..., None],
+        on_complete: Callable[[str], Coroutine[Any, Any, None]] | None = None,
+        *,
+        tier: Any = None,
+        memory_scope: str = "",
+        conversation_key: str = "",
+    ) -> None:
+        pending_key = conversation_key or session_key
+        async with self._lock:
+            if pending_key in self._pending:
+                return
+            self._pending.add(pending_key)
+        if tier is not None:
+            # DURABLE point: pass a zero-arg factory (not a bare coroutine) so the
+            # scheduler can re-invoke it on retry, and tag the tier so it is
+            # queued — never dropped — under saturation.
+            spawn_fn(
+                lambda: self._run(
+                    session_key, on_complete, memory_scope, pending_key,
+                ),
+                tier=tier,
+            )
+        else:
+            spawn_fn(self._run(session_key, on_complete, memory_scope, pending_key))
+
+    def is_pending(self, session_key: str) -> bool:
+        return session_key in self._pending
+
+    async def _run(
+        self,
+        session_key: str,
+        on_complete: Callable[[str], Coroutine[Any, Any, None]] | None = None,
+        memory_scope: str = "",
+        conversation_key: str = "",
+    ) -> None:
+        conversation_key = conversation_key or session_key
+        try:
+            # Phase 1 (locked, fast): snapshot the unconsolidated chunk.
+            # The session lock must NOT be held across the LLM calls below —
+            # consolidation can take many seconds (summary + fact extraction +
+            # contradiction checks), and the user's next message blocks on
+            # this same lock for the entire duration.
+            session_lock = await self._sessions.acquire(session_key)
+            async with session_lock:
+                session = await self._sessions.get_or_create(session_key)
+                start = session.last_consolidated
+                chunk = [dict(m) for m in session.messages[start:]]
+                if not chunk:
+                    return
+
+            # Align the boundary on the snapshot: never consolidate up to a
+            # trailing tool-call chain (its results may still be pending).
+            boundary = len(chunk)
+            while boundary > 0:
+                msg = chunk[boundary - 1]
+                if msg.get("role") == "tool":
+                    boundary -= 1
+                elif msg.get("role") == "assistant" and msg.get("tool_calls"):
+                    boundary -= 1
+                else:
+                    break
+            if boundary <= 0:
+                return
+            # Consolidate only up to the boundary — the trimmed tail gets
+            # picked up next round, instead of being consolidated twice
+            # (once now, once after the boundary rollback).
+            trimmed = chunk[:boundary]
+
+            # Phase 2 (unlocked, slow): LLM work on the immutable snapshot.
+            chunk_ok = await self._consolidator.consolidate_chunk(trimmed, memory_scope)
+
+            # Sleep consolidation runs BEFORE the Phase-3 boundary commit: it
+            # works purely on the snapshot and the memory store (own locking),
+            # no session lock needed. Ordering matters — if sleep fails and
+            # raises, the boundary must NOT have advanced, so the DURABLE retry
+            # re-snapshots the SAME non-empty chunk and truly replays this span.
+            # Committing the boundary first (the old order) advanced start past
+            # the chunk, so the retry saw an empty chunk (77) and returned early,
+            # dropping episode/fact-extraction/reflection permanently.
+            # Idempotency of a replay is guaranteed: episodes by D's unique index,
+            # fact extraction via service.promote (same-key merge, no dup), and
+            # reflection consuming unresolved rows (resolved-once, re-entrant).
+            if self._sleep_consolidation:
+                # A reset may have happened while the summarizer was running.
+                # Never promote the old conversation into the new epoch.
+                from codex_pro.session.context_epoch import conversation_context_key
+
+                current = await self._sessions.get_or_create(session_key)
+                if conversation_context_key(session_key, current) != conversation_key:
+                    logger.info(
+                        "Discarding stale consolidation for {} after session reset",
+                        session_key,
+                    )
+                    return
+                try:
+                    stats = await self._consolidator.sleep_consolidate(
+                        conversation_key, trimmed, chunk_already_consolidated=chunk_ok,
+                        memory_scope=memory_scope, range_start=start,
+                    )
+                    if any(v > 0 for v in stats.values()):
+                        logger.info("Sleep consolidation for {}: {}", session_key, stats)
+                except Exception as e:
+                    logger.warning("Sleep consolidation failed: {}", e)
+                    raise
+
+            # Phase 3 (locked, fast): commit the new boundary AFTER sleep
+            # succeeded — only if the session region we consolidated is still
+            # intact (compression may have rewritten history while the LLM ran).
+            if chunk_ok:
+                session_lock = await self._sessions.acquire(session_key)
+                async with session_lock:
+                    session = await self._sessions.get_or_create(session_key)
+                    if self._snapshot_still_valid(session, start, chunk, boundary):
+                        session.last_consolidated = start + boundary
+                        await self._sessions.save(session)
+                    else:
+                        logger.info(
+                            "Consolidation boundary for {} skipped: history changed during LLM work",
+                            session_key,
+                        )
+
+            if on_complete:
+                await on_complete(session_key)
+
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            # Re-raise so the DURABLE scheduler tier actually retries this
+            # attempt — previously the error was swallowed here, so the
+            # DURABLE factory/tier wiring was inert and a transient failure was
+            # silently dropped. Consolidation is idempotent: the Phase-3 commit
+            # re-checks ``last_consolidated == start`` and snapshot validity, so
+            # a retried (or even concurrent) re-run cannot double-commit a
+            # region. The scheduler logs the final give-up after retries.
+            logger.warning("Consolidation attempt failed for {}: {}", session_key, e)
+            raise
+        finally:
+            async with self._lock:
+                self._pending.discard(conversation_key or session_key)
+
+    @staticmethod
+    def _snapshot_still_valid(session: Any, start: int, chunk: list[dict], boundary: int) -> bool:
+        """The consolidated region must still match the snapshot before we
+        advance the boundary over it. Full-region comparison: a partial check
+        could be fooled by compression rewriting history into a tail that
+        happens to end with an identical message."""
+        if session.last_consolidated != start:
+            return False
+        if len(session.messages) < start + boundary:
+            return False
+        for offset in range(boundary):
+            snap = chunk[offset]
+            live = session.messages[start + offset]
+            if live.get("role") != snap.get("role") or live.get("content") != snap.get("content"):
+                return False
+        return True

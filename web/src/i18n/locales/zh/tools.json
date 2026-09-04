@@ -1,0 +1,20 @@
+{
+  "layout": "布局",
+  "full": "全屏",
+  "bottom": "底部面板",
+  "side": "侧栏面板",
+  "review": "审查",
+  "terminal": "终端",
+  "browser": "浏览器",
+  "files": "文件",
+  "sidechat": "侧边聊天",
+  "hubTitle": "工具",
+  "emptyReview": "暂无待审查的变更（mock）",
+  "emptyBrowser": "浏览器预览尚未连接",
+  "emptyFiles": "选择一个文件以预览",
+  "emptySidechat": "开始侧边对话",
+  "openTerminal": "在底部打开终端",
+  "searchPlaceholder": "搜索对话、文件、命令…",
+  "searchEmpty": "输入关键词开始搜索",
+  "close": "关闭"
+}

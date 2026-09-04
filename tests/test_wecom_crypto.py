@@ -1,0 +1,242 @@
+import base64
+import os
+import struct
+
+import pytest
+
+from codex_pro.channels.wecom_crypto import decrypt_message, verify_signature
+
+
+def _encrypt(aes_key_b64: str, corp_id: str, plaintext: str) -> str:
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    key = base64.b64decode(aes_key_b64 + "=")
+    iv = key[:16]
+    rand = os.urandom(16)
+    msg = plaintext.encode()
+    raw = rand + struct.pack(">I", len(msg)) + msg + corp_id.encode()
+    pad = 32 - (len(raw) % 32)
+    raw += bytes([pad]) * pad
+    enc = Cipher(algorithms.AES(key), modes.CBC(iv)).encryptor()
+    return base64.b64encode(enc.update(raw) + enc.finalize()).decode()
+
+
+def test_decrypt_round_trip():
+    aes_key = base64.b64encode(os.urandom(32)).decode().rstrip("=")
+    corp_id = "wwcorp123"
+    cipher = _encrypt(aes_key, corp_id, "<xml><Content>hi</Content></xml>")
+    assert decrypt_message(aes_key, corp_id, cipher) == "<xml><Content>hi</Content></xml>"
+
+
+def test_decrypt_rejects_wrong_corp_id():
+    aes_key = base64.b64encode(os.urandom(32)).decode().rstrip("=")
+    cipher = _encrypt(aes_key, "rightcorp", "<xml/>")
+    with pytest.raises(ValueError):
+        decrypt_message(aes_key, "wrongcorp", cipher)
+
+
+def _encrypt_raw(aes_key_b64: str, raw: bytes) -> str:
+    """AES-CBC encrypt an arbitrary already-padded plaintext block.
+
+    Unlike _encrypt (which builds a well-formed header+payload+PKCS7), this lets
+    a test drive decrypt_message's post-decrypt validation branches directly by
+    controlling the exact stripped-plaintext length.
+    """
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    key = base64.b64decode(aes_key_b64 + "=")
+    enc = Cipher(algorithms.AES(key), modes.CBC(key[:16])).encryptor()
+    return base64.b64encode(enc.update(raw) + enc.finalize()).decode()
+
+
+def test_decrypt_short_header_raises_value_error():
+    """Plaintext that survives PKCS7 stripping but is <20 bytes must raise
+    ValueError at the header-length check (wecom_crypto.py:42), not IndexError/
+    struct.error. The caller only catches ValueError, so a leak would 500.
+
+    Construct a 32-byte block padded with pad=13 so 32-13=19 bytes remain — a
+    non-empty plaintext that is still one byte short of the 20-byte header. This
+    genuinely reaches the header check, unlike an all-0x10 block which strips to
+    0 bytes and trips the earlier 'empty plaintext' guard instead.
+    """
+    aes_key = base64.b64encode(os.urandom(32)).decode().rstrip("=")
+    pad = 13
+    raw = os.urandom(32 - pad) + bytes([pad]) * pad  # strips to 19 bytes
+    cipher = _encrypt_raw(aes_key, raw)
+    with pytest.raises(ValueError, match="too short"):
+        decrypt_message(aes_key, "corp", cipher)
+
+
+def test_decrypt_empty_plaintext_raises_value_error():
+    """An empty ciphertext decrypts to zero bytes and raises ValueError at the
+    empty-plaintext guard (wecom_crypto.py:35), before any padding read. This
+    guard runs on the pre-strip block, so it is reachable only via empty input,
+    not via padding that happens to consume a non-empty block."""
+    aes_key = base64.b64encode(os.urandom(32)).decode().rstrip("=")
+    with pytest.raises(ValueError, match="empty plaintext"):
+        decrypt_message(aes_key, "corp", "")
+
+
+def test_decrypt_invalid_padding_raises_value_error():
+    """A trailing pad byte outside 1..32 must raise ValueError at the padding
+    check (wecom_crypto.py:38), not slice into the plaintext incorrectly."""
+    aes_key = base64.b64encode(os.urandom(32)).decode().rstrip("=")
+    raw = os.urandom(31) + bytes([0])  # pad byte 0 is invalid (< 1)
+    cipher = _encrypt_raw(aes_key, raw)
+    with pytest.raises(ValueError, match="invalid padding"):
+        decrypt_message(aes_key, "corp", cipher)
+
+
+def test_decrypt_rejects_bad_key_length():
+    """An encoding_aes_key that does not decode to 32 bytes raises ValueError at
+    the key-length guard (wecom_crypto.py:28), before any cipher work. 24 raw
+    bytes decode cleanly under the source's ``key + "="`` convention yet are the
+    wrong length for AES-256."""
+    short_key = base64.b64encode(os.urandom(24)).decode().rstrip("=")  # -> 24 bytes
+    with pytest.raises(ValueError, match="32 bytes"):
+        decrypt_message(short_key, "corp", base64.b64encode(os.urandom(32)).decode())
+
+
+def test_verify_signature_sorts_four_tuple():
+    sig = verify_signature("tok", "100", "nonce", "encblob")
+    import hashlib
+    expected = hashlib.sha1("".join(sorted(["tok", "100", "nonce", "encblob"])).encode()).hexdigest()
+    assert sig == expected
+
+
+# ── channel-level: plaintext mode must not regress; encrypted mode verifies sig ──
+
+def _make_channel(encoding_aes_key: str, corp_id: str = "corp123", token: str = "mytoken"):
+    from unittest.mock import MagicMock
+    from codex_pro.channels.wecom import WeComChannel
+
+    config = MagicMock()
+    config.corp_id = corp_id
+    config.agent_id = "1000001"
+    config.secret = "sec"
+    config.token = token
+    config.encoding_aes_key = encoding_aes_key
+    config.webhook_path = "/wecom"
+    config.host = "0.0.0.0"
+    config.port = 8084
+    config.allow_from = []
+    bus = MagicMock()
+    return WeComChannel(config, bus)
+
+
+@pytest.mark.asyncio
+async def test_verify_plaintext_mode_unchanged():
+    """Plaintext mode (no aes key) keeps codexing codexstr on valid 3-tuple sig."""
+    import hashlib
+    from aiohttp.test_utils import make_mocked_request
+
+    ch = _make_channel("")
+    ts, nonce, codex = "1234567890", "nonce123", "codex_back"
+    sig = hashlib.sha1("".join(sorted(["mytoken", ts, nonce])).encode()).hexdigest()
+    req = make_mocked_request(
+        "GET", f"/wecom?msg_signature={sig}&timestamp={ts}&nonce={nonce}&codexstr={codex}"
+    )
+    resp = await ch._verify(req)
+    assert resp.status == 200
+    assert resp.text == codex
+
+
+@pytest.mark.asyncio
+async def test_verify_encrypted_mode_round_trip():
+    """Encrypted mode verifies the 4-tuple sig then decrypts codexstr."""
+    from aiohttp.test_utils import make_mocked_request
+    from urllib.parse import quote
+
+    aes_key = base64.b64encode(os.urandom(32)).decode().rstrip("=")
+    corp_id = "corp123"
+    ch = _make_channel(aes_key, corp_id=corp_id)
+    codexstr = _encrypt(aes_key, corp_id, "plain_codex")
+    ts, nonce = "100", "n1"
+    sig = verify_signature("mytoken", ts, nonce, codexstr)
+    req = make_mocked_request(
+        "GET",
+        f"/wecom?msg_signature={sig}&timestamp={ts}&nonce={nonce}&codexstr={quote(codexstr)}",
+    )
+    resp = await ch._verify(req)
+    assert resp.status == 200
+    assert resp.text == "plain_codex"
+
+
+@pytest.mark.asyncio
+async def test_verify_encrypted_mode_rejects_bad_signature():
+    """Encrypted mode returns 403 when msg_signature does not match."""
+    from aiohttp.test_utils import make_mocked_request
+
+    aes_key = base64.b64encode(os.urandom(32)).decode().rstrip("=")
+    ch = _make_channel(aes_key, corp_id="corp123")
+    codexstr = _encrypt(aes_key, "corp123", "x")
+    req = make_mocked_request(
+        "GET", f"/wecom?msg_signature=deadbeef&timestamp=100&nonce=n1&codexstr={codexstr}"
+    )
+    resp = await ch._verify(req)
+    assert resp.status == 403
+
+
+# ── _webhook (POST) security: the message-dispatch path must verify sig first ──
+
+def _encrypted_body(encrypt_b64: str) -> str:
+    return f"<xml><Encrypt>{encrypt_b64}</Encrypt></xml>"
+
+
+def _post_request(query: str, body: str):
+    """Build a mocked POST request whose .text() yields the given body."""
+    from aiohttp.test_utils import make_mocked_request
+    from aiohttp.streams import StreamReader
+    from unittest.mock import Mock
+
+    loop = __import__("asyncio").get_event_loop()
+    payload = StreamReader(Mock(), 2 ** 16, loop=loop)
+    payload.feed_data(body.encode())
+    payload.feed_eof()
+    return make_mocked_request("POST", query, payload=payload)
+
+
+@pytest.mark.asyncio
+async def test_webhook_bad_signature_rejected_and_not_handled():
+    """A POST with a bad msg_signature must 403 and never reach _handle_message."""
+    from unittest.mock import AsyncMock
+
+    aes_key = base64.b64encode(os.urandom(32)).decode().rstrip("=")
+    corp_id = "corp123"
+    ch = _make_channel(aes_key, corp_id=corp_id)
+    handle = AsyncMock()
+    ch._handle_message = handle
+
+    inner = "<xml><MsgType>text</MsgType><FromUserName>u1</FromUserName><Content>hi</Content></xml>"
+    encrypt = _encrypt(aes_key, corp_id, inner)
+    body = _encrypted_body(encrypt)
+    # Deliberately wrong signature.
+    req = _post_request("/wecom?msg_signature=deadbeef&timestamp=100&nonce=n1", body)
+    resp = await ch._webhook(req)
+    assert resp.status == 403
+    handle.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_webhook_valid_signature_decrypts_and_handles():
+    """A POST with a valid signature + correct ciphertext decrypts and dispatches."""
+    from unittest.mock import AsyncMock
+
+    aes_key = base64.b64encode(os.urandom(32)).decode().rstrip("=")
+    corp_id = "corp123"
+    ch = _make_channel(aes_key, corp_id=corp_id)
+    handle = AsyncMock()
+    ch._handle_message = handle
+
+    inner = "<xml><MsgType>text</MsgType><FromUserName>u1</FromUserName><Content>hello</Content></xml>"
+    encrypt = _encrypt(aes_key, corp_id, inner)
+    body = _encrypted_body(encrypt)
+    ts, nonce = "100", "n1"
+    sig = verify_signature("mytoken", ts, nonce, encrypt)
+    req = _post_request(f"/wecom?msg_signature={sig}&timestamp={ts}&nonce={nonce}", body)
+    resp = await ch._webhook(req)
+    assert resp.status == 200
+    handle.assert_called_once()
+    kwargs = handle.call_args.kwargs
+    assert kwargs["sender_id"] == "u1"
+    assert kwargs["chat_id"] == "u1"
+    assert kwargs["text"] == "hello"
+

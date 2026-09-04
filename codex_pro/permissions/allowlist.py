@@ -1,0 +1,129 @@
+"""Approval allowlist with three persistence levels: once, session, always."""
+
+from __future__ import annotations
+
+import json
+import os
+import threading
+from enum import Enum
+from pathlib import Path
+from typing import Any
+
+from loguru import logger
+
+
+class ApprovalLevel(str, Enum):
+    ONCE = "once"
+    SESSION = "session"
+    ALWAYS = "always"
+    # Session-wide grant for an entire tool family (e.g. every exec command in
+    # this session), not just the one command that was prompted. In-memory only:
+    # never written to disk, cleared on restart / clear_session. The gate
+    # translates this into a family-wildcard key (exec:*) recorded at SESSION
+    # scope, so it reuses the same storage/matching as an ordinary session grant.
+    SESSION_ALL = "session_all"
+
+
+class ApprovalAllowlist:
+    """Manages session-scoped and permanent approval allowlists."""
+
+    def __init__(self, store_path: Path | None = None):
+        self._lock = threading.Lock()
+        self._session_approved: dict[str, set[str]] = {}
+        self._permanent: set[str] = set()
+        self._store_path = store_path
+        if store_path:
+            self._load()
+
+    def is_approved(self, session_key: str, pattern_key: str) -> bool:
+        """Check if a pattern is approved at any level.
+
+        Besides an exact match, a family-wildcard grant (e.g. ``exec:*``) matches
+        any key in that family (``exec:pip``, ``exec:ffprobe``, ...). The family
+        is the prefix before the first ``:`` in the pattern key, mirroring
+        build_pattern_key's ``<family>:<name>`` shape. Wildcards are only ever
+        recorded at SESSION scope, so this is what makes "approve all exec for
+        this session" cover later, differently-named commands.
+        """
+        with self._lock:
+            if pattern_key in self._permanent:
+                return True
+            session_set = self._session_approved.get(session_key, set())
+            if pattern_key in session_set:
+                return True
+            if ":" in pattern_key:
+                family_wildcard = pattern_key.split(":", 1)[0] + ":*"
+                if family_wildcard in session_set:
+                    return True
+            return False
+
+    def approve(self, session_key: str, pattern_key: str, level: ApprovalLevel = ApprovalLevel.ONCE) -> None:
+        """Record an approval at the specified persistence level."""
+        if level == ApprovalLevel.ONCE:
+            return
+        with self._lock:
+            # SESSION_ALL persists exactly like SESSION (in-memory, per session);
+            # the only difference is the pattern_key the gate hands us — a family
+            # wildcard such as "exec:*" instead of a single "exec:pip". Never
+            # written to disk, so a broad session grant evaporates on restart.
+            if level in (ApprovalLevel.SESSION, ApprovalLevel.SESSION_ALL):
+                self._session_approved.setdefault(session_key, set()).add(pattern_key)
+            elif level == ApprovalLevel.ALWAYS:
+                self._permanent.add(pattern_key)
+                self._session_approved.setdefault(session_key, set()).add(pattern_key)
+                self._save()
+
+    def clear_session(self, session_key: str) -> None:
+        with self._lock:
+            self._session_approved.pop(session_key, None)
+
+    def _load(self) -> None:
+        if not self._store_path or not self._store_path.exists():
+            return
+        try:
+            data = json.loads(self._store_path.read_text(encoding="utf-8"))
+            self._permanent = set(data.get("permanent", []))
+        except Exception as e:
+            logger.warning("Failed to load approval allowlist: {}", e)
+
+    def _save(self) -> None:
+        if not self._store_path:
+            return
+        try:
+            self._store_path.parent.mkdir(parents=True, exist_ok=True)
+            data = {"permanent": sorted(self._permanent)}
+            tmp = self._store_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp, self._store_path)
+        except Exception as e:
+            logger.warning("Failed to save approval allowlist: {}", e)
+
+
+def build_pattern_key(tool_name: str, arguments: dict[str, Any]) -> str:
+    """Build a pattern key for allowlist matching.
+
+    For exec tools: exec:<command_name>
+    For code tools: code:<language>
+    For skill_run: skill_run:<skill>/<script>
+    For other tools: tool:<tool_name>
+    """
+    if tool_name == "skill_run":
+        # tool:skill_run would make one "approve always" a standing permit for
+        # every script of every skill with any arguments — far broader than the
+        # exec:<command> grants it sits next to. Scope the grant to the single
+        # script the user actually looked at.
+        skill = str(arguments.get("name", "")).strip() or "unknown"
+        script = str(arguments.get("script", "")).strip() or "unknown"
+        return f"skill_run:{skill}/{script}"
+    if tool_name == "exec":
+        command = str(arguments.get("command", "")).strip()
+        cmd_name = command.split()[0].rsplit("/", 1)[-1] if command else "unknown"
+        return f"exec:{cmd_name}"
+    if tool_name == "execute_code":
+        lang = str(arguments.get("language", "unknown"))
+        return f"code:{lang}"
+    if tool_name == "process":
+        command = str(arguments.get("command", "")).strip()
+        cmd_name = command.split()[0].rsplit("/", 1)[-1] if command else "unknown"
+        return f"process:{cmd_name}"
+    return f"tool:{tool_name}"

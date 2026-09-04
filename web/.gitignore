@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tsbuildinfo
+# 项目用 pnpm(pnpm-lock.yaml),忽略 npm 误生成的 lockfile。
+package-lock.json
+pnpm-lock.yaml
+# Local gateway proxy origin (e.g. when 58123 is in a WinNAT excluded range).
+.env*.local

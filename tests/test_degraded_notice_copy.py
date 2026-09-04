@@ -1,0 +1,87 @@
+from __future__ import annotations
+
+from codex_pro.agent.degraded_notice import (
+    GENERIC_FALLBACK_TEXT,
+    REASON_APPROVAL_DELIVERY_FAILED,
+    REASON_APPROVAL_TIMEOUT,
+    REASON_APPROVAL_UNAVAILABLE,
+    REASON_LOOP_EXHAUSTED,
+    REASON_OUTPUT_TRUNCATED,
+    REASON_REPEAT_BLOCKED,
+    combine_notices,
+    is_generic_fallback,
+    notice_for,
+)
+
+
+def test_notice_approval_unavailable_is_chinese():
+    text = notice_for(REASON_APPROVAL_UNAVAILABLE)
+    assert "安全审批暂时不可用" in text
+    assert text.startswith("⚠️")
+
+
+def test_notice_approval_delivery_failed_cancels_instead_of_waiting():
+    text = notice_for(REASON_APPROVAL_DELIVERY_FAILED, tool="cronjob")
+    assert "cronjob" in text
+    assert "未能送达" in text
+    assert "已取消" in text
+
+
+def test_notice_approval_timeout_tells_user_to_retrigger():
+    # On timeout the request is already expired and removed from _pending, so the
+    # notice must NOT tell users to /approve the stale id — it must ask them to
+    # re-trigger the action to get a fresh request.
+    text = notice_for(REASON_APPROVAL_TIMEOUT, tool="exec", request_id="abc123")
+    assert "exec" in text
+    assert "超时" in text
+    assert "重新发起" in text
+    assert "/approve" not in text
+    assert "abc123" not in text
+
+
+def test_notice_repeat_blocked_is_chinese():
+    text = notice_for(REASON_REPEAT_BLOCKED)
+    assert "多次尝试" in text
+
+
+def test_notice_output_truncated_is_chinese():
+    text = notice_for(REASON_OUTPUT_TRUNCATED)
+    assert text.startswith("⚠️")
+    assert "截断" in text
+
+
+def test_notice_loop_exhausted_tells_user_to_continue():
+    text = notice_for(REASON_LOOP_EXHAUSTED)
+    assert text.startswith("⚠️")
+    assert "继续" in text
+
+
+def test_notice_unknown_reason_falls_back():
+    assert notice_for("something_else") == GENERIC_FALLBACK_TEXT
+
+
+def test_combine_dedupes_preserving_order():
+    a = notice_for(REASON_APPROVAL_UNAVAILABLE)
+    b = notice_for(REASON_REPEAT_BLOCKED)
+    combined = combine_notices([a, b, a])
+    assert combined.count(a) == 1
+    assert combined.index(a) < combined.index(b)
+
+
+def test_combine_empty_returns_empty():
+    assert combine_notices([]) == ""
+
+
+def test_is_generic_fallback_true_for_empty():
+    assert is_generic_fallback("") is True
+    assert is_generic_fallback("   ") is True
+
+
+def test_is_generic_fallback_true_for_english_filler():
+    assert is_generic_fallback(
+        "I encountered an issue processing your request. Please try again or rephrase your question."
+    ) is True
+
+
+def test_is_generic_fallback_false_for_real_answer():
+    assert is_generic_fallback("调研完成,结论是 ...") is False

@@ -1,0 +1,516 @@
+"""Loopback-trust 补完回归。
+
+覆盖三道闸门姿态一致后的行为：
+- is_authorized(trusted=True) 对 loopback 来源放行（守住零配置 cli attach 必挂的 bug）；
+- 非 loopback 仍走 allowlist，不被削弱；
+- trusted 只能源自真实 socket peer，转发头伪造不生效；
+- 网关端口预检占用时给出友好提示而非裸 traceback。
+"""
+from __future__ import annotations
+
+import errno
+import socket
+from unittest.mock import MagicMock
+
+import aiohttp
+import pytest
+import pytest_asyncio
+from aiohttp.test_utils import make_mocked_request
+
+from codex_pro.config.schema import GatewayAuthConfig
+from codex_pro.gateway.auth import GatewayAuth
+from codex_pro.gateway.server import GatewayServer
+
+
+def _auth(tmp_path) -> GatewayAuth:
+    # 默认 allowlist + 空白名单：这正是零配置网关锁死 cli:local 的场景。
+    return GatewayAuth(GatewayAuthConfig(mode="allowlist", allowed_users=[]), tmp_path)
+
+
+def test_is_authorized_has_no_trusted_bypass(tmp_path) -> None:
+    auth = _auth(tmp_path)
+    # 空白名单：任何身份都不因 loopback 而放行——trusted 短路已移除。
+    assert not auth.is_authorized("cli", "local")
+    assert not auth.is_authorized("wechat", "victim")
+
+
+def test_is_authorized_allowlist_still_grants_listed_user(tmp_path) -> None:
+    auth = GatewayAuth(
+        GatewayAuthConfig(mode="allowlist", allowed_users=["cli:local"]), tmp_path
+    )
+    assert auth.is_authorized("cli", "local")
+    assert not auth.is_authorized("cli", "other")
+
+
+def test_is_authorized_rejects_trusted_kwarg(tmp_path) -> None:
+    # P0 回归护栏：trusted 短路已彻底移除，连关键字都不再接受。
+    # 若有人把 `if trusted: return True` 加回，此测试立即转红。
+    import inspect
+    auth = _auth(tmp_path)
+    assert "trusted" not in inspect.signature(auth.is_authorized).parameters
+    with pytest.raises(TypeError):
+        auth.is_authorized("cli", "local", trusted=True)
+
+
+def _request_with_peer(peer, headers=None):
+    transport = MagicMock()
+    transport.get_extra_info = lambda key, default=None: peer if key == "peername" else default
+    return make_mocked_request("GET", "/ws", headers=headers or {}, transport=transport)
+
+
+def test_is_loopback_peer_true_for_loopback_socket() -> None:
+    req = _request_with_peer(("127.0.0.1", 51234))
+    assert GatewayServer._is_loopback_peer(req) is True
+
+
+def test_is_loopback_peer_false_for_remote_socket() -> None:
+    req = _request_with_peer(("203.0.113.7", 51234))
+    assert GatewayServer._is_loopback_peer(req) is False
+
+
+def test_forwarded_header_cannot_forge_loopback_trust() -> None:
+    # 真实 peer 是远程，但 X-Forwarded-For 伪造成 127.0.0.1：必须仍判为不可信。
+    req = _request_with_peer(
+        ("203.0.113.7", 51234),
+        headers={"X-Forwarded-For": "127.0.0.1"},
+    )
+    assert GatewayServer._is_loopback_peer(req) is False
+
+
+def test_is_loopback_peer_false_when_no_peername() -> None:
+    transport = MagicMock()
+    transport.get_extra_info = lambda key, default=None: default
+    req = make_mocked_request("GET", "/ws", transport=transport)
+    assert GatewayServer._is_loopback_peer(req) is False
+
+
+def test_port_preflight_reports_when_occupied() -> None:
+    from codex_pro.app import _gateway_port_in_use
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as held:
+        held.bind(("127.0.0.1", 0))
+        held.listen(1)
+        port = held.getsockname()[1]
+        msg = _gateway_port_in_use("127.0.0.1", port)
+        assert msg is not None
+        assert "codex-pro cli" in msg
+
+
+def test_port_bind_error_distinguishes_windows_access_denied() -> None:
+    from codex_pro.gateway.port_bind import format_gateway_port_bind_error
+
+    denied = OSError("denied")
+    denied.winerror = 10013
+    denied.errno = 13
+    msg = format_gateway_port_bind_error("127.0.0.1", 58123, denied)
+    assert "排除范围" in msg
+    assert "18789" in msg
+    assert "已被占用" not in msg
+
+    busy = OSError("busy")
+    busy.errno = errno.EADDRINUSE
+    busy_msg = format_gateway_port_bind_error("127.0.0.1", 58123, busy)
+    assert "已被占用" in busy_msg
+    assert "codex-pro cli" in busy_msg
+
+
+def test_port_preflight_clear_when_free() -> None:
+    from codex_pro.app import _gateway_port_in_use
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    # socket 已关闭，端口空出。
+    assert _gateway_port_in_use("127.0.0.1", port) is None
+
+
+def test_port_preflight_skips_ephemeral_port() -> None:
+    from codex_pro.app import _gateway_port_in_use
+
+    assert _gateway_port_in_use("0.0.0.0", 0) is None
+
+
+def test_port_preflight_is_best_effort_not_authoritative() -> None:
+    # 契约：free 结果是「尽力」判断，权威判定在 GatewayServer.start() 的
+    # EADDRINUSE 包装。这里固定 docstring 不再过度承诺（回归防线）。
+    from codex_pro.app import _gateway_port_in_use
+    doc = _gateway_port_in_use.__doc__ or ""
+    assert "尽力" in doc or "best-effort" in doc.lower()
+    assert "127.0.0.1" in doc  # 说明 0.0.0.0/:: 的探测局限
+
+
+# ── 端到端：默认 allowlist 网关下 loopback cli 必须握手成功 ──────────────────
+#
+# 这正是 bug 现象（零配置 codex-pro cli 报 认证失败：unauthorized）的真实链路：
+# gateway_ws_url fixture 用 mode="open" 会掩盖它，故单独起一个 allowlist 空白名单网关。
+
+
+@pytest_asyncio.fixture
+async def allowlist_gateway_ws_url():
+    from pathlib import Path
+    from unittest.mock import AsyncMock
+
+    from codex_pro.bus.queue import MessageBus
+    from codex_pro.config.schema import (
+        GatewayConfig,
+        GatewayAuthConfig,
+        GatewaySessionPolicyConfig,
+    )
+    from codex_pro.gateway.server import GatewayServer
+
+    config = GatewayConfig(
+        enabled=True,
+        host="127.0.0.1",
+        port=0,
+        # 模式默认 allowlist、白名单为空：未补完前这会拒掉 cli:local。
+        auth=GatewayAuthConfig(mode="allowlist", allowed_users=[], api_tokens=[]),
+        session_policy=GatewaySessionPolicyConfig(mode="none"),
+    )
+    bus = MessageBus()
+    session_manager = MagicMock()
+    session_manager.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
+    server = GatewayServer(
+        config=config,
+        bus=bus,
+        channel_manager=MagicMock(),
+        session_manager=session_manager,
+        workspace=Path("/tmp/codex-pro-test-loopback"),
+        agent_loop=None,
+    )
+    await bus.start()
+    await server.start()
+    try:
+        yield f"ws://127.0.0.1:{server.actual_port}/ws"
+    finally:
+        await server.stop()
+        await bus.stop()
+
+
+@pytest.mark.asyncio
+async def test_loopback_cli_auth_ok_under_empty_allowlist(allowlist_gateway_ws_url):
+    async with aiohttp.ClientSession() as s:
+        async with s.ws_connect(allowlist_gateway_ws_url) as ws:
+            await ws.send_json({
+                "type": "auth", "platform": "cli",
+                "user_id": "local", "session_key": "cli:local",
+            })
+            msg = await ws.receive_json()
+            assert msg["type"] == "auth_ok"
+            assert msg["session_key"] == "cli:local"
+
+
+@pytest.mark.asyncio
+async def test_cross_site_origin_rejected_before_upgrade(allowlist_gateway_ws_url):
+    import aiohttp
+    url = allowlist_gateway_ws_url.replace("ws://", "http://")
+    async with aiohttp.ClientSession() as s:
+        # 带跨站 Origin 的 WS 升级请求：应在 prepare 前 403，不升级。
+        async with s.get(
+            url,
+            headers={
+                "Origin": "https://evil.example",
+                "Upgrade": "websocket",
+                "Connection": "Upgrade",
+                "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==",
+                "Sec-WebSocket-Version": "13",
+            },
+        ) as resp:
+            assert resp.status == 403
+
+
+@pytest.mark.asyncio
+async def test_loopback_only_client_without_cli_key_rejected(allowlist_gateway_ws_url):
+    import aiohttp
+    async with aiohttp.ClientSession() as s:
+        async with s.ws_connect(allowlist_gateway_ws_url) as ws:
+            # 空白名单 → 仅 loopback 豁免 → 无 cli key、自报 wechat:victim 必须被拒。
+            await ws.send_json({
+                "type": "auth", "platform": "wechat", "user_id": "victim",
+            })
+            msg = await ws.receive_json()
+            assert msg["type"] == "error"
+            assert msg["error"] == "forbidden session_key"
+
+
+@pytest.mark.asyncio
+async def test_loopback_cli_with_key_still_ok(allowlist_gateway_ws_url):
+    import aiohttp
+    async with aiohttp.ClientSession() as s:
+        async with s.ws_connect(allowlist_gateway_ws_url) as ws:
+            await ws.send_json({
+                "type": "auth", "platform": "cli",
+                "user_id": "local", "session_key": "cli:local",
+            })
+            msg = await ws.receive_json()
+            assert msg["type"] == "auth_ok"
+            assert msg["session_key"] == "cli:local"
+
+
+def test_cross_site_browser_origin_with_none_sfs_is_rejected(tmp_path) -> None:
+    auth = _auth(tmp_path)
+    assert auth.is_cross_site_browser("https://evil.example", "none") is True
+
+
+def test_cross_site_browser_detected_even_with_empty_allowlist(tmp_path) -> None:
+    auth = _auth(tmp_path)  # allowed_origins 默认空
+    # 明确跨站浏览器请求：默认开，判为 True（应被拒）。
+    assert auth.is_cross_site_browser("https://evil.example", "cross-site") is True
+    assert auth.is_cross_site_browser("https://evil.example", "") is True
+
+
+def test_cross_site_browser_false_for_native_client(tmp_path) -> None:
+    auth = _auth(tmp_path)
+    # 原生客户端（cli/curl）：无 Origin、无 Sec-Fetch-Site → 非浏览器 → False。
+    assert auth.is_cross_site_browser("", "") is False
+
+
+def test_cross_site_browser_false_for_same_origin(tmp_path) -> None:
+    auth = _auth(tmp_path)
+    assert auth.is_cross_site_browser("http://127.0.0.1:58123", "same-origin") is False
+    assert auth.is_cross_site_browser("", "none") is False
+
+
+def test_cross_site_browser_allowlisted_origin_passes(tmp_path) -> None:
+    from codex_pro.config.schema import GatewayAuthConfig
+    auth = GatewayAuth(
+        GatewayAuthConfig(mode="open", allowed_origins=["https://app.example"]), tmp_path
+    )
+    # 显式放行的 Origin：不算跨站浏览器攻击 → False。
+    assert auth.is_cross_site_browser("https://app.example", "cross-site") is False
+    # 其它跨站 Origin 仍判为 True。
+    assert auth.is_cross_site_browser("https://evil.example", "cross-site") is True
+
+
+def test_allowlisted_origin_is_normalized_on_both_sides(tmp_path) -> None:
+    """Pasted URL spelling must not create a silent deny-all allowlist."""
+    from codex_pro.config.schema import GatewayAuthConfig
+    auth = GatewayAuth(
+        GatewayAuthConfig(
+            mode="open",
+            allowed_origins=["https://Dashboard.Example:443/"],
+        ),
+        tmp_path,
+    )
+    assert auth.is_cross_site_browser(
+        "https://dashboard.example", "", "dashboard.example",
+    ) is False
+
+
+# ── same-site 不再被无条件信任 ────────────────────────────────────────────────
+# same-site 只说明发起方与本站共享可注册域，仍可能是不同子域、不同端口，或
+# localhost 上的另一个程序 —— 正是这个闸门要防的 CSRF-to-localhost / DNS
+# rebinding 场景。此前它与 same-origin 一样直接放行，且从不比较 Origin 与 Host。
+
+
+def test_same_site_passes_only_when_it_really_is_same_origin(tmp_path) -> None:
+    auth = _auth(tmp_path)
+    assert auth.is_cross_site_browser(
+        "http://127.0.0.1:58123", "same-site", "127.0.0.1:58123",
+    ) is False
+
+
+def test_same_site_from_a_different_port_is_rejected(tmp_path) -> None:
+    """不同端口就是不同来源；在开发机上更是另一个程序。"""
+    auth = _auth(tmp_path)
+    assert auth.is_cross_site_browser(
+        "http://localhost:5173", "same-site", "localhost:58123",
+    ) is True
+
+
+def test_same_site_from_a_sibling_subdomain_is_rejected(tmp_path) -> None:
+    auth = _auth(tmp_path)
+    assert auth.is_cross_site_browser(
+        "https://evil.app.example", "same-site", "app.example",
+    ) is True
+
+
+def test_same_site_without_a_host_to_compare_is_rejected(tmp_path) -> None:
+    """无法核对时按拒绝处理，而不是沿用旧的无条件信任。"""
+    auth = _auth(tmp_path)
+    assert auth.is_cross_site_browser("http://localhost:5173", "same-site", "") is True
+
+
+def test_same_site_honours_default_ports_and_ipv6(tmp_path) -> None:
+    auth = _auth(tmp_path)
+    # Host 不带端口时按 Origin 的 scheme 默认端口比较。
+    assert auth.is_cross_site_browser(
+        "https://app.example", "same-site", "app.example",
+    ) is False
+    assert auth.is_cross_site_browser(
+        "http://[::1]:58123", "same-site", "[::1]:58123",
+    ) is False
+    assert auth.is_cross_site_browser(
+        "http://[::1]:5173", "same-site", "[::1]:58123",
+    ) is True
+
+
+def test_allowlist_remains_the_escape_hatch_for_same_site(tmp_path) -> None:
+    """开发场景(vite 5173 → gateway 58123)通过 allowed_origins 显式放行。"""
+    from codex_pro.config.schema import GatewayAuthConfig
+    auth = GatewayAuth(
+        GatewayAuthConfig(mode="open", allowed_origins=["http://localhost:5173"]),
+        tmp_path,
+    )
+    assert auth.is_cross_site_browser(
+        "http://localhost:5173", "same-site", "localhost:58123",
+    ) is False
+
+
+def test_same_site_gate_does_not_affect_native_clients(tmp_path) -> None:
+    """无 Origin/Sec-Fetch-Site 的 cli/curl 仍然不受影响。"""
+    auth = _auth(tmp_path)
+    assert auth.is_cross_site_browser("", "", "127.0.0.1:58123") is False
+    assert auth.is_cross_site_browser("", "none", "127.0.0.1:58123") is False
+
+
+def _msg_request(body, *, headers=None, peer=("127.0.0.1", 5555)):
+    from unittest.mock import MagicMock
+    from aiohttp.test_utils import make_mocked_request
+    transport = MagicMock()
+    transport.get_extra_info = lambda key, default=None: peer if key == "peername" else default
+    req = make_mocked_request("POST", "/api/v1/message", headers=headers or {}, transport=transport)
+    async def _json():
+        return body
+    req.json = _json  # type: ignore[method-assign]
+    return req
+
+
+@pytest.mark.asyncio
+async def test_message_rejects_cross_site_browser(tmp_path) -> None:
+    from test_gateway_server import _make_gateway
+    gw, _ = _make_gateway()
+    resp = await gw._handle_message(_msg_request(
+        {"platform": "api", "user_id": "u1", "text": "hi"},
+        headers={"Origin": "https://evil.example", "Sec-Fetch-Site": "cross-site"},
+    ))
+    assert resp.status == 403
+
+
+@pytest.mark.asyncio
+async def test_port_preflight_runs_before_bootstrap(monkeypatch, tmp_path) -> None:
+    import socket as _socket
+    from codex_pro import app as app_mod
+
+    bootstrap_called = False
+
+    async def _spy_bootstrap(*a, **k):
+        nonlocal bootstrap_called
+        bootstrap_called = True
+        raise AssertionError("bootstrap must not run when port is occupied")
+
+    monkeypatch.setattr(app_mod, "bootstrap", _spy_bootstrap)
+
+    # 占住一个端口，让预检命中。
+    with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as held:
+        held.bind(("127.0.0.1", 0))
+        held.listen(1)
+        port = held.getsockname()[1]
+        # host/port 直接由入参提供，跳过 bootstrap 也能预检。
+        await app_mod.run_gateway(host="127.0.0.1", port=port, workspace=str(tmp_path))
+
+    assert bootstrap_called is False
+
+
+# ── HTTP /api/v1/message 的 Gate B 身份收口（对齐 WS 握手）──────────────────
+#
+# WS 握手已用 resolve_client_session_key 堵死「loopback 豁免进来后自报他人身份」，
+# 但 HTTP 端点历史上无条件构造 gateway:{platform}:{chat_id}，缺 Gate B。
+# 这里用 allowlist 空白名单 gateway 直调 _handle_message 复现越权并锁死修复。
+
+
+def _allowlist_gateway():
+    """mode=allowlist + 空白名单 gateway，直调 _handle_message 用。
+
+    open 模式 normally_ok 恒 True、allow_fallback 恒 True，无法触发越权；
+    必须空白名单才让 loopback 豁免成为唯一放行来源。
+    """
+    from pathlib import Path
+    from unittest.mock import AsyncMock
+
+    from codex_pro.bus.queue import MessageBus
+    from codex_pro.config.schema import (
+        GatewayConfig,
+        GatewayAuthConfig,
+        GatewaySessionPolicyConfig,
+    )
+    from codex_pro.gateway.server import GatewayServer
+
+    config = GatewayConfig(
+        enabled=True,
+        host="127.0.0.1",
+        port=0,
+        auth=GatewayAuthConfig(mode="allowlist", allowed_users=[], api_tokens=[]),
+        session_policy=GatewaySessionPolicyConfig(mode="none"),
+    )
+    bus = MessageBus()
+    session_manager = MagicMock()
+    session_manager.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
+    gw = GatewayServer(
+        config=config,
+        bus=bus,
+        channel_manager=MagicMock(),
+        session_manager=session_manager,
+        workspace=Path("/tmp/codex-pro-test-http-gateb"),
+        agent_loop=None,
+    )
+    return gw, session_manager
+
+
+@pytest.mark.asyncio
+async def test_http_message_loopback_without_key_forbidden() -> None:
+    # loopback、无 Origin、自报 wechat:victim、不带 session_key：
+    # 仅靠 loopback 豁免放行 → allow_fallback=False → 必须 403 forbidden session_key，
+    # 且绝不落到 gateway:wechat:victim 的会话。
+    gw, session_manager = _allowlist_gateway()
+    resp = await gw._handle_message(_msg_request(
+        {"platform": "wechat", "user_id": "victim", "text": "hi"},
+        peer=("127.0.0.1", 5555),
+    ))
+    assert resp.status == 403
+    import json as _json
+    assert _json.loads(resp.body)["error"] == "forbidden session_key"
+    # Gate B 应在建会话前拒掉：绝不能以受害者身份键创建会话。
+    called_keys = [c.args[0] for c in session_manager.get_or_create.call_args_list]
+    assert "gateway:wechat:victim" not in called_keys
+    assert session_manager.get_or_create.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_http_message_loopback_with_cli_key_accepted() -> None:
+    # 对照组：带合法 cli: 前缀 session_key → 不误伤，正常受理。
+    gw, session_manager = _allowlist_gateway()
+    resp = await gw._handle_message(_msg_request(
+        {"platform": "cli", "user_id": "local", "text": "hi", "session_key": "cli:local"},
+        peer=("127.0.0.1", 5555),
+    ))
+    assert resp.status == 200
+    session_manager.get_or_create.assert_awaited_once_with("cli:local")
+
+
+@pytest.mark.asyncio
+async def test_http_message_rejects_reserved_epoch_injection() -> None:
+    gw, session_manager = _allowlist_gateway()
+    resp = await gw._handle_message(_msg_request(
+        {
+            "platform": "cli",
+            "user_id": "local",
+            "text": "hi",
+            "session_key": "cli:victim::epoch:3",
+        },
+        peer=("127.0.0.1", 5555),
+    ))
+    assert resp.status == 403
+    assert session_manager.get_or_create.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_http_message_open_mode_fallback_unchanged(tmp_path) -> None:
+    # open 模式 normally_ok=True → allow_fallback=True，
+    # 无 session_key 仍走 gateway:{platform}:{chat_id}，行为不变（不误伤）。
+    from test_gateway_server import _make_gateway
+    gw, _ = _make_gateway()
+    resp = await gw._handle_message(_msg_request(
+        {"platform": "api", "user_id": "u1", "text": "hi"},
+    ))
+    assert resp.status == 200
+    gw.session_manager.get_or_create.assert_awaited_once_with("gateway:api:u1")

@@ -1,0 +1,182 @@
+﻿import pytest
+
+from codex_pro.cli.tui.app import CodexTUI
+from codex_pro.cli.tui.blocks import humanize_tool, pick_object, summarize_result
+from codex_pro.cli.tui.protocol import CogEvent
+from codex_pro.cli.tui.transcript import TranscriptView
+
+
+def test_humanize_known_and_unknown():
+    assert humanize_tool("read_file") == "读取"
+    assert humanize_tool("search_files") == "搜索"
+    assert humanize_tool("exec") == "执行"
+    # 未知工具名原样兜底，不硬造中文
+    assert humanize_tool("some_new_tool") == "some_new_tool"
+
+
+def test_pick_object_by_tool_type():
+    assert pick_object("read_file", {"path": "a/b/inference_stage.py"}) == "inference_stage.py"
+    assert pick_object("list_dir", {"path": "codex_pro/cli"}) == "codex_pro/cli"
+    assert pick_object("search_files", {"pattern": "tool_call"}) == '"tool_call"'
+    assert pick_object("exec", {"command": "find . -name x"}).startswith("find")
+    # 兜底：第一个字符串参数
+    assert pick_object("weird", {"n": 3, "q": "hello"}) == "hello"
+    # 无可用参数不崩
+    assert pick_object("read_file", {}) == ""
+
+
+def test_summarize_result_uses_meta_not_text():
+    # read_file: 用 result_meta 的真实行数，而非在截断文本上重数
+    assert summarize_result("read_file", {"total_lines": 300}, "只有\n三行\n预览", True) == "300 行"
+    assert summarize_result("search_files", {"count": 40}, "", True) == "找到 40 处"
+    assert summarize_result("list_dir", {"count": 12}, "", True) == "12 个"
+    assert summarize_result("exec", None, "done", True) == "完成"
+    # 失败优先
+    assert summarize_result("read_file", {"total_lines": 5}, "", False) == "失败"
+    # 无 meta 兜底截预览
+    assert summarize_result("unknown", None, "some output text", True) == "some output text"
+    # None/缺键/空文本都不崩
+    assert isinstance(summarize_result("read_file", None, "", True), str)
+    assert isinstance(summarize_result("read_file", {}, "", True), str)
+
+
+def _plain(markup: str) -> str:
+    # Blocks render Textual console markup ([$var]…[/]) for colour; strip the
+    # tags and assert on the visible text only. A plain regex is enough here and
+    # avoids Rich's parser choking on Textual's $variable tags.
+    import re
+    return re.sub(r"\[/?[^\]]*\]", "", markup)
+
+
+def test_tool_block_running_then_done_flip():
+    from codex_pro.cli.tui.blocks import ToolCallBlock
+
+    b = ToolCallBlock("tc_1", "read_file", {"path": "x/inference_stage.py"})
+    running = _plain(b.render_summary())
+    assert "●" in running and "读取" in running and "inference_stage.py" in running
+    assert running.endswith("…")           # 进行中：尾部省略号
+    assert "✓" not in running
+
+    b.mark_done("ok", {"total_lines": 300}, "preview", 320)
+    done = _plain(b.render_summary())
+    assert done.endswith("✓")
+    assert "300 行" in done
+    assert "…" not in done                  # 完成后去掉省略号
+
+
+def test_tool_block_summary_never_renders_command_secret():
+    from codex_pro.cli.tui.blocks import ToolCallBlock
+
+    secret = "sk-live-123456"
+    block = ToolCallBlock(
+        "tc-secret",
+        "exec",
+        {"command": f"curl --token {secret} https://example.test"},
+    )
+    summary = _plain(block.render_summary())
+    assert secret not in summary
+    assert "••••" in summary
+
+
+def test_tool_block_shows_duration_only_when_it_matters():
+    """耗时此前只存不显，30 秒的命令和瞬时读取长得一模一样。现在超过 1 秒才
+    显示，否则每一行都挂个 "0.1s" 反而盖住真正慢的那次调用。"""
+    from codex_pro.cli.tui.blocks import ToolCallBlock
+
+    quick = ToolCallBlock("tc_q", "read_file", {"path": "a.py"})
+    quick.mark_done("ok", {}, "preview", 120)
+    assert "s" not in _plain(quick.render_summary()).split("·")[-1]
+
+    slow = ToolCallBlock("tc_s", "exec", {"command": "pytest"})
+    slow.mark_done("ok", {}, "done", 92_000)
+    assert "1m 32s" in _plain(slow.render_summary())
+
+
+def test_tool_block_error_shows_cross():
+    from codex_pro.cli.tui.blocks import ToolCallBlock
+
+    b = ToolCallBlock("tc_2", "exec", {"command": "rm -rf /tmp/x"})
+    b.mark_done("err", None, "Error: boom", 10)
+    s = _plain(b.render_summary())
+    assert s.endswith("✗")
+    assert "失败" in s
+
+
+def test_tool_block_detail_has_params_and_result():
+    from codex_pro.cli.tui.blocks import ToolCallBlock
+
+    b = ToolCallBlock("tc_3", "read_file", {"path": "a.py", "limit": 300})
+    b.mark_done("ok", {"total_lines": 42}, "line1\nline2", 5)
+    assert b.expanded is False
+    b.toggle()
+    assert b.expanded is True
+    detail = b.render_detail()
+    assert "参数" in detail and "a.py" in detail
+    assert "结果" in detail
+
+
+def _tool_ev(tcid, status, name="read_file", **data):
+    d = {"tool_call_id": tcid, "name": name, "params": {"path": "a.py"},
+         "status": status, **data}
+    return CogEvent("tool_call", f"evt_{tcid}_{status}", "in_1", d, "")
+
+
+@pytest.mark.asyncio
+async def test_add_tool_call_flips_in_place():
+    from textual.app import App
+    from codex_pro.cli.tui.transcript import TranscriptView
+    from codex_pro.cli.tui.details import DetailPrefs
+
+    class T(App):
+        def compose(self):
+            yield TranscriptView()
+
+    app = T()
+    async with app.run_test():
+        tv = app.query_one(TranscriptView)
+        tv.details = DetailPrefs(tools="collapsed")
+        b1 = tv.add_tool_call(_tool_ev("tc_1", "running"))
+        assert b1.status == "running"
+        assert tv.tool_block_count == 1
+        # 同一 id 的完成事件：原地翻转，不新增
+        b2 = tv.add_tool_call(
+            _tool_ev("tc_1", "ok", result_meta={"total_lines": 42}, result_text="x")
+        )
+        assert b2 is b1
+        assert b1.status == "ok"
+        assert tv.tool_block_count == 1
+        # 不同 id：新增
+        tv.add_tool_call(_tool_ev("tc_2", "running"))
+        assert tv.tool_block_count == 2
+        tv.clear()
+        assert tv.tool_block_count == 0
+
+
+@pytest.mark.asyncio
+async def test_on_cognitive_routes_tool_call(monkeypatch):
+    # A tool_call CogEvent must be routed to add_tool_call (in-place flip),
+    # not the generic add_cognitive stream.
+    calls = {"tool": 0, "generic": 0}
+    orig_tool = TranscriptView.add_tool_call
+    orig_generic = TranscriptView.add_cognitive
+
+    def spy_tool(self, ev):
+        calls["tool"] += 1
+        return orig_tool(self, ev)
+
+    def spy_generic(self, ev):
+        calls["generic"] += 1
+        return orig_generic(self, ev)
+
+    monkeypatch.setattr(TranscriptView, "add_tool_call", spy_tool)
+    monkeypatch.setattr(TranscriptView, "add_cognitive", spy_generic)
+
+    app = CodexTUI()
+    async with app.run_test():
+        app.on_cognitive(_tool_ev("tc_1", "running"))
+        assert calls["tool"] == 1
+        assert calls["generic"] == 0
+        # A non-tool cognitive event still flows through add_cognitive.
+        app.on_cognitive(CogEvent("thinking", "e2", "in_1", {}, "想一下"))
+        assert calls["tool"] == 1
+        assert calls["generic"] == 1

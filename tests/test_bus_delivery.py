@@ -1,0 +1,116 @@
+import pytest
+
+from codex_pro.bus.delivery import DeliveryStage, DeliveryResult
+from codex_pro.bus.events import OutboundEvent
+from codex_pro.bus.queue import MessageBus
+from codex_pro.channels.base import SendResult
+
+
+def _evt(channel="cli"):
+    return OutboundEvent(channel=channel, chat_id="c1", content=[])
+
+
+def test_ok_true_for_delivered_and_accepted():
+    assert DeliveryResult(DeliveryStage.DELIVERED, "cli").ok is True
+    assert DeliveryResult(DeliveryStage.ACCEPTED, "cli").ok is True
+
+
+def test_ok_false_for_failed_and_no_handler():
+    assert DeliveryResult(DeliveryStage.FAILED, "cli", error="x").ok is False
+    assert DeliveryResult(DeliveryStage.NO_HANDLER, "cli").ok is False
+
+
+def test_from_send_result_maps_success_and_failure():
+    ok = DeliveryResult.from_send_result(SendResult(success=True, message_id="m1"), "cli")
+    assert ok.stage is DeliveryStage.DELIVERED
+    bad = DeliveryResult.from_send_result(SendResult(success=False, error="boom"), "cli")
+    assert bad.stage is DeliveryStage.FAILED
+    assert bad.error == "boom"
+
+
+def test_from_send_result_keeps_skipped_distinct_from_delivered():
+    skipped = DeliveryResult.from_send_result(
+        SendResult(success=True, skipped=True), "weixin"
+    )
+    assert skipped.stage is DeliveryStage.ACCEPTED
+    assert skipped.detail == {"skipped": True}
+
+
+def test_from_send_result_preserves_deferred_receipt_detail():
+    deferred = DeliveryResult.from_send_result(
+        SendResult(success=True, message_id="buffer-1", deferred=True),
+        "gateway:cli",
+    )
+    assert deferred.stage is DeliveryStage.DELIVERED
+    assert deferred.detail == {"message_id": "buffer-1", "deferred": True}
+
+
+@pytest.mark.asyncio
+async def test_publish_no_handler_returns_no_handler():
+    bus = MessageBus()
+    res = await bus.publish_outbound(_evt())
+    assert res.stage is DeliveryStage.NO_HANDLER
+
+
+@pytest.mark.asyncio
+async def test_publish_handler_returning_none_is_accepted():
+    bus = MessageBus()
+    async def h(e): return None
+    bus.subscribe_outbound("cli", h)
+    res = await bus.publish_outbound(_evt())
+    assert res.stage is DeliveryStage.ACCEPTED
+
+
+@pytest.mark.asyncio
+async def test_publish_send_result_success_is_delivered():
+    bus = MessageBus()
+    async def h(e): return SendResult(success=True, message_id="m")
+    bus.subscribe_outbound("cli", h)
+    res = await bus.publish_outbound(_evt())
+    assert res.stage is DeliveryStage.DELIVERED
+
+
+@pytest.mark.asyncio
+async def test_publish_send_result_deferred_reaches_caller_detail():
+    bus = MessageBus()
+
+    async def h(e):
+        return SendResult(success=True, deferred=True)
+
+    bus.subscribe_outbound("gateway:cli", h)
+    res = await bus.publish_outbound(_evt("gateway:cli"))
+    assert res.stage is DeliveryStage.DELIVERED
+    assert res.detail["deferred"] is True
+
+
+@pytest.mark.asyncio
+async def test_publish_send_result_failure_is_failed():
+    bus = MessageBus()
+    async def h(e): return SendResult(success=False, error="down")
+    bus.subscribe_outbound("cli", h)
+    res = await bus.publish_outbound(_evt())
+    assert res.stage is DeliveryStage.FAILED
+    assert res.error == "down"
+
+
+@pytest.mark.asyncio
+async def test_publish_handler_exception_is_failed():
+    bus = MessageBus()
+    async def h(e): raise RuntimeError("boom")
+    bus.subscribe_outbound("cli", h)
+    res = await bus.publish_outbound(_evt())
+    assert res.stage is DeliveryStage.FAILED
+
+
+@pytest.mark.asyncio
+async def test_publish_handler_cancelled_error_is_failed():
+    # asyncio.gather(return_exceptions=True) captures CancelledError, which
+    # derives from BaseException (not Exception) in Python 3.8+. A cancelled
+    # handler is a failed delivery and must never be classified as ACCEPTED.
+    import asyncio
+
+    bus = MessageBus()
+    async def h(e): raise asyncio.CancelledError()
+    bus.subscribe_outbound("cli", h)
+    res = await bus.publish_outbound(_evt())
+    assert res.stage is DeliveryStage.FAILED

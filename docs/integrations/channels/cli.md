@@ -1,0 +1,68 @@
+# CLI Channel
+
+The CLI channel provides terminal-based interaction with Codex Pro in foreground mode.
+
+---
+
+## 概述
+
+CLI 通道是最简单的交互方式，在前台模式 (`codex-pro run`) 下自动启用，无需额外配置。
+
+## 配置
+
+```yaml
+channels:
+  cli:
+    enabled: true
+```
+
+CLI 通道在前台模式下默认启用，通常无需手动配置。
+
+## 能力
+
+| 能力 | 支持 |
+|------|------|
+| 编辑消息 | ❌ |
+| 表情回应 | ❌ |
+| 文件发送 | ❌ |
+| 实时响应 | ✅ |
+| 群聊 | ❌ |
+
+## 使用方式
+
+```bash
+# 前台模式直接使用
+codex-pro run
+
+# 或连接到运行中的 Gateway
+codex-pro cli
+```
+
+## 终端交互命令
+
+在 CLI 交互中可使用本地命令：
+
+- `/help` — 显示帮助
+- `/clear` — 清屏
+- `/copy` — 复制最后回复
+- `/details` — 显示详情
+- `/save` — 保存对话
+- `/theme` — 切换主题
+- `/reconnect` — 断线后重连
+- `/status` — 查询服务端回合状态
+- `/quit` — 退出
+
+服务端命令（连接 Gateway 时）：
+
+- `/approve` — 批准工具执行
+- `/deny` — 拒绝工具执行
+- `/approvals` — 查看待批准列表
+- `/clarify` — 回复澄清请求
+
+## 与 Gateway CLI Client 的区别
+
+`codex-pro cli` 默认使用原生 scrollback 界面；`codex-pro cli --tui`
+使用共享同一协议和命令集的全屏 Textual 界面。
+
+- `codex-pro run`：前台模式，CLI 通道内建于进程中
+- `codex-pro cli`：默认原生 scrollback 的瘦客户端，通过 WebSocket 连接 Gateway

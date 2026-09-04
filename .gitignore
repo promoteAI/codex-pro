@@ -1,0 +1,65 @@
+.worktrees/
+.assets
+.docs
+.env
+*.pyc
+dist/
+build/
+*.egg-info/
+*.egg
+*.pycs
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzz
+.venv/
+.venv-docs/
+venv/
+__pycache__/
+poetry.lock
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+bridge/node_modules/
+botpy.log
+.DS_Store
+*lock*
+.cursor/
+
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Claude Code local session/settings
+.claude/
+CLAUDE.md
+
+# Internal development process docs (specs/plans/designs), not for public repo
+docs/superpowers/
+.superpowers/
+docs/*-design-*.md
+docs/*-plan-*.md
+docs/*roadmap*.md
+docs/*-backlog.md
+
+# Documentation build output
+site/
+
+# Auto-generated reference docs (rebuilt by CI)
+docs/reference/configuration.md
+docs/reference/configuration.en.md
+docs/assets/generated/
+
+# Local runtime state and generated workspace data
+/runtime/cron/jobs.json
+/runtime/workspace/
+
+# pnpm content-addressable store (local package cache, never versioned)
+/.pnpm-store/

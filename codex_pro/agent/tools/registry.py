@@ -1,0 +1,353 @@
+"""Tool registry — dynamic registration, permission checks, execution with retry/timeout/logging."""
+
+from __future__ import annotations
+
+import asyncio
+import collections
+import json
+import re
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from collections.abc import Awaitable, Callable
+from typing import Any
+
+from loguru import logger
+
+from codex_pro.tools import Tool, ToolExecutionContext, ToolResult
+
+_MAX_REPLAY_CACHE = 500
+_MAX_EXECUTION_LOG = 1000
+_MAX_AUDIT_FILE_BYTES = 5_000_000
+
+_SENSITIVE_KEYS = frozenset({"key", "token", "secret", "password", "api_key", "credential", "auth"})
+# Matches a CLI flag that names a secret, e.g. "--token", "-p", "--api-key".
+# Used to mask the *following* element of an argv list.
+_SENSITIVE_FLAG_RE = re.compile(
+    r"^--?(?:[\w-]*(?:key|token|secret|password|passwd|pwd|credential|auth)[\w-]*)$",
+    re.IGNORECASE,
+)
+_TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _mask_sensitive(params: dict[str, Any]) -> dict[str, Any]:
+    masked: dict[str, Any] = {}
+    for k, v in params.items():
+        if any(s in k.lower() for s in _SENSITIVE_KEYS):
+            masked[k] = "***"
+        elif isinstance(v, dict):
+            masked[k] = _mask_sensitive(v)
+        elif isinstance(v, (list, tuple)):
+            # Lists were passed through verbatim, so a secret inside one landed
+            # in the audit log in cleartext — ["--token", "s3cr3t"] being the
+            # case the skill docs actively steered users toward.
+            masked[k] = _mask_sequence(v)
+        else:
+            masked[k] = v
+    return masked
+
+
+def _mask_sequence(seq: Any) -> list[Any]:
+    """Mask secrets inside a list, including argv-style flag/value pairs."""
+    out: list[Any] = []
+    mask_next = False
+    for item in seq:
+        if isinstance(item, dict):
+            out.append(_mask_sensitive(item))
+            mask_next = False
+            continue
+        if isinstance(item, (list, tuple)):
+            out.append(_mask_sequence(item))
+            mask_next = False
+            continue
+        if mask_next and isinstance(item, str):
+            out.append("***")
+            mask_next = False
+            continue
+        if isinstance(item, str):
+            # "--token=s3cr3t" carries the value in the same token.
+            if "=" in item and _SENSITIVE_FLAG_RE.match(item.split("=", 1)[0]):
+                out.append(item.split("=", 1)[0] + "=***")
+                mask_next = False
+                continue
+            mask_next = bool(_SENSITIVE_FLAG_RE.match(item))
+        else:
+            mask_next = False
+        out.append(item)
+    return out
+
+
+class ToolRegistry:
+    """Registry for agent tools with execution, replay guard, and audit logging."""
+
+    _ALIASES: dict[str, str] = {
+        "bash": "exec",
+        "shell": "exec",
+        "run_code": "execute_code",
+        "code": "execute_code",
+    }
+
+    def __init__(
+        self, audit_log_path: Path | None = None, config: Any = None, spill_policy: Any = None
+    ):  # SpillPolicy;用 Any 避免 registry 依赖 spill 包
+        self._tools: dict[str, Tool] = {}
+        self._replay_cache: collections.OrderedDict[str, dict[str, Any]] = collections.OrderedDict()
+        self._execution_log: collections.deque[dict[str, Any]] = collections.deque(maxlen=_MAX_EXECUTION_LOG)
+        self._lock = asyncio.Lock()
+        # Durable JSONL audit trail — the in-memory deque alone evaporates on
+        # restart, which defeats the point of an audit log.
+        self._audit_log_path = audit_log_path
+        # Defense-in-depth: registration-time filtering (filter_tools_by_policy)
+        # is the primary gate, but if the security profile is tightened *after*
+        # registration the registry would still hold high-risk tools. Re-checking
+        # the policy at execute time closes that window. When config is set, every
+        # tool that passed registration already satisfies this check under the
+        # same config, so this is a no-op unless the profile changed underneath.
+        self._config = config
+        # execute 是所有工具的唯一收口点,超长输出的落盘策略挂在这里才能覆盖
+        # 动态注册的 MCP 工具——逐工具打补丁覆盖不到它们。未装配时是 no-op。
+        self._spill_policy = spill_policy
+        self._skill_usage_recorder: Callable[[str, bool], Awaitable[None]] | None = None
+
+    def set_skill_usage_recorder(
+        self,
+        recorder: Callable[[str, bool], Awaitable[None]] | None,
+    ) -> None:
+        """Attach analytics without coupling the registry to CostTracker."""
+        self._skill_usage_recorder = recorder
+
+    async def _record_skill_usage(self, name: str, params: dict[str, Any], success: bool) -> None:
+        if name != "skill_run" or self._skill_usage_recorder is None:
+            return
+        skill = params.get("name") or params.get("skill")
+        if not isinstance(skill, str) or not skill.strip():
+            return
+        try:
+            await self._skill_usage_recorder(skill, success)
+        except Exception:
+            logger.debug("Skill usage recorder failed for '{}'", skill)
+
+    def set_audit_log_path(self, path: Path) -> None:
+        self._audit_log_path = path
+
+    def _append_audit(self, entry: dict[str, Any]) -> None:
+        if self._audit_log_path is None:
+            return
+        try:
+            self._audit_log_path.parent.mkdir(parents=True, exist_ok=True)
+            if self._audit_log_path.exists() and self._audit_log_path.stat().st_size > _MAX_AUDIT_FILE_BYTES:
+                rotated = self._audit_log_path.with_name(
+                    f"{self._audit_log_path.stem}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.jsonl"
+                )
+                self._audit_log_path.replace(rotated)
+            with self._audit_log_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
+        except Exception as e:
+            logger.debug("Failed to append tool audit entry: {}", e)
+
+    def _resolve(self, name: str) -> str:
+        return self._ALIASES.get(name, name)
+
+    def register(self, tool: Tool, *, replace: bool = False) -> None:
+        """Register a tool without silently shadowing an existing capability.
+
+        Alias names are reserved even when their canonical target is not yet
+        present. Registering (for example) a tool literally named ``bash``
+        would advertise one schema while execution resolves to ``exec`` -- an
+        ambiguity that is both unsafe and almost impossible to diagnose.
+
+        Exact-object re-registration is an idempotent no-op. This preserves the
+        legitimate startup/lifecycle pattern where the same constructed tool is
+        offered twice. Replacing a different implementation is explicit so a
+        trusted lifecycle owner can deliberately hot-swap one; plugin-facing
+        registration never opts in, and therefore cannot shadow built-ins.
+        """
+        raw_name = getattr(tool, "name", "")
+        if not isinstance(raw_name, str) or not _TOOL_NAME_RE.fullmatch(raw_name):
+            raise ValueError("Tool name must be a 1-64 character string containing only letters, digits, '_' or '-'")
+        name = raw_name
+        if name in self._ALIASES:
+            target = self._ALIASES[name]
+            raise ValueError(f"Tool name '{name}' is reserved as an alias for '{target}'")
+        existing = self._tools.get(name)
+        if existing is tool:
+            return
+        if existing is not None and not replace:
+            raise ValueError(f"Tool '{name}' is already registered; explicit replace=True is required")
+        self._tools[name] = tool
+
+    def unregister(self, name: str) -> None:
+        self._tools.pop(name, None)
+
+    def get(self, name: str) -> Tool | None:
+        return self._tools.get(self._resolve(name))
+
+    def has(self, name: str) -> bool:
+        return self._resolve(name) in self._tools
+
+    def get_definitions(self, channel: str | None = None) -> list[dict[str, Any]]:
+        definitions: list[dict[str, Any]] = []
+        for tool in self._tools.values():
+            try:
+                definitions.append(tool.to_schema(channel))
+            except ValueError as e:
+                logger.error("Skipping tool '{}' due to invalid schema: {}", tool.name, e)
+        return definitions
+
+    def get_ready_definitions(self, channel: str | None = None) -> list[dict[str, Any]]:
+        """Like get_definitions() but only includes tools where is_ready() is True."""
+        definitions: list[dict[str, Any]] = []
+        for tool in self._tools.values():
+            if not tool.is_ready():
+                continue
+            try:
+                definitions.append(tool.to_schema(channel))
+            except ValueError as e:
+                logger.error("Skipping tool '{}' due to invalid schema: {}", tool.name, e)
+        return definitions
+
+    @property
+    def ready_tool_names(self) -> list[str]:
+        return [name for name, tool in self._tools.items() if tool.is_ready()]
+
+    def get_readiness_report(self) -> list[tuple[str, bool, str]]:
+        """Returns [(tool_name, ready, reason), ...] for all registered tools."""
+        return [(name, *tool.readiness_detail()) for name, tool in self._tools.items()]
+
+    @property
+    def tool_names(self) -> list[str]:
+        return list(self._tools.keys())
+
+    async def execute(
+        self,
+        name: str,
+        params: dict[str, Any],
+        ctx: ToolExecutionContext | None = None,
+        *,
+        replay_scope: str = "",
+    ) -> ToolResult:
+        resolved_name = self._resolve(name)
+        if ctx and ctx.allowed_tools and resolved_name not in ctx.allowed_tools:
+            return ToolResult(success=False, error=f"Tool '{name}' is outside the scoped tool allowlist")
+
+        tool = self._tools.get(resolved_name)
+        if not tool:
+            return ToolResult(success=False, error=f"Tool '{name}' not found. Available: {', '.join(self.tool_names)}")
+
+        # Defense-in-depth re-check: native tools have no other runtime policy
+        # gate (only mcp_* tools are re-checked in the loop). If the security
+        # profile was tightened after registration, refuse the call here even
+        # though the tool is still in the registry.
+        if self._config is not None:
+            from codex_pro.security.tool_policy import is_tool_allowed
+
+            if not is_tool_allowed(self._config, tool):
+                logger.warning("Tool '{}' blocked at execute time by security policy", resolved_name)
+                return ToolResult(
+                    success=False, error=f"Tool '{name}' is not allowed under the current security profile"
+                )
+
+        errors = tool.validate_params(params)
+        if errors:
+            return ToolResult(success=False, error=f"Invalid parameters: {'; '.join(errors)}", error_kind="validation")
+
+        exec_ctx = ctx or ToolExecutionContext(
+            execution_id=uuid.uuid4().hex[:12],
+            trace_id=uuid.uuid4().hex[:12],
+        )
+
+        if tool.execution_mode(params) == "side_effect" and exec_ctx.idempotency_key:
+            effective_key = f"{replay_scope}:{exec_ctx.idempotency_key}" if replay_scope else exec_ctx.idempotency_key
+            async with self._lock:
+                cached = self._replay_cache.get(effective_key)
+            if cached and not exec_ctx.is_replay:
+                # Honour explicit replay requests; otherwise refuse to repeat
+                # a side-effecting call with the same idempotency key.
+                logger.warning("Replay prevented for tool={} key={}", name, effective_key[:16])
+                return ToolResult(success=False, error=f"Replay prevented for '{name}'")
+
+        log_entry = {
+            "tool": name,
+            "params": _mask_sensitive(params),
+            "execution_id": exec_ctx.execution_id,
+            "trace_id": exec_ctx.trace_id,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        attempt = 0
+        max_attempts = tool.max_retries + 1
+        last_result = ToolResult(success=False, error="no attempt made")
+
+        while attempt < max_attempts:
+            try:
+                result = await asyncio.wait_for(
+                    tool.execute(params, exec_ctx),
+                    timeout=tool.timeout_seconds,
+                )
+                log_entry["completed_at"] = datetime.now(timezone.utc).isoformat()
+                log_entry["success"] = result.success
+                log_entry["attempt"] = attempt + 1
+                self._execution_log.append(log_entry)
+                self._append_audit(log_entry)
+                await self._record_skill_usage(resolved_name, params, result.success)
+
+                if result.success and tool.execution_mode(params) == "side_effect" and exec_ctx.idempotency_key:
+                    effective_key = (
+                        f"{replay_scope}:{exec_ctx.idempotency_key}" if replay_scope else exec_ctx.idempotency_key
+                    )
+                    async with self._lock:
+                        self._replay_cache[effective_key] = {
+                            "tool": name,
+                            "execution_id": exec_ctx.execution_id,
+                            "at": datetime.now(timezone.utc).isoformat(),
+                        }
+                        while len(self._replay_cache) > _MAX_REPLAY_CACHE:
+                            self._replay_cache.popitem(last=False)
+                return self._apply_spill(resolved_name, exec_ctx, result)
+            except asyncio.TimeoutError:
+                last_result = ToolResult(
+                    success=False, error=f"Tool '{name}' timed out after {tool.timeout_seconds}s", error_kind="timeout"
+                )
+                logger.warning("Tool {} timed out (attempt {}/{})", name, attempt + 1, max_attempts)
+            except Exception as e:
+                last_result = ToolResult(success=False, error=f"Tool '{name}' error: {e}", error_kind="internal")
+                logger.error("Tool {} failed (attempt {}/{}): {}", name, attempt + 1, max_attempts, e)
+            attempt += 1
+
+        log_entry["completed_at"] = datetime.now(timezone.utc).isoformat()
+        log_entry["success"] = False
+        log_entry["error"] = last_result.error
+        log_entry["attempt"] = attempt
+        self._execution_log.append(log_entry)
+        self._append_audit(log_entry)
+        await self._record_skill_usage(resolved_name, params, False)
+        return self._apply_spill(resolved_name, exec_ctx, last_result)
+
+    def apply_spill(self, tool_name: str, ctx: ToolExecutionContext, result: ToolResult) -> ToolResult:
+        """把超长的模型可见文本落盘换成预览。spill 未装配时是 no-op。
+
+        公开是因为 registry 不是最终写回边界:post_tool_call 插件可以在
+        execute 返回之后替换 result,插件产出的超长文本若不再过一遍这里,就会
+        被下游按 16000 字符哑截断,尾部丢失且没有取回路径——恰是 spill 要消除
+        的那个失效模式。调用点见 inference_stage 的 dispatch_modify 之后。
+
+        二次调用天然幂等:第一次替换后的预览长度必 <= cap,再进来直接原样返回,
+        不会落第二个文件。
+        """
+        if self._spill_policy is None:
+            return result
+        try:
+            return self._spill_policy.apply(tool_name, ctx.session_key, result)
+        except Exception as e:
+            # spill 是可选能力,它自身的缺陷不该让工具调用失败
+            logger.warning("spill 策略异常,保留原结果 tool={} err={}", tool_name, e)
+            return result
+
+    # 旧名:内部调用点仍在用,且外部可能已引用。
+    _apply_spill = apply_spill
+
+    def get_execution_log(self, limit: int = 100) -> list[dict[str, Any]]:
+        return list(self._execution_log)[-limit:]
+
+    def clear_log(self) -> None:
+        self._execution_log.clear()

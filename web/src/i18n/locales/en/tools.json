@@ -1,0 +1,20 @@
+{
+  "layout": "Layout",
+  "full": "Full width",
+  "bottom": "Bottom panel",
+  "side": "Side panel",
+  "review": "Review",
+  "terminal": "Terminal",
+  "browser": "Browser",
+  "files": "Files",
+  "sidechat": "Side chat",
+  "hubTitle": "Tools",
+  "emptyReview": "No changes to review (mock)",
+  "emptyBrowser": "Browser preview is not connected",
+  "emptyFiles": "Select a file to preview",
+  "emptySidechat": "Start a side conversation",
+  "openTerminal": "Open terminal at the bottom",
+  "searchPlaceholder": "Search chats, files, commands…",
+  "searchEmpty": "Type to search",
+  "close": "Close"
+}

@@ -1,0 +1,58 @@
+{
+  "loading": "Loading…",
+  "newPlaceholder": "New task…",
+  "create": "Create",
+  "autoClaimHint": "Click \"Start\" (or drag to \"Queued\") on an inbox task; the Agent will claim and run it automatically.",
+  "showArchived": "Show cancelled / suspended",
+  "emptyColumn": "No tasks",
+  "priorityTitle": "Priority",
+  "retried": "Retried {{count}}/{{max}}",
+  "action": {
+    "start": "Start (hand to Agent)", "approve": "Approve", "reject": "Send back",
+    "retry": "Retry", "cancel": "Cancel task"
+  },
+  "toast": {
+    "requeued": "Re-queued", "queued": "Queued, awaiting execution", "cancelled": "Task cancelled",
+    "approved": "Approved", "rejected": "Sent back to queue",
+    "loadFailed": "Failed to load tasks: {{error}}", "transitionFailed": "Transition failed: {{error}}",
+    "retryFailed": "Retry failed: {{error}}", "createFailed": "Create failed: {{error}}",
+    "updateFailed": "Save failed: {{error}}", "updated": "Saved",
+    "invalidTransition": "Cannot move from \"{{from}}\" straight to \"{{to}}\": {{hint}}"
+  },
+  "detail": {
+    "openAria": "View task details: {{title}}",
+    "edit": "Edit",
+    "editAria": "Edit task: {{title}}",
+    "save": "Save",
+    "titleField": "Title",
+    "priorityField": "Priority (0-9)",
+    "assigneeField": "Assignee",
+    "labelsField": "Labels (comma separated)",
+    "cancelTask": "Cancel task",
+    "cancelConfirmTitle": "Cancel this task?",
+    "cancelConfirmMessage": "\"{{title}}\" moves to \"Cancelled\". If it is running, the current turn is interrupted. A cancelled task cannot re-enter the pipeline, but the record stays in the archived columns.",
+    "description": "Description",
+    "result": "Result",
+    "error": "Error",
+    "blockedReason": "Blocked reason",
+    "reviewSummary": "Review summary",
+    "source": "Source",
+    "sessionId": "Session",
+    "retries": "Retries",
+    "createdAt": "Created",
+    "updatedAt": "Updated",
+    "id": "ID",
+    "staleWarning": "Could not load the latest details; showing the board's local copy."
+  },
+  "status": {
+    "pending": { "label": "Inbox", "hint": "Created but not yet queued" },
+    "queued": { "label": "Queued", "hint": "Waiting for the Agent to claim" },
+    "running": { "label": "Running", "hint": "Agent is processing" },
+    "blocked": { "label": "Blocked", "hint": "Missing prerequisites, cannot continue" },
+    "review": { "label": "Review", "hint": "Done, awaiting human review" },
+    "success": { "label": "Done", "hint": "Approved and finished" },
+    "failed": { "label": "Failed", "hint": "Errored, can retry" },
+    "cancelled": { "label": "Cancelled", "hint": "Cancelled by human" },
+    "suspended": { "label": "Suspended", "hint": "Temporarily shelved" }
+  }
+}

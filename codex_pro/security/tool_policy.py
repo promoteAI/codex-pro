@@ -1,0 +1,198 @@
+"""Tool exposure policy based on stable names plus coarse capabilities."""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+from loguru import logger
+
+from codex_pro.security.capabilities import tool_capabilities, tool_name as resolve_tool_name
+
+if TYPE_CHECKING:
+    from codex_pro.tools import Tool
+    from codex_pro.config.schema import Config
+
+
+MINIMAL_TOOLS = frozenset({
+    "agents_list",
+    "agents_route",
+    "artifact_append",
+    "artifact_create",
+    "artifact_deliver",
+    "artifact_finalize",
+    "artifact_validate",
+    "clarify",
+    "knowledge_search",
+    "list_dir",
+    "message",
+    "notify",
+    "read_file",
+    # spill 对所有 profile 生效,取回工具就必须同样对所有 profile 可见。放在
+    # MINIMAL 里而不是 CODING:minimal/messaging 恰是 exec 关掉的部署,那里
+    # 没有 shell 兜底,取回工具被策略过滤掉就等于产物彻底不可达。
+    "read_spill",
+    "search_files",
+    "session_search",
+    "skill_view",
+    "skills_list",
+    "todo",
+})
+
+MESSAGING_TOOLS = MINIMAL_TOOLS | frozenset({
+    "image_generate",
+    "memory",
+    "text_to_speech",
+    "vision_analyze",
+})
+
+CODING_TOOLS = MESSAGING_TOOLS | frozenset({
+    "edit_file",
+    "knowledge_index",
+    "patch",
+    "task",
+    "workflow",
+    "write_file",
+})
+
+HIGH_RISK_TOOLS = frozenset({
+    "cronjob",
+    "exec",
+    "execute_code",
+    "process",
+    "skill_install",
+    "skill_manage",
+    # Runs a skill-authored Python file in a subprocess. Named here in addition
+    # to carrying process.exec/code.exec capabilities: the capability sets
+    # already deny it, but a name in the list is what a reader greps for when
+    # asking "is exec reachable in this profile?".
+    "skill_run",
+})
+
+PUBLIC_GATEWAY_DENY = HIGH_RISK_TOOLS | frozenset({
+    "edit_file",
+    "knowledge_index",
+    "patch",
+    "workflow",
+    "write_file",
+})
+PUBLIC_GATEWAY_DENY_CAPABILITIES = frozenset({
+    "code.exec",
+    "fs.write",
+    # An MCP tool's behaviour is defined by a third party, not by this codebase:
+    # the name, the description and the schema all come from the server, and the
+    # only thing bounding what it does is that server's own honesty. On a public
+    # gateway — untrusted callers, nobody watching — that is not a surface to
+    # open by default. Operators who do want it name the tool (or "mcp.call") in
+    # tools.allow, which is an explicit, greppable decision.
+    "mcp.call",
+    "process.exec",
+    "process.manage",
+    "scheduler.write",
+    "skill.install",
+    "skill.write",
+    "workflow.write",
+})
+
+DAEMON_DENY_BY_DEFAULT = frozenset({
+    "exec",
+    "execute_code",
+    "process",
+    "skill_install",
+    "skill_run",
+})
+DAEMON_DENY_CAPABILITIES = frozenset({
+    "code.exec",
+    "process.exec",
+    "process.manage",
+    "skill.install",
+    # Same reasoning as the public-gateway list: a daemon runs unattended, so
+    # nobody is present to notice a third-party tool doing something unexpected.
+    "mcp.call",
+})
+
+PROFILE_TOOLS = {
+    "minimal": MINIMAL_TOOLS,
+    "messaging": MESSAGING_TOOLS,
+    "coding": CODING_TOOLS,
+    "full": frozenset({"*"}),
+}
+
+
+def _profile_allows(profile: str, tool_name: str) -> bool:
+    allowed = PROFILE_TOOLS.get(profile, CODING_TOOLS)
+    return "*" in allowed or tool_name in allowed
+
+
+def _explicit_allow(config: "Config") -> set[str]:
+    tools_cfg = config.tools
+    return set(tools_cfg.allow or []) | set(tools_cfg.also_allow or [])
+
+
+def tool_policy_decision(config: "Config", tool: object) -> tuple[bool, str]:
+    """Return the effective decision and a stable, operator-facing reason."""
+    tools_cfg = config.tools
+    explicit = _explicit_allow(config)
+    deny = set(tools_cfg.deny or [])
+    name = resolve_tool_name(tool)
+    capabilities = tool_capabilities(tool)
+    profile = tools_cfg.profile
+
+    if name in deny:
+        return False, "explicitly denied by tools.deny"
+
+    if tools_cfg.allow:
+        base_allowed = name in tools_cfg.allow
+    else:
+        base_allowed = _profile_allows(profile, name) or name in tools_cfg.also_allow
+
+    if not base_allowed:
+        if tools_cfg.allow:
+            return False, "not present in the exclusive tools.allow list"
+        return False, f"not included by tools.profile={profile}"
+
+    security_profile = config.security.profile
+    if (
+        security_profile == "public_gateway"
+        and (name in PUBLIC_GATEWAY_DENY or capabilities.intersection(PUBLIC_GATEWAY_DENY_CAPABILITIES))
+        and name not in explicit
+    ):
+        return False, "blocked by security.profile=public_gateway"
+    if (
+        security_profile == "daemon"
+        and (name in DAEMON_DENY_BY_DEFAULT or capabilities.intersection(DAEMON_DENY_CAPABILITIES))
+        and name not in explicit
+    ):
+        return False, "blocked by security.profile=daemon"
+
+    if config.execution.network_policy == "deny" and (
+        name in {"web_fetch", "web_search"} or "network.outbound" in capabilities
+    ):
+        return False, "blocked by execution.network_policy=deny"
+
+    if name in explicit:
+        return True, "explicitly allowed by tools.allow/tools.also_allow"
+    return True, f"allowed by tools.profile={profile} and security.profile={security_profile}"
+
+
+def is_tool_allowed(config: "Config", tool: object) -> bool:
+    """Return whether a tool should be exposed to the model."""
+    return tool_policy_decision(config, tool)[0]
+
+
+def filter_tools_by_policy(config: "Config", tools: Iterable["Tool"]) -> list["Tool"]:
+    allowed: list[Tool] = []
+    skipped: list[tuple[str, str]] = []
+    for tool in tools:
+        allowed_by_policy, reason = tool_policy_decision(config, tool)
+        if allowed_by_policy:
+            allowed.append(tool)
+        else:
+            skipped.append((tool.name, reason))
+    if skipped:
+        logger.info(
+            "Tool policy skipped {} tools: {}",
+            len(skipped),
+            "; ".join(f"{name} ({reason})" for name, reason in sorted(skipped)),
+        )
+    return allowed

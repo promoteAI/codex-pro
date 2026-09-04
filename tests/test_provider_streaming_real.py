@@ -1,0 +1,561 @@
+import pytest
+from codex_pro.models.provider import LLMProvider, StreamingUnsupported, LLMResponse
+
+
+class _NoStreamProvider(LLMProvider):
+    def __init__(self):
+        super().__init__(api_key="k", api_base="b")
+        self.chat_calls = 0
+
+    async def chat(self, messages, tools=None, model=None, tool_choice=None, **kwargs):
+        self.chat_calls += 1
+        return LLMResponse(content="full answer", finish_reason="stop")
+
+    def get_default_model(self):
+        return "stub"
+
+
+@pytest.mark.asyncio
+async def test_base_chat_stream_raises_unsupported():
+    p = _NoStreamProvider()
+    with pytest.raises(StreamingUnsupported):
+        await p.chat_stream(messages=[{"role": "user", "content": "hi"}])
+
+
+@pytest.mark.asyncio
+async def test_chat_stream_with_retry_falls_back_to_chat():
+    p = _NoStreamProvider()
+    deltas = []
+    resp = await p.chat_stream_with_retry(
+        messages=[{"role": "user", "content": "hi"}],
+        on_delta=lambda d: deltas.append(d),
+    )
+    assert resp.content == "full answer"
+    assert p.chat_calls >= 1
+
+
+@pytest.mark.asyncio
+async def test_anthropic_chat_stream_emits_deltas_before_completion(monkeypatch):
+    from codex_pro.models.providers.anthropic_provider import AnthropicProvider
+    # 用一个产出两段 text delta 的假 stream，断言 on_delta 在拿到 final 前被调用
+    deltas = []
+    final_calls = {"count": 0}
+    final_called_at_first_delta = {"value": None}
+
+    class _Final:
+        content = [type("B", (), {"type": "text", "text": "hello world"})()]
+        stop_reason = "end_turn"
+        usage = type("U", (), {"input_tokens": 1, "output_tokens": 2})()
+        model = "claude-x"
+
+    p = AnthropicProvider.__new__(AnthropicProvider)
+    p._default_model = "claude-x"
+    p._enable_cache = False
+    p._thinking_effort = ""
+    from codex_pro.models.provider import GenerationParams
+    p.generation = GenerationParams()
+
+    class _Stream:
+        async def __aenter__(self_inner): return self_inner
+        async def __aexit__(self_inner, *a): return False
+        def __aiter__(self_inner): return _aiter_events()
+        async def get_final_message(self_inner):
+            final_calls["count"] += 1
+            return _Final()
+
+    async def _aiter_events():
+        for t in ("hello ", "world"):
+            yield type("E", (), {"type": "content_block_delta",
+                                 "delta": type("D", (), {"type": "text_delta", "text": t})()})()
+
+    p._client = type("C", (), {"messages": type("M", (), {"stream": staticmethod(lambda **k: _Stream())})()})()
+
+    def _on_delta(d):
+        if final_called_at_first_delta["value"] is None:
+            final_called_at_first_delta["value"] = final_calls["count"] > 0
+        deltas.append(d)
+
+    resp = await p.chat_stream(messages=[{"role": "user", "content": "hi"}],
+                               on_delta=_on_delta)
+    # 时序断言：真流式下首个 delta 触发时 final 尚未取到（边收边吐，而非攒完再吐）
+    assert final_called_at_first_delta["value"] is False, \
+        "delta 应严格早于 get_final_message（真流式），当前在 delta 之前已取 final（伪流式）"
+    assert "".join(deltas) == "hello world"
+    assert resp.content == "hello world"
+
+
+@pytest.mark.asyncio
+async def test_gemini_chat_stream_emits_deltas():
+    from codex_pro.models.providers.gemini_provider import GeminiProvider
+    deltas = []
+    parse_calls = {"count": 0}
+    parse_called_at_first_delta = {"value": None}
+
+    class _Chunk:
+        def __init__(self, t): self.text = t
+        candidates = []
+
+    chunks = [_Chunk("foo"), _Chunk("bar")]
+
+    class _FakeModel:
+        def generate_content(self, **kw):
+            assert kw.get("stream") is True
+            return iter(chunks)
+
+    p = GeminiProvider.__new__(GeminiProvider)
+    p._default_model = "gemini-x"
+    from codex_pro.models.provider import GenerationParams
+    p.generation = GenerationParams()
+    p._client = type("G", (), {"GenerativeModel": staticmethod(lambda **k: _FakeModel())})()
+
+    def _parse(resp, model_name):
+        parse_calls["count"] += 1
+        return __import__("codex_pro.models.provider", fromlist=["LLMResponse"]).LLMResponse(content="foobar", finish_reason="stop")
+    p._parse_response = _parse
+
+    def _on_delta(d):
+        if parse_called_at_first_delta["value"] is None:
+            parse_called_at_first_delta["value"] = parse_calls["count"] > 0
+        deltas.append(d)
+
+    await p.chat_stream(messages=[{"role": "user", "content": "hi"}],
+                        on_delta=_on_delta)
+    # 时序断言:真流式下首个 delta 触发时 _parse_response 尚未调用(边收边吐,而非攒完再吐)
+    assert parse_called_at_first_delta["value"] is False, \
+        "delta 应严格早于 _parse_response(真流式),当前在 delta 之前已收尾(伪流式)"
+    assert "".join(deltas) == "foobar"
+
+
+@pytest.mark.asyncio
+async def test_gemini_aggregate_feeds_real_parse_response():
+    """生产路径校验:真实 _GeminiAggregate 喂给真实 _parse_response,
+    能正确还原跨 chunk 累积的文本、function_call 与 usage。"""
+    from codex_pro.models.providers.gemini_provider import GeminiProvider, _GeminiAggregate
+
+    class _Part:
+        def __init__(self, text="", function_call=None):
+            self.text = text
+            self.function_call = function_call
+
+    class _Content:
+        def __init__(self, parts): self.parts = parts
+
+    class _Candidate:
+        def __init__(self, parts): self.content = _Content(parts)
+
+    class _FC:
+        def __init__(self, name, args):
+            self.name = name
+            self.args = args
+
+    class _Usage:
+        prompt_token_count = 7
+        candidates_token_count = 11
+
+    class _Chunk:
+        def __init__(self, parts, usage=None):
+            self.candidates = [_Candidate(parts)]
+            if usage is not None:
+                self.usage_metadata = usage
+
+    # 文本分两 chunk 到达,function_call 在第三 chunk,usage 仅末块携带
+    chunks = [
+        _Chunk([_Part(text="Hello ")]),
+        _Chunk([_Part(text="world")]),
+        _Chunk([_Part(function_call=_FC("get_weather", {"city": "SF"}))], usage=_Usage()),
+    ]
+
+    agg = _GeminiAggregate(chunks)
+    p = GeminiProvider.__new__(GeminiProvider)
+    resp = p._parse_response(agg, "gemini-x")
+
+    assert resp.content == "Hello world"
+    assert resp.finish_reason == "tool_calls"
+    assert len(resp.tool_calls) == 1
+    assert resp.tool_calls[0].name == "get_weather"
+    assert resp.tool_calls[0].arguments == {"city": "SF"}
+    assert resp.usage["prompt_tokens"] == 7
+    assert resp.usage["completion_tokens"] == 11
+
+
+@pytest.mark.asyncio
+async def test_bedrock_claude_chat_stream_emits_deltas_before_completion():
+    from codex_pro.models.providers.bedrock_provider import BedrockProvider
+    deltas = []
+    final_calls = {"count": 0}
+    final_called_at_first_delta = {"value": None}
+
+    class _Final:
+        content = [type("B", (), {"type": "text", "text": "abc"})()]
+        stop_reason = "end_turn"
+        usage = type("U", (), {"input_tokens": 1, "output_tokens": 1})()
+        model = "anthropic.claude-x"
+
+    class _Stream:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        def __aiter__(self):
+            async def gen():
+                for t in ("ab", "c"):
+                    yield type("E", (), {"type": "content_block_delta",
+                                         "delta": type("D", (), {"type": "text_delta", "text": t})()})()
+            return gen()
+        async def get_final_message(self):
+            final_calls["count"] += 1
+            return _Final()
+
+    p = BedrockProvider.__new__(BedrockProvider)
+    p._default_model = "anthropic.claude-x"
+    p._enable_cache = False
+    from codex_pro.models.provider import GenerationParams
+    p.generation = GenerationParams()
+    p._build_anthropic_bedrock = lambda: type(
+        "C", (), {"messages": type("M", (), {"stream": staticmethod(lambda **k: _Stream())})()})()
+
+    def _on_delta(d):
+        if final_called_at_first_delta["value"] is None:
+            final_called_at_first_delta["value"] = final_calls["count"] > 0
+        deltas.append(d)
+
+    resp = await p.chat_stream(messages=[{"role": "user", "content": "hi"}],
+                               on_delta=_on_delta)
+    assert final_called_at_first_delta["value"] is False, \
+        "delta 应严格早于 get_final_message（真流式），当前在 delta 之前已取 final（伪流式）"
+    assert "".join(deltas) == "abc"
+    assert resp.content == "abc"
+
+
+@pytest.mark.asyncio
+async def test_bedrock_converse_chat_stream_emits_deltas_during_iteration():
+    from codex_pro.models.providers.bedrock_provider import BedrockProvider
+    deltas = []
+    events_yielded = {"count": 0}
+    yielded_at_first_delta = {"value": None}
+
+    raw_events = [
+        {"contentBlockDelta": {"delta": {"text": "Hel"}}},
+        {"contentBlockDelta": {"delta": {"text": "lo"}}},
+        {"messageStop": {"stopReason": "end_turn"}},
+        {"metadata": {"usage": {"inputTokens": 5, "outputTokens": 9}}},
+    ]
+
+    def _event_gen():
+        for ev in raw_events:
+            events_yielded["count"] += 1
+            yield ev
+
+    class _FakeBoto:
+        def converse_stream(self, **kw):
+            return {"stream": _event_gen()}
+
+    p = BedrockProvider.__new__(BedrockProvider)
+    p._default_model = "amazon.titan-x"
+    from codex_pro.models.provider import GenerationParams
+    p.generation = GenerationParams()
+    p._build_boto3_client = lambda: _FakeBoto()
+
+    def _on_delta(d):
+        if yielded_at_first_delta["value"] is None:
+            yielded_at_first_delta["value"] = events_yielded["count"]
+        deltas.append(d)
+
+    resp = await p.chat_stream(messages=[{"role": "user", "content": "hi"}],
+                               on_delta=_on_delta)
+    assert yielded_at_first_delta["value"] == 1, \
+        "首个 delta 应在仅消费首个 event 后即触发（边收边吐），而非全部 event 消费完再回放"
+    assert "".join(deltas) == "Hello"
+    assert resp.content == "Hello"
+    # usage/stopReason 必须从 metadata/messageStop 事件解析出来，否则成本统计漏记
+    assert resp.usage["prompt_tokens"] == 5
+    assert resp.usage["completion_tokens"] == 9
+    assert resp.finish_reason == "stop"
+
+
+@pytest.mark.asyncio
+async def test_bedrock_converse_stream_reports_max_tokens_truncation():
+    # messageStop=max_tokens 必须映射为 finish_reason="length"，不能误报成 stop。
+    from codex_pro.models.providers.bedrock_provider import BedrockProvider
+
+    raw_events = [
+        {"contentBlockDelta": {"delta": {"text": "partial"}}},
+        {"messageStop": {"stopReason": "max_tokens"}},
+        {"metadata": {"usage": {"inputTokens": 3, "outputTokens": 4096}}},
+    ]
+
+    class _FakeBoto:
+        def converse_stream(self, **kw):
+            return {"stream": iter(raw_events)}
+
+    p = BedrockProvider.__new__(BedrockProvider)
+    p._default_model = "amazon.titan-x"
+    from codex_pro.models.provider import GenerationParams
+    p.generation = GenerationParams()
+    p._build_boto3_client = lambda: _FakeBoto()
+
+    resp = await p.chat_stream(messages=[{"role": "user", "content": "hi"}])
+    assert resp.content == "partial"
+    assert resp.finish_reason == "length"
+    assert resp.usage["completion_tokens"] == 4096
+
+
+@pytest.mark.asyncio
+async def test_bedrock_converse_with_tools_falls_back_to_non_stream():
+    # 非 Claude 的 Bedrock 模型 + 带 tools 走 chat_stream 时，应回退到非流式
+    # _chat_converse（它能完整收 tool_calls），而不是只解析文本的流式路径。
+    from codex_pro.models.providers.bedrock_provider import BedrockProvider
+
+    p = BedrockProvider.__new__(BedrockProvider)
+    p._default_model = "amazon.titan-x"
+    from codex_pro.models.provider import GenerationParams, LLMResponse, ToolCallRequest
+    p.generation = GenerationParams()
+
+    converse_calls = {"count": 0}
+    stream_calls = {"count": 0}
+
+    async def _fake_converse(model, messages, tools, tool_choice, **kwargs):
+        converse_calls["count"] += 1
+        return LLMResponse(
+            content=None,
+            tool_calls=[ToolCallRequest(id="t1", name="do_it", arguments={"x": 1})],
+            finish_reason="tool_calls",
+            model=model,
+        )
+
+    async def _fake_stream(*a, **k):
+        stream_calls["count"] += 1
+        return LLMResponse(content="text only", finish_reason="stop")
+
+    p._chat_converse = _fake_converse
+    p._chat_stream_converse = _fake_stream
+
+    tools = [{"function": {"name": "do_it", "description": "", "parameters": {}}}]
+    resp = await p.chat_stream(
+        messages=[{"role": "user", "content": "hi"}],
+        tools=tools,
+    )
+    assert converse_calls["count"] == 1
+    assert stream_calls["count"] == 0
+    assert resp.tool_calls and resp.tool_calls[0].name == "do_it"
+    assert resp.finish_reason == "tool_calls"
+
+
+@pytest.mark.asyncio
+async def test_bedrock_converse_without_tools_uses_real_stream():
+    from codex_pro.models.providers.bedrock_provider import BedrockProvider
+
+    p = BedrockProvider.__new__(BedrockProvider)
+    p._default_model = "amazon.titan-x"
+    from codex_pro.models.provider import GenerationParams, LLMResponse
+    p.generation = GenerationParams()
+
+    converse_calls = {"count": 0}
+    stream_calls = {"count": 0}
+
+    async def _fake_converse(*a, **k):
+        converse_calls["count"] += 1
+        return LLMResponse(content="non-stream", finish_reason="stop")
+
+    async def _fake_stream(model, messages, tools, tool_choice, *, on_delta=None, **kwargs):
+        stream_calls["count"] += 1
+        return LLMResponse(content="streamed", finish_reason="stop", model=model)
+
+    p._chat_converse = _fake_converse
+    p._chat_stream_converse = _fake_stream
+
+    resp = await p.chat_stream(messages=[{"role": "user", "content": "hi"}])
+    assert stream_calls["count"] == 1
+    assert converse_calls["count"] == 0
+    assert resp.content == "streamed"
+
+
+@pytest.mark.asyncio
+async def test_gemini_chat_stream_skips_chunk_whose_text_property_raises():
+    # 防御分支覆盖：chunk.text 是"访问即抛异常的 property"时，chat_stream 不应崩，
+    # 该 chunk 被跳过（不中断整个流），其后正常 chunk 的文本仍正常吐出。
+    from codex_pro.models.providers.gemini_provider import GeminiProvider
+    deltas = []
+
+    class _RaisingChunk:
+        candidates = []
+
+        @property
+        def text(self):
+            raise ValueError("function_call chunk has no text")
+
+    class _GoodChunk:
+        candidates = []
+
+        def __init__(self, t):
+            self._t = t
+
+        @property
+        def text(self):
+            return self._t
+
+    chunks = [_RaisingChunk(), _GoodChunk("after")]
+
+    class _FakeModel:
+        def generate_content(self, **kw):
+            assert kw.get("stream") is True
+            return iter(chunks)
+
+    p = GeminiProvider.__new__(GeminiProvider)
+    p._default_model = "gemini-x"
+    from codex_pro.models.provider import GenerationParams, LLMResponse
+    p.generation = GenerationParams()
+    p._client = type("G", (), {"GenerativeModel": staticmethod(lambda **k: _FakeModel())})()
+    p._parse_response = lambda resp, model_name: LLMResponse(content="after", finish_reason="stop")
+
+    resp = await p.chat_stream(
+        messages=[{"role": "user", "content": "hi"}],
+        on_delta=lambda d: deltas.append(d),
+    )
+    # 抛错 chunk 被跳过、流未中断，正常 chunk 的文本仍吐出
+    assert deltas == ["after"]
+    assert resp.finish_reason == "stop"
+
+
+# --- finding 3: tools-aware delta buffering in chat_stream_with_retry ---
+
+
+class _ScriptedStreamProvider(LLMProvider):
+    """chat_stream 按脚本吐 delta，再返回预设的 LLMResponse。"""
+
+    def __init__(self, deltas, response):
+        super().__init__(api_key="k", api_base="b")
+        self._deltas = deltas
+        self._response = response
+
+    async def chat(self, messages, tools=None, model=None, tool_choice=None, **kwargs):
+        return self._response
+
+    async def chat_stream(self, messages, tools=None, model=None, tool_choice=None,
+                          on_delta=None, **kwargs):
+        from codex_pro.models.provider import _invoke_stream_callback
+        for d in self._deltas:
+            await _invoke_stream_callback(on_delta, d)
+        return self._response
+
+    def get_default_model(self):
+        return "stub"
+
+
+@pytest.mark.asyncio
+async def test_tool_bearing_turn_does_not_leak_pretool_draft():
+    # 带 tools 且本轮返回 tool_calls（中间轮）：流出去的"工具前草稿"必须被丢弃，
+    # 用户一个字都不应看到，避免与后续轮的最终答案分叉。
+    from codex_pro.models.provider import ToolCallRequest
+    resp = LLMResponse(
+        content="let me check the weather",
+        tool_calls=[ToolCallRequest(id="t1", name="get_weather", arguments={})],
+        finish_reason="tool_calls",
+    )
+    p = _ScriptedStreamProvider(["let me ", "check ", "the weather"], resp)
+    seen = []
+    out = await p.chat_stream_with_retry(
+        messages=[{"role": "user", "content": "weather?"}],
+        tools=[{"function": {"name": "get_weather"}}],
+        on_delta=lambda d: seen.append(d),
+    )
+    assert seen == []  # 工具前草稿未外发
+    assert out.has_tool_calls
+
+
+@pytest.mark.asyncio
+async def test_tool_offered_but_terminal_answer_releases_buffer():
+    # 带 tools 但本轮直接给终态答案（无 tool_calls）：缓冲的文本必须最终释放给用户，
+    # 不能因为缓冲而把答案吞掉。
+    resp = LLMResponse(content="it is sunny", finish_reason="stop")
+    p = _ScriptedStreamProvider(["it ", "is ", "sunny"], resp)
+    seen = []
+    out = await p.chat_stream_with_retry(
+        messages=[{"role": "user", "content": "weather?"}],
+        tools=[{"function": {"name": "get_weather"}}],
+        on_delta=lambda d: seen.append(d),
+    )
+    assert "".join(seen) == "it is sunny"  # 缓冲整段释放
+    assert out.finish_reason == "stop"
+
+
+@pytest.mark.asyncio
+async def test_no_tools_streams_in_realtime():
+    # 不带 tools：保持逐 delta 实时流式（无缓冲回退）。
+    resp = LLMResponse(content="hello world", finish_reason="stop")
+    p = _ScriptedStreamProvider(["hello ", "world"], resp)
+    seen = []
+    await p.chat_stream_with_retry(
+        messages=[{"role": "user", "content": "hi"}],
+        on_delta=lambda d: seen.append(d),
+    )
+    assert seen == ["hello ", "world"]  # 逐块到达，未被合并成整段
+
+
+# --- draft_policy: 是否放行工具前草稿由调用方决定，不再由 provider 从 tools 推断 ---
+
+
+@pytest.mark.asyncio
+async def test_draft_policy_stream_emits_deltas_despite_tools():
+    # 调用方显式选 stream：即使带 tools 也逐 delta 直发（调用方自负撤回责任）。
+    resp = LLMResponse(content="it is sunny", finish_reason="stop")
+    p = _ScriptedStreamProvider(["it ", "is ", "sunny"], resp)
+    seen = []
+    await p.chat_stream_with_retry(
+        messages=[{"role": "user", "content": "weather?"}],
+        tools=[{"function": {"name": "get_weather"}}],
+        on_delta=lambda d: seen.append(d),
+        draft_policy="stream",
+    )
+    assert seen == ["it ", "is ", "sunny"]
+
+
+@pytest.mark.asyncio
+async def test_draft_policy_stream_leaks_pretool_draft_by_design():
+    # stream 策略下工具前草稿会真的发出去 —— 这是刻意的取舍，撤回由调用方负责。
+    from codex_pro.models.provider import ToolCallRequest
+    resp = LLMResponse(
+        content="let me check",
+        tool_calls=[ToolCallRequest(id="t1", name="get_weather", arguments={})],
+        finish_reason="tool_calls",
+    )
+    p = _ScriptedStreamProvider(["let me ", "check"], resp)
+    seen = []
+    out = await p.chat_stream_with_retry(
+        messages=[{"role": "user", "content": "weather?"}],
+        tools=[{"function": {"name": "get_weather"}}],
+        on_delta=lambda d: seen.append(d),
+        draft_policy="stream",
+    )
+    assert seen == ["let me ", "check"]
+    assert out.has_tool_calls
+
+
+@pytest.mark.asyncio
+async def test_draft_policy_defaults_to_buffer_for_tool_bearing_calls():
+    # 不传 draft_policy 时保持历史行为：带 tools → 缓冲，仅在终态答案时整段释放。
+    resp = LLMResponse(content="it is sunny", finish_reason="stop")
+    p = _ScriptedStreamProvider(["it ", "is ", "sunny"], resp)
+    seen = []
+    await p.chat_stream_with_retry(
+        messages=[{"role": "user", "content": "weather?"}],
+        tools=[{"function": {"name": "get_weather"}}],
+        on_delta=lambda d: seen.append(d),
+    )
+    assert seen == ["it is sunny"]
+
+
+@pytest.mark.asyncio
+async def test_draft_policy_buffer_collapses_stream_into_one_frame():
+    # 显式 buffer 的塌缩形态：整段答案作为「单个」delta 放出。这正是把可重绘通道
+    # 漏配出 channels.stream_optimistic_channels 时客户端看到的现象 —— 一帧全文，
+    # 表现为完全没有流式效果，而不是某种安全的空操作。
+    resp = LLMResponse(content="it is sunny", finish_reason="stop")
+    p = _ScriptedStreamProvider(["it ", "is ", "sunny"], resp)
+    seen = []
+    await p.chat_stream_with_retry(
+        messages=[{"role": "user", "content": "weather?"}],
+        tools=[{"function": {"name": "get_weather"}}],
+        on_delta=lambda d: seen.append(d),
+        draft_policy="buffer",
+    )
+    assert len(seen) == 1
+    assert seen == ["it is sunny"]

@@ -1,0 +1,341 @@
+"""ShadowGitStore — env-isolated git subprocess wrapper for checkpoints."""
+from __future__ import annotations
+
+import asyncio
+import fnmatch
+import hashlib
+import os
+from pathlib import Path
+
+from codex_pro.agent.proc_lifecycle import communicate_owned, spawn_exec
+
+# Upper bound for a single git invocation. Snapshot commands are local and
+# normally finish in well under a second, but git can block indefinitely on an
+# index.lock held by another process, a stalled network filesystem, or a very
+# large work tree. Without a bound the caller (a checkpoint save/restore) hangs
+# forever and the stuck git process is never reaped.
+_GIT_TIMEOUT = 120.0
+
+
+class ShadowGitStore:
+    """A single external bare-ish git repo driven via GIT_DIR/GIT_WORK_TREE.
+
+    Never touches the user's own .git: all git metadata lives under store_path,
+    the work tree is pointed at the caller's workspace via env vars only.
+    """
+
+    def __init__(
+        self, store_path: Path, exclude: tuple[str, ...] | None = None
+    ) -> None:
+        self._store = Path(store_path).expanduser().resolve()
+        self._initialized = False
+        # Paths never captured in a snapshot. A plain name matches by directory
+        # prefix ("data/" -> data/ and everything under it); a name with a glob
+        # metachar matches against each path's basename ("*.db-wal"). The wiring
+        # layer supplies the runtime DB dir and the shadow store's own dir so a
+        # snapshot never does a torn read of a live SQLite file or recursively
+        # captures the checkpoint repo itself.
+        self._exclude: tuple[str, ...] = tuple(exclude or ())
+
+    def _workspace_hash(self, workspace: Path) -> str:
+        raw = str(Path(workspace).expanduser().resolve())
+        return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+    def ref_for(self, workspace: Path) -> str:
+        return f"refs/codex/{self._workspace_hash(workspace)}"
+
+    def _index_path(self, workspace: Path) -> Path:
+        return self._store / "indexes" / self._workspace_hash(workspace)
+
+    def _env_for(self, workspace: Path) -> dict[str, str]:
+        env = dict(os.environ)
+        env["GIT_DIR"] = str(self._store)
+        env["GIT_WORK_TREE"] = str(Path(workspace).expanduser().resolve())
+        env["GIT_INDEX_FILE"] = str(self._index_path(workspace))
+        return env
+
+    async def ensure_initialized(self) -> None:
+        if self._initialized:
+            return
+        self._store.mkdir(parents=True, exist_ok=True)
+        (self._store / "indexes").mkdir(parents=True, exist_ok=True)
+        if not (self._store / "objects").exists():
+            proc = await spawn_exec(
+                "git", "init", "--bare", str(self._store),
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            await self._communicate(proc, "init --bare")
+        self._initialized = True
+
+    @staticmethod
+    async def _communicate(proc: "asyncio.subprocess.Process", label: str) -> tuple[bytes, bytes]:
+        """communicate() with a hard timeout, reaping the process group on expiry.
+
+        A bare communicate() on a wedged git blocks the caller forever and leaves
+        the child (and any grandchildren) running.
+        """
+        try:
+            return await communicate_owned(proc, timeout=_GIT_TIMEOUT)
+        except (asyncio.TimeoutError, TimeoutError):
+            raise RuntimeError(f"git {label} timed out after {_GIT_TIMEOUT}s") from None
+
+    async def _run_git(
+        self, args: list[str], workspace: Path | None = None, check: bool = True,
+        extra_env: dict[str, str] | None = None,
+    ) -> tuple[int, str, str]:
+        env = self._env_for(workspace) if workspace is not None else dict(os.environ)
+        if workspace is None:
+            # Store-level commands must never inherit an external work tree/index.
+            env.pop("GIT_WORK_TREE", None)
+            env.pop("GIT_INDEX_FILE", None)
+            env["GIT_DIR"] = str(self._store)
+        # Stamp a fixed identity so commit-tree never depends on the caller's
+        # global git config (CI runners, containers, and fresh machines have
+        # none -> "Author identity unknown"). This store is internal-only, so a
+        # constant identity keeps snapshots self-contained and reproducible.
+        env.setdefault("GIT_AUTHOR_NAME", "codex-pro")
+        env.setdefault("GIT_AUTHOR_EMAIL", "checkpoint@codex-pro.local")
+        env.setdefault("GIT_COMMITTER_NAME", "codex-pro")
+        env.setdefault("GIT_COMMITTER_EMAIL", "checkpoint@codex-pro.local")
+        env.update(extra_env or {})
+        proc = await spawn_exec(
+            "git", *args, env=env,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        out, err = await self._communicate(proc, " ".join(args))
+        rc = proc.returncode or 0
+        if check and rc != 0:
+            raise RuntimeError(f"git {' '.join(args)} failed ({rc}): {err.decode(errors='replace')}")
+        return rc, out.decode(errors="replace"), err.decode(errors="replace")
+
+    def _excluded(self, name: str) -> bool:
+        """True if a workspace-relative path must never enter a snapshot.
+
+        A plain entry matches by directory prefix ("data/" covers data/ and all
+        descendants); an entry containing a glob metachar matches a path's
+        basename ("*.db-wal"). Keeps live SQLite files and the shadow store's
+        own dir out of snapshots (torn reads / recursive capture).
+        """
+        for pat in self._exclude:
+            if any(ch in pat for ch in "*?["):
+                if fnmatch.fnmatch(name.rsplit("/", 1)[-1], pat):
+                    return True
+            else:
+                prefix = pat.rstrip("/")
+                if name == prefix or name.startswith(prefix + "/"):
+                    return True
+        return False
+
+    async def take_snapshot(
+        self, workspace: Path, message: str, max_file_size_mb: int = 10
+    ) -> str | None:
+        ws = Path(workspace).expanduser().resolve()
+        ref = self.ref_for(ws)
+        # Load previous tip into this workspace's index (empty tree if first run).
+        rc, _, _ = await self._run_git(["rev-parse", "--verify", ref], workspace=ws, check=False)
+        if rc == 0:
+            await self._run_git(["read-tree", ref], workspace=ws)
+        else:
+            await self._run_git(["read-tree", "--empty"], workspace=ws)
+        # Stage everything, then unstage oversize blobs.
+        await self._run_git(["add", "-A"], workspace=ws)
+        limit = max_file_size_mb * 1024 * 1024
+        # -z emits raw NUL-separated names; without it git C-quotes non-ASCII
+        # names (e.g. Chinese), so ws / name would be a bogus quoted path.
+        _, staged, _ = await self._run_git(
+            ["diff", "--cached", "--name-only", "-z"], workspace=ws, check=False
+        )
+        for name in [n for n in staged.split("\x00") if n.strip()]:
+            # Never capture runtime paths (live SQLite DBs, the shadow store's
+            # own dir): a filesystem-level snapshot of a file being written is a
+            # torn read, and snapshotting the checkpoint repo is recursive.
+            if self._excluded(name):
+                await self._run_git(["rm", "--cached", "--", name], workspace=ws, check=False)
+                continue
+            fp = ws / name
+            try:
+                if fp.is_file() and fp.stat().st_size > limit:
+                    await self._run_git(["rm", "--cached", "--", name], workspace=ws, check=False)
+            except OSError:
+                continue
+        # Write the staged tree, then compare it against the parent commit's tree.
+        _, tree, _ = await self._run_git(["write-tree"], workspace=ws)
+        tree = tree.strip()
+        parent_args: list[str] = []
+        rc_ref, parent, _ = await self._run_git(
+            ["rev-parse", "--verify", ref], workspace=ws, check=False
+        )
+        if rc_ref == 0:
+            parent = parent.strip()
+            # diff-tree --quiet exits 0 when the trees are identical -> no change, skip.
+            rc_id, _, _ = await self._run_git(
+                ["diff-tree", "--quiet", parent, tree], workspace=ws, check=False
+            )
+            if rc_id == 0:
+                return None
+            parent_args = ["-p", parent]
+        _, sha, _ = await self._run_git(
+            ["commit-tree", tree, *parent_args, "-m", message], workspace=ws
+        )
+        sha = sha.strip()
+        await self._run_git(["update-ref", ref, sha], workspace=ws)
+        return sha
+
+    async def list_snapshots(self, workspace: Path, limit: int = 50) -> list[dict]:
+        ws = Path(workspace).expanduser().resolve()
+        ref = self.ref_for(ws)
+        rc, _, _ = await self._run_git(["rev-parse", "--verify", ref], workspace=ws, check=False)
+        if rc != 0:
+            return []
+        _, out, _ = await self._run_git(
+            ["log", ref, f"-{limit}", "--pretty=format:%H%x1f%ct%x1f%s"], workspace=ws
+        )
+        snaps: list[dict] = []
+        for line in [ln for ln in out.split("\n") if ln.strip()]:
+            sha, ts, subject = line.split("\x1f", 2)
+            files = len(await self.changed_paths(ws, sha))
+            snaps.append({"sha": sha, "short": sha[:10], "ts": int(ts),
+                          "subject": subject, "files": files})
+        return snaps
+
+    async def _diff_status(self, workspace: Path, sha: str) -> list[tuple[str, str]]:
+        """Return (status, path) for each file this snapshot changed vs its parent.
+
+        status is git's single-letter code A/M/D/T. restore needs the
+        distinction because a D(eleted) file is absent from sha's tree, so
+        `git checkout sha -- <it>` fails with "pathspec did not match" and
+        aborts the whole restore.
+        """
+        ws = Path(workspace).expanduser().resolve()
+        # -z keeps non-ASCII names raw; without it git C-quotes them (e.g.
+        # Chinese -> "\346..."), and restore's checkout pathspec would miss.
+        rc, out, _ = await self._run_git(
+            ["diff-tree", "--no-commit-id", "--name-status", "-z", "-r", f"{sha}^", sha],
+            workspace=ws, check=False,
+        )
+        if rc != 0:
+            # no parent (first commit): every tree entry is an addition
+            _, out, _ = await self._run_git(
+                ["ls-tree", "-r", "--name-only", "-z", sha], workspace=ws
+            )
+            return [("A", n) for n in out.split("\x00") if n.strip()]
+        # --name-status -z emits flat NUL-separated fields: status, path,
+        # status, path, ... We don't pass -M/-C, so a rename surfaces as a
+        # D+A pair of single-path entries rather than one two-path R entry;
+        # the R/C branch below is defensive only.
+        fields = [f for f in out.split("\x00") if f != ""]
+        pairs: list[tuple[str, str]] = []
+        i = 0
+        while i + 1 < len(fields):
+            status = (fields[i] or "M")[0]
+            if status in ("R", "C") and i + 2 < len(fields):
+                pairs.append((status, fields[i + 2]))
+                i += 3
+            else:
+                pairs.append((status, fields[i + 1]))
+                i += 2
+        return pairs
+
+    async def changed_paths(self, workspace: Path, sha: str) -> list[str]:
+        return [name for _, name in await self._diff_status(workspace, sha)]
+
+    async def show_snapshot(self, workspace: Path, sha: str) -> str:
+        ws = Path(workspace).expanduser().resolve()
+        await self._assert_owned(ws, sha)
+        _, out, _ = await self._run_git(["show", sha], workspace=ws)
+        return out
+
+    async def _assert_owned(self, workspace: Path, sha: str) -> None:
+        ref = self.ref_for(workspace)
+        rc, _, _ = await self._run_git(
+            ["merge-base", "--is-ancestor", sha, ref], workspace=workspace, check=False
+        )
+        # is-ancestor exits 0 when sha is reachable from ref
+        _, tip, _ = await self._run_git(["rev-parse", "--verify", ref], workspace=workspace, check=False)
+        if rc != 0 and sha != tip.strip():
+            raise ValueError(f"checkpoint {sha[:10]} does not belong to this workspace")
+
+    async def restore(self, workspace: Path, sha: str) -> list[str]:
+        ws = Path(workspace).expanduser().resolve()
+        await self._assert_owned(ws, sha)
+        # pre-rollback snapshot so the rollback itself is undoable
+        await self.take_snapshot(ws, f"before restore {sha[:10]}")
+        changes = await self._diff_status(ws, sha)
+        # Split by change kind: files present in sha's tree (A/M/T, and any
+        # defensive R/C) are checked back out; files DELETED in sha are absent
+        # from its tree, so restoring "to sha's state" means removing them from
+        # the work tree. A plain `checkout sha -- <deleted>` would fail with
+        # "pathspec did not match" and abort the whole restore (the P0 bug).
+        restore_paths = [name for status, name in changes if status != "D"]
+        delete_paths = [name for status, name in changes if status == "D"]
+        if restore_paths:
+            await self._run_git(["checkout", sha, "--", *restore_paths], workspace=ws)
+        for name in delete_paths:
+            fp = ws / name
+            try:
+                if fp.is_file() or fp.is_symlink():
+                    fp.unlink()
+            except OSError:
+                # Best-effort: a path we can't remove shouldn't abort the whole
+                # rollback of the files that did restore cleanly.
+                continue
+        # Return every path the restore touched (both re-created and removed) so
+        # callers/CLI can report an accurate changed-file count.
+        return [name for _, name in changes]
+
+    async def prune(self, workspace: Path, max_snapshots: int) -> int:
+        """Keep only the newest max_snapshots commits, dropping older ones.
+
+        WARNING: this REWRITES the SHAs of the kept snapshots (re-root rebuild),
+        so callers must NOT cache commit hashes obtained before prune. After
+        prune, re-run list_snapshots to fetch the new SHAs.
+        """
+        ws = Path(workspace).expanduser().resolve()
+        ref = self.ref_for(ws)
+        _, out, _ = await self._run_git(
+            ["log", ref, "--pretty=format:%H"], workspace=ws, check=False
+        )
+        shas = [s for s in out.split("\n") if s.strip()]
+        if len(shas) <= max_snapshots:
+            return 0
+        # git log is newest-first. History is linear, so we can't keep the newest
+        # N by moving the ref backward (that keeps the OLDEST N). Re-root instead:
+        # rebuild the newest max_snapshots commits so the oldest kept one drops its
+        # parent, orphaning everything older (gc reclaims those objects later).
+        # Pass through each original author/committer date so list_snapshots ts
+        # stays faithful instead of collapsing to the prune moment.
+        keep = shas[:max_snapshots]  # newest-first
+        new_parent: str | None = None
+        for sha in reversed(keep):  # oldest kept first
+            _, tree, _ = await self._run_git(
+                ["rev-parse", f"{sha}^{{tree}}"], workspace=ws
+            )
+            _, meta, _ = await self._run_git(
+                ["log", "-1", "--pretty=format:%at%x1f%ct%x1f%s", sha], workspace=ws
+            )
+            at, ct, subject = meta.split("\x1f", 2)
+            parent_args = ["-p", new_parent] if new_parent else []
+            _, new_sha, _ = await self._run_git(
+                ["commit-tree", tree.strip(), *parent_args, "-m", subject],
+                workspace=ws,
+                extra_env={
+                    "GIT_AUTHOR_DATE": f"{at} +0000",
+                    "GIT_COMMITTER_DATE": f"{ct} +0000",
+                },
+            )
+            new_parent = new_sha.strip()
+        await self._run_git(["update-ref", ref, new_parent], workspace=ws)
+        return len(shas) - max_snapshots
+
+    async def total_size_mb(self) -> float:
+        total = 0
+        for p in self._store.rglob("*"):
+            try:
+                if p.is_file():
+                    total += p.stat().st_size
+            except OSError:
+                continue
+        return total / (1024 * 1024)
+
+    async def gc(self) -> None:
+        await self._run_git(["gc", "--auto", "--quiet"], check=False)

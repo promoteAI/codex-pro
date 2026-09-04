@@ -1,0 +1,280 @@
+"""episodic 语义化：嵌入入库、语义检索、LIKE 降级、孤儿分表、stale 回填。"""
+from pathlib import Path
+
+import pytest
+import pytest_asyncio
+
+from codex_pro.memory.tiers import EpisodicManager
+from codex_pro.memory.vectors import VectorIndex
+from codex_pro.storage.sqlite import SQLiteBackend
+
+MODEL = "fastembed:test"
+
+
+def _embed_factory(mapping):
+    """确定性伪嵌入：按关键词映射到固定向量，模拟语义相近。"""
+    async def _embed(text: str) -> list[float]:
+        for kw, vec in mapping.items():
+            if kw in text:
+                return vec
+        return [0.0, 0.0, 0.0, 1.0]
+    return _embed
+
+
+@pytest_asyncio.fixture
+async def storage(tmp_path: Path) -> SQLiteBackend:
+    backend = SQLiteBackend(tmp_path / "test.db")
+    await backend.initialize()
+    yield backend
+    await backend.close()
+
+
+@pytest_asyncio.fixture
+async def episodic(storage) -> EpisodicManager:
+    index = VectorIndex(storage, dimensions=4, model_id=MODEL)
+    await index.initialize()
+    mgr = EpisodicManager(storage)
+    embed = _embed_factory({
+        "部署": [1.0, 0.0, 0.0, 0.0],
+        "上线": [0.9, 0.1, 0.0, 0.0],   # 与"部署"语义相近
+        "宠物": [0.0, 1.0, 0.0, 0.0],
+    })
+    mgr.attach_embedding(embed, index)
+    return mgr
+
+
+@pytest.mark.asyncio
+async def test_create_episode_stores_prefixed_vector(episodic, storage):
+    ep = await episodic.create_episode("s1", [], "讨论了项目部署方案")
+    rows = await storage.load_vectors_all()
+    assert any(r["source_id"] == f"ep:{ep.id}" for r in rows)
+
+
+@pytest.mark.asyncio
+async def test_semantic_search_finds_synonym(episodic):
+    """LIKE 匹配不到的同义查询能语义命中。"""
+    ep = await episodic.create_episode("s1", [], "讨论了项目部署方案")
+    await episodic.create_episode("s1", [], "聊了宠物猫的名字")
+    results = await episodic.search_episodes("上线", session_key="s1", limit=3)
+    assert results and results[0].id == ep.id
+
+
+@pytest.mark.asyncio
+async def test_semantic_search_respects_session_filter(episodic):
+    await episodic.create_episode("s1", [], "讨论了项目部署方案")
+    results = await episodic.search_episodes("上线", session_key="other", limit=3)
+    assert results == []
+
+
+@pytest.mark.asyncio
+async def test_semantic_floor_drops_low_cosine_episode(storage):
+    """min_similarity 下限:与查询余弦过低的 episode 不进语义候选(源头拦截)。"""
+    index = VectorIndex(storage, dimensions=4, model_id=MODEL)
+    await index.initialize()
+    mgr = EpisodicManager(storage)
+    embed = _embed_factory({
+        "部署": [1.0, 0.0, 0.0, 0.0],
+        "宠物": [0.0, 1.0, 0.0, 0.0],  # 与"部署"正交,余弦≈0
+    })
+    mgr.attach_embedding(embed, index, min_similarity=0.5)
+    await mgr.create_episode("s1", [], "聊了宠物猫的名字")
+    # 查询"部署"与"宠物"episode 余弦≈0 < 0.5 → 语义候选为空;
+    # summary 不含"部署" → LIKE 也空 → 整体空。
+    results = await mgr.search_episodes("部署", session_key="s1", limit=3)
+    assert results == [], "低余弦 episode 不应进语义候选"
+
+
+@pytest.mark.asyncio
+async def test_semantic_floor_keeps_relevant_episode(storage):
+    """下限不误杀:余弦达标的 episode 仍被语义召回。"""
+    index = VectorIndex(storage, dimensions=4, model_id=MODEL)
+    await index.initialize()
+    mgr = EpisodicManager(storage)
+    embed = _embed_factory({
+        "部署": [1.0, 0.0, 0.0, 0.0],
+        "上线": [0.9, 0.1, 0.0, 0.0],  # 与"部署"余弦≈0.994
+    })
+    mgr.attach_embedding(embed, index, min_similarity=0.5)
+    ep = await mgr.create_episode("s1", [], "讨论了项目部署方案")
+    results = await mgr.search_episodes("上线", session_key="s1", limit=3)
+    assert results and results[0].id == ep.id
+
+
+@pytest.mark.asyncio
+async def test_fallback_to_like_without_embedding(storage):
+    mgr = EpisodicManager(storage)  # 未 attach → LIKE 路径
+    ep = await mgr.create_episode("s1", [], "讨论了项目部署方案")
+    results = await mgr.search_episodes("部署", session_key="s1", limit=3)
+    assert results and results[0].id == ep.id
+
+
+@pytest.mark.asyncio
+async def test_scan_orphan_vectors_checks_episodes_table(storage, episodic, tmp_path):
+    """ep: 向量对照 episodes 表而非 entries；活 episode 向量不被误删。"""
+    from codex_pro.memory.store import MemoryStore
+
+    ep = await episodic.create_episode("s1", [], "讨论了项目部署方案")
+    import numpy as np
+    dead = np.array([1.0, 0, 0, 0], dtype=np.float32).tobytes()
+    await storage.store_vector("v_dead_ep", "ep:gone_episode", dead, {}, model=MODEL, dim=4)
+
+    store = MemoryStore(tmp_path / "memory", storage=storage)
+    removed = await store.scan_orphan_vectors()
+    rows = await storage.load_vectors_all()
+    ids = {r["source_id"] for r in rows}
+    assert f"ep:{ep.id}" in ids          # 活 episode 保留
+    assert "ep:gone_episode" not in ids  # 死 episode 向量删除
+    assert removed >= 1
+
+
+@pytest.mark.asyncio
+async def test_requeue_stale_reembeds_episode(storage):
+    """模型切换后 ep: 向量按 summary 重嵌入。"""
+    old_index = VectorIndex(storage, dimensions=4, model_id="fastembed:old")
+    await old_index.initialize()
+    mgr_old = EpisodicManager(storage)
+    mgr_old.attach_embedding(_embed_factory({"部署": [1.0, 0, 0, 0]}), old_index)
+    ep = await mgr_old.create_episode("s1", [], "讨论了项目部署方案")
+
+    new_index = VectorIndex(storage, dimensions=4, model_id=MODEL)
+    await new_index.initialize()
+    assert f"ep:{ep.id}" in new_index.stale_source_ids
+
+    mgr_new = EpisodicManager(storage)
+    mgr_new.attach_embedding(_embed_factory({"部署": [0.5, 0.5, 0, 0]}), new_index)
+    n = await mgr_new.requeue_stale(new_index.stale_source_ids)
+    assert n == 1
+    rows = await storage.load_vectors_all()
+    ep_rows = [r for r in rows if r["source_id"] == f"ep:{ep.id}"]
+    assert len(ep_rows) == 1 and ep_rows[0]["model"] == MODEL
+
+
+@pytest.mark.asyncio
+async def test_scan_orphan_keeps_ep_vectors_when_episodes_table_fails(
+    storage, episodic, tmp_path,
+):
+    """C-1: episodes 表查询瞬时报错时，ep: 向量一律保守跳过，不被误删清空。"""
+    from codex_pro.memory.store import MemoryStore
+
+    ep = await episodic.create_episode("s1", [], "讨论了项目部署方案")
+
+    # 故障注入：让针对 memory_episodes 的 fetch_sql 抛错，其它查询照常。
+    real_fetch_sql = storage.fetch_sql
+
+    async def flaky_fetch_sql(sql, params=()):
+        if "memory_episodes" in sql:
+            raise RuntimeError("simulated transient DB error")
+        return await real_fetch_sql(sql, params)
+
+    storage.fetch_sql = flaky_fetch_sql
+    try:
+        store = MemoryStore(tmp_path / "memory", storage=storage)
+        removed = await store.scan_orphan_vectors()
+    finally:
+        storage.fetch_sql = real_fetch_sql
+
+    rows = await storage.load_vectors_all()
+    ids = {r["source_id"] for r in rows}
+    assert f"ep:{ep.id}" in ids   # 活 episode 向量仍在，未被瞬时错误清空
+    assert removed == 0           # episodes 表不可用时不删除任何 ep: 向量
+
+
+@pytest.mark.asyncio
+async def test_requeue_stale_keeps_old_vector_on_embed_failure(storage):
+    """I-1: 重嵌失败时旧向量行保留、count 为 0，episode 不会失去向量。"""
+    old_index = VectorIndex(storage, dimensions=4, model_id="fastembed:old")
+    await old_index.initialize()
+    mgr_old = EpisodicManager(storage)
+    mgr_old.attach_embedding(_embed_factory({"部署": [1.0, 0, 0, 0]}), old_index)
+    ep = await mgr_old.create_episode("s1", [], "讨论了项目部署方案")
+
+    new_index = VectorIndex(storage, dimensions=4, model_id=MODEL)
+    await new_index.initialize()
+    assert f"ep:{ep.id}" in new_index.stale_source_ids
+
+    async def failing_embed(text: str) -> list[float]:
+        raise RuntimeError("simulated embed failure")
+
+    mgr_new = EpisodicManager(storage)
+    mgr_new.attach_embedding(failing_embed, new_index)
+    n = await mgr_new.requeue_stale(new_index.stale_source_ids)
+    assert n == 0                 # 重嵌失败不计入 count
+    rows = await storage.load_vectors_all()
+    ep_rows = [r for r in rows if r["source_id"] == f"ep:{ep.id}"]
+    # 旧向量行保留（模型仍是旧模型），下次启动仍会进 stale 集合重试
+    assert len(ep_rows) == 1 and ep_rows[0]["model"] == "fastembed:old"
+
+
+@pytest.mark.asyncio
+async def test_create_episode_idempotent_on_session_range(storage):
+    """E1-b: 同 (session_key, range) 重复调 create_episode 幂等，不新建第二条。"""
+    mgr = EpisodicManager(storage)
+    e1 = await mgr.create_episode(
+        "s1", [{"role": "user", "content": "x"}], "摘要A", message_range=(0, 5)
+    )
+    e2 = await mgr.create_episode(
+        "s1", [{"role": "user", "content": "x"}], "摘要B", message_range=(0, 5)
+    )
+    assert e1.id == e2.id  # 同 (session,range) 幂等，不新建
+    rows = await storage.fetch_sql(
+        "SELECT COUNT(*) AS n FROM memory_episodes WHERE session_key='s1'"
+    )
+    assert rows[0]["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_create_episode_distinct_ranges_create_two(storage):
+    """幂等键有区分度：不同 message_range 各建一条不同 id 的 episode。"""
+    mgr = EpisodicManager(storage)
+    e1 = await mgr.create_episode(
+        "s1", [{"role": "user", "content": "x"}], "摘要A", message_range=(0, 2)
+    )
+    e2 = await mgr.create_episode(
+        "s1", [{"role": "user", "content": "y"}], "摘要B", message_range=(2, 4)
+    )
+    assert e1.id != e2.id  # 不同 range → 不同 episode
+    rows = await storage.fetch_sql(
+        "SELECT COUNT(*) AS n FROM memory_episodes WHERE session_key='s1'"
+    )
+    assert rows[0]["n"] == 2
+
+
+@pytest.mark.asyncio
+async def test_create_episode_zero_range_always_new(storage):
+    """range=(0,0) 表示"无区间信息"，保持既有 per-call 新建行为，不去重。"""
+    mgr = EpisodicManager(storage)
+    e1 = await mgr.create_episode("s1", [], "摘要A", message_range=(0, 0))
+    e2 = await mgr.create_episode("s1", [], "摘要B", message_range=(0, 0))
+    assert e1.id != e2.id  # (0,0) 每次新建
+    rows = await storage.fetch_sql(
+        "SELECT COUNT(*) AS n FROM memory_episodes WHERE session_key='s1'"
+    )
+    assert rows[0]["n"] == 2
+
+
+@pytest.mark.asyncio
+async def test_create_episode_concurrent_same_span_dedup(storage):
+    """D: 20 个并发同 (session, range) 调用 → 表中恰 1 行,返回值 id 全相同。"""
+    import asyncio
+    mgr = EpisodicManager(storage)
+    results = await asyncio.gather(*[
+        mgr.create_episode("s1", [], f"摘要{i}", message_range=(0, 5))
+        for i in range(20)
+    ])
+    ids = {e.id for e in results}
+    assert len(ids) == 1, f"并发应收敛到单一 episode,实得 {ids}"
+    rows = await storage.fetch_sql(
+        "SELECT COUNT(*) AS n FROM memory_episodes WHERE session_key='s1'"
+    )
+    assert rows[0]["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_create_episode_dedup_no_orphan_vector(episodic, storage):
+    """D: 重复(冲突)调用不产生第二条 ep: 向量。"""
+    e1 = await episodic.create_episode("s1", [], "讨论了项目部署方案", message_range=(0, 5))
+    e2 = await episodic.create_episode("s1", [], "又一次部署总结", message_range=(0, 5))
+    assert e1.id == e2.id
+    rows = await storage.load_vectors_all()
+    ep_vecs = [r for r in rows if r["source_id"].startswith("ep:")]
+    assert len(ep_vecs) == 1, f"应只有 1 条 ep 向量,实得 {[r['source_id'] for r in ep_vecs]}"

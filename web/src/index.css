@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+@theme {
+  --color-codex-bg: #181818;
+  --color-codex-sidebar: #1c1c1c;
+  --color-codex-surface: #1e1e1e;
+  --color-codex-elevated: #222222;
+  --color-codex-panel: #141414;
+  --color-codex-border: #2a2a2a;
+  --color-codex-border-strong: #3a3a3a;
+  --color-codex-text: #e6e6e6;
+  --color-codex-text-secondary: #a0a0a0;
+  --color-codex-muted: #6e6e6e;
+  --color-codex-hover: #242424;
+  --color-codex-active: #2a2a2a;
+  --color-codex-accent: #3866f0;
+  --color-codex-accent-hover: #2c55d4;
+  --color-codex-warn: #f79748;
+  --color-codex-success: #3fb950;
+  --color-codex-danger: #f85149;
+  --color-codex-focus: #d6d6d6;
+}
+
+:root {
+  --accent: #3866f0;
+  --accent-hover: #2c55d4;
+  --warn: #f79748;
+  --warn-hover: #1f1708;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: #181818;
+  color: #e6e6e6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 13px;
+}
+
+:focus-visible {
+  outline: 2px solid #d6d6d6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Dark admin panes inside settings — soften leftover light-theme utilities */
+.codex-admin-pane {
+  color: #e6e6e6;
+}
+
+.codex-admin-pane .bg-white,
+.codex-admin-pane .bg-gray-50,
+.codex-admin-pane .bg-gray-100 {
+  background-color: #1e1e1e !important;
+}
+
+.codex-admin-pane .border,
+.codex-admin-pane .border-gray-200,
+.codex-admin-pane .border-b,
+.codex-admin-pane .border-r,
+.codex-admin-pane .border-t {
+  border-color: #2a2a2a !important;
+}
+
+.codex-admin-pane .text-gray-700,
+.codex-admin-pane .text-gray-800,
+.codex-admin-pane .text-gray-900 {
+  color: #e6e6e6 !important;
+}
+
+.codex-admin-pane .text-gray-500,
+.codex-admin-pane .text-gray-600 {
+  color: #a0a0a0 !important;
+}
+
+.codex-admin-pane .text-gray-400 {
+  color: #6e6e6e !important;
+}
+
+.codex-admin-pane .hover\:bg-gray-100:hover,
+.codex-admin-pane .hover\:bg-gray-50:hover {
+  background-color: #242424 !important;
+}
+
+.codex-admin-pane .bg-blue-50 {
+  background-color: #1a2744 !important;
+}
+
+.codex-admin-pane .text-blue-700,
+.codex-admin-pane .text-blue-600 {
+  color: #7aa2ff !important;
+}
+
+.codex-admin-pane input,
+.codex-admin-pane textarea,
+.codex-admin-pane select {
+  background: #1e1e1e;
+  color: #e6e6e6;
+  border-color: #3a3a3a;
+}
+
+.codex-admin-pane button.bg-blue-600 {
+  background-color: #3866f0 !important;
+}

@@ -1,0 +1,228 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "codex-pro"
+version = "0.1.0"
+description = "A self-hosted, long-running AI agent runtime with memory, skills, plugins, and multi-channel integrations"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Codex Pro contributors" }]
+keywords = ["ai", "agent", "runtime", "memory", "plugins", "mcp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Communications :: Chat",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+dependencies = [
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "pyyaml>=6.0",
+    "loguru>=0.7",
+    "aiohttp>=3.9",
+    "aiosqlite>=0.20",
+    "croniter>=1.4",
+    "numpy>=1.24",
+    "fastembed>=0.6",  # >=0.6 for rerank.cross_encoder.TextCrossEncoder
+    "questionary>=2.0",
+    # Used directly by the default scrollback-first interactive renderer.
+    "prompt-toolkit>=3.0",
+    "httpx>=0.23",
+    # rich>=13.5: this declares an existing fact rather than adding a new
+    # install. rich already arrives with `[tui]` (textual depends on
+    # rich>=14.2), but the cli/render package needs rich.markup.escape for the
+    # *inline* renderer, which must work without the tui extra.
+    # The floor is a *behaviour* fix, not an API change — the signature has been
+    # stable far longer. 13.5.0 is where escape() started compensating for a
+    # trailing backslash; before it, a diff line ending in `\` (C macros, shell
+    # continuations, Windows paths) escapes to markup whose closing `[/]` gets
+    # swallowed by that backslash and rendered as literal text.
+    "rich>=13.5",
+    "cryptography>=50.0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/promoteAI/codex-pro"
+Repository = "https://github.com/promoteAI/codex-pro"
+Issues = "https://github.com/promoteAI/codex-pro/issues"
+Discussions = "https://github.com/promoteAI/codex-pro/discussions"
+Documentation = "https://codex-pro.io/codex-pro"
+Changelog = "https://github.com/promoteAI/codex-pro/blob/master/CHANGELOG.md"
+
+[project.optional-dependencies]
+openai = ["openai>=1.30", "httpx[socks]>=0.23"]
+anthropic = ["anthropic>=0.40", "httpx[socks]>=0.23"]
+bedrock = ["anthropic>=0.40", "boto3>=1.34", "httpx[socks]>=0.23"]
+gemini = ["google-generativeai>=0.8"]
+allproviders = ["openai>=1.30", "anthropic>=0.40", "boto3>=1.34", "google-generativeai>=0.8", "httpx[socks]>=0.23"]
+vector = ["faiss-cpu>=1.7"]
+container = ["docker>=7.0"]
+process = ["psutil>=5.9"]
+fal = ["fal-client>=0.5"]
+weixin = ["cryptography>=41.0", "pilk>=0.2.4", "imageio-ffmpeg>=0.4.9"]
+# playwright>=1.50: the snapshot builder traverses the DOM in-page and drives
+# elements by absolute XPath, which needs nothing newer, but the *old* floor
+# (1.40) also permits versions where page.accessibility still existed — code
+# written against that removed API would install cleanly and fail at runtime.
+# 1.58 is the version this integration is verified against.
+browser = ["playwright>=1.50"]
+otel = ["opentelemetry-api>=1.20", "opentelemetry-sdk>=1.20", "opentelemetry-exporter-otlp>=1.20"]
+tokenizers = ["tiktoken>=0.7"]
+documents = ["pymupdf>=1.24", "python-docx>=1.1", "openpyxl>=3.1", "python-pptx>=1.0"]
+# textual>=8.2: the TUI uses the theme API (textual.theme, added 0.86) and
+# native content markup with theme variables like [$primary] (added 2.0).
+# 8.2 is the version the TUI is developed and verified against; pinning the
+# floor to it avoids declaring an unverified 2.0–8.1 compatibility window.
+tui = ["textual>=8.2"]
+# `[all]` includes `[skills]` because a fresh `pip install codex-pro[all]`
+# on a machine that wants every bundled skill running is the documented path;
+# the previous omission meant "all" was a lie for any deployment that picked
+# skills beyond the documents/TUI core (web-search, ocr-document, …).
+all = [
+    "openai>=1.30", "anthropic>=0.40", "boto3>=1.34", "google-generativeai>=0.8",
+    "httpx[socks]>=0.23", "psutil>=5.9", "faiss-cpu>=1.7", "cryptography>=41.0",
+    "tiktoken>=0.7", "fal-client>=0.5", "pymupdf>=1.24", "python-docx>=1.1",
+    "openpyxl>=3.1", "python-pptx>=1.0", "textual>=8.2", "playwright>=1.50",
+    # bundled skill deps (see the `[skills]` extra below)
+    "duckduckgo_search>=7.0", "trafilatura>=2.0", "feedparser>=6.0",
+    "croniter>=1.4", "caldav>=1.3", "icalendar>=5.0", "Pillow>=10.0",
+    "pytesseract>=0.3", "pyyaml>=6.0", "markdown>=3.6",
+    "edge-tts>=7.0", "faster-whisper>=1.0",
+]
+# ruff is pinned exactly (not a range): a linter is a build gate, and any
+# ruff release can expand the *default* rule set, which silently turns green
+# CI red on unchanged code. Bumping ruff must be a deliberate, reviewable act
+# (change this pin, inspect the diff), not something a fresh `pip install`
+# decides for us. The lint job installs this same extra, so this line is the
+# single source of truth for the ruff version everywhere.
+dev = ["ruff==0.15.12", "pytest>=8.0", "pytest-asyncio>=0.23", "pytest-cov>=5.0"]
+docs = ["mkdocs-material>=9.5", "mkdocs-static-i18n>=1.2"]
+skills = [
+    "duckduckgo_search>=7.0",
+    "trafilatura>=2.0",
+    "feedparser>=6.0",
+    "croniter>=1.4",
+    "caldav>=1.3",
+    "icalendar>=5.0",
+    "pymupdf>=1.24",
+    "python-docx>=1.1",
+    "Pillow>=10.0",
+    "pytesseract>=0.3",
+    "pyyaml>=6.0",
+    "markdown>=3.6",
+    "python-pptx>=1.0",
+    "openpyxl>=3.1",
+    "edge-tts>=7.0",
+    "faster-whisper>=1.0",
+    "psutil>=5.9",
+]
+
+[project.scripts]
+codex-pro = "codex_pro.__main__:main"
+
+[project.entry-points."codex_pro.plugins"]
+# External plugins register here via their own pyproject.toml
+
+[tool.hatch.build]
+# Anchored (leading slash) so nothing matches inside web/node_modules — see the
+# note on the sdist target below.
+include = [
+    "/codex_pro/**/*.py",
+    "/codex_pro/config/**/*.yaml",
+    "/codex_pro/gateway/static/**/*",
+    "/skills/**/*.md",
+    "/skills/**/*.py",
+    "/skills/**/*.sh",
+    "/README.md",
+    "/LICENSE",
+    "/scripts/install.sh",
+    "/hatch_build.py",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["codex_pro"]
+
+[tool.hatch.build.targets.wheel.sources]
+"codex_pro" = "codex_pro"
+
+[tool.hatch.build.targets.wheel.force-include]
+"skills" = "codex_pro/_bundled/skills"
+
+# web/dist → codex_pro/_bundled/web is injected by hatch_build.py
+# only when web/dist exists (see WebAssetsHook). This keeps
+# `pip install -e .` working in CI / fresh clones before the frontend
+# has been built, while production wheels built via scripts/publish.sh
+# still bundle the complete web UI. The hook is registered at the
+# project level so it runs for both the wheel and the sdist target —
+# this keeps `python -m build` (sdist → wheel round-trip) producing a
+# web-UI-bundled wheel, just like `hatch build` does directly.
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    # Every pattern is anchored with a leading slash. Unanchored patterns match
+    # at any depth, which dragged 300+ files out of web/node_modules into the
+    # published sdist: bare "README.md"/"LICENSE" matched each dependency's
+    # copies, and bare "skills/" matched @reduxjs/toolkit's own skills/ dir.
+    "/codex_pro/",
+    "/skills/",
+    "/scripts/install.sh",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml",
+    "/hatch_build.py",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# Rules are declared explicitly rather than inherited from ruff's default set.
+# The default set changes between ruff releases (e.g. 0.16 pulled I/BLE/DTZ/UP/
+# SIM into the defaults, adding ~1700 findings on unchanged code), so relying on
+# it couples our CI verdict to whatever ruff version happens to be installed.
+# This is the baseline that master passes today (ruff's pre-0.16 defaults:
+# pyflakes + a subset of pycodestyle). Expanding it — e.g. adding DTZ (naive
+# datetimes) or I (import sorting) — is a deliberate, per-family decision made
+# by editing this list, not a side effect of a ruff upgrade.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.pytest.ini_options]
+# Tests mark async cases explicitly with @pytest.mark.asyncio (strict mode).
+asyncio_mode = "strict"
+testpaths = ["tests"]
+# Coverage is opt-in (it ~3.5x's run time): `pytest --cov`. When enabled, the
+# gate in [tool.coverage.report] (fail_under) is enforced automatically.
+
+[tool.coverage.run]
+source = ["codex_pro"]
+branch = true
+
+[tool.coverage.report]
+# Baseline measured at 77%; gate set just under it to absorb noise while
+# preventing regressions. Raise this as coverage improves.
+fail_under = 75
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

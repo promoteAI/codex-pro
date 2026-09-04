@@ -1,0 +1,221 @@
+"""Dimensional cost ledger: migration, incremental accumulation, isolation."""
+
+from __future__ import annotations
+
+import inspect
+
+import pytest
+
+from codex_pro.cost.budget import CostTracker, BudgetExceeded
+from codex_pro.storage.sqlite import SQLiteBackend
+
+
+async def _fresh_storage(tmp_path):
+    storage = SQLiteBackend(tmp_path / "db.sqlite")
+    await storage.initialize()
+    return storage
+
+
+def _tracker(storage):
+    return CostTracker(storage=storage, enabled=True, daily_budget_usd=100.0)
+
+
+async def _dim_rows(storage):
+    return await storage.fetch_sql(
+        "SELECT window_date, provider, model, channel, spent_usd, "
+        "input_tokens, output_tokens FROM cost_ledger_dim"
+    )
+
+
+@pytest.mark.asyncio
+async def test_migration_creates_cost_ledger_dim(tmp_path):
+    storage = SQLiteBackend(tmp_path / "db.sqlite")
+    await storage.initialize()
+    rows = await storage.fetch_sql(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='cost_ledger_dim'"
+    )
+    assert len(rows) == 1
+    await storage.close()
+
+
+@pytest.mark.asyncio
+async def test_record_writes_dim_row(tmp_path):
+    storage = await _fresh_storage(tmp_path)
+    t = _tracker(storage)
+    await t.record("gpt-4o-mini", {"prompt_tokens": 1_000_000, "completion_tokens": 0},
+                   "openai", channel="telegram")
+    rows = await _dim_rows(storage)
+    assert len(rows) == 1
+    assert rows[0]["provider"] == "openai"
+    assert rows[0]["model"] == "gpt-4o-mini"
+    assert rows[0]["channel"] == "telegram"
+    assert abs(rows[0]["spent_usd"] - 0.15) < 1e-9
+    assert rows[0]["input_tokens"] == 1_000_000
+    await storage.close()
+
+
+@pytest.mark.asyncio
+async def test_same_dimension_accumulates(tmp_path):
+    storage = await _fresh_storage(tmp_path)
+    t = _tracker(storage)
+    usage = {"prompt_tokens": 1_000_000, "completion_tokens": 0}
+    await t.record("gpt-4o-mini", usage, "openai", channel="telegram")
+    await t.record("gpt-4o-mini", usage, "openai", channel="telegram")
+    rows = await _dim_rows(storage)
+    assert len(rows) == 1
+    assert abs(rows[0]["spent_usd"] - 0.30) < 1e-9
+    assert rows[0]["input_tokens"] == 2_000_000
+    await storage.close()
+
+
+@pytest.mark.asyncio
+async def test_different_dimensions_isolated(tmp_path):
+    storage = await _fresh_storage(tmp_path)
+    t = _tracker(storage)
+    usage = {"prompt_tokens": 1_000_000, "completion_tokens": 0}
+    await t.record("gpt-4o-mini", usage, "openai", channel="telegram")
+    await t.record("gpt-4o-mini", usage, "openai", channel="discord")
+    rows = await _dim_rows(storage)
+    assert len(rows) == 2
+    await storage.close()
+
+
+@pytest.mark.asyncio
+async def test_channel_defaults_to_empty_string(tmp_path):
+    storage = await _fresh_storage(tmp_path)
+    t = _tracker(storage)
+    await t.record("gpt-4o-mini", {"prompt_tokens": 1, "completion_tokens": 0}, "openai")
+    rows = await _dim_rows(storage)
+    assert len(rows) == 1
+    assert rows[0]["channel"] == ""
+    await storage.close()
+
+
+class _DimFailStorage:
+    """Storage that fails only on cost_ledger_dim writes; legacy writes succeed."""
+
+    def __init__(self):
+        self.legacy_writes = 0
+
+    async def execute_sql(self, sql, params=()):
+        if "cost_ledger_dim" in sql:
+            raise RuntimeError("simulated dim write failure")
+        self.legacy_writes += 1
+
+    async def fetch_sql(self, sql, params=()):
+        return []
+
+
+@pytest.mark.asyncio
+async def test_dim_failure_does_not_break_legacy_or_gate():
+    storage = _DimFailStorage()
+    t = CostTracker(storage=storage, enabled=True, daily_budget_usd=1.0)
+    await t.record("gpt-4o-mini", {"prompt_tokens": 1_000_000, "completion_tokens": 0},
+                   "openai", channel="telegram")
+    assert abs(t.spent_usd - 0.15) < 1e-9
+    assert storage.legacy_writes == 1
+    t._spent_usd = 1.5
+    with pytest.raises(BudgetExceeded):
+        t.enforce()
+
+
+@pytest.mark.asyncio
+async def test_cross_day_writes_new_window_row(tmp_path):
+    storage = await _fresh_storage(tmp_path)
+    t = _tracker(storage)
+    t._window_date = "2000-01-01"
+    await t.record("gpt-4o-mini", {"prompt_tokens": 1_000_000, "completion_tokens": 0},
+                   "openai", channel="telegram")
+    rows = await _dim_rows(storage)
+    assert all(r["window_date"] != "2000-01-01" for r in rows)
+    await storage.close()
+
+
+def test_record_accepts_channel_kwarg():
+    sig = inspect.signature(CostTracker.record)
+    assert "channel" in sig.parameters
+    assert sig.parameters["channel"].default == ""
+
+
+# ── Reporting aggregation (dashboard analytics) ──────────────────────────────
+# 这些方法此前不存在,analytics API 调用会 500;测试用真实 storage 驱动聚合,
+# 而非 mock,确保 SQL 与表结构真实对齐。
+
+
+@pytest.mark.asyncio
+async def test_get_daily_usage_aggregates_across_dimensions(tmp_path):
+    storage = await _fresh_storage(tmp_path)
+    t = _tracker(storage)
+    # 同一天两条不同维度(不同 channel),daily 汇总应合并为一行。
+    await t.record("gpt-4o-mini", {"prompt_tokens": 1_000_000, "completion_tokens": 0},
+                   "openai", channel="telegram")
+    await t.record("gpt-4o-mini", {"prompt_tokens": 1_000_000, "completion_tokens": 0},
+                   "openai", channel="discord")
+    daily = await t.get_daily_usage(days=7)
+    assert len(daily) == 1
+    row = daily[0]
+    assert set(row.keys()) == {"date", "input_tokens", "output_tokens", "cost_usd"}
+    assert row["input_tokens"] == 2_000_000
+    assert row["cost_usd"] > 0
+    await storage.close()
+
+
+@pytest.mark.asyncio
+async def test_get_channel_usage_groups_by_channel(tmp_path):
+    storage = await _fresh_storage(tmp_path)
+    t = _tracker(storage)
+    await t.record("gpt-4o-mini", {"prompt_tokens": 1_000_000, "completion_tokens": 0},
+                   "openai", channel="telegram")
+    await t.record("gpt-4o-mini", {"prompt_tokens": 1_000_000, "completion_tokens": 0},
+                   "openai", channel="discord")
+    channels = await t.get_channel_usage(days=7)
+    names = {c["channel"] for c in channels}
+    assert names == {"telegram", "discord"}
+    assert all(set(c.keys()) == {"channel", "input_tokens", "output_tokens", "cost_usd"}
+               for c in channels)
+    await storage.close()
+
+
+@pytest.mark.asyncio
+async def test_get_skill_usage_returns_empty_no_datasource(tmp_path):
+    # skill 维度无埋点,契约上先降级为空数组(而非 500)。
+    storage = await _fresh_storage(tmp_path)
+    t = _tracker(storage)
+    assert await t.get_skill_usage(days=7) == []
+    await storage.close()
+
+
+@pytest.mark.asyncio
+async def test_record_skill_aggregates_success_and_failure(tmp_path):
+    storage = await _fresh_storage(tmp_path)
+    tracker = _tracker(storage)
+    await tracker.record_skill("research", True)
+    await tracker.record_skill("research", False)
+    await tracker.record_skill("writer", True)
+
+    usage = await tracker.get_skill_usage(days=7)
+    assert usage == [
+        {
+            "skill": "research",
+            "calls": 2,
+            "successes": 1,
+            "failures": 1,
+            "success_rate": 0.5,
+        },
+        {
+            "skill": "writer",
+            "calls": 1,
+            "successes": 1,
+            "failures": 0,
+            "success_rate": 1.0,
+        },
+    ]
+    await storage.close()
+
+
+@pytest.mark.asyncio
+async def test_reporting_methods_no_storage_return_empty():
+    t = CostTracker(storage=None, enabled=False)
+    assert await t.get_daily_usage() == []
+    assert await t.get_channel_usage() == []
+    assert await t.get_skill_usage() == []

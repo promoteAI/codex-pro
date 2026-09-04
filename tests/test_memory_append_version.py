@@ -1,0 +1,232 @@
+import pytest
+
+from codex_pro.memory.store import MemoryStore
+from codex_pro.memory.types import MemoryEntry, MemoryType
+
+
+def _store(tmp_path):
+    return MemoryStore(memory_dir=tmp_path / "mem", scope_policy="session")
+
+
+def test_append_version_preserves_old_and_bumps(tmp_path):
+    s = _store(tmp_path)
+    old = s.add(MemoryEntry(type=MemoryType.USER, key="home", content="北京",
+                            source="user_stated", source_session="x"))
+    new = MemoryEntry(type=MemoryType.USER, key="home", content="上海",
+                      source="user_stated", source_session="x")
+    result = s.append_version(old.id, new)
+    assert result.version == old.version + 1        # 新版本 version+1
+    assert s.get(old.id) is not None                # 旧版本保留
+    assert s.get(old.id).superseded_by == result.id # 旧指向新
+    assert not s.get(result.id).is_superseded        # 新是 active
+
+
+def test_add_same_key_higher_or_equal_appends(tmp_path):
+    s = _store(tmp_path)
+    s.add(MemoryEntry(type=MemoryType.USER, key="home", content="北京",
+                      source="user_stated", source_session="x"))
+    r = s.add(MemoryEntry(type=MemoryType.USER, key="home", content="上海",
+                          source="user_stated", source_session="x"))
+    assert r.content == "上海" and r.version == 2       # 走 append 非覆盖
+    all_home = [e for e in s._entries.values() if e.key == "home"]
+    assert len(all_home) == 2                            # 旧版本保留(未被覆盖)
+    assert any(e.content == "北京" and e.is_superseded for e in all_home)
+
+
+def test_add_same_key_lower_priority_keeps_old_no_overwrite(tmp_path):
+    s = _store(tmp_path)
+    s.add(MemoryEntry(type=MemoryType.USER, key="home", content="上海",
+                      source="user_stated", source_session="x"))
+    r = s.add(MemoryEntry(type=MemoryType.USER, key="home", content="北京",
+                          source="model_inferred", source_session="x"))
+    assert r.content == "上海"                           # 低优先级不覆盖,保留旧
+    live = [e for e in s._entries.values() if e.key == "home" and not e.is_superseded]
+    assert len(live) == 1 and live[0].content == "上海"  # 无新 active 版本
+
+
+def test_conflict_ignores_superseded(tmp_path):
+    # 确定性 RED 构造:只让 key 下残留一个 superseded 版本(active 版本已删)。
+    # 若 _find_conflict 不过滤 superseded,会把 superseded 旧版本当冲突基准,
+    # 把新写当"改口"→ version 递增到 2;正确行为是忽略 superseded、当作全新
+    # 首版 → version 1。只保留单一 superseded 候选,消除 set 迭代顺序的偶然性:
+    # 保留 active 兄弟时,有缺陷的实现可能凑巧命中 active 而假绿(跨种子 flaky)。
+    s = _store(tmp_path)
+    s.add(MemoryEntry(type=MemoryType.USER, key="home", content="北京",
+                      source="user_stated", source_session="x"))
+    v2 = s.add(MemoryEntry(type=MemoryType.USER, key="home", content="上海",
+                           source="user_stated", source_session="x"))  # 北京→superseded
+    s.delete(v2.id)  # 删除 active 上海,key=home 下只余 superseded 北京
+    # 改口广州:superseded 不应充当冲突基准,应作为全新首版落地
+    r = s.add(MemoryEntry(type=MemoryType.USER, key="home", content="广州",
+                          source="user_stated", source_session="x"))
+    live = [e for e in s._entries.values() if e.key == "home" and not e.is_superseded]
+    assert r.version == 1                                # 未以 superseded 为基准递增
+    assert len(live) == 1 and live[0].content == "广州"  # 广州为唯一 active
+
+
+def test_mark_superseded_clears_vector(tmp_path):
+    s = _store(tmp_path)
+    old = s.add(MemoryEntry(type=MemoryType.USER, key="home", content="北京",
+                            source="user_stated", source_session="x"))
+    new = s.add(MemoryEntry(type=MemoryType.USER, key="other", content="上海",
+                            source="user_stated", source_session="x"))
+    # 赋予旧条目真实向量并落盘,否则 mark_superseded 的 reload 会读回空 embedding_id,
+    # 测试将恒绿而覆盖不到"清旧向量"这条路径。
+    s.get(old.id).embedding_id = "vec-old"
+    s._save_type(MemoryType.USER)
+    s.mark_superseded(old.id, new.id)
+    assert s.get(old.id).superseded_by == new.id
+    assert s.get(old.id).embedding_id in ("", None)  # 旧向量已清
+
+
+def test_append_version_clears_old_embedding_id(tmp_path):
+    # append 改口路径也须清空旧条目 embedding_id,与 mark_superseded 对齐。
+    # 否则 scan_orphan_vectors 仍把旧 embedding_id 当有效引用,而向量已被
+    # fire-and-forget 移除 → 移除失败时永久孤儿(回收缺口)。
+    s = _store(tmp_path)
+    old = s.add(MemoryEntry(type=MemoryType.USER, key="home", content="北京",
+                            source="user_stated", source_session="x"))
+    # 赋真实向量并落盘,否则 append 的 reload 读回空 embedding_id,测试恒绿。
+    s.get(old.id).embedding_id = "vec-old"
+    s._save_type(MemoryType.USER)
+    new = MemoryEntry(type=MemoryType.USER, key="home", content="上海",
+                      source="user_stated", source_session="x")
+    s.append_version(old.id, new)
+    assert s.get(old.id).is_superseded                    # 旧被取代
+    assert s.get(old.id).embedding_id in ("", None)       # 旧 embedding_id 已清
+
+
+def test_capacity_counts_only_active(tmp_path):
+    s = MemoryStore(memory_dir=tmp_path / "mem", scope_policy="session", max_user=2)
+    s.add(MemoryEntry(type=MemoryType.USER, key="a", content="v1", source="user_stated", source_session="x"))
+    s.add(MemoryEntry(type=MemoryType.USER, key="a", content="v2", source="user_stated", source_session="x"))  # a: 1 active + 1 superseded
+    s.add(MemoryEntry(type=MemoryType.USER, key="b", content="w", source="user_stated", source_session="x"))
+    # active 计数为 2(a-v2, b),未超 max_user=2,b 不应触发淘汰。
+    # 缺陷:容量计数把 superseded a-v1 也算进去→达 max→触发淘汰;而 a-v1 被
+    # supersede 时 updated_at 被刷新,_evict_oldest 若不排除 superseded 会误删
+    # active 的 a-v2、反留 superseded 的 a-v1。故断言 active a-v2 必须存活——
+    # (原断言只查 b 存活是恒真:b 是最后写入、永不被淘汰,与 bug 无关)。
+    assert any(
+        e.key == "a" and not e.is_superseded and e.content == "v2"
+        for e in s._entries.values()
+    )                                                   # active a-v2 未被误淘汰
+    # 无 active 条目被误删:a-v2 与 b 两个 active 都在
+    live = [e for e in s._entries.values() if not e.is_superseded]
+    assert {e.content for e in live} == {"v2", "w"}
+
+
+def test_lineage_prunes_beyond_max_versions(tmp_path):
+    s = MemoryStore(memory_dir=tmp_path / "mem", scope_policy="session",
+                    lineage_max_versions=2)
+    for c in ["v1", "v2", "v3", "v4"]:  # 连续改口,产生 3 个 superseded + 1 active
+        s.add(MemoryEntry(type=MemoryType.USER, key="home", content=c,
+                          source="user_stated", source_session="x"))
+    superseded = [e for e in s._entries.values() if e.key == "home" and e.is_superseded]
+    # 世系裁剪:保留最近 2 版 superseded,更旧的转 ARCHIVAL(待遗忘删除)
+    from codex_pro.memory.types import MemoryTier
+    archival = [e for e in superseded if e.tier == MemoryTier.ARCHIVAL]
+    assert len(archival) == 1  # 上限=2、3 个 superseded 恰好归档最旧 1 个
+
+
+def test_lineage_prune_groups_by_scope(tmp_path):
+    # 多主体同 key(两 session 都有 home)不应共用同一 lineage_max_versions 上限。
+    # 按 key 分组会把两 session 的 superseded 混入一组,越限误归档另一主体的世系。
+    # 按 (key, source_session) 分组:每 session 各 2 版、均未超上限 → 无一归档。
+    from codex_pro.memory.forgetting import ForgettingCurve
+    from codex_pro.memory.types import MemoryTier
+    from datetime import datetime, timedelta
+    # retention_days=0 关闭陈旧年龄判定,隔离出"版本数上限"这一条,专测按 scope 分组。
+    fc = ForgettingCurve(lineage_max_versions=2, lineage_retention_days=0)
+    recent = [(datetime.now() - timedelta(hours=2)).isoformat(),
+              (datetime.now() - timedelta(hours=1)).isoformat()]
+    entries = []
+    for sess in ("s1", "s2"):
+        for i, ts in enumerate(recent):
+            e = MemoryEntry(type=MemoryType.USER, key="home", content=f"{sess}-v{i}",
+                            source="user_stated", source_session=sess)
+            e.superseded_by = "later"           # 标记为 superseded
+            e.updated_at = ts
+            entries.append(e)
+    marked = fc.prune_lineage(entries)
+    # 各 session 恰好 2 版 superseded、等于上限,不应有任何条目被归档
+    assert marked == []
+    assert all(e.tier != MemoryTier.ARCHIVAL for e in entries)
+
+
+def test_lineage_exact_max_versions_not_pruned(tmp_path):
+    # 边界:superseded 版本数恰好 == lineage_max_versions 时,无一被归档。
+    s = MemoryStore(memory_dir=tmp_path / "mem", scope_policy="session",
+                    lineage_max_versions=2)
+    for c in ["v1", "v2", "v3"]:  # 2 个 superseded(v1,v2) + 1 active(v3)
+        s.add(MemoryEntry(type=MemoryType.USER, key="home", content=c,
+                          source="user_stated", source_session="x"))
+    from codex_pro.memory.types import MemoryTier
+    superseded = [e for e in s._entries.values() if e.key == "home" and e.is_superseded]
+    assert len(superseded) == 2                                   # 恰好 2 版 superseded
+    archival = [e for e in superseded if e.tier == MemoryTier.ARCHIVAL]
+    assert len(archival) == 0                                     # 未超上限,无一归档
+
+
+def test_lineage_active_not_pruned(tmp_path):
+    # 世系裁剪只作用于 superseded,active 版本永不被标记归档。
+    s = MemoryStore(memory_dir=tmp_path / "mem", scope_policy="session",
+                    lineage_max_versions=1)
+    for c in ["v1", "v2", "v3"]:
+        s.add(MemoryEntry(type=MemoryType.USER, key="home", content=c,
+                          source="user_stated", source_session="x"))
+    from codex_pro.memory.types import MemoryTier
+    active = [e for e in s._entries.values() if e.key == "home" and not e.is_superseded]
+    assert len(active) == 1                          # 仅一个 active
+    assert active[0].content == "v3"                 # 最新版本存活
+    assert active[0].tier != MemoryTier.ARCHIVAL     # active 未被裁剪
+
+
+@pytest.mark.asyncio
+async def test_lineage_retention_days_marks_stale(tmp_path):
+    # 超过保留天数的 superseded 即使未超版本数上限,也被标记 ARCHIVAL。
+    from datetime import datetime, timedelta
+    from codex_pro.memory.types import MemoryTier
+    s = MemoryStore(memory_dir=tmp_path / "mem", scope_policy="session",
+                    lineage_max_versions=100, lineage_retention_days=30)
+    old = s.add(MemoryEntry(type=MemoryType.USER, key="home", content="旧",
+                            source="user_stated", source_session="x"))
+    s.add(MemoryEntry(type=MemoryType.USER, key="home", content="新",
+                      source="user_stated", source_session="x"))  # 旧→superseded
+    stale = s.get(old.id)
+    stale.updated_at = (datetime.now() - timedelta(days=60)).isoformat()  # 陈旧 60 天
+    to_archive, to_forget = await s._forgetting.run_decay_pass(list(s._entries.values()))
+    assert stale.tier == MemoryTier.ARCHIVAL          # 超期 superseded 被归档
+
+
+def test_no_dead_supersede_and_paths_converge(tmp_path):
+    # 写时 append 产生的 superseded 不应被再当作新冲突(排除已由 _find_conflict 保证)
+    s = _store(tmp_path)
+    s.add(MemoryEntry(type=MemoryType.USER, key="home", content="北京",
+                      source="user_stated", source_session="x"))
+    s.add(MemoryEntry(type=MemoryType.USER, key="home", content="上海",
+                      source="user_stated", source_session="x"))
+    # 再 add 与 active 同内容(精确重复)应短路,不产生新版本
+    s.add(MemoryEntry(type=MemoryType.USER, key="home", content="上海",
+                      source="user_stated", source_session="x"))
+    live = [e for e in s._entries.values() if e.key == "home" and not e.is_superseded]
+    assert len(live) == 1 and live[0].content == "上海"  # 精确重复短路,无新版本
+
+
+@pytest.mark.asyncio
+async def test_beijing_to_shanghai_acceptance(tmp_path):
+    from codex_pro.memory.service import MemoryService, ActorContext
+    store = MemoryStore(memory_dir=tmp_path / "mem", scope_policy="session")
+    svc = MemoryService(store)
+    ctx = ActorContext(actor="model", session_key="s", memory_scope="x")
+    await svc.add(ctx, type=MemoryType.USER, key="home", content="住在北京", source="user_stated")
+    await svc.add(ctx, type=MemoryType.USER, key="home", content="住在上海", source="user_stated")
+    home = [e for e in store._entries.values() if e.key == "home"]
+    live = [e for e in home if not e.is_superseded]
+    old = [e for e in home if e.is_superseded]
+    assert len(live) == 1 and live[0].content == "住在上海" and live[0].version == 2
+    assert len(old) == 1 and old[0].content == "住在北京"          # 旧事实保留
+    assert old[0].superseded_by == live[0].id
+    # 召回只回 active:关键词族 TOOL audience 不返回 superseded
+    from codex_pro.memory.eligibility import Audience
+    hits = store.search_scored("北京", session_key="x", audience=Audience.TOOL)
+    assert all("北京" not in e.content for e, _ in hits)          # 旧值不被召回

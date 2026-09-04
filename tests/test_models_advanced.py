@@ -1,0 +1,313 @@
+"""Comprehensive tests for credential_pool, inference, and rate_limiter modules."""
+
+from __future__ import annotations
+
+import time
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from codex_pro.models.credential_pool import CredentialPool
+from codex_pro.models.inference import InferenceConstraints, InferenceController
+from codex_pro.models.provider import LLMResponse, ToolCallRequest
+from codex_pro.models.rate_limiter import RateLimitedProvider, TokenBucketLimiter
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_tool(name: str) -> dict:
+    return {"type": "function", "function": {"name": name, "parameters": {}}}
+
+
+def _make_response(
+    content: str | None = None,
+    tool_names: list[str] | None = None,
+    finish_reason: str = "stop",
+) -> LLMResponse:
+    tool_calls = []
+    if tool_names:
+        for n in tool_names:
+            tool_calls.append(ToolCallRequest(id=f"call_{n}", name=n, arguments={}))
+    return LLMResponse(content=content, tool_calls=tool_calls, finish_reason=finish_reason)
+
+
+def _make_provider_mock() -> MagicMock:
+    provider = MagicMock()
+    provider.api_key = "test"
+    provider.api_base = "http://test"
+    provider.generation = MagicMock()
+    provider.chat = AsyncMock(return_value=_make_response(content="ok"))
+    provider.chat_stream = AsyncMock(return_value=_make_response(content="streamed"))
+    provider.get_default_model = MagicMock(return_value="test-model")
+    return provider
+
+
+# ===========================================================================
+# TestCredentialPool
+# ===========================================================================
+
+class TestCredentialPool:
+
+    def test_empty_keys_raises(self):
+        with pytest.raises(ValueError, match="at least one key"):
+            CredentialPool([])
+
+    def test_size_property(self):
+        pool = CredentialPool(["a", "b", "c"])
+        assert pool.size == 3
+
+    def test_round_robin_cycles(self):
+        pool = CredentialPool(["a", "b", "c"])
+        results = [pool.get_next() for _ in range(6)]
+        assert results == ["a", "b", "c", "a", "b", "c"]
+
+    def test_report_error_exhausts_at_three(self):
+        pool = CredentialPool(["a", "b"])
+        pool.report_error("a")
+        pool.report_error("a")
+        # Two errors — key still usable
+        assert pool.get_next() == "a"
+        pool.report_error("a")
+        # Third error — key exhausted, should skip to "b"
+        assert pool.get_next() == "b"
+
+    def test_exhausted_key_skipped(self):
+        pool = CredentialPool(["a", "b", "c"])
+        for _ in range(3):
+            pool.report_error("b")
+        results = [pool.get_next() for _ in range(4)]
+        assert "b" not in results
+
+    def test_all_exhausted_resets(self):
+        pool = CredentialPool(["a", "b"])
+        for key in ["a", "b"]:
+            for _ in range(3):
+                pool.report_error(key)
+        # All exhausted — should reset and return first key
+        result = pool.get_next()
+        assert result == "a"
+
+    def test_report_success_clears_errors(self):
+        pool = CredentialPool(["a", "b"])
+        pool.report_error("a")
+        pool.report_error("a")
+        pool.report_success("a")
+        # Error count reset — three more errors needed to exhaust
+        pool.report_error("a")
+        pool.report_error("a")
+        assert pool.get_next() == "a"
+
+    def test_exhausted_key_recovers_after_cooldown(self, monkeypatch):
+        """A key that hits the error threshold must auto-recover when its
+        cooldown window elapses, instead of staying permanently blacklisted
+        until *every* key dies and the pool resets wholesale."""
+        import codex_pro.models.credential_pool as cp_mod
+        clock = {"now": 1000.0}
+        monkeypatch.setattr(cp_mod.time, "monotonic", lambda: clock["now"])
+        pool = CredentialPool(["a", "b"], cooldown_seconds=60)
+        for _ in range(3):
+            pool.report_error("a")
+        # While cooldown is active, get_next must skip "a".
+        results_during = [pool.get_next() for _ in range(4)]
+        assert "a" not in results_during
+
+        # Advance past the cooldown window.
+        clock["now"] += 61
+        seen = {pool.get_next() for _ in range(6)}
+        assert "a" in seen, "key should rejoin rotation after cooldown"
+
+    def test_zero_cooldown_keeps_legacy_behavior(self):
+        """cooldown_seconds=0 must preserve the old "exhaust forever" behavior
+        for callers that opt out of automatic recovery."""
+        pool = CredentialPool(["a", "b"], cooldown_seconds=0)
+        for _ in range(3):
+            pool.report_error("a")
+        results = [pool.get_next() for _ in range(6)]
+        # "a" should never come back without an explicit success report.
+        assert "a" not in results
+
+
+# ===========================================================================
+# TestInferenceConstraints
+# ===========================================================================
+
+class TestInferenceConstraints:
+
+    def test_defaults(self):
+        c = InferenceConstraints()
+        assert c.allowed_tools is None
+        assert c.blocked_tools is None
+        assert c.output_format is None
+        assert c.require_tool_call is False
+        assert c.require_confirmation_for == []
+
+
+# ===========================================================================
+# TestInferenceController
+# ===========================================================================
+
+class TestInferenceController:
+
+    def _controller(self, **kwargs) -> InferenceController:
+        ctrl = InferenceController()
+        ctrl.set_constraints(InferenceConstraints(**kwargs))
+        return ctrl
+
+    # -- filter_tools -------------------------------------------------------
+
+    def test_filter_tools_allowed(self):
+        ctrl = self._controller(allowed_tools=["search", "read"])
+        tools = [_make_tool("search"), _make_tool("write"), _make_tool("read")]
+        result = ctrl.filter_tools(tools)
+        names = [t["function"]["name"] for t in result]
+        assert names == ["search", "read"]
+
+    def test_filter_tools_blocked(self):
+        ctrl = self._controller(blocked_tools=["delete"])
+        tools = [_make_tool("search"), _make_tool("delete")]
+        result = ctrl.filter_tools(tools)
+        names = [t["function"]["name"] for t in result]
+        assert names == ["search"]
+
+    def test_filter_tools_allowed_and_blocked(self):
+        ctrl = self._controller(allowed_tools=["a", "b", "c"], blocked_tools=["b"])
+        tools = [_make_tool("a"), _make_tool("b"), _make_tool("c"), _make_tool("d")]
+        result = ctrl.filter_tools(tools)
+        names = [t["function"]["name"] for t in result]
+        assert names == ["a", "c"]
+
+    # -- validate_response --------------------------------------------------
+
+    def test_validate_require_tool_call_missing(self):
+        ctrl = self._controller(require_tool_call=True)
+        resp = _make_response(content="just text")
+        issues = ctrl.validate_response(resp)
+        assert any("Expected tool call" in i for i in issues)
+
+    def test_validate_blocked_tool_used(self):
+        ctrl = self._controller(blocked_tools=["danger"])
+        resp = _make_response(tool_names=["danger"])
+        issues = ctrl.validate_response(resp)
+        assert any("blocked" in i.lower() for i in issues)
+
+    def test_validate_json_format_invalid(self):
+        ctrl = self._controller(output_format="json")
+        resp = _make_response(content="not json at all")
+        issues = ctrl.validate_response(resp)
+        assert any("JSON" in i for i in issues)
+
+    def test_validate_response_valid(self):
+        ctrl = self._controller(
+            allowed_tools=["search"],
+            output_format="json",
+        )
+        resp = _make_response(content='{"ok": true}', tool_names=["search"])
+        issues = ctrl.validate_response(resp)
+        assert issues == []
+
+    def test_validate_response_flags_empty_content(self):
+        ctrl = InferenceController()
+        resp = _make_response(content=None)
+        issues = ctrl.validate_response(resp)
+        assert any("empty content" in i.lower() for i in issues)
+
+    def test_validate_response_ok_when_has_tool_calls(self):
+        ctrl = InferenceController()
+        resp = _make_response(content=None, tool_names=["t"])
+        issues = ctrl.validate_response(resp)
+        assert not any("empty content" in i.lower() for i in issues)
+
+    # -- needs_confirmation -------------------------------------------------
+
+    def test_needs_confirmation(self):
+        ctrl = self._controller(require_confirmation_for=["deploy", "delete"])
+        assert ctrl.needs_confirmation("deploy") is True
+        assert ctrl.needs_confirmation("delete") is True
+        assert ctrl.needs_confirmation("read") is False
+
+
+# ===========================================================================
+# TestTokenBucketLimiter
+# ===========================================================================
+
+class TestTokenBucketLimiter:
+
+    @pytest.mark.asyncio
+    async def test_acquire_immediate_when_available(self):
+        limiter = TokenBucketLimiter(tokens_per_minute=600, burst=10)
+        # Bucket starts full at capacity (10), so acquiring 5 should be instant
+        await limiter.acquire(5)
+        assert limiter._tokens < 10
+
+    @pytest.mark.asyncio
+    async def test_acquire_waits_when_empty(self):
+        limiter = TokenBucketLimiter(tokens_per_minute=60, burst=1)
+        # Drain the bucket
+        await limiter.acquire(1)
+        assert limiter._tokens == 0.0
+
+        # Patch asyncio.sleep to simulate waiting, and advance _last_refill
+        # so _refill() adds tokens on the next loop iteration.
+        async def fake_sleep(duration):
+            # Simulate time passing by backdating _last_refill
+            limiter._last_refill -= 2.0
+            # Don't actually sleep
+
+        with patch("codex_pro.models.rate_limiter.asyncio.sleep", side_effect=fake_sleep):
+            await limiter.acquire(1)
+        # Should have succeeded after the fake sleep advanced time
+        assert limiter._tokens >= 0
+
+    @pytest.mark.asyncio
+    async def test_refill_over_time(self):
+        limiter = TokenBucketLimiter(tokens_per_minute=600, burst=10)
+        await limiter.acquire(10)  # drain
+        # Simulate time passing
+        limiter._last_refill = time.monotonic() - 1.0  # 1 second ago
+        limiter._refill()
+        # rate = 600/60 = 10/sec, so 1 second -> 10 tokens
+        assert limiter._tokens == pytest.approx(10.0, abs=1.0)
+
+
+# ===========================================================================
+# TestRateLimitedProvider
+# ===========================================================================
+
+class TestRateLimitedProvider:
+
+    @pytest.mark.asyncio
+    async def test_chat_acquires_before_delegating(self):
+        inner = _make_provider_mock()
+        limiter = TokenBucketLimiter(tokens_per_minute=600, burst=10)
+        provider = RateLimitedProvider(inner, limiter)
+
+        msgs = [{"role": "user", "content": "hi"}]
+        result = await provider.chat(msgs, tools=None, model="m")
+
+        inner.chat.assert_awaited_once_with(msgs, None, "m", None)
+        assert result.content == "ok"
+        # Limiter should have consumed 1 token
+        assert limiter._tokens < 10
+
+    @pytest.mark.asyncio
+    async def test_chat_stream_acquires_before_delegating(self):
+        inner = _make_provider_mock()
+        limiter = TokenBucketLimiter(tokens_per_minute=600, burst=10)
+        provider = RateLimitedProvider(inner, limiter)
+
+        msgs = [{"role": "user", "content": "hi"}]
+        result = await provider.chat_stream(msgs, tools=None, model="m")
+
+        inner.chat_stream.assert_awaited_once()
+        assert result.content == "streamed"
+        assert limiter._tokens < 10
+
+    def test_get_default_model_delegates(self):
+        inner = _make_provider_mock()
+        limiter = TokenBucketLimiter(tokens_per_minute=60, burst=10)
+        provider = RateLimitedProvider(inner, limiter)
+
+        assert provider.get_default_model() == "test-model"
+        inner.get_default_model.assert_called_once()

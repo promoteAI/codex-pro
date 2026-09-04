@@ -1,0 +1,70 @@
+# Observability
+
+Logging, monitoring, and telemetry for Codex Pro.
+
+---
+
+## Logging
+
+Codex Pro uses [Loguru](https://github.com/Delgan/loguru) for structured logging.
+
+### Log Levels
+
+Configure via environment variable:
+
+```bash
+export CODEX_PRO_OBSERVABILITY__LOG_LEVEL=DEBUG  # DEBUG, INFO, WARNING, ERROR
+```
+
+### Log Locations
+
+- **Console**: stderr (foreground mode)
+- **File**: `~/.codex-pro/logs/` (when running as service)
+- **Gateway API**: `GET /api/v1/logs` (Codex Pro Logs page)
+
+## Gateway Health
+
+```bash
+curl http://127.0.0.1:58123/api/v1/health
+```
+
+Returns: status (healthy/degraded/unhealthy), active channels, WebSocket clients, provider status, rate limiter stats.
+
+## OpenTelemetry
+
+Enable OTLP export:
+
+OTel settings are flat fields under `observability` prefixed with `otel_`; there is no nested `otlp` section:
+
+```yaml
+observability:
+  otel_enabled: true                     # default true
+  otel_endpoint: "http://localhost:4317" # nothing is exported while empty
+  otel_service_name: codex-pro
+  otel_export_interval_ms: 5000
+  trace_enabled: true
+```
+
+`otel_enabled` is on by default, but `otel_endpoint` is empty by default — with no endpoint set, nothing is exported. There are no `protocol` or `headers` fields.
+
+Requires the `otel` extra:
+
+```bash
+pip install "codex-pro[otel]"
+```
+
+Exports traces and metrics via OTLP gRPC.
+
+## Cost Analytics
+
+```bash
+codex-pro cost --days 7
+codex-pro cost --days 30 --json
+```
+
+Codex Pro Analytics page provides per-model token usage and cost breakdown.
+
+## Sensitive Data
+
+!!! warning
+    Logs may contain conversation metadata. Review `observability` config for redaction settings before shipping logs to external systems.

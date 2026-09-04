@@ -1,0 +1,100 @@
+"""Token-bucket rate limiter and rate-limited provider wrapper."""
+
+from __future__ import annotations
+
+import asyncio
+import time
+from typing import Any
+
+from codex_pro.models.provider import (
+    LLMProvider,
+    LLMResponse,
+    StreamDeltaCallback,
+    StreamReasoningCallback,
+)
+
+
+class TokenBucketLimiter:
+
+    def __init__(self, tokens_per_minute: int, burst: int = 0):
+        self._rate = tokens_per_minute / 60.0
+        self._capacity = burst or tokens_per_minute
+        self._tokens = float(self._capacity)
+        self._last_refill = time.monotonic()
+        self._lock = asyncio.Lock()
+
+    async def acquire(self, count: int = 1) -> None:
+        if count > self._capacity:
+            raise ValueError(
+                f"acquire(count={count}) exceeds bucket capacity {self._capacity}; "
+                "the request can never be satisfied"
+            )
+        while True:
+            async with self._lock:
+                self._refill()
+                if self._tokens >= count:
+                    self._tokens -= count
+                    return
+                wait = (count - self._tokens) / self._rate
+            await asyncio.sleep(min(wait, 5.0))
+
+    def _refill(self) -> None:
+        now = time.monotonic()
+        elapsed = now - self._last_refill
+        self._tokens = min(self._capacity, self._tokens + elapsed * self._rate)
+        self._last_refill = now
+
+
+class RateLimitedProvider(LLMProvider):
+
+    def __init__(self, inner: LLMProvider, limiter: TokenBucketLimiter):
+        super().__init__(api_key=inner.api_key, api_base=inner.api_base)
+        self._inner = inner
+        self._limiter = limiter
+        self.generation = inner.generation
+
+    async def chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        model: str | None = None,
+        tool_choice: str | dict | None = None,
+        **kwargs: Any,
+    ) -> LLMResponse:
+        await self._limiter.acquire()
+        return await self._inner.chat(messages, tools, model, tool_choice, **kwargs)
+
+    async def chat_stream(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        model: str | None = None,
+        tool_choice: str | dict | None = None,
+        on_delta: StreamDeltaCallback | None = None,
+        on_reasoning: StreamReasoningCallback | None = None,
+        **kwargs: Any,
+    ) -> LLMResponse:
+        await self._limiter.acquire()
+        return await self._inner.chat_stream(
+            messages, tools, model, tool_choice,
+            on_delta=on_delta, on_reasoning=on_reasoning, **kwargs,
+        )
+
+    async def aclose(self) -> None:
+        # The limiter holds no client of its own; the socket owner is _inner.
+        await self._inner.aclose()
+
+    def get_default_model(self) -> str:
+        return self._inner.get_default_model()
+
+    async def embed(self, text: str, model: str | None = None) -> list[float] | None:
+        # Proxy so embed-capability probes see through the wrapper; without
+        # this a rate-limited OpenAI provider is misdetected as
+        # embed-incapable and embedding silently falls back to the local model.
+        if not self._inner.supports_embed():
+            return None
+        await self._limiter.acquire()
+        return await self._inner.embed(text, model=model)
+
+    def supports_embed(self) -> bool:
+        return self._inner.supports_embed()

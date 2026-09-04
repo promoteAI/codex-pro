@@ -1,0 +1,391 @@
+"""Tests for codex_pro/config/loader.py."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+import yaml
+
+from codex_pro.config.loader import (
+    _canonicalize_keys,
+    _deep_merge,
+    _env_overrides,
+    _find_config_file_in,
+    _load_yaml_file,
+    load_config,
+    migrate_heartbeat_config,
+    resolve_config_file,
+    save_config,
+)
+from codex_pro.config.schema import Config
+
+
+# ---------------------------------------------------------------------------
+# _find_config_file_in
+# ---------------------------------------------------------------------------
+
+class TestFindConfigFileIn:
+    def test_finds_yaml(self, tmp_path: Path):
+        (tmp_path / "codex-pro.yaml").write_text("key: val\n")
+        assert _find_config_file_in(tmp_path) == tmp_path / "codex-pro.yaml"
+
+    def test_finds_yml(self, tmp_path: Path):
+        (tmp_path / "codex-pro.yml").write_text("key: val\n")
+        assert _find_config_file_in(tmp_path) == tmp_path / "codex-pro.yml"
+
+    def test_prefers_yaml_over_yml(self, tmp_path: Path):
+        (tmp_path / "codex-pro.yaml").write_text("a: 1\n")
+        (tmp_path / "codex-pro.yml").write_text("b: 2\n")
+        result = _find_config_file_in(tmp_path)
+        assert result.name == "codex-pro.yaml"
+
+    def test_finds_config_yaml(self, tmp_path: Path):
+        (tmp_path / "config.yaml").write_text("x: 1\n")
+        assert _find_config_file_in(tmp_path) == tmp_path / "config.yaml"
+
+    def test_returns_none_when_missing(self, tmp_path: Path):
+        assert _find_config_file_in(tmp_path) is None
+
+
+# ---------------------------------------------------------------------------
+# _load_yaml_file
+# ---------------------------------------------------------------------------
+
+class TestLoadYamlFile:
+    def test_valid_yaml(self, tmp_path: Path):
+        p = tmp_path / "test.yaml"
+        p.write_text("foo: bar\nnested:\n  a: 1\n")
+        data = _load_yaml_file(p)
+        assert data["foo"] == "bar"
+        assert data["nested"]["a"] == 1
+
+    def test_empty_file(self, tmp_path: Path):
+        p = tmp_path / "empty.yaml"
+        p.write_text("")
+        assert _load_yaml_file(p) == {}
+
+    def test_missing_file(self, tmp_path: Path):
+        assert _load_yaml_file(tmp_path / "nope.yaml") == {}
+
+    def test_none_path(self):
+        assert _load_yaml_file(None) == {}
+
+
+# ---------------------------------------------------------------------------
+# _deep_merge
+# ---------------------------------------------------------------------------
+
+class TestDeepMerge:
+    def test_nested_dicts(self):
+        base = {"a": {"x": 1, "y": 2}, "b": 10}
+        override = {"a": {"y": 99, "z": 3}}
+        result = _deep_merge(base, override)
+        assert result == {"a": {"x": 1, "y": 99, "z": 3}, "b": 10}
+
+    def test_override_scalar(self):
+        base = {"a": 1, "b": 2}
+        override = {"a": 100}
+        result = _deep_merge(base, override)
+        assert result["a"] == 100
+        assert result["b"] == 2
+
+    def test_override_dict_with_scalar(self):
+        base = {"a": {"nested": True}}
+        override = {"a": "flat"}
+        result = _deep_merge(base, override)
+        assert result["a"] == "flat"
+
+    def test_empty_override(self):
+        base = {"a": 1}
+        assert _deep_merge(base, {}) == {"a": 1}
+
+    def test_empty_base(self):
+        override = {"a": 1}
+        assert _deep_merge({}, override) == {"a": 1}
+
+
+# ---------------------------------------------------------------------------
+# _env_overrides
+# ---------------------------------------------------------------------------
+
+class TestEnvOverrides:
+    def test_simple_prefix(self, monkeypatch):
+        monkeypatch.setenv("CODEX_PRO_MODEL", "gpt-4")
+        result = _env_overrides()
+        assert result["model"] == "gpt-4"
+
+    def test_nested_with_double_underscore(self, monkeypatch):
+        monkeypatch.setenv("CODEX_PRO_LLM__PROVIDER", "openai")
+        result = _env_overrides()
+        assert result["llm"]["provider"] == "openai"
+
+    def test_json_list_for_nested_gateway_tokens(self, monkeypatch):
+        monkeypatch.setenv(
+            "CODEX_PRO_GATEWAY__AUTH__ADMIN_TOKENS",
+            '["ephemeral-token"]',
+        )
+        result = _env_overrides()
+        assert result["gateway"]["auth"]["admin_tokens"] == ["ephemeral-token"]
+
+    def test_json_dict_for_mapping_field(self, monkeypatch):
+        monkeypatch.setenv("CODEX_PRO_MODELS__MODEL_WINDOWS", '{"gpt-4": 128000}')
+        result = _env_overrides()
+        assert result["models"]["model_windows"] == {"gpt-4": 128000}
+
+    @pytest.mark.parametrize("raw", ["false", "true", "null", "[]", "{}", '{"a": 1}'])
+    def test_str_field_never_json_parsed(self, monkeypatch, raw):
+        """A secret that happens to read like JSON must stay a string.
+
+        Parsing by value shape turned tokens such as ``false`` into a bool and
+        made Config() reject a previously working deployment.
+        """
+        monkeypatch.setenv("CODEX_PRO_CHANNELS__TELEGRAM__TOKEN", raw)
+        result = _env_overrides()
+        assert result["channels"]["telegram"]["token"] == raw
+        cfg = Config(**result)
+        assert cfg.channels.telegram.token == raw
+
+    def test_bool_field_still_coerced_by_pydantic(self, monkeypatch):
+        monkeypatch.setenv("CODEX_PRO_CHANNELS__TELEGRAM__ENABLED", "true")
+        cfg = Config(**_env_overrides())
+        assert cfg.channels.telegram.enabled is True
+
+    def test_unknown_path_left_as_string(self, monkeypatch):
+        monkeypatch.setenv("CODEX_PRO_NOT_A_FIELD__NESTED", "[1,2]")
+        result = _env_overrides()
+        assert result["not_a_field"]["nested"] == "[1,2]"
+
+    def test_malformed_json_container_left_as_string(self, monkeypatch):
+        """Keep the raw value so pydantic names the offending field."""
+        monkeypatch.setenv("CODEX_PRO_GATEWAY__AUTH__ADMIN_TOKENS", "[unclosed")
+        result = _env_overrides()
+        assert result["gateway"]["auth"]["admin_tokens"] == "[unclosed"
+
+    def test_list_field_through_submodel_mapping(self, monkeypatch):
+        """``mcp_servers__<name>__args`` addresses a list inside a user key."""
+        monkeypatch.setenv("CODEX_PRO_TOOLS__MCP_SERVERS__MYSRV__ARGS", '["-m", "srv"]')
+        result = _env_overrides()
+        assert result["tools"]["mcp_servers"]["mysrv"]["args"] == ["-m", "srv"]
+
+    def test_str_field_through_submodel_mapping(self, monkeypatch):
+        monkeypatch.setenv("CODEX_PRO_TOOLS__MCP_SERVERS__MYSRV__COMMAND", "null")
+        result = _env_overrides()
+        assert result["tools"]["mcp_servers"]["mysrv"]["command"] == "null"
+
+
+# ---------------------------------------------------------------------------
+# alias normalization: camelCase YAML keys must not shadow env overrides
+# ---------------------------------------------------------------------------
+
+class TestAliasCanonicalization:
+    def test_camel_case_keys_rewritten_to_field_names(self):
+        out = _canonicalize_keys(Config, {"execution": {"networkPolicy": "allow"}})
+        assert out == {"execution": {"network_policy": "allow"}}
+
+    def test_recurses_into_list_of_submodels(self):
+        out = _canonicalize_keys(
+            Config, {"models": {"providers": [{"name": "openai", "apiKeyEnv": "K"}]}}
+        )
+        assert out["models"]["providers"][0]["api_key_env"] == "K"
+
+    def test_recurses_into_mapping_of_submodels(self):
+        out = _canonicalize_keys(
+            Config, {"tools": {"mcpServers": {"srv": {"connectTimeout": 5}}}}
+        )
+        assert out["tools"]["mcp_servers"]["srv"]["connect_timeout"] == 5
+
+    def test_unknown_keys_preserved(self):
+        """Compat migrations run on raw data and must survive this pass."""
+        out = _canonicalize_keys(
+            Config, {"agent": {"heartbeat": {"interval_sec": 30}}, "bogusKey": 1}
+        )
+        assert out["agent"]["heartbeat"]["interval_sec"] == 30
+        assert out["bogusKey"] == 1
+
+    def test_env_var_overrides_camel_case_yaml(self, tmp_path, monkeypatch):
+        """The regression this normalization exists for.
+
+        ``networkPolicy: allow`` in the packaged default.yaml used to make
+        CODEX_PRO_EXECUTION__NETWORK_POLICY a silent no-op — a hardening
+        setting that failed open.
+        """
+        cfg = tmp_path / "codex-pro.yaml"
+        cfg.write_text("execution:\n  networkPolicy: allow\n", encoding="utf-8")
+        monkeypatch.setenv("CODEX_PRO_EXECUTION__NETWORK_POLICY", "deny")
+        assert load_config(cfg).execution.network_policy == "deny"
+
+    def test_env_var_overrides_camel_case_packaged_default(self, monkeypatch):
+        monkeypatch.setenv("CODEX_PRO_EXECUTION__NETWORK_POLICY", "deny")
+        assert load_config("/nonexistent").execution.network_policy == "deny"
+
+    def test_yaml_value_survives_when_no_env_override(self, tmp_path):
+        cfg = tmp_path / "codex-pro.yaml"
+        cfg.write_text(
+            "gateway:\n  apiPrefix: /from-yaml\n", encoding="utf-8"
+        )
+        assert load_config(cfg).gateway.api_prefix == "/from-yaml"
+
+    def test_ignores_unrelated_vars(self, monkeypatch):
+        monkeypatch.setenv("OTHER_VAR", "nope")
+        monkeypatch.delenv("CODEX_PRO_MODEL", raising=False)
+        monkeypatch.delenv("CODEX_PRO_LLM__PROVIDER", raising=False)
+        result = _env_overrides()
+        assert "other_var" not in result
+
+
+# ---------------------------------------------------------------------------
+# save_config
+# ---------------------------------------------------------------------------
+
+class TestSaveConfig:
+    def test_writes_yaml(self, tmp_path: Path):
+        target = tmp_path / "out.yaml"
+        data = {"model": "gpt-4", "nested": {"key": "val"}}
+        result = save_config(data, path=target)
+        assert result == target
+        loaded = yaml.safe_load(target.read_text())
+        assert loaded["model"] == "gpt-4"
+        assert loaded["nested"]["key"] == "val"
+
+    def test_creates_parent_dirs(self, tmp_path: Path):
+        target = tmp_path / "sub" / "dir" / "config.yaml"
+        save_config({"a": 1}, path=target)
+        assert target.exists()
+
+
+# ---------------------------------------------------------------------------
+# resolve_config_file
+# ---------------------------------------------------------------------------
+
+class TestResolveConfigFile:
+    def test_explicit_path(self, tmp_path: Path):
+        cfg = tmp_path / "my.yaml"
+        cfg.write_text("x: 1\n")
+        result = resolve_config_file(config_path=cfg)
+        assert result == cfg.resolve()
+
+    def test_explicit_path_nonexistent(self, tmp_path: Path):
+        cfg = tmp_path / "missing.yaml"
+        result = resolve_config_file(config_path=cfg)
+        assert result == cfg
+
+    def test_search_dir(self, tmp_path: Path):
+        (tmp_path / "codex-pro.yaml").write_text("a: 1\n")
+        result = resolve_config_file(search_dir=tmp_path)
+        assert result is not None
+        assert result.name == "codex-pro.yaml"
+
+
+# ---------------------------------------------------------------------------
+# load_config — end-to-end profile cognitive defaults
+# ---------------------------------------------------------------------------
+
+class TestLoadConfigProfileDefaults:
+    """Lock the zero-config default: a CLI run with no user YAML must resolve
+    to the lean personal_cli cognitive defaults (planning off). Regression
+    guard for the bug where profile_defaults ran before pydantic injected the
+    default profile, so planning stayed on for the most common path."""
+
+    def test_zero_config_defaults_to_lean_cli(self, tmp_path: Path):
+        # Point at a nonexistent file inside an empty dir so only the packaged
+        # default.yaml is loaded — no user/home config bleeds in.
+        cfg = load_config(config_path=tmp_path / "absent.yaml")
+        assert cfg.security.profile == "personal_cli"
+        assert cfg.planning.enabled is False
+        assert cfg.memory.retrieval_on_miss == "degrade"
+
+    def test_explicit_daemon_keeps_planning(self, tmp_path: Path):
+        cfg_file = tmp_path / "codex-pro.yaml"
+        cfg_file.write_text("security:\n  profile: daemon\n")
+        cfg = load_config(config_path=cfg_file)
+        assert cfg.security.profile == "daemon"
+        assert cfg.planning.enabled is True
+        assert cfg.memory.retrieval_on_miss == "sync"
+
+    def test_explicit_user_planning_overrides_profile_default(self, tmp_path: Path):
+        # personal_cli would turn planning off, but an explicit user value wins.
+        cfg_file = tmp_path / "codex-pro.yaml"
+        cfg_file.write_text("planning:\n  enabled: true\n")
+        cfg = load_config(config_path=cfg_file)
+        assert cfg.security.profile == "personal_cli"
+        assert cfg.planning.enabled is True
+
+
+def test_migrate_every_maps_to_every_tool():
+    data = {"agent": {"heartbeat": {"on_uneditable": "every"}}}
+    out = migrate_heartbeat_config(data)
+    assert out["agent"]["heartbeat"]["verbosity"] == "every_tool"
+    assert "on_uneditable" not in out["agent"]["heartbeat"]
+
+
+def test_load_config_does_not_emit_info_log(tmp_path):
+    """The per-command 'Loading config' line is now debug, so an INFO-level
+    sink (loguru's default is INFO+) must not capture it — otherwise it leaks
+    into clean command output like `status`/`cost`."""
+    from loguru import logger
+
+    cfg_file = tmp_path / "codex-pro.yaml"
+    cfg_file.write_text("planning:\n  enabled: true\n")
+
+    captured: list[str] = []
+    sink_id = logger.add(lambda msg: captured.append(str(msg)), level="INFO")
+    try:
+        load_config(config_path=cfg_file)
+    finally:
+        logger.remove(sink_id)
+
+    assert not any("Loading config" in line for line in captured)
+
+
+def test_load_config_debug_log_still_available(tmp_path):
+    """At DEBUG level the load line is still emitted (diagnostics preserved)."""
+    from loguru import logger
+
+    cfg_file = tmp_path / "codex-pro.yaml"
+    cfg_file.write_text("planning:\n  enabled: true\n")
+
+    captured: list[str] = []
+    sink_id = logger.add(lambda msg: captured.append(str(msg)), level="DEBUG")
+    try:
+        load_config(config_path=cfg_file)
+    finally:
+        logger.remove(sink_id)
+
+    assert any("Loading config" in line for line in captured)
+
+
+def test_migrate_first_only_drops_without_setting_verbosity():
+    data = {"agent": {"heartbeat": {"on_uneditable": "first_only"}}}
+    out = migrate_heartbeat_config(data)
+    assert "on_uneditable" not in out["agent"]["heartbeat"]
+    # first_only/off carry no clean mapping -> leave verbosity to schema default
+    assert "verbosity" not in out["agent"]["heartbeat"]
+
+
+def test_migrate_renames_interval_sec():
+    data = {"agent": {"heartbeat": {"interval_sec": 90}}}
+    out = migrate_heartbeat_config(data)
+    assert out["agent"]["heartbeat"]["min_interval_sec"] == 90
+    assert "interval_sec" not in out["agent"]["heartbeat"]
+
+
+def test_migrate_noop_when_no_heartbeat():
+    data = {"agent": {}}
+    assert migrate_heartbeat_config(data) == {"agent": {}}
+
+
+def test_migrate_every_does_not_override_explicit_verbosity():
+    # User already set verbosity explicitly -> legacy on_uneditable must not clobber it.
+    data = {"agent": {"heartbeat": {"on_uneditable": "every", "verbosity": "silent"}}}
+    out = migrate_heartbeat_config(data)
+    assert out["agent"]["heartbeat"]["verbosity"] == "silent"
+    assert "on_uneditable" not in out["agent"]["heartbeat"]
+
+
+def test_migrate_drops_interval_sec_when_min_interval_present():
+    # Both present -> keep min_interval_sec, drop legacy interval_sec.
+    data = {"agent": {"heartbeat": {"interval_sec": 90, "min_interval_sec": 45}}}
+    out = migrate_heartbeat_config(data)
+    assert out["agent"]["heartbeat"]["min_interval_sec"] == 45
+    assert "interval_sec" not in out["agent"]["heartbeat"]

@@ -1,0 +1,152 @@
+"""Regression tests for BaseChannel.should_deliver heartbeat passthrough.
+
+Background: heartbeat OutboundEvents carry is_final=False on uneditable channels
+(e.g. weixin). The base should_deliver guard exists to suppress token-stream /
+progress chunks on channels that cannot edit, but it was also silently dropping
+heartbeats — so long-running turns produced no "still working" message on weixin
+until the final answer arrived. These tests pin the passthrough so the
+ChannelManager's milestone-based tiering stays authoritative.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from codex_pro.bus.delivery import DeliveryStage
+from codex_pro.bus.events import OutboundEvent
+from codex_pro.bus.queue import MessageBus
+from codex_pro.channels.base import BaseChannel, SendResult
+from codex_pro.channels.manager import ChannelManager
+from codex_pro.config.schema import ChannelsConfig, HeartbeatConfig
+
+
+class _MinimalChannel(BaseChannel):
+    """Uneditable channel that, like the real weixin adapter, gates send() on
+    should_deliver before touching any platform API."""
+
+    name = "minimal"
+    supports_edit = False
+
+    def __init__(self):
+        self.delivered: list[OutboundEvent] = []
+        self._running = True
+        self.config = type("C", (), {"reactions_enabled": False})()
+
+    async def start(self) -> None:  # pragma: no cover - not exercised
+        pass
+
+    async def stop(self) -> None:  # pragma: no cover - not exercised
+        pass
+
+    async def send(self, event: OutboundEvent) -> SendResult | None:
+        if not self.should_deliver(event):
+            return SendResult(success=True, skipped=True)
+        self.delivered.append(event)
+        return SendResult(success=True, message_id=f"m{len(self.delivered)}")
+
+    async def send_typing(self, chat_id, metadata=None) -> None:
+        pass
+
+    async def stop_typing(self, chat_id) -> None:
+        pass
+
+
+def _heartbeat_event(text: str = "正在处理中…") -> OutboundEvent:
+    out = OutboundEvent.text_reply(channel="minimal", chat_id="c1", text=text)
+    out.is_final = False
+    out.message_kind = "heartbeat"
+    return out
+
+
+def _progress_event(text: str = "thinking…") -> OutboundEvent:
+    out = OutboundEvent.text_reply(channel="minimal", chat_id="c1", text=text)
+    out.is_final = False
+    out.message_kind = "progress"
+    return out
+
+
+def _approval_prompt_event(text: str = "⚠️ 需要确认执行\n/approve abc123") -> OutboundEvent:
+    out = OutboundEvent.text_reply(channel="minimal", chat_id="c1", text=text)
+    out.is_final = False
+    out.message_kind = "approval_prompt"
+    out.metadata["_approval_request"] = True
+    return out
+
+
+def test_uneditable_channel_delivers_heartbeat():
+    ch = _MinimalChannel()
+    assert ch.should_deliver(_heartbeat_event()) is True
+
+
+def test_uneditable_channel_delivers_approval_prompt():
+    """Approval prompts are control messages, not disposable stream chunks."""
+    ch = _MinimalChannel()
+    assert ch.should_deliver(_approval_prompt_event()) is True
+
+
+def test_uneditable_channel_still_drops_non_final_non_heartbeat():
+    """The guard must keep suppressing token-stream / progress chunks — only
+    heartbeats get the new exemption."""
+    ch = _MinimalChannel()
+    assert ch.should_deliver(_progress_event()) is False
+
+
+def test_uneditable_channel_delivers_final():
+    ch = _MinimalChannel()
+    final = OutboundEvent.text_reply(channel="minimal", chat_id="c1", text="answer")
+    final.is_final = True
+    final.message_kind = "final"
+    assert ch.should_deliver(final) is True
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_reaches_send_on_uneditable_channel():
+    """End-to-end through the send() guard the real adapter uses: a heartbeat
+    must actually be delivered (not skipped) on an uneditable channel."""
+    ch = _MinimalChannel()
+    result = await ch.send(_heartbeat_event())
+    assert result is not None and not result.skipped
+    assert [e.text for e in ch.delivered] == ["正在处理中…"]
+
+
+@pytest.mark.asyncio
+async def test_approval_prompt_reaches_platform_via_full_bus():
+    """Pin the real weixin topology: global manager plus channel subscriber.
+
+    The regression lived between these layers: the manager accepted the event,
+    then the uneditable channel silently skipped it.  A DELIVERED receipt proves
+    that the platform-facing ``send`` path was actually reached.
+    """
+    bus = MessageBus()
+    manager = ChannelManager(ChannelsConfig(), bus)
+    ch = _MinimalChannel()
+    manager._channels["minimal"] = ch
+    bus.subscribe_outbound("minimal", ch.send)
+
+    result = await bus.publish_outbound(_approval_prompt_event())
+
+    assert result.stage is DeliveryStage.DELIVERED
+    assert [e.text for e in ch.delivered] == ["⚠️ 需要确认执行\n/approve abc123"]
+
+
+@pytest.mark.asyncio
+async def test_milestone_dedup_delivers_one_heartbeat_via_manager():
+    """The manager's milestone dedup plus the relaxed guard yields exactly one
+    heartbeat on an uneditable channel for a repeated milestone seq — not zero
+    (the bug) and not many."""
+    manager = ChannelManager(ChannelsConfig(), MessageBus())
+    manager._heartbeat_cfg = HeartbeatConfig(verbosity="every_tool")
+    ch = _MinimalChannel()
+    manager._channels["minimal"] = ch
+
+    first = _heartbeat_event("hb1")
+    first.metadata = {"_heartbeat": True, "_inbound_event_id": "evt1",
+                      "_hb_milestone": 1, "_hb_key": False}
+    second = _heartbeat_event("hb2")
+    second.metadata = {"_heartbeat": True, "_inbound_event_id": "evt1",
+                       "_hb_milestone": 1, "_hb_key": False}
+
+    await manager._filter_and_dispatch(first)
+    await manager._filter_and_dispatch(second)
+
+    assert [e.text for e in ch.delivered] == ["hb1"]

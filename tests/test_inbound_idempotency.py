@@ -1,0 +1,1430 @@
+"""Webhook and Gateway retries are at-most-once within a bounded window."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
+import aiohttp
+import pytest
+
+from codex_pro.agent.turn_run_store import TurnRunStore
+from codex_pro.bus.idempotency import (
+    BoundedIdempotencyStore,
+    IDEMPOTENCY_FINGERPRINT_METADATA,
+    IDEMPOTENCY_NAMESPACE_METADATA,
+    canonical_operation_fingerprint,
+    deterministic_event_id,
+)
+from codex_pro.bus.events import OutboundEvent, stamp_turn_outcome
+from codex_pro.channels.webhook import WebhookChannel
+from codex_pro.storage.sqlite import SQLiteBackend
+
+
+class _Request:
+    def __init__(self, body: dict, *, headers: dict[str, str] | None = None) -> None:
+        self._body = body
+        self._raw = json.dumps(body).encode("utf-8")
+        self.headers = headers or {}
+        self.query = {}
+
+    async def read(self) -> bytes:
+        return self._raw
+
+    async def json(self) -> dict:
+        return self._body
+
+
+class _DurableIngressStub:
+    """Small storage seam used by unit tests that do not initialize SQLite."""
+
+    def __init__(self) -> None:
+        self.records: dict[str, dict] = {}
+        self.turns: dict[str, dict] = {}
+
+    async def claim_idempotency(
+        self, event_id: str, *, namespace: str, fingerprint: str, session_key: str,
+    ) -> dict:
+        row = self.records.get(event_id)
+        if row is None:
+            row = {
+                "event_id": event_id,
+                "namespace": namespace,
+                "fingerprint": fingerprint,
+                "session_key": session_key,
+                "status": "pending",
+                "response_text": "",
+                "error": "",
+            }
+            self.records[event_id] = row
+            return {"outcome": "new", "row": dict(row)}
+        if (
+            row["namespace"] != namespace
+            or row["fingerprint"] != fingerprint
+            or row["session_key"] != session_key
+        ):
+            return {"outcome": "conflict", "row": dict(row)}
+        return {"outcome": "duplicate", "row": dict(row)}
+
+    async def get(self, event_id: str) -> dict | None:
+        return self.turns.get(event_id)
+
+    async def release_acceptance(self, event_id: str, session_key: str) -> bool:
+        return True
+
+    async def mark_idempotency_admitted(self, event_id: str) -> None:
+        if event_id in self.records:
+            self.records[event_id]["status"] = "accepted"
+
+    async def release_idempotency(self, event_id: str) -> bool:
+        row = self.records.get(event_id)
+        if row is not None and row["status"] in {"pending", "accepted"}:
+            self.records.pop(event_id)
+            return True
+        return False
+
+    async def sync_idempotency_from_turn(self, row: dict) -> None:
+        record = self.records.get(str(row.get("event_id") or ""))
+        if record is not None:
+            record.update({
+                "status": row.get("status", "accepted"),
+                "response_text": row.get("response_text", ""),
+                "error": row.get("error", ""),
+            })
+
+
+def _response_json(response) -> dict:
+    return json.loads(response.body)
+
+
+@pytest.mark.asyncio
+async def test_store_claim_is_atomic_and_capacity_is_bounded() -> None:
+    store = BoundedIdempotencyStore(max_entries=2, ttl_seconds=60)
+
+    claims = await asyncio.gather(*(
+        store.claim(
+            namespace="n", scope="s", key="same", fingerprint="body",
+            event_id="event-1",
+        )
+        for _ in range(10)
+    ))
+    assert [claim.outcome for claim in claims].count("new") == 1
+    assert [claim.outcome for claim in claims].count("duplicate") == 9
+
+    second = await store.claim(
+        namespace="n", scope="s", key="second", fingerprint="body",
+        event_id="event-2",
+    )
+    full = await store.claim(
+        namespace="n", scope="s", key="third", fingerprint="body",
+        event_id="event-3",
+    )
+    assert second.outcome == "new" and full.outcome == "full"
+    assert store.size == 2
+
+    assert claims[0].entry is not None
+    await store.complete(claims[0].entry, status=200, payload={"ok": True})
+    admitted = await store.claim(
+        namespace="n", scope="s", key="third", fingerprint="body",
+        event_id="event-3",
+    )
+    assert admitted.outcome == "new"
+    assert store.size == 2
+
+
+@pytest.mark.asyncio
+async def test_same_key_with_different_fingerprint_conflicts() -> None:
+    store = BoundedIdempotencyStore(max_entries=2, ttl_seconds=60)
+    await store.claim(
+        namespace="n", scope="s", key="same", fingerprint="body-a",
+        event_id="event-1",
+    )
+    conflict = await store.claim(
+        namespace="n", scope="s", key="same", fingerprint="body-b",
+        event_id="event-1",
+    )
+    assert conflict.outcome == "conflict"
+
+
+@pytest.mark.asyncio
+async def test_stale_inflight_entry_is_reclaimed_with_unknown_outcome() -> None:
+    now = [0.0]
+    store = BoundedIdempotencyStore(
+        max_entries=1, ttl_seconds=10, clock=lambda: now[0],
+    )
+    first = await store.claim(
+        namespace="n", scope="s", key="first", fingerprint="body",
+        event_id="event-1",
+    )
+    assert first.entry is not None
+    now[0] = 11.0
+    second = await store.claim(
+        namespace="n", scope="s", key="second", fingerprint="body",
+        event_id="event-2",
+    )
+    assert second.outcome == "new" and store.size == 1
+    stale = await store.wait(first.entry)
+    assert stale.status == 409
+    assert "outcome unknown" in stale.payload["error"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("complete_by_event", [False, True])
+async def test_completed_entry_ttl_starts_when_response_completes(
+    complete_by_event: bool,
+) -> None:
+    now = [0.0]
+    store = BoundedIdempotencyStore(
+        max_entries=2, ttl_seconds=10, clock=lambda: now[0],
+    )
+    first = await store.claim(
+        namespace="n", scope="s", key="slow", fingerprint="body",
+        event_id="event-slow",
+    )
+    assert first.entry is not None
+    now[0] = 9.0
+    if complete_by_event:
+        await store.complete_event(
+            "event-slow", status=200, payload={"ok": True},
+        )
+    else:
+        await store.complete(first.entry, status=200, payload={"ok": True})
+
+    now[0] = 11.0
+    replay = await store.claim(
+        namespace="n", scope="s", key="slow", fingerprint="body",
+        event_id="event-slow",
+    )
+    assert replay.outcome == "duplicate"
+    assert replay.entry is first.entry
+
+    now[0] = 19.0
+    expired = await store.claim(
+        namespace="n", scope="s", key="slow", fingerprint="body",
+        event_id="event-slow",
+    )
+    assert expired.outcome == "new"
+
+
+def _webhook() -> tuple[WebhookChannel, AsyncMock]:
+    config = SimpleNamespace(
+        host="127.0.0.1", port=0, path="/webhook", secret="",
+        allow_from=[], max_pending=10,
+    )
+    bus = MagicMock()
+    durable = _DurableIngressStub()
+    bus.publish_inbound = AsyncMock(return_value=True)
+    bus.claim_durable_idempotency = durable.claim_idempotency
+    bus.mark_durable_idempotency_admitted = durable.mark_idempotency_admitted
+    bus.release_durable_idempotency = durable.release_idempotency
+    bus.sync_durable_idempotency = durable.sync_idempotency_from_turn
+    bus.get_turn_run = durable.get
+    channel = WebhookChannel(config, bus)
+    return channel, bus.publish_inbound
+
+
+@pytest.mark.asyncio
+async def test_webhook_retry_publishes_one_event_and_replays_ack() -> None:
+    channel, publish = _webhook()
+    body = {"sender_id": "sender", "chat_id": "chat", "text": "do it"}
+    headers = {"X-Idempotency-Key": "delivery-42"}
+
+    first = await channel._handle_webhook(_Request(body, headers=headers))
+    second = await channel._handle_webhook(_Request(body, headers=headers))
+
+    assert first.status == second.status == 200
+    assert _response_json(first) == _response_json(second)
+    publish.assert_awaited_once()
+    event = publish.await_args.args[0]
+    assert event.event_id == _response_json(first)["event_id"]
+    assert event.metadata[IDEMPOTENCY_NAMESPACE_METADATA] == "webhook"
+    assert event.metadata[IDEMPOTENCY_FINGERPRINT_METADATA]
+
+
+@pytest.mark.asyncio
+async def test_webhook_fingerprint_uses_operation_not_json_or_key_transport() -> None:
+    channel, publish = _webhook()
+    first = await channel._handle_webhook(_Request({
+        "idempotency_key": "delivery-42",
+        "sender_id": "sender",
+        "chat_id": "chat",
+        "text": "do it",
+        "wait": False,
+    }))
+    second = await channel._handle_webhook(_Request(
+        {
+            "wait": True,
+            "text": "do it",
+            "chat_id": "chat",
+            "sender_id": "sender",
+        },
+        headers={"Idempotency-Key": "delivery-42"},
+    ))
+
+    assert first.status == second.status == 200
+    assert _response_json(first) == _response_json(second)
+    publish.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_webhook_rejects_key_reuse_for_different_payload() -> None:
+    channel, publish = _webhook()
+    headers = {"Idempotency-Key": "delivery-42"}
+    await channel._handle_webhook(_Request(
+        {"sender_id": "sender", "chat_id": "chat", "text": "first"},
+        headers=headers,
+    ))
+    conflict = await channel._handle_webhook(_Request(
+        {"sender_id": "sender", "chat_id": "chat", "text": "changed"},
+        headers=headers,
+    ))
+    assert conflict.status == 409
+    publish.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_webhook_pending_capacity_rejection_releases_claim() -> None:
+    channel, publish = _webhook()
+    for i in range(channel.config.max_pending):
+        channel._pending_responses[str(i)] = asyncio.get_running_loop().create_future()
+    request = _Request(
+        {"sender_id": "sender", "chat_id": "chat", "text": "work", "wait": True},
+        headers={"Idempotency-Key": "capacity-key"},
+    )
+    response = await channel._handle_webhook(request)
+    assert response.status == 503
+    assert channel._idempotency.size == 0
+    publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_webhook_publish_exception_releases_claim() -> None:
+    channel, publish = _webhook()
+    publish.side_effect = RuntimeError("bus failed")
+    request = _Request(
+        {"sender_id": "sender", "chat_id": "chat", "text": "work"},
+        headers={"Idempotency-Key": "publish-key"},
+    )
+    with pytest.raises(RuntimeError, match="bus failed"):
+        await channel._handle_webhook(request)
+    assert channel._idempotency.size == 0
+
+
+@pytest.mark.asyncio
+async def test_webhook_keyed_request_fails_closed_without_durable_storage() -> None:
+    channel, publish = _webhook()
+    channel.bus.claim_durable_idempotency = AsyncMock(
+        side_effect=RuntimeError("storage offline")
+    )
+    response = await channel._handle_webhook(_Request(
+        {"sender_id": "sender", "chat_id": "chat", "text": "work"},
+        headers={"Idempotency-Key": "durable-required"},
+    ))
+
+    assert response.status == 503
+    assert "durable idempotency" in _response_json(response)["error"]
+    assert channel._idempotency.size == 0
+    publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_webhook_definite_bus_rejection_can_be_retried() -> None:
+    channel, publish = _webhook()
+    publish.side_effect = [False, True]
+    request = lambda: _Request(  # noqa: E731 - fresh request objects are intentional
+        {"sender_id": "sender", "chat_id": "chat", "text": "work"},
+        headers={"Idempotency-Key": "retryable-key"},
+    )
+
+    first = await channel._handle_webhook(request())
+    second = await channel._handle_webhook(request())
+
+    assert first.status == 503
+    assert second.status == 200
+    assert _response_json(second)["status"] == "accepted"
+    assert publish.await_count == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("wait", [False, True])
+@pytest.mark.parametrize("ledger_status", ["running", "completed"])
+async def test_webhook_replays_durable_turn_status_without_republishing(
+    tmp_path, wait: bool, ledger_status: str,
+) -> None:
+    backend = SQLiteBackend(tmp_path / f"webhook-{wait}-{ledger_status}.db")
+    await backend.initialize()
+    try:
+        store = TurnRunStore(backend)
+        event_id = deterministic_event_id(
+            "webhook", "sender\0chat", "durable-key",
+        )
+        await store.accept(event_id, "webhook:chat")
+        assert await store.mark_running(
+            event_id, "webhook:chat", context_key="ctx", trace_id="trace",
+        )
+        if ledger_status == "completed":
+            await store.mark_terminal(
+                event_id, "completed", response_text="durable answer",
+            )
+
+        channel, publish = _webhook()
+        channel.bus.get_turn_run = store.get
+        response = await channel._handle_webhook(_Request(
+            {
+                "sender_id": "sender", "chat_id": "chat", "text": "work",
+                "wait": wait,
+            },
+            headers={"Idempotency-Key": "durable-key"},
+        ))
+
+        assert response.status == 200
+        assert _response_json(response)["status"] == ledger_status
+        if ledger_status == "completed":
+            assert _response_json(response)["response"] == "durable answer"
+        publish.assert_not_awaited()
+    finally:
+        await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_webhook_durable_fingerprint_rejects_changed_operation(
+    tmp_path,
+) -> None:
+    backend = SQLiteBackend(tmp_path / "webhook-fingerprint.db")
+    await backend.initialize()
+    try:
+        store = TurnRunStore(backend)
+        event_id = deterministic_event_id(
+            "webhook", "sender\0chat", "durable-key",
+        )
+        fingerprint = canonical_operation_fingerprint({
+            "sender_id": "sender",
+            "chat_id": "chat",
+            "text": "original work",
+            "metadata": {},
+        })
+        await store.accept(event_id, "webhook:chat", metadata={
+            IDEMPOTENCY_NAMESPACE_METADATA: "webhook",
+            IDEMPOTENCY_FINGERPRINT_METADATA: fingerprint,
+        })
+        assert await store.mark_running(
+            event_id, "webhook:chat", context_key="ctx", trace_id="trace",
+        )
+
+        channel, publish = _webhook()
+        channel.bus.get_turn_run = store.get
+        response = await channel._handle_webhook(_Request(
+            {"sender_id": "sender", "chat_id": "chat", "text": "changed work"},
+            headers={"Idempotency-Key": "durable-key"},
+        ))
+
+        assert response.status == 409
+        assert "different request" in _response_json(response)["error"]
+        publish.assert_not_awaited()
+    finally:
+        await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_webhook_racing_retry_observes_publish_rejection() -> None:
+    channel, publish = _webhook()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def reject_after_race(_event) -> bool:
+        entered.set()
+        await release.wait()
+        return False
+
+    publish.side_effect = reject_after_race
+    request = lambda: _Request(  # noqa: E731 - fresh request objects are intentional
+        {"sender_id": "sender", "chat_id": "chat", "text": "work"},
+        headers={"Idempotency-Key": "racing-key"},
+    )
+    first = asyncio.create_task(channel._handle_webhook(request()))
+    await entered.wait()
+    duplicate = asyncio.create_task(channel._handle_webhook(request()))
+    await asyncio.sleep(0)
+    assert not duplicate.done()
+
+    release.set()
+    first_response, duplicate_response = await asyncio.gather(first, duplicate)
+    assert first_response.status == duplicate_response.status == 503
+    assert _response_json(first_response) == _response_json(duplicate_response)
+    publish.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_webhook_heartbeat_does_not_finish_waiter_or_cache() -> None:
+    channel, _publish = _webhook()
+    claim = await channel._idempotency.claim(
+        namespace="webhook",
+        scope="sender\0chat",
+        key="heartbeat-key",
+        fingerprint="operation",
+        event_id="event-heartbeat",
+    )
+    assert claim.entry is not None
+    waiter = asyncio.get_running_loop().create_future()
+    channel._pending_responses["event-heartbeat"] = waiter
+
+    heartbeat = OutboundEvent.text_reply(
+        channel="webhook",
+        chat_id="chat",
+        text="still working",
+        is_final=False,
+        message_kind="heartbeat",
+    )
+    heartbeat.metadata["_inbound_event_id"] = "event-heartbeat"
+    await channel.send(heartbeat)
+
+    assert channel._pending_responses["event-heartbeat"] is waiter
+    assert not waiter.done()
+    assert claim.entry.response is None
+
+    final = OutboundEvent.text_reply(
+        channel="webhook", chat_id="chat", text="done",
+        is_final=True, message_kind="final",
+    )
+    final.metadata["_inbound_event_id"] = "event-heartbeat"
+    await channel.send(final)
+
+    assert waiter.result().payload == {
+        "response": "done", "event_id": "event-heartbeat",
+    }
+    cached = await channel._idempotency.wait(claim.entry)
+    assert cached.payload == {
+        "response": "done", "event_id": "event-heartbeat",
+    }
+
+
+@pytest.mark.asyncio
+async def test_webhook_final_outcome_sets_truthful_wait_and_cache_status() -> None:
+    channel, _publish = _webhook()
+    claim = await channel._idempotency.claim(
+        namespace="webhook",
+        scope="sender\0chat",
+        key="incomplete-key",
+        fingerprint="operation",
+        event_id="event-incomplete",
+    )
+    assert claim.entry is not None
+    waiter = asyncio.get_running_loop().create_future()
+    channel._pending_responses["event-incomplete"] = waiter
+    final = OutboundEvent.text_reply(
+        channel="webhook",
+        chat_id="chat",
+        text="partial answer",
+        is_final=True,
+        message_kind="final",
+    )
+    final.metadata["_inbound_event_id"] = "event-incomplete"
+    # Stamp through the real producer rather than hand-writing the keys, so this
+    # test cannot drift from the outcome contract it is meant to pin.
+    stamp_turn_outcome(final.metadata, "incomplete", error="budget_halted")
+
+    await channel.send(final)
+
+    result = waiter.result()
+    # The answer exists, so the caller gets 200 with the status in the body;
+    # 409 stays reserved for idempotency-key conflicts.
+    assert result.status == 200
+    assert result.payload["status"] == "incomplete"
+    assert result.payload["error"] == "budget_halted"
+    assert result.payload["response"] == "partial answer"
+    cached = await channel._idempotency.wait(claim.entry)
+    assert cached.status == 200
+    assert cached.payload == result.payload
+
+
+def _gateway(tmp_path):
+    from codex_pro.bus.queue import MessageBus
+    from codex_pro.config.schema import (
+        GatewayAuthConfig,
+        GatewayConfig,
+        GatewaySessionPolicyConfig,
+    )
+    from codex_pro.gateway.server import GatewayServer
+
+    config = GatewayConfig(
+        enabled=True,
+        host="127.0.0.1",
+        port=0,
+        auth=GatewayAuthConfig(mode="open"),
+        session_policy=GatewaySessionPolicyConfig(mode="none"),
+    )
+    bus = MessageBus()
+    bus.set_turn_run_store(_DurableIngressStub())
+    bus.publish_inbound = AsyncMock(return_value=True)
+    sessions = MagicMock()
+    sessions.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
+    gateway = GatewayServer(
+        config=config,
+        bus=bus,
+        channel_manager=MagicMock(),
+        session_manager=sessions,
+        workspace=tmp_path,
+        agent_loop=None,
+    )
+    return gateway, bus.publish_inbound
+
+
+@pytest.mark.asyncio
+async def test_gateway_http_retry_publishes_one_event(tmp_path) -> None:
+    gateway, publish = _gateway(tmp_path)
+    body = {
+        "platform": "api", "user_id": "user", "chat_id": "chat",
+        "text": "do it",
+    }
+    headers = {"Idempotency-Key": "request-99"}
+
+    first = await gateway._handle_message(_Request(body, headers=headers))
+    second = await gateway._handle_message(_Request(body, headers=headers))
+
+    assert first.status == second.status == 200
+    assert _response_json(first) == _response_json(second)
+    publish.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_gateway_timeout_retry_replays_late_terminal_with_tool_deliveries(
+    tmp_path,
+) -> None:
+    """A 504 ends the socket wait, not the admitted turn or its replay data."""
+    gateway, publish = _gateway(tmp_path)
+    accepted_event_id = ""
+
+    async def accept_after_tool_delivery(event) -> bool:
+        nonlocal accepted_event_id
+        accepted_event_id = event.event_id
+        tool_delivery = OutboundEvent.text_reply(
+            channel=event.channel,
+            chat_id=event.chat_id,
+            text="report part 1",
+            metadata={
+                "_inbound_event_id": event.event_id,
+                "_tool_delivery": True,
+                "_artifact_delivery_id": "report-delivery",
+                "_artifact_part": 1,
+                "_artifact_parts": 1,
+            },
+        )
+        receipt = await gateway._handle_outbound(tool_delivery)
+        assert receipt is not None
+        assert receipt.success is True and receipt.deferred is True
+        return True
+
+    publish.side_effect = accept_after_tool_delivery
+    body = {
+        "platform": "api",
+        "user_id": "user",
+        "chat_id": "chat",
+        "text": "build report",
+        "wait": True,
+        "timeout_seconds": 1,
+    }
+    headers = {"Idempotency-Key": "late-report"}
+
+    timed_out = await gateway._handle_message(_Request(body, headers=headers))
+
+    assert timed_out.status == 504
+    assert accepted_event_id
+    assert gateway._pending_http == {}
+    assert accepted_event_id in gateway._pending_http_tool_deliveries
+
+    terminal = OutboundEvent.text_reply(
+        channel="gateway:api",
+        chat_id="chat",
+        text="report complete",
+        is_final=True,
+        message_kind="final",
+        metadata={"_inbound_event_id": accepted_event_id},
+    )
+    stamp_turn_outcome(terminal.metadata, "completed")
+    await gateway._handle_outbound(terminal)
+
+    replay = await gateway._handle_message(_Request(body, headers=headers))
+    payload = _response_json(replay)
+    assert replay.status == 200
+    assert payload["status"] == "completed"
+    assert payload["reply"]["text"] == "report complete"
+    assert [
+        frame["text"] for frame in payload["reply"]["tool_deliveries"]
+    ] == ["report part 1"]
+    assert gateway._pending_http_tool_deliveries == {}
+    publish.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_gateway_keyed_request_fails_closed_without_durable_storage(
+    tmp_path,
+) -> None:
+    gateway, publish = _gateway(tmp_path)
+    gateway._bus.set_turn_run_store(None)
+    response = await gateway._handle_message(_Request(
+        {
+            "platform": "api",
+            "user_id": "user",
+            "chat_id": "chat",
+            "text": "work",
+        },
+        headers={"Idempotency-Key": "durable-required"},
+    ))
+
+    assert response.status == 503
+    assert "durable idempotency" in _response_json(response)["error"]
+    assert gateway._message_idempotency.size == 0
+    publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_gateway_fingerprint_excludes_key_wait_and_timeout_controls(
+    tmp_path,
+) -> None:
+    gateway, publish = _gateway(tmp_path)
+    first_body = {
+        "idempotency_key": "request-99",
+        "platform": "api",
+        "user_id": "user",
+        "chat_id": "chat",
+        "text": "do it",
+        "wait": False,
+        "timeout_seconds": 1,
+    }
+    second_body = {
+        "timeout_seconds": 600,
+        "wait": True,
+        "text": "do it",
+        "chat_id": "chat",
+        "user_id": "user",
+        "platform": "api",
+    }
+
+    first = await gateway._handle_message(_Request(first_body))
+    second = await gateway._handle_message(_Request(
+        second_body, headers={"Idempotency-Key": "request-99"},
+    ))
+
+    assert first.status == second.status == 200
+    assert _response_json(first) == _response_json(second)
+    publish.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_gateway_http_retry_does_not_consume_another_rate_limit_token(
+    tmp_path,
+) -> None:
+    gateway, publish = _gateway(tmp_path)
+    gateway.rate_limiter.acquire = MagicMock(return_value=True)
+    body = {
+        "platform": "api", "user_id": "user", "chat_id": "chat",
+        "text": "do it",
+    }
+    request = lambda: _Request(  # noqa: E731 - fresh request objects are intentional
+        body, headers={"Idempotency-Key": "request-99"},
+    )
+
+    first = await gateway._handle_message(request())
+    second = await gateway._handle_message(request())
+
+    assert first.status == second.status == 200
+    gateway.rate_limiter.acquire.assert_called_once_with("api", "chat")
+    publish.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_gateway_wait_maps_and_replays_bus_rate_limit_as_429(tmp_path) -> None:
+    gateway, publish = _gateway(tmp_path)
+    deliveries: list[asyncio.Task] = []
+
+    async def accept_then_rate_limit(event) -> bool:
+        reply = OutboundEvent.text_reply(
+            channel=event.channel,
+            chat_id=event.chat_id,
+            text="too many requests",
+            is_final=True,
+            message_kind="final",
+        )
+        reply.metadata = {
+            "_inbound_event_id": event.event_id,
+            "_error": True,
+            "_error_reason": "rate limited",
+            "_http_status": 429,
+        }
+
+        async def deliver() -> None:
+            await asyncio.sleep(0)
+            await gateway._handle_outbound(reply)
+
+        deliveries.append(asyncio.create_task(deliver()))
+        return True
+
+    publish.side_effect = accept_then_rate_limit
+    body = {
+        "platform": "api", "user_id": "user", "chat_id": "chat",
+        "text": "work", "wait": True, "timeout_seconds": 2,
+    }
+    headers = {"Idempotency-Key": "rate-limited-key"}
+
+    first = await gateway._handle_message(_Request(body, headers=headers))
+    second = await gateway._handle_message(_Request(body, headers=headers))
+    await asyncio.gather(*deliveries)
+
+    assert first.status == second.status == 429
+    assert _response_json(first) == _response_json(second)
+    assert _response_json(first)["status"] == "failed"
+    assert _response_json(first)["error"] == "rate limited"
+    publish.assert_awaited_once()
+
+
+def test_gateway_generic_error_final_is_not_reported_completed(tmp_path) -> None:
+    gateway, _publish = _gateway(tmp_path)
+    status, payload = gateway._http_final_response(
+        "event-id",
+        "gateway:api:chat",
+        {"text": "failed", "metadata": {"_error": True}},
+    )
+    assert status == 500
+    assert payload["status"] == "failed"
+    assert payload["error"] == "agent processing failed"
+
+
+def test_gateway_incomplete_final_preserves_turn_status(tmp_path) -> None:
+    """An unfinished turn that still answered is a 200 carrying its status.
+
+    409 is reserved for idempotency-key conflicts. Reusing it here would leave a
+    client unable to tell "your key was reused with different content" (never
+    retry) from "here is the answer, the task just did not finish" (retryable).
+    """
+    gateway, _publish = _gateway(tmp_path)
+    status, payload = gateway._http_final_response(
+        "event-id",
+        "gateway:api:chat",
+        {
+            "text": "partial",
+            "metadata": {
+                "_turn_status": "incomplete",
+                "_error_reason": "budget_halted",
+                "_http_status": 200,
+            },
+        },
+    )
+    assert status == 200
+    assert payload["status"] == "incomplete"
+    assert payload["error"] == "budget_halted"
+    assert payload["reply"]["text"] == "partial"
+
+
+@pytest.mark.asyncio
+async def test_gateway_http_key_is_bound_to_request_body(tmp_path) -> None:
+    gateway, publish = _gateway(tmp_path)
+    headers = {"X-Idempotency-Key": "request-99"}
+    base = {"platform": "api", "user_id": "user", "chat_id": "chat"}
+    await gateway._handle_message(_Request({**base, "text": "first"}, headers=headers))
+    conflict = await gateway._handle_message(
+        _Request({**base, "text": "changed"}, headers=headers)
+    )
+    assert conflict.status == 409
+    publish.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_gateway_pending_capacity_rejection_releases_claim(tmp_path) -> None:
+    gateway, publish = _gateway(tmp_path)
+    gateway._MAX_PENDING_HTTP = 1
+    gateway._pending_http["occupied"] = asyncio.get_running_loop().create_future()
+    response = await gateway._handle_message(_Request(
+        {
+            "platform": "api", "user_id": "user", "chat_id": "chat",
+            "text": "work", "wait": True,
+        },
+        headers={"Idempotency-Key": "capacity-key"},
+    ))
+    assert response.status == 503
+    assert gateway._message_idempotency.size == 0
+    publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("wait", [False, True])
+async def test_gateway_definite_bus_rejection_releases_ledger_for_retry(
+    tmp_path, wait: bool,
+) -> None:
+    backend = SQLiteBackend(tmp_path / f"gateway-retry-{wait}.db")
+    await backend.initialize()
+    deliveries: list[asyncio.Task] = []
+    try:
+        store = TurnRunStore(backend)
+        gateway, publish = _gateway(tmp_path)
+        gateway._bus.set_turn_run_store(store)
+        gateway._agent_loop = SimpleNamespace(turn_runs=store)
+        calls = 0
+
+        async def reject_then_accept(event) -> bool:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return False
+            if wait:
+                reply = OutboundEvent.text_reply(
+                    channel=event.channel,
+                    chat_id=event.chat_id,
+                    text="done",
+                    is_final=True,
+                    message_kind="final",
+                )
+                reply.metadata["_inbound_event_id"] = event.event_id
+
+                async def deliver() -> None:
+                    await asyncio.sleep(0)
+                    await gateway._handle_outbound(reply)
+
+                deliveries.append(asyncio.create_task(deliver()))
+            return True
+
+        publish.side_effect = reject_then_accept
+        body = {
+            "platform": "api", "user_id": "user", "chat_id": "chat",
+            "text": "work", "wait": wait, "timeout_seconds": 2,
+        }
+        headers = {"Idempotency-Key": "retryable-key"}
+
+        first = await gateway._handle_message(_Request(body, headers=headers))
+        assert first.status == 503
+        event_id = deterministic_event_id(
+            "gateway-message",
+            "http\0anonymous\0gateway:api:chat",
+            "retryable-key",
+        )
+        assert await store.get(event_id) is None
+
+        second = await gateway._handle_message(_Request(body, headers=headers))
+        await asyncio.gather(*deliveries)
+        assert second.status == 200
+        assert _response_json(second)["status"] == (
+            "completed" if wait else "accepted"
+        )
+        persisted = await store.get(event_id)
+        assert persisted is not None
+        assert (
+            persisted["metadata"][IDEMPOTENCY_NAMESPACE_METADATA]
+            == "gateway-message"
+        )
+        assert persisted["metadata"][IDEMPOTENCY_FINGERPRINT_METADATA]
+        assert publish.await_count == 2
+    finally:
+        await backend.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("wait", [False, True])
+@pytest.mark.parametrize("ledger_status", ["running", "completed"])
+async def test_gateway_replays_durable_turn_status_without_republishing(
+    tmp_path, wait: bool, ledger_status: str,
+) -> None:
+    backend = SQLiteBackend(tmp_path / f"gateway-{wait}-{ledger_status}.db")
+    await backend.initialize()
+    try:
+        store = TurnRunStore(backend)
+        event_id = deterministic_event_id(
+            "gateway-message",
+            "http\0anonymous\0gateway:api:chat",
+            "durable-key",
+        )
+        await store.accept(event_id, "gateway:api:chat")
+        assert await store.mark_running(
+            event_id, "gateway:api:chat", context_key="ctx", trace_id="trace",
+        )
+        if ledger_status == "completed":
+            await store.mark_terminal(
+                event_id, "completed", response_text="durable answer",
+            )
+
+        gateway, publish = _gateway(tmp_path)
+        gateway._bus.set_turn_run_store(store)
+        response = await gateway._handle_message(_Request(
+            {
+                "platform": "api", "user_id": "user", "chat_id": "chat",
+                "text": "work", "wait": wait,
+            },
+            headers={"Idempotency-Key": "durable-key"},
+        ))
+
+        assert response.status == 200
+        assert _response_json(response)["status"] == ledger_status
+        if ledger_status == "completed":
+            assert _response_json(response)["reply"]["text"] == "durable answer"
+        publish.assert_not_awaited()
+    finally:
+        await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_gateway_durable_fingerprint_rejects_changed_operation(
+    tmp_path,
+) -> None:
+    backend = SQLiteBackend(tmp_path / "gateway-fingerprint.db")
+    await backend.initialize()
+    try:
+        gateway, publish = _gateway(tmp_path)
+        store = TurnRunStore(backend)
+        event_id = deterministic_event_id(
+            "gateway-message",
+            "http\0anonymous\0gateway:api:chat",
+            "durable-key",
+        )
+        fingerprint = gateway._idempotency_fingerprint({
+            "platform": "api",
+            "user_id": "user",
+            "chat_id": "chat",
+            "text": "original work",
+            "media_urls": [],
+            "is_group": False,
+            "session_key": "gateway:api:chat",
+        })
+        await store.accept(event_id, "gateway:api:chat", metadata={
+            IDEMPOTENCY_NAMESPACE_METADATA: "gateway-message",
+            IDEMPOTENCY_FINGERPRINT_METADATA: fingerprint,
+        })
+        assert await store.mark_running(
+            event_id,
+            "gateway:api:chat",
+            context_key="ctx",
+            trace_id="trace",
+        )
+        gateway._bus.set_turn_run_store(store)
+
+        response = await gateway._handle_message(_Request(
+            {
+                "platform": "api",
+                "user_id": "user",
+                "chat_id": "chat",
+                "text": "changed work",
+            },
+            headers={"Idempotency-Key": "durable-key"},
+        ))
+
+        assert response.status == 409
+        assert "different request" in _response_json(response)["error"]
+        publish.assert_not_awaited()
+    finally:
+        await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_gateway_reset_failure_releases_claim(tmp_path) -> None:
+    gateway, publish = _gateway(tmp_path)
+    gateway._reset_session_if_needed = AsyncMock(
+        side_effect=RuntimeError("reset failed")
+    )
+    request = _Request(
+        {
+            "platform": "api", "user_id": "user", "chat_id": "chat",
+            "text": "work",
+        },
+        headers={"Idempotency-Key": "reset-key"},
+    )
+
+    with pytest.raises(RuntimeError, match="reset failed"):
+        await gateway._handle_message(request)
+    assert gateway._message_idempotency.size == 0
+    publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_gateway_publish_failure_preserves_unknown_claim_but_not_waiter(
+    tmp_path,
+) -> None:
+    gateway, publish = _gateway(tmp_path)
+    publish.side_effect = RuntimeError("publish failed")
+    request = _Request(
+        {
+            "platform": "api", "user_id": "user", "chat_id": "chat",
+            "text": "work", "wait": True,
+        },
+        headers={"Idempotency-Key": "publish-key"},
+    )
+
+    with pytest.raises(RuntimeError, match="publish failed"):
+        await gateway._handle_message(request)
+    # Once publish_inbound has been invoked, an exception does not prove the
+    # event stayed out of the queue. Preserve the key as outcome-unknown; the
+    # deterministic event ID and durable turn claim prevent a second execution.
+    assert gateway._message_idempotency.size == 1
+    assert gateway._pending_http == {}
+
+
+@pytest.mark.asyncio
+async def test_gateway_cancelled_publish_preserves_unknown_claim_but_not_waiter(
+    tmp_path,
+) -> None:
+    gateway, publish = _gateway(tmp_path)
+    publish.side_effect = asyncio.CancelledError
+    request = _Request(
+        {
+            "platform": "api", "user_id": "user", "chat_id": "chat",
+            "text": "work", "wait": True,
+        },
+        headers={"Idempotency-Key": "uncertain-key"},
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        await gateway._handle_message(request)
+    assert gateway._message_idempotency.size == 1
+    assert gateway._pending_http == {}
+
+
+@pytest.mark.asyncio
+async def test_gateway_final_settles_unknown_nonwait_http_claim(tmp_path) -> None:
+    gateway, _publish = _gateway(tmp_path)
+    claim = await gateway._message_idempotency.claim(
+        namespace="gateway-message",
+        scope="http-scope",
+        key="uncertain-key",
+        fingerprint="request-body",
+        event_id="uncertain-event",
+        context={
+            "transport": "http",
+            "wait": False,
+            "session_key": "gateway:api:chat",
+        },
+    )
+    assert claim.entry is not None
+    gateway.broadcast_to_ws = AsyncMock(return_value=False)
+
+    await gateway._handle_outbound(OutboundEvent.text_reply(
+        channel="gateway:api",
+        chat_id="chat",
+        text="finished despite disconnect",
+        metadata={"_inbound_event_id": "uncertain-event"},
+    ))
+
+    settled = await gateway._message_idempotency.wait_admitted(claim.entry)
+    assert settled.status == 200
+    assert settled.payload["status"] == "completed"
+    assert settled.payload["reply"]["text"] == "finished despite disconnect"
+
+
+async def _ws_auth(ws) -> None:
+    await ws.send_json({
+        "type": "auth",
+        "platform": "api",
+        "user_id": "user",
+        "chat_id": "chat",
+    })
+    assert (await asyncio.wait_for(ws.receive_json(), timeout=2))["type"] == "auth_ok"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ledger_status", ["running", "completed"])
+async def test_gateway_ws_replays_durable_turn_without_republishing(
+    tmp_path, ledger_status: str,
+) -> None:
+    backend = SQLiteBackend(tmp_path / f"gateway-ws-{ledger_status}.db")
+    await backend.initialize()
+    gateway, publish = _gateway(tmp_path)
+    try:
+        store = TurnRunStore(backend)
+        event_id = deterministic_event_id(
+            "gateway-message",
+            "ws\0anonymous\0gateway:api:chat",
+            "durable-ws-key",
+        )
+        fingerprint = gateway._idempotency_fingerprint({
+            "text": "work",
+            "is_group": False,
+            "platform": "api",
+            "user_id": "user",
+            "chat_id": "chat",
+        })
+        await store.accept(event_id, "gateway:api:chat", metadata={
+            IDEMPOTENCY_NAMESPACE_METADATA: "gateway-message",
+            IDEMPOTENCY_FINGERPRINT_METADATA: fingerprint,
+        })
+        assert await store.mark_running(
+            event_id,
+            "gateway:api:chat",
+            context_key="ctx",
+            trace_id="trace",
+        )
+        if ledger_status == "completed":
+            await store.mark_terminal(
+                event_id, "completed", response_text="durable answer",
+            )
+        gateway._bus.set_turn_run_store(store)
+        await gateway.start()
+
+        async with aiohttp.ClientSession() as client:
+            async with client.ws_connect(
+                f"ws://127.0.0.1:{gateway.actual_port}/ws"
+            ) as ws:
+                await _ws_auth(ws)
+                # Authentication emits a control event through the same bus.
+                # Measure only whether the durable message itself is replayed.
+                publish.reset_mock()
+                await ws.send_json({
+                    "type": "message",
+                    "text": "work",
+                    "idempotency_key": "durable-ws-key",
+                })
+                response = await asyncio.wait_for(ws.receive_json(), timeout=2)
+                publish.assert_not_awaited()
+
+        if ledger_status == "completed":
+            assert response["type"] == "message"
+            assert response["text"] == "durable answer"
+        else:
+            assert response["type"] == "accepted"
+            assert response["status"] == "running"
+    finally:
+        await gateway.stop()
+        await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_gateway_ws_definite_rejection_releases_ledger_for_retry(
+    tmp_path,
+) -> None:
+    backend = SQLiteBackend(tmp_path / "gateway-ws-retry.db")
+    await backend.initialize()
+    gateway, publish = _gateway(tmp_path)
+    try:
+        store = TurnRunStore(backend)
+        gateway._bus.set_turn_run_store(store)
+        gateway._agent_loop = SimpleNamespace(turn_runs=store)
+        calls = 0
+
+        async def reject_then_accept(event) -> bool:
+            nonlocal calls
+            if event.is_control:
+                return True
+            calls += 1
+            return calls > 1
+
+        publish.side_effect = reject_then_accept
+        await gateway.start()
+        event_id = deterministic_event_id(
+            "gateway-message",
+            "ws\0anonymous\0gateway:api:chat",
+            "retryable-ws-key",
+        )
+
+        async with aiohttp.ClientSession() as client:
+            async with client.ws_connect(
+                f"ws://127.0.0.1:{gateway.actual_port}/ws"
+            ) as ws:
+                await _ws_auth(ws)
+                request = {
+                    "type": "message",
+                    "text": "work",
+                    "idempotency_key": "retryable-ws-key",
+                }
+                await ws.send_json(request)
+                first = await asyncio.wait_for(ws.receive_json(), timeout=2)
+                assert first == {"type": "error", "error": "server overloaded"}
+                assert await store.get(event_id) is None
+
+                await ws.send_json(request)
+                second = await asyncio.wait_for(ws.receive_json(), timeout=2)
+                assert second["type"] == "accepted"
+                assert second["event_id"] == event_id
+                assert (await store.get(event_id))["status"] == "accepted"
+                assert calls == 2
+    finally:
+        await gateway.stop()
+        await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_webhook_releases_tombstone_when_durable_sync_fails(tmp_path) -> None:
+    """A failed replay sync must not pin the key at `pending` for its whole TTL.
+
+    The tombstone is claimed before the turn row is synced. When that sync failed
+    the claim was left behind, so every later retry replayed "pending" even
+    though the turn had already completed — the answer became unreachable until
+    the 1h TTL expired.
+    """
+    backend = SQLiteBackend(tmp_path / "webhook-sync-release.db")
+    await backend.initialize()
+    try:
+        store = TurnRunStore(backend)
+        event_id = deterministic_event_id("webhook", "sender\0chat", "sync-key")
+        await store.accept(event_id, "webhook:chat")
+        assert await store.mark_running(
+            event_id, "webhook:chat", context_key="ctx", trace_id="trace",
+        )
+        await store.mark_terminal(
+            event_id, "completed", response_text="real answer",
+        )
+
+        channel, publish = _webhook()
+        channel.bus.claim_durable_idempotency = store.claim_idempotency
+        channel.bus.release_durable_idempotency = store.release_idempotency
+        channel.bus.get_turn_run = store.get
+        channel.bus.sync_durable_idempotency = AsyncMock(
+            side_effect=RuntimeError("storage flapped")
+        )
+
+        body = {"sender_id": "sender", "chat_id": "chat", "text": "work"}
+        headers = {"Idempotency-Key": "sync-key"}
+        failed = await channel._handle_webhook(_Request(body, headers=headers))
+        assert failed.status == 503
+
+        # The tombstone must be gone, not stranded at `pending`.
+        assert await store.get_idempotency(event_id) is None
+
+        # A retry now reaches the real durable result instead of "pending".
+        channel.bus.sync_durable_idempotency = store.sync_idempotency_from_turn
+        retry = await channel._handle_webhook(_Request(body, headers=headers))
+        assert retry.status == 200
+        assert _response_json(retry)["status"] == "completed"
+        assert _response_json(retry)["response"] == "real answer"
+        publish.assert_not_awaited()
+    finally:
+        await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_gateway_releases_tombstone_when_durable_sync_fails(tmp_path) -> None:
+    """Gateway HTTP mirrors the webhook release-on-sync-failure contract."""
+    backend = SQLiteBackend(tmp_path / "gateway-sync-release.db")
+    await backend.initialize()
+    try:
+        store = TurnRunStore(backend)
+        event_id = deterministic_event_id(
+            "gateway-message", "http\0anonymous\0gateway:api:chat", "sync-key",
+        )
+        await store.accept(event_id, "gateway:api:chat")
+        assert await store.mark_running(
+            event_id, "gateway:api:chat", context_key="ctx", trace_id="trace",
+        )
+        await store.mark_terminal(
+            event_id, "completed", response_text="real answer",
+        )
+
+        gateway, publish = _gateway(tmp_path)
+        gateway._bus.set_turn_run_store(store)
+        original_sync = gateway._bus.sync_durable_idempotency
+        gateway._bus.sync_durable_idempotency = AsyncMock(
+            side_effect=RuntimeError("storage flapped")
+        )
+
+        body = {
+            "platform": "api", "user_id": "user", "chat_id": "chat",
+            "text": "work",
+        }
+        headers = {"Idempotency-Key": "sync-key"}
+        failed = await gateway._handle_message(_Request(body, headers=headers))
+        assert failed.status == 503
+        assert await store.get_idempotency(event_id) is None
+
+        gateway._bus.sync_durable_idempotency = original_sync
+        retry = await gateway._handle_message(_Request(body, headers=headers))
+        assert retry.status == 200
+        assert _response_json(retry)["status"] == "completed"
+        assert _response_json(retry)["reply"]["text"] == "real answer"
+        publish.assert_not_awaited()
+    finally:
+        await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_release_failure_preserves_the_definite_response(tmp_path) -> None:
+    """A failing release must not replace a definite 503 with an opaque 500."""
+    backend = SQLiteBackend(tmp_path / "release-raises.db")
+    await backend.initialize()
+    try:
+        store = TurnRunStore(backend)
+        event_id = deterministic_event_id("webhook", "sender\0chat", "sync-key")
+        await store.accept(event_id, "webhook:chat")
+        assert await store.mark_running(
+            event_id, "webhook:chat", context_key="ctx", trace_id="trace",
+        )
+
+        channel, _publish = _webhook()
+        channel.bus.claim_durable_idempotency = store.claim_idempotency
+        channel.bus.get_turn_run = store.get
+        channel.bus.sync_durable_idempotency = AsyncMock(
+            side_effect=RuntimeError("storage flapped")
+        )
+        channel.bus.release_durable_idempotency = AsyncMock(
+            side_effect=RuntimeError("release also failed")
+        )
+
+        response = await channel._handle_webhook(_Request(
+            {"sender_id": "sender", "chat_id": "chat", "text": "work"},
+            headers={"Idempotency-Key": "sync-key"},
+        ))
+        assert response.status == 503
+    finally:
+        await backend.close()
+
+
+def test_unfinished_turn_that_answered_is_not_an_error_frame() -> None:
+    """`_error` drives user-visible failure signals, so it means "no answer".
+
+    A turn that hit the iteration ceiling or a length cap still carries the
+    model's conclusion. Flagging it would show the user a failure reaction (❌)
+    on a reply that actually succeeded.
+    """
+    for status in ("incomplete", "interrupted"):
+        metadata: dict = {}
+        stamp_turn_outcome(metadata, status, error="forced_convergence")
+        assert metadata["_turn_status"] == status
+        assert "_error" not in metadata
+        assert metadata["_http_status"] == 200
+        # The reason survives for diagnostics without being an error signal.
+        assert metadata["_error_reason"] == "forced_convergence"
+
+    faulted: dict = {}
+    stamp_turn_outcome(faulted, "failed", error="provider exploded")
+    assert faulted["_error"] is True
+    assert faulted["_http_status"] == 500
+
+    completed: dict = {"_error": True, "_error_reason": "stale"}
+    stamp_turn_outcome(completed, "completed")
+    assert "_error" not in completed
+    assert "_error_reason" not in completed
+    assert completed["_http_status"] == 200
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("outcome", "expected_emoji"),
+    [("completed", "\U0001f44d"), ("incomplete", "\U0001f44d"), ("failed", "❌")],
+)
+async def test_reaction_reflects_whether_the_turn_answered(
+    outcome: str, expected_emoji: str,
+) -> None:
+    """An unfinished turn that answered must not be reacted to as a failure."""
+    from codex_pro.channels.manager import ChannelManager
+
+    manager = ChannelManager.__new__(ChannelManager)
+    manager._channels = {}
+    manager._state_lock = asyncio.Lock()
+    manager._inbound_msg_ids = {"turn-1": ("chat", "msg-1", 0.0)}
+    manager._heartbeat_msg_ids = {}
+    manager._delivered_milestone = {}
+
+    reactions: list[str] = []
+    channel = SimpleNamespace(
+        config=SimpleNamespace(reactions_enabled=True),
+        stop_typing=AsyncMock(),
+        remove_reaction=AsyncMock(),
+        send_reaction=AsyncMock(
+            side_effect=lambda _chat, _msg, emoji: reactions.append(emoji)
+        ),
+    )
+    manager._channels["telegram"] = channel
+
+    event = OutboundEvent.text_reply(
+        channel="telegram", chat_id="chat", text="answer",
+    )
+    event.metadata["_inbound_event_id"] = "turn-1"
+    stamp_turn_outcome(event.metadata, outcome, error="forced_convergence")
+
+    await manager._on_outbound_final(event)
+
+    assert reactions == [expected_emoji]

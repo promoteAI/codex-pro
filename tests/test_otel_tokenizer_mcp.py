@@ -1,0 +1,776 @@
+"""OTel, TokenCounter, and MCP transport tests."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 1. OpenTelemetry — telemetry.py
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestTelemetryManagerWithoutOTel:
+    """TelemetryManager when opentelemetry is NOT installed."""
+
+    def test_available_reflects_import(self):
+        with patch("codex_pro.observability.telemetry._HAS_OTEL", False):
+            from codex_pro.observability.telemetry import TelemetryManager
+            tm = TelemetryManager()
+            tm.setup()
+
+    def test_setup_no_crash_without_otel(self):
+        with patch("codex_pro.observability.telemetry._HAS_OTEL", False):
+            from codex_pro.observability.telemetry import TelemetryManager
+            tm = TelemetryManager(service_name="test-svc")
+            tm.setup()
+            assert tm.get_tracer() is None
+            assert tm.get_meter() is None
+
+    def test_shutdown_no_crash_without_otel(self):
+        with patch("codex_pro.observability.telemetry._HAS_OTEL", False):
+            from codex_pro.observability.telemetry import TelemetryManager
+            tm = TelemetryManager()
+            tm.shutdown()  # should not raise
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 2. OpenTelemetry — spans.py
+# ═══════════════════════════════════════════════════════════════════════════════
+class TestSpansWithNoneTracer:
+    """All span helpers must be no-ops when tracer is None."""
+
+    def test_start_llm_span_none_tracer(self):
+        from codex_pro.observability.spans import start_llm_span
+        assert start_llm_span(None, "gpt-4o", "openai") is None
+
+    def test_end_llm_span_none(self):
+        from codex_pro.observability.spans import end_llm_span
+        end_llm_span(None)  # no crash
+        end_llm_span(None, error="boom")
+
+    def test_record_llm_usage_none(self):
+        from codex_pro.observability.spans import record_llm_usage
+        record_llm_usage(None, {"input_tokens": 10})
+
+    def test_start_tool_span_none(self):
+        from codex_pro.observability.spans import start_tool_span
+        assert start_tool_span(None, "web_search") is None
+
+    def test_end_tool_span_none(self):
+        from codex_pro.observability.spans import end_tool_span
+        end_tool_span(None)
+        end_tool_span(None, error="fail")
+
+    def test_start_agent_span_none(self):
+        from codex_pro.observability.spans import start_agent_span
+        assert start_agent_span(None, 0) is None
+        assert start_agent_span(None, 3, strategy="react") is None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 3. OpenTelemetry — monitor.py (TraceLogger)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestTraceLogger:
+    def test_start_and_end_span(self):
+        from codex_pro.observability.monitor import TraceLogger
+        tl = TraceLogger()
+        span = tl.start_span("t1", "s1", "llm_call", "llm_call")
+        assert span.trace_id == "t1"
+        assert span.span_id == "s1"
+        assert span.started_at > 0
+        tl.end_span(span, metadata={"model": "gpt-4o"})
+        assert span.ended_at >= span.started_at
+        assert span.metadata["model"] == "gpt-4o"
+        assert span.duration_ms >= 0
+
+    def test_end_span_with_error(self):
+        from codex_pro.observability.monitor import TraceLogger
+        tl = TraceLogger()
+        span = tl.start_span("t2", "s2", "tool", "tool_call")
+        tl.end_span(span, error="timeout")
+        assert span.error == "timeout"
+
+    def test_get_trace(self):
+        from codex_pro.observability.monitor import TraceLogger
+        tl = TraceLogger()
+        tl.start_span("t3", "s3", "input", "input")
+        spans = tl.get_trace("t3")
+        assert len(spans) == 1
+        assert tl.get_trace("nonexistent") == []
+
+    def test_set_otel_tracer(self):
+        from codex_pro.observability.monitor import TraceLogger
+        tl = TraceLogger()
+        assert tl._otel_tracer is None
+        tl.set_otel_tracer("fake_tracer")
+        assert tl._otel_tracer == "fake_tracer"
+
+    def test_flush_trace_to_disk(self, tmp_path: Path):
+        from codex_pro.observability.monitor import TraceLogger
+        tl = TraceLogger(logs_dir=tmp_path)
+        span = tl.start_span("t4", "s4", "output", "output")
+        tl.end_span(span)
+        tl.flush_trace("t4")
+        written = tmp_path / "trace_t4.json"
+        assert written.exists()
+        data = json.loads(written.read_text())
+        assert len(data) == 1
+        assert data[0]["span_id"] == "s4"
+
+    def test_flush_trace_no_dir(self):
+        from codex_pro.observability.monitor import TraceLogger
+        tl = TraceLogger()
+        tl.start_span("t5", "s5", "x", "x")
+        tl.flush_trace("t5")
+        assert tl.get_trace("t5") == []
+
+    def test_get_recent_traces(self):
+        from codex_pro.observability.monitor import TraceLogger
+        tl = TraceLogger()
+        for i in range(5):
+            tl.start_span(f"trace_{i}", f"s_{i}", "x", "x")
+        recent = tl.get_recent_traces(limit=3)
+        assert len(recent) == 3
+        assert recent[-1] == "trace_4"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 4. TokenCounter — tokenizer.py
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestTokenCounterFallback:
+    """TokenCounter in fallback mode (no tiktoken / anthropic SDK)."""
+
+    def _make_counter(self) -> Any:
+        from codex_pro.models.tokenizer import TokenCounter
+        tc = TokenCounter(provider="unknown", model="test")
+        assert tc._tokenizer is None
+        return tc
+
+    def test_empty_string_returns_zero(self):
+        tc = self._make_counter()
+        assert tc.count("") == 0
+
+    def test_count_fallback_formula(self):
+        tc = self._make_counter()
+        text = "hello world test"
+        expected = max(1, len(text) // 4)
+        assert tc.count(text) == expected
+
+    def test_count_messages_basic(self):
+        tc = self._make_counter()
+        msgs = [
+            {"role": "user", "content": "Hello there"},
+            {"role": "assistant", "content": "Hi!"},
+        ]
+        result = tc.count_messages(msgs)
+        assert result > 0
+        assert isinstance(result, int)
+
+    def test_count_messages_with_tool_calls(self):
+        tc = self._make_counter()
+        msgs = [
+            {
+                "role": "assistant",
+                "content": "Let me search.",
+                "tool_calls": [
+                    {
+                        "function": {
+                            "name": "web_search",
+                            "arguments": json.dumps({"query": "test"}),
+                        }
+                    }
+                ],
+            }
+        ]
+        result = tc.count_messages(msgs)
+        assert result > 0
+
+    def test_count_messages_with_content_blocks(self):
+        tc = self._make_counter()
+        msgs = [{"role": "user", "content": [{"text": "block one"}, {"text": "block two"}]}]
+        result = tc.count_messages(msgs)
+        assert result > 0
+
+    def test_count_tools(self):
+        tc = self._make_counter()
+        tools = [{"function": {"name": "search", "parameters": {"type": "object"}}}]
+        result = tc.count_tools(tools)
+        assert result > 0
+
+    def test_for_model_caching(self):
+        from codex_pro.models.tokenizer import TokenCounter
+        # Clear cache to avoid cross-test pollution
+        TokenCounter._instances.pop("test_cache:model_a", None)
+        a = TokenCounter.for_model("test_cache", "model_a")
+        b = TokenCounter.for_model("test_cache", "model_a")
+        assert a is b
+
+    def test_for_model_different_keys(self):
+        from codex_pro.models.tokenizer import TokenCounter
+        TokenCounter._instances.pop("test_x:m1", None)
+        TokenCounter._instances.pop("test_y:m2", None)
+        a = TokenCounter.for_model("test_x", "m1")
+        b = TokenCounter.for_model("test_y", "m2")
+        assert a is not b
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5. LLMResponse — provider.py
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestLLMResponse:
+    def test_has_tool_calls_true(self):
+        from codex_pro.models.provider import LLMResponse, ToolCallRequest
+        resp = LLMResponse(tool_calls=[ToolCallRequest(id="1", name="search", arguments={})])
+        assert resp.has_tool_calls is True
+
+    def test_has_tool_calls_false(self):
+        from codex_pro.models.provider import LLMResponse
+        resp = LLMResponse(content="hello")
+        assert resp.has_tool_calls is False
+
+    def test_cache_hit_rate_with_cache(self):
+        from codex_pro.models.provider import LLMResponse
+        resp = LLMResponse(usage={"input_tokens": 100, "cache_read_input_tokens": 400})
+        assert abs(resp.cache_hit_rate - 0.8) < 1e-9
+
+    def test_cache_hit_rate_no_cache(self):
+        from codex_pro.models.provider import LLMResponse
+        resp = LLMResponse(usage={"input_tokens": 100})
+        assert resp.cache_hit_rate == 0.0
+
+    def test_cache_hit_rate_zero_input(self):
+        from codex_pro.models.provider import LLMResponse
+        resp = LLMResponse(usage={})
+        assert resp.cache_hit_rate == 0.0
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 6. MCP Transport — transport.py
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestStreamableHttpTransport:
+    def test_init_not_connected(self):
+        from codex_pro.mcp.transport import StreamableHttpTransport
+        t = StreamableHttpTransport(url="http://localhost:8080/mcp")
+        assert t.is_connected is False
+
+    def test_session_id_initially_none(self):
+        from codex_pro.mcp.transport import StreamableHttpTransport
+        t = StreamableHttpTransport(url="http://localhost:8080/mcp")
+        assert t.session_id is None
+
+    def test_custom_headers_stored(self):
+        from codex_pro.mcp.transport import StreamableHttpTransport
+        t = StreamableHttpTransport(url="http://x", headers={"Authorization": "Bearer tok"})
+        assert t._headers["Authorization"] == "Bearer tok"
+
+    @pytest.mark.asyncio
+    async def test_send_with_sse_response_does_not_block(self):
+        """The streamable-HTTP send() must return as soon as the response
+        headers arrive — the SSE body is consumed in the background. A
+        previous version awaited the entire stream inside send(), which
+        turned the bidirectional transport into a serialized one."""
+        import asyncio
+        import json
+        from unittest.mock import MagicMock, AsyncMock
+        from codex_pro.mcp.transport import StreamableHttpTransport
+
+        t = StreamableHttpTransport(url="http://x")
+        t._connected = True
+
+        # A response object that streams two SSE events, then *stalls* — i.e.
+        # the body is intentionally never closed. send() must still return.
+        body_started = asyncio.Event()
+        body_release = asyncio.Event()
+
+        class _StreamContent:
+            # Mirrors aiohttp's StreamReader: the SSE parser reads via
+            # iter_any() so it sees bytes as soon as they arrive rather than
+            # waiting for line boundaries.
+            def iter_any(self):
+                return self
+
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                if not body_started.is_set():
+                    body_started.set()
+                    return (
+                        b"data: " + json.dumps({"jsonrpc": "2.0", "id": 1, "result": {}}).encode() + b"\n\n"
+                    )
+                # Hang until the test releases us.
+                await body_release.wait()
+                raise StopAsyncIteration
+
+        resp = MagicMock()
+        resp.status = 200
+        resp.headers = {"Content-Type": "text/event-stream", "Mcp-Session-Id": "sess-1"}
+        resp.content = _StreamContent()
+
+        class _RespCtx:
+            async def __aenter__(self_inner):
+                return resp
+
+            async def __aexit__(self_inner, exc_type, exc, tb):
+                return False
+
+        session = MagicMock()
+        session.post = MagicMock(return_value=_RespCtx())
+        session.close = AsyncMock()
+        t._session = session
+
+        await asyncio.wait_for(t.send({"jsonrpc": "2.0", "id": 1, "method": "ping"}), timeout=1.0)
+
+        assert t.session_id == "sess-1"
+
+        msg = await asyncio.wait_for(t._response_queue.get(), timeout=1.0)
+        assert msg["id"] == 1
+
+        body_release.set()
+        await t.close()
+
+
+class TestStdioTransport:
+    def test_init_not_connected(self):
+        from codex_pro.mcp.transport import StdioTransport
+        t = StdioTransport(command="codex", args=["hello"])
+        assert t.is_connected is False
+
+    def test_init_stores_command(self):
+        from codex_pro.mcp.transport import StdioTransport
+        t = StdioTransport(command="/usr/bin/node", args=["server.js"], env={"FOO": "1"})
+        assert t._command == "/usr/bin/node"
+        assert t._args == ["server.js"]
+        assert t._env == {"FOO": "1"}
+
+    @pytest.mark.asyncio
+    async def test_send_serializes_concurrent_writers(self):
+        """Two coroutines writing to stdin at the same time must NOT
+        interleave their JSON-RPC frames. The transport's _send_lock
+        guarantees a frame is fully written before the next one starts.
+        """
+        import asyncio
+        from codex_pro.mcp.transport import StdioTransport
+
+        t = StdioTransport(command="codex")
+
+        writes: list[bytes] = []
+
+        class _Stdin:
+            def write(self, data: bytes) -> None:
+                writes.append(data)
+
+            async def drain(self) -> None:
+                # Yield control so the second coroutine could (incorrectly)
+                # interleave if there were no lock.
+                await asyncio.sleep(0)
+
+        proc = type("P", (), {})()
+        proc.stdin = _Stdin()
+        # A live child process: send() now refuses to write to one that has
+        # already exited, so the fixture has to say it is still running.
+        proc.returncode = None
+        t._process = proc  # type: ignore[assignment]
+
+        async def writer(i: int) -> None:
+            await t.send({"id": i, "data": "x" * 200})
+
+        await asyncio.gather(*[writer(i) for i in range(8)])
+
+        # Each write should be a full single-line JSON-RPC frame.
+        for line in writes:
+            assert line.endswith(b"\n")
+            # Exactly one newline per frame (no interleaving).
+            assert line.count(b"\n") == 1
+
+
+class TestMCPClient:
+    @pytest.mark.asyncio
+    async def test_request_after_disconnect_raises(self):
+        """Once disconnect() runs, _request must refuse to register a new
+        pending future (otherwise it would hang forever waiting for a
+        response that nobody's reading)."""
+        from codex_pro.mcp.client import MCPClient
+
+        class _DummyTransport:
+            is_connected = True
+            async def send(self, msg): ...
+            async def receive(self): return {}
+            async def close(self): ...
+
+        client = MCPClient(name="dummy", transport=_DummyTransport())
+        await client.disconnect()
+        with pytest.raises(ConnectionError):
+            await client._request("ping", {}, timeout=0.1)
+
+    def test_notification_queue_is_bounded(self):
+        from codex_pro.mcp.client import MCPClient
+
+        class _DummyTransport:
+            is_connected = False
+            async def send(self, msg): ...
+            async def receive(self): return {}
+            async def close(self): ...
+
+        client = MCPClient(name="d", transport=_DummyTransport())
+        # Bounded queue prevents unbounded growth on connections that emit
+        # notifications faster than any consumer drains them.
+        assert client._notifications.maxsize > 0
+
+
+class TestSSEFraming:
+    """SSE parsing for the Streamable HTTP transport.
+
+    The legacy ``HttpTransport`` these tests used to cover is gone — it was never
+    constructed by the manager, only by this test class, and it carried the same
+    framing defects as the transport that does ship. What remains is the parser
+    that is actually reachable.
+    """
+
+    def test_parse_event_valid(self):
+        from codex_pro.mcp.transport import _parse_sse_event
+        assert _parse_sse_event('data: {"jsonrpc":"2.0","id":1}') == {"jsonrpc": "2.0", "id": 1}
+
+    def test_parse_event_no_data_field(self):
+        from codex_pro.mcp.transport import _parse_sse_event
+        assert _parse_sse_event("event: ping") is None
+
+    def test_parse_event_invalid_json(self):
+        from codex_pro.mcp.transport import _parse_sse_event
+        with pytest.raises(ValueError, match="not valid JSON"):
+            _parse_sse_event("data: not-json")
+
+    def test_parse_event_tolerates_missing_and_extra_space(self):
+        """Spec: a ``data:`` value drops exactly one optional leading space."""
+        from codex_pro.mcp.transport import _parse_sse_event
+        assert _parse_sse_event('data:{"a":1}') == {"a": 1}
+        assert _parse_sse_event('data:  {"a":1}') == {"a": 1}
+
+    def test_parse_event_ignores_comments_and_similar_field_names(self):
+        from codex_pro.mcp.transport import _parse_sse_event
+        assert _parse_sse_event(': keepalive\ndata: {"a":1}') == {"a": 1}
+        assert _parse_sse_event('dataFoo: {"a":2}\ndata: {"a":1}') == {"a": 1}
+
+    def test_parse_event_joins_multiline_data(self):
+        from codex_pro.mcp.transport import _parse_sse_event
+        assert _parse_sse_event('data: {"a":\ndata: 1}') == {"a": 1}
+
+    def test_split_handles_crlf_framing(self):
+        """The framing bug that made HTTP MCP unusable in practice.
+
+        The official SDK terminates events with CRLFCRLF. The old parser split
+        only on ``\\n\\n``, so against a real server it never produced a single
+        event and every call over SSE timed out.
+        """
+        from codex_pro.mcp.transport import _split_sse_event
+
+        event, rest = _split_sse_event('event: message\r\ndata: {"id":1}\r\n\r\ntail')
+        assert event is not None and '"id":1' in event
+        assert rest == "tail"
+
+    def test_split_handles_lf_and_cr_framing(self):
+        from codex_pro.mcp.transport import _split_sse_event
+
+        event, rest = _split_sse_event('data: {"id":2}\n\ntail')
+        assert event == 'data: {"id":2}' and rest == "tail"
+        event, rest = _split_sse_event('data: {"id":3}\r\rtail')
+        assert event == 'data: {"id":3}' and rest == "tail"
+
+    def test_split_returns_none_until_terminated(self):
+        from codex_pro.mcp.transport import _split_sse_event
+
+        event, rest = _split_sse_event('data: {"id":4}\r\n')
+        assert event is None
+        assert rest == 'data: {"id":4}\r\n'
+
+
+class TestStreamableHttpProtocolHeaders:
+    def _transport(self):
+        from codex_pro.mcp.transport import StreamableHttpTransport
+        return StreamableHttpTransport(url="https://x/mcp", headers={"X-Custom": "1"})
+
+    def test_post_sends_required_accept_header(self):
+        """The spec requires both media types on every POST; without this a
+        compliant server answers 406."""
+        headers = self._transport()._request_headers()
+        assert headers["Accept"] == "application/json, text/event-stream"
+        assert headers["Content-Type"] == "application/json"
+        assert headers["X-Custom"] == "1"
+
+    def test_get_stream_accepts_event_stream_only(self):
+        headers = self._transport()._request_headers(for_get=True)
+        assert headers["Accept"] == "text/event-stream"
+        assert "Content-Type" not in headers
+
+    def test_protocol_version_header_sent_after_negotiation(self):
+        t = self._transport()
+        assert "MCP-Protocol-Version" not in t._request_headers()
+        t.set_protocol_version("2025-06-18")
+        assert t._request_headers()["MCP-Protocol-Version"] == "2025-06-18"
+
+    def test_session_id_header_sent_once_known(self):
+        t = self._transport()
+        assert "Mcp-Session-Id" not in t._request_headers()
+        t._session_id = "sess-9"
+        assert t._request_headers()["Mcp-Session-Id"] == "sess-9"
+
+    @pytest.mark.asyncio
+    async def test_http_error_raises_instead_of_hanging(self):
+        """A 406/500 used to be pushed onto the response queue with an id the
+        client never issued, so no future matched and the call waited out its
+        full timeout — a protocol error surfacing as a hang."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        t = self._transport()
+        resp = MagicMock()
+        resp.status = 406
+        resp.headers = {}
+        resp.text = AsyncMock(return_value="Not Acceptable")
+        with pytest.raises(ConnectionError, match="406"):
+            await t._check_status(resp, {"method": "initialize"})
+
+    @pytest.mark.asyncio
+    async def test_404_marks_the_session_expired(self):
+        """Per spec the client starts a new session by re-initialising; flagging
+        it lets the manager rebuild instead of reporting a generic error forever."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        t = self._transport()
+        t._session_id = "old"
+        resp = MagicMock()
+        resp.status = 404
+        resp.headers = {}
+        resp.text = AsyncMock(return_value="expired")
+        with pytest.raises(ConnectionError, match="session expired"):
+            await t._check_status(resp, {"method": "tools/call"})
+        assert t.session_expired is True
+        assert t.session_id is None
+
+    @pytest.mark.asyncio
+    async def test_unauthorized_is_reported_distinctly(self):
+        from unittest.mock import AsyncMock, MagicMock
+
+        t = self._transport()
+        resp = MagicMock()
+        resp.status = 401
+        resp.headers = {}
+        resp.text = AsyncMock(return_value="no token")
+        with pytest.raises(ConnectionError, match="unauthorized"):
+            await t._check_status(resp, {"method": "tools/list"})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. Prompt Caching — format_utils.py
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestOpenaiToAnthropicTools:
+    def test_inject_cache_markers_true(self):
+        from codex_pro.models.providers.format_utils import openai_to_anthropic_tools
+        tools = [
+            {"function": {"name": "a", "description": "tool a", "parameters": {"type": "object"}}},
+            {"function": {"name": "b", "description": "tool b", "parameters": {"type": "object"}}},
+        ]
+        result = openai_to_anthropic_tools(tools, inject_cache_markers=True)
+        assert len(result) == 2
+        assert "cache_control" not in result[0]
+        assert result[-1]["cache_control"] == {"type": "ephemeral"}
+
+    def test_inject_cache_markers_false(self):
+        from codex_pro.models.providers.format_utils import openai_to_anthropic_tools
+        tools = [{"function": {"name": "x", "description": "d", "parameters": {"type": "object"}}}]
+        result = openai_to_anthropic_tools(tools, inject_cache_markers=False)
+        assert "cache_control" not in result[0]
+
+    def test_empty_tools(self):
+        from codex_pro.models.providers.format_utils import openai_to_anthropic_tools
+        assert openai_to_anthropic_tools([], inject_cache_markers=True) == []
+
+
+class TestOpenaiToAnthropicMessages:
+    def test_system_message_extracted(self):
+        from codex_pro.models.providers.format_utils import openai_to_anthropic_messages
+        msgs = [
+            {"role": "system", "content": "You are helpful."},
+            {"role": "user", "content": "Hi"},
+        ]
+        system_blocks, converted = openai_to_anthropic_messages(msgs)
+        assert len(system_blocks) == 1
+        assert system_blocks[0]["text"] == "You are helpful."
+        assert converted[0]["role"] == "user"
+
+    def test_cache_markers_injected_on_system(self):
+        from codex_pro.models.providers.format_utils import openai_to_anthropic_messages
+        msgs = [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "hi"},
+        ]
+        system_blocks, _ = openai_to_anthropic_messages(msgs, inject_cache_markers=True)
+        assert system_blocks[-1].get("cache_control") == {"type": "ephemeral"}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 8. Compression Engine — engine.py
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ConcreteEngine:
+    """Minimal concrete subclass for testing ContextEngine."""
+
+    @staticmethod
+    def _make():
+        from codex_pro.agent.compression.engine import ContextEngine
+        from codex_pro.agent.compression.types import CompressionResult, CompressionStats
+
+        class _Impl(ContextEngine):
+            async def compress(self, messages, focus_topic=""):
+                return CompressionResult(messages=messages, stats=CompressionStats())
+
+        return _Impl
+
+
+class TestContextEngine:
+    def test_estimate_without_token_counter(self):
+        Cls = ConcreteEngine._make()
+        engine = Cls(context_window_tokens=10000)
+        msg = {"role": "user", "content": "Hello world, this is a test message."}
+        tokens = engine._estimate_message_tokens(msg)
+        # 4 overhead + len(content)//4
+        assert tokens == 4 + len("Hello world, this is a test message.") // 4
+
+    def test_estimate_with_token_counter(self):
+        Cls = ConcreteEngine._make()
+        engine = Cls(context_window_tokens=10000)
+        counter = MagicMock()
+        counter.count.return_value = 10
+        engine.set_token_counter(counter)
+        msg = {"role": "user", "content": "Hello"}
+        tokens = engine._estimate_message_tokens(msg)
+        assert tokens == 14  # 10 + 4 overhead
+        counter.count.assert_called_with("Hello")
+
+    def test_estimate_with_content_blocks_and_counter(self):
+        Cls = ConcreteEngine._make()
+        engine = Cls(context_window_tokens=10000)
+        counter = MagicMock()
+        counter.count.return_value = 5
+        engine.set_token_counter(counter)
+        msg = {"role": "user", "content": [{"text": "a"}, {"text": "b"}]}
+        tokens = engine._estimate_message_tokens(msg)
+        assert tokens == 4 + 5 + 5  # overhead + 2 blocks
+
+    def test_should_compress(self):
+        Cls = ConcreteEngine._make()
+        engine = Cls(context_window_tokens=100, trigger_ratio=0.5)
+        # Each msg ~ 4 + len//4 tokens. Make enough to exceed 50.
+        msgs = [{"role": "user", "content": "x" * 200}]  # 4 + 50 = 54 > 50
+        assert engine.should_compress(msgs) is True
+
+    def test_should_not_compress(self):
+        Cls = ConcreteEngine._make()
+        engine = Cls(context_window_tokens=10000, trigger_ratio=0.7)
+        msgs = [{"role": "user", "content": "hi"}]
+        assert engine.should_compress(msgs) is False
+
+    def test_set_token_counter(self):
+        Cls = ConcreteEngine._make()
+        engine = Cls(context_window_tokens=100)
+        assert engine._token_counter is None
+        engine.set_token_counter("fake")
+        assert engine._token_counter == "fake"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 9. Config — schema.py
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestConfigDefaults:
+    def test_config_instantiation(self):
+        from codex_pro.config.schema import Config
+        cfg = Config()
+        assert cfg.models.default_model == ""
+        assert cfg.workspace == "~/.codex-pro"
+
+    def test_planning_config_defaults(self):
+        from codex_pro.config.schema import PlanningConfig
+        pc = PlanningConfig()
+        assert pc.enabled is True
+        assert pc.default_strategy == "auto"
+        assert pc.max_tree_depth == 5
+        assert pc.reflection_enabled is True
+
+    def test_a2a_config_defaults(self):
+        from codex_pro.config.schema import A2AConfig
+        a = A2AConfig()
+        assert a.enabled is True
+        assert a.agent_name == "codex-pro"
+        assert "chat" in a.capabilities
+
+    def test_eval_config_defaults(self):
+        from codex_pro.config.schema import EvalConfig
+        e = EvalConfig()
+        assert e.timeout_per_case == 120
+
+    def test_memory_config_new_fields(self):
+        from codex_pro.config.schema import MemoryConfig
+        m = MemoryConfig()
+        assert m.contradiction_detection is True
+        assert m.vector_enabled is True
+        assert m.sleep_consolidation is True
+        assert m.archival_threshold == 0.05
+        assert m.forget_threshold == 0.01
+        assert m.max_working_memory == 20
+
+    def test_compression_config_defaults(self):
+        from codex_pro.config.schema import CompressionConfig
+        c = CompressionConfig()
+        assert c.enabled is True
+        assert c.trigger_ratio == 0.7
+        assert c.tool_pruning_enabled is True
+
+    def test_mcp_server_config_transport(self):
+        from codex_pro.config.schema import MCPServerConfig
+        m = MCPServerConfig(command="npx")
+        assert m.connect_timeout == 60
+        assert m.timeout == 120
+        # Untrusted by default: a server's own annotations must not be able to
+        # lower the approval level required to call its tools.
+        assert m.trust_level == "untrusted"
+
+    def test_mcp_server_config_requires_exactly_one_transport(self):
+        """Both fields set used to mean "url silently wins", so a typo in one
+        produced a connection to the other with no indication why. Neither set
+        failed only at connect time, for what is purely a config error."""
+        from pydantic import ValidationError
+        from codex_pro.config.schema import MCPServerConfig
+
+        with pytest.raises(ValidationError, match="either 'url' or 'command'"):
+            MCPServerConfig()
+        with pytest.raises(ValidationError, match="not both"):
+            MCPServerConfig(command="npx", url="https://x/mcp")
+        # A disabled entry may be left incomplete — it is never connected.
+        assert MCPServerConfig(enabled=False).enabled is False
+
+    def test_mcp_server_config_rejects_nonpositive_timeouts(self):
+        from pydantic import ValidationError
+        from codex_pro.config.schema import MCPServerConfig
+
+        with pytest.raises(ValidationError):
+            MCPServerConfig(command="x", timeout=-1)
+        with pytest.raises(ValidationError):
+            MCPServerConfig(command="x", connect_timeout=0)
+
+    def test_mcp_oauth_requires_http_transport(self):
+        from pydantic import ValidationError
+        from codex_pro.config.schema import MCPServerConfig
+
+        with pytest.raises(ValidationError, match="oauth"):
+            MCPServerConfig(command="npx", auth="oauth")
+        assert MCPServerConfig(url="https://x/mcp", auth="oauth").auth == "oauth"

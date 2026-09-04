@@ -1,0 +1,15 @@
+{
+  "heroTitle": "你想让我们在 {{project}} 中构建什么？",
+  "promptExplore": "探索并理解代码",
+  "promptExploreFull": "探索并理解代码：请帮我梳理这个仓库的架构与关键入口。",
+  "promptBuild": "构建新功能、应用或工具",
+  "promptBuildFull": "构建新功能、应用或工具：请帮我设计并实现一个可落地的功能方案。",
+  "promptReview": "审查代码并提出修改建议",
+  "promptReviewFull": "审查代码并提出修改建议：请审查当前变更并给出可操作的改进建议。",
+  "promptFix": "修复问题和失败",
+  "promptFixFull": "修复问题和失败：请定位当前失败原因并给出修复步骤。",
+  "you": "你",
+  "assistant": "Codex",
+  "loadingHistory": "加载会话…",
+  "historyError": "无法加载会话：{{error}}"
+}

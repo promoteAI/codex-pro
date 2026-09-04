@@ -1,0 +1,62 @@
+# Codex Pro packaged defaults — ONLY values that intentionally differ from
+# the schema defaults in codex_pro/config/schema.py.
+#
+# schema.py is the single source of truth for defaults. Do NOT restate schema
+# defaults here: this file is deep-merged over the schema, so a duplicated
+# value silently wins and the two drift apart.
+# User overrides go in codex-pro.yaml or CODEX_PRO_ env vars.
+
+tools:
+  web:
+    enabled: true
+execution:
+  defaultExecutor: local
+  networkPolicy: allow
+permissions:
+  approval:
+    requireApproval:
+    - cronjob
+    - skill_install
+    - skill_manage
+memory:
+  consolidationThreshold: 15
+multiAgent:
+  workerProfiles:
+  - id: coder
+    name: Coding Worker
+    description: Code implementation, debugging, and testing.
+    instructions: Focus on writing correct, tested code. Use exec to verify results.
+    defaultTools:
+    - read_file
+    - write_file
+    - edit_file
+    - list_dir
+    - search_files
+    - patch
+    - exec
+    - execute_code
+    - process
+    temperature: 0.3
+  - id: researcher
+    name: Research Worker
+    description: Web research, source comparison, and evidence synthesis.
+    instructions: Search multiple sources, compare findings, cite evidence clearly.
+    defaultTools:
+    - web_search
+    - web_fetch
+    - read_file
+    - search_files
+    - knowledge_search
+    temperature: 0.4
+  - id: operator
+    name: Operations Worker
+    description: System operations, file management, process execution.
+    instructions: Execute commands carefully, verify results before reporting.
+    defaultTools:
+    - exec
+    - process
+    - read_file
+    - write_file
+    - list_dir
+    - search_files
+    temperature: 0.2

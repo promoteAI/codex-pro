@@ -1387,6 +1387,25 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   .ms-primary-btn{width:100%}
 }
 
+
+/* ── Plan mode banner ── */
+.plan-mode-banner{display:none;align-items:center;gap:8px;padding:8px 14px;background:#1e2a3a;border:1px solid #2a4a6a;border-radius:10px;font-size:12.5px;color:#8eb6ff;margin-bottom:12px;flex-shrink:0}
+.plan-mode-banner.is-active{display:flex}
+.plan-mode-banner .pm-label{font-weight:500;color:#a8d4ff}
+.plan-mode-banner .pm-close{margin-left:auto;width:20px;height:20px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;color:#668;border:0;background:transparent;cursor:pointer}
+.plan-mode-banner .pm-close:hover{background:#253545;color:#a8d4ff}
+.plan-mode-banner .pm-close svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8}
+/* ── PR action buttons ── */
+.pr-detail-actions{display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #2a2a2a;flex-wrap:wrap}
+.pr-approve-btn{padding:7px 16px;border:0;border-radius:8px;background:#163221;color:#4ade80;font:inherit;font-size:13px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.pr-approve-btn:hover{background:#1a4028}
+.pr-approve-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8}
+.pr-changes-btn{padding:7px 16px;border:1px solid #5a3a00;border-radius:8px;background:#2a1f0a;color:#e3b341;font:inherit;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.pr-changes-btn:hover{background:#3a2a10}
+.pr-changes-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8}
+.pr-merge-btn{padding:7px 16px;border:1px solid #333;border-radius:8px;background:#252525;color:#c0c0c0;font:inherit;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.pr-merge-btn:hover{background:#2e2e2e;border-color:#444;color:#e0e0e0}
+.pr-merge-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8}
 </style>
 </head>
 <body>
@@ -1773,6 +1792,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                 <div class="pr-detail-file"><span>docs/design/index.html</span><span><span class="add">+120</span><span class="del">-24</span></span></div>
                 <div class="pr-detail-file"><span>README.md</span><span><span class="add">+8</span><span class="del">-0</span></span></div>
               </div>
+              <div class="pr-detail-actions" id="prDetailActions"></div>
             </div>
           </div>
         </section>
@@ -5986,6 +6006,15 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     if (row.type === 'action' && row.data.id === 'new') {
       var nav = document.querySelector('.nav-item[aria-label="新对话"]');
       if (nav) nav.click();
+    } else if (row.type === 'chat') {
+      var chats = document.querySelectorAll('.chat-row[data-chat]');
+      for (var i = 0; i < chats.length; i++) {
+        var label = (chats[i].querySelector('.chat-label') || {}).textContent || '';
+        if (label.indexOf(row.data.title) !== -1 || row.data.title.indexOf(label) !== -1) {
+          chats[i].click();
+          break;
+        }
+      }
     }
   }
   if (searchBtn) {
@@ -6080,11 +6109,13 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     hideAllMainViews();
     if (typeof exitChatMode === 'function') exitChatMode();
     if (scheduledView) scheduledView.classList.add('active');
+    if (sideOpen) closeSidePanel();
   }
   function showPrView() {
     hideAllMainViews();
     if (typeof exitChatMode === 'function') exitChatMode();
     if (prView) prView.classList.add('active');
+    if (sideOpen) closeSidePanel();
   }
   function showPluginsView() {
     hideAllMainViews();
@@ -6110,6 +6141,14 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       showHomeView();
       var key = r.getAttribute('data-chat') || 'codex-pro';
       enterChatMode(key);
+    });
+  });
+  /* ── Theme preview: toggle selection ── */
+  document.querySelectorAll('.theme-preview-card').forEach(function (card) {
+    card.addEventListener('click', function () {
+      document.querySelectorAll('.theme-preview-card').forEach(function (c) { c.classList.remove('selected'); });
+      card.classList.add('selected');
+      showProtoToast('主题已切换：' + ((card.querySelector('.theme-preview-label') || {}).textContent || ''));
     });
   });
 
@@ -6254,6 +6293,16 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       files.innerHTML = data.files.map(function (f) {
         return '<div class="pr-detail-file"><span>' + f[0] + '</span><span><span class="add">' + f[1] + '</span><span class="del">' + f[2] + '</span></span></div>';
       }).join('');
+    }
+    var actions = document.getElementById('prDetailActions');
+    if (actions) {
+      var isReview = data.kicker.indexOf('Review') !== -1;
+      actions.innerHTML = '<button class="pr-approve-btn" type="button" data-action="approve" title="批准"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>批准</button>' + (isReview ? '<button class="pr-changes-btn" type="button" data-action="changes" title="请求修改"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M3 7l8.5-5.5a1.5 1.5 0 0 1 2 0L21 7M5 11v4M9 11v4M13 11v4"/></svg>请求修改</button>' : '') + '<button class="pr-merge-btn" type="button" data-action="merge" title="合并"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="12" r="3"/><path d="M6 9v3M6 15v3M9 12h6"/></svg>合并</button>';
+      actions.querySelectorAll('.pr-approve-btn,.pr-changes-btn,.pr-merge-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          showProtoToast((btn.getAttribute('data-action') || '操作') + '（原型）');
+        });
+      });
     }
   }
   function filterPrList() {
@@ -7074,6 +7123,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         goalBtn.hidden = false;
         goalBtn.classList.add('is-visible');
         goalBtn.setAttribute('data-mode', kind);
+        updatePlanBanner();
         goalBtn.setAttribute('aria-label', label);
         var ico = goalBtn.querySelector('svg');
         if (ico) ico.outerHTML = icon;
@@ -7769,6 +7819,21 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       goalBtn.classList.remove('is-visible');
       showProtoToast('已关闭' + (goalBtn.getAttribute('aria-label') || '目标'));
     });
+    var planBanner = document.getElementById('planModeBanner');
+    var pmClose = planBanner && planBanner.querySelector('.pm-close');
+    function updatePlanBanner() {
+      if (!planBanner) return;
+      var isPlan = goalBtn.classList.contains('is-visible') && goalBtn.getAttribute('data-mode') === 'plan';
+      planBanner.hidden = !isPlan;
+      planBanner.classList.toggle('is-active', isPlan);
+    }
+    if (pmClose) {
+      pmClose.addEventListener('click', function () {
+        goalBtn.hidden = true;
+        goalBtn.classList.remove('is-visible');
+        updatePlanBanner();
+      });
+    }
   }
 
 
@@ -8647,6 +8712,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   }
 </script>
 <div class="proto-toast" id="protoToast" role="status" aria-live="polite"></div>
+<div class="plan-mode-banner" id="planModeBanner" role="status" aria-live="polite" hidden><span class="pm-label">计划模式</span><span>当前任务：探索并比较架构方案</span><button class="pm-close" type="button" aria-label="关闭计划模式"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
 <div class="notif-panel" id="notifPanel" role="dialog" aria-label="通知" hidden>
   <div class="notif-panel-title">通知</div>
   <div class="notif-item"><p class="notif-item-title">任务已完成</p><p class="notif-item-sub">Codex-Pro 竞品研究与迭代开发 · 刚刚</p></div>

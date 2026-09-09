@@ -29,6 +29,7 @@ botpy.log
 .DS_Store
 *lock*
 .cursor/
+reference
 
 
 # Editor / IDE

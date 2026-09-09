@@ -139,7 +139,7 @@ def test_installer_flag_alone_does_not_defer(monkeypatch):
 
     monkeypatch.setenv("CODEX_PRO_SETUP_HANDLES_SERVICE", "1")
     monkeypatch.setattr(sys, "platform", "linux")
-    monkeypatch.setattr(os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(os, "geteuid", lambda: 1000, raising=False)
     assert wiz._installer_owns_service_registration() is False
 
 
@@ -150,7 +150,7 @@ def test_no_installer_flag_never_defers(monkeypatch):
 
     monkeypatch.delenv("CODEX_PRO_SETUP_HANDLES_SERVICE", raising=False)
     monkeypatch.setattr(sys, "platform", "linux")
-    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
     assert wiz._installer_owns_service_registration() is False
 
 
@@ -160,7 +160,7 @@ def test_root_with_installer_flag_defers(monkeypatch):
 
     monkeypatch.setenv("CODEX_PRO_SETUP_HANDLES_SERVICE", "1")
     monkeypatch.setattr(sys, "platform", "linux")
-    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
     assert wiz._installer_owns_service_registration() is True
 
 

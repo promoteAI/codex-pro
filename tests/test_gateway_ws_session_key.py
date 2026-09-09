@@ -79,6 +79,7 @@ def test_fallback_true_keeps_legacy_gateway_key():
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_ws_auth_accepts_cli_session_key(gateway_ws_url):
     async with aiohttp.ClientSession() as s:
         async with s.ws_connect(gateway_ws_url) as ws:
@@ -92,6 +93,7 @@ async def test_ws_auth_accepts_cli_session_key(gateway_ws_url):
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_ws_auth_rejects_impersonation(gateway_ws_url):
     async with aiohttp.ClientSession() as s:
         async with s.ws_connect(gateway_ws_url) as ws:
@@ -104,6 +106,7 @@ async def test_ws_auth_rejects_impersonation(gateway_ws_url):
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_ws_auth_rejects_reserved_epoch_injection(gateway_ws_url):
     async with aiohttp.ClientSession() as s:
         async with s.ws_connect(gateway_ws_url) as ws:

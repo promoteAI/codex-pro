@@ -210,6 +210,9 @@ asyncio_mode = "strict"
 testpaths = ["tests"]
 # Coverage is opt-in (it ~3.5x's run time): `pytest --cov`. When enabled, the
 # gate in [tool.coverage.report] (fail_under) is enforced automatically.
+markers = [
+    "slow: marks tests as slow (deselect with -m \"not slow\")",
+]
 
 [tool.coverage.run]
 source = ["codex_pro"]

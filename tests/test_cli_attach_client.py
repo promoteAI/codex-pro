@@ -99,6 +99,7 @@ async def test_authenticate_raises_on_error():
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_client_auth_and_send_roundtrip(gateway_ws_url):
     # 不走完整 run_client 的 stdin，只验证 connect+auth+发 message 被服务端 accepted
     async with aiohttp.ClientSession() as s:

@@ -60,6 +60,7 @@ async def _chatter_until_closed(ws, send, *, budget_multiple: float = 4.0):
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_main_ws_deadline_is_not_renewed_by_traffic(gateway_ws_url, monkeypatch):
     """Chatter must not buy more time on the main WS.
 

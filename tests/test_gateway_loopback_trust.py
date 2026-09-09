@@ -187,6 +187,7 @@ async def allowlist_gateway_ws_url():
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_loopback_cli_auth_ok_under_empty_allowlist(allowlist_gateway_ws_url):
     async with aiohttp.ClientSession() as s:
         async with s.ws_connect(allowlist_gateway_ws_url) as ws:
@@ -200,6 +201,7 @@ async def test_loopback_cli_auth_ok_under_empty_allowlist(allowlist_gateway_ws_u
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_cross_site_origin_rejected_before_upgrade(allowlist_gateway_ws_url):
     import aiohttp
     url = allowlist_gateway_ws_url.replace("ws://", "http://")
@@ -219,6 +221,7 @@ async def test_cross_site_origin_rejected_before_upgrade(allowlist_gateway_ws_ur
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_loopback_only_client_without_cli_key_rejected(allowlist_gateway_ws_url):
     import aiohttp
     async with aiohttp.ClientSession() as s:
@@ -233,6 +236,7 @@ async def test_loopback_only_client_without_cli_key_rejected(allowlist_gateway_w
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_loopback_cli_with_key_still_ok(allowlist_gateway_ws_url):
     import aiohttp
     async with aiohttp.ClientSession() as s:

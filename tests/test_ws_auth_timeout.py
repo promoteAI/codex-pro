@@ -18,6 +18,7 @@ import pytest
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_main_ws_closes_unauthenticated_socket(gateway_ws_url, monkeypatch):
     """An open socket that never authenticates is closed by the server."""
     from codex_pro.gateway import ws_common
@@ -31,6 +32,7 @@ async def test_main_ws_closes_unauthenticated_socket(gateway_ws_url, monkeypatch
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_pre_auth_timeout_survives_non_auth_traffic(gateway_ws_url, monkeypatch):
     """Chatting without authenticating does not buy more time.
 
@@ -56,6 +58,7 @@ async def test_pre_auth_timeout_survives_non_auth_traffic(gateway_ws_url, monkey
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_authenticated_socket_survives_auth_timeout(gateway_ws_url, monkeypatch):
     """The timeout bounds only the pre-auth window.
 
@@ -82,6 +85,7 @@ async def test_authenticated_socket_survives_auth_timeout(gateway_ws_url, monkey
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_cross_site_origin_rejected_before_upgrade(gateway_ws_url):
     """The shared gate still refuses cross-site browser upgrades pre-prepare()."""
     async with aiohttp.ClientSession() as s:
@@ -91,6 +95,7 @@ async def test_cross_site_origin_rejected_before_upgrade(gateway_ws_url):
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_native_client_without_origin_still_accepted(gateway_ws_url):
     """The CLI sends no Origin / Sec-Fetch-Site and must pass the gate."""
     async with aiohttp.ClientSession() as s:

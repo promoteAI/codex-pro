@@ -15,5 +15,6 @@
   "calls": "Calls",
   "successes": "Successes",
   "failures": "Failures",
-  "successRate": "Success rate"
+  "successRate": "Success rate",
+  "clearChannelFilter": "Clear channel filter"
 }

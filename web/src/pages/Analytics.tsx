@@ -31,10 +31,12 @@ function formatUsd(value: unknown): string {
 export function Analytics() {
   const { t } = useTranslation(["analytics", "common"]);
   const [days, setDays] = useState(7);
+  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const { data: tokens, error, refetch: refetchTokens } = useApi<{ usage: TokenUsage[] }>(`/analytics/tokens?days=${days}`);
   // 渠道归因与技能调用质量都来自持久化聚合，页面通过实时事件刷新。
+  const channelParam = selectedChannel ? `&channel=${encodeURIComponent(selectedChannel)}` : "";
   const { data: channels, error: channelsError, refetch: refetchChannels } = useApi<{ channels: ChannelUsage[] }>(
-    `/analytics/channels?days=${days}`
+    `/analytics/channels?days=${days}${channelParam}`
   );
   const { data: skills, error: skillsError, refetch: refetchSkills } = useApi<SkillUsageResponse>(
     `/analytics/skills?days=${days}`,
@@ -115,13 +117,31 @@ export function Analytics() {
             <div className="text-sm text-gray-400">{t("common:noData")}</div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={channelRows}>
+              <BarChart data={channelRows} onClick={() => setSelectedChannel(null)}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="channel" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} unit="$" />
                 <Tooltip formatter={formatUsd} />
-                <Bar dataKey="cost_usd" fill="#6366f1" name={t("costUsd")} />
+                <Bar
+                  dataKey="cost_usd"
+                  fill={selectedChannel ? "#6366f1" : "#94a3b8"}
+                  name={t("costUsd")}
+                  onClick={(e) => {
+                    if (e && typeof e === "object" && "payload" in e) {
+                      const ch = (e as any).payload?.channel;
+                      if (ch) setSelectedChannel(selectedChannel === ch ? null : ch);
+                    }
+                  }}
+                />
               </BarChart>
+              {selectedChannel && (
+                <button
+                  onClick={() => setSelectedChannel(null)}
+                  className="mt-2 text-xs text-blue-600 hover:text-blue-800"
+                >
+                  {t("clearChannelFilter")}
+                </button>
+              )}
             </ResponsiveContainer>
           )}
         </div>

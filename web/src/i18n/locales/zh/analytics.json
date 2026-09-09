@@ -15,5 +15,6 @@
   "calls": "调用次数",
   "successes": "成功",
   "failures": "失败",
-  "successRate": "成功率"
+  "successRate": "成功率",
+  "clearChannelFilter": "清除频道筛选"
 }

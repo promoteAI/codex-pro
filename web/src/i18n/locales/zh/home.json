@@ -11,5 +11,8 @@
   "you": "你",
   "assistant": "Codex",
   "loadingHistory": "加载会话…",
-  "historyError": "无法加载会话：{{error}}"
+  "historyError": "无法加载会话：{{error}}",
+  "recentSessions": "最近会话",
+  "messages": "条消息",
+  "loadMore": "加载更多"
 }

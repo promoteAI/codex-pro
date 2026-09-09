@@ -11,5 +11,8 @@
   "you": "You",
   "assistant": "Codex",
   "loadingHistory": "Loading session…",
-  "historyError": "Failed to load session: {{error}}"
+  "historyError": "Failed to load session: {{error}}",
+  "recentSessions": "Recent Sessions",
+  "messages": "messages",
+  "loadMore": "Load more"
 }

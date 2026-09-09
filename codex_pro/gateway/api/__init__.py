@@ -97,3 +97,13 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_get(f"{prefix}/analytics/tokens", analytics_api.token_usage)
     app.router.add_get(f"{prefix}/analytics/skills", analytics_api.skill_usage)
     app.router.add_get(f"{prefix}/analytics/channels", analytics_api.channel_usage)
+
+    # OpenAPI schema endpoint
+    from codex_pro.gateway.api.openapi import generate_openapi_schema
+
+    async def _openapi_json(request: web.Request) -> web.Response:
+        schema = generate_openapi_schema(server)
+        return web.json_response(schema)
+
+    app.router.add_get(f"{prefix}/openapi.json", _openapi_json)
+

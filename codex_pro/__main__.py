@@ -187,6 +187,26 @@ def _build_parser() -> argparse.ArgumentParser:
     cost_parser.add_argument("--json", action="store_true", dest="json",
                              help="Emit machine-readable JSON (no ANSI)")
 
+    # logs — tail gateway logs
+    logs_parser = subparsers.add_parser(
+        "logs",
+        help="Show gateway logs (tail or follow)",
+    )
+    logs_parser.add_argument(
+        "-f", "--follow", action="store_true",
+        help="Follow log output (like tail -f)",
+    )
+    logs_parser.add_argument(
+        "-l", "--limit", type=int, default=200,
+        help="Number of log entries to show (default: 200)",
+    )
+    logs_parser.add_argument(
+        "--level", default=None,
+        help="Filter by log level (DEBUG/INFO/WARNING/ERROR)",
+    )
+    logs_parser.add_argument("-c", "--config", help="Path to config file")
+    logs_parser.add_argument("-w", "--workspace", help="Workspace directory")
+
     # gateway — foreground run (default) or service lifecycle management
     gw_parser = subparsers.add_parser(
         "gateway",
@@ -606,6 +626,17 @@ def _dispatch() -> None:
             renderer=args.renderer,
         )
         _sys.exit(rc)
+
+    if args.command == "logs":
+        from codex_pro.cli.logs_cmd import run_logs_command
+        import sys as _sys
+        _sys.exit(run_logs_command(
+            follow=getattr(args, "follow", False),
+            limit=getattr(args, "limit", 200),
+            level=getattr(args, "level", None),
+            workspace=getattr(args, "workspace", None) or getattr(args, "top_workspace", None),
+            config_path=getattr(args, "config", None) or getattr(args, "top_config", None),
+        ))
 
     # "run" command or no command (backward compat)
     config_path = getattr(args, "config", None) or args.top_config

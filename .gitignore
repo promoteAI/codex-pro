@@ -30,6 +30,7 @@ botpy.log
 *lock*
 .cursor/
 reference
+.codex-pro/
 
 
 # Editor / IDE

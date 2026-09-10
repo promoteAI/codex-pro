@@ -2,7 +2,19 @@
 name: summarize
 description: Summarize or extract text/transcripts from URLs, podcasts, and local files (great fallback for "transcribe this YouTube/video").
 homepage: https://summarize.sh
-metadata: {"codex":{"emoji":"🧾","requires":{"bins":["summarize"]},"install":[{"id":"brew","kind":"brew","formula":"steipete/tap/summarize","bins":["summarize"],"label":"Install summarize (brew)"}]}}
+version: 1.0.0
+metadata:
+  codex:
+    emoji: "🧾"
+    tags: [Summarize, Extract, Text, YouTube, Transcript, URL]
+    requires:
+      bins: [summarize]
+    install:
+      - id: brew
+        kind: brew
+        formula: steipete/tap/summarize
+        bins: [summarize]
+        label: Install summarize (brew)
 ---
 
 # Summarize

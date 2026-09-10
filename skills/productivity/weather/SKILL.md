@@ -2,7 +2,13 @@
 name: weather
 description: Get current weather and forecasts (no API key required).
 homepage: https://wttr.in/:help
-metadata: {"codex":{"emoji":"🌤️","requires":{"bins":["curl"]}}}
+version: 1.0.0
+metadata:
+  codex:
+    emoji: "🌤️"
+    tags: [Weather, Forecast, Climate, wttr, Open-Meteo]
+    requires:
+      bins: [curl]
 ---
 
 # Weather

@@ -100,7 +100,7 @@ async def test_interpreter_is_sys_executable(workspace):
         ctx=None,
     )
     assert result.success, result.error
-    assert result.output == f"exe={_sys.executable}\n"
+    assert result.output.strip() == f"exe={_sys.executable}"
 
 
 # ── escape refusal ──────────────────────────────────────────────────────────

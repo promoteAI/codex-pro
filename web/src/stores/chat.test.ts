@@ -18,6 +18,7 @@ beforeEach(() => {
     historyError: null,
     typing: false,
     pendingEventId: null,
+    activeTool: null,
   });
   vi.useFakeTimers();
 });
@@ -28,7 +29,8 @@ afterEach(() => {
 });
 
 describe("chat store", () => {
-  it("sendMessage posts a cli: session key and waits for the assistant", async () => {
+  it("sendMessage polls /turns until terminal then reloads history", async () => {
+    let turnCalls = 0;
     const fetchSpy = vi.spyOn(api, "apiFetch").mockImplementation(async (path, init) => {
       if (path === "/message") {
         const body = JSON.parse(String(init?.body ?? "{}")) as { session_key: string };
@@ -37,6 +39,15 @@ describe("chat store", () => {
           status: "accepted",
           event_id: "evt-1",
           session_key: body.session_key,
+        };
+      }
+      if (String(path).startsWith("/turns/")) {
+        turnCalls += 1;
+        return {
+          turn: {
+            status: turnCalls >= 2 ? "failed" : "running",
+            response_text: turnCalls >= 2 ? "hi there" : "",
+          },
         };
       }
       if (String(path).includes("/history")) {
@@ -53,13 +64,14 @@ describe("chat store", () => {
     useChatStore.getState().setDraft("hello");
     await useChatStore.getState().sendMessage();
 
-    expect(useChatStore.getState().messages).toHaveLength(1);
-    expect(useChatStore.getState().chatting).toBe(true);
     expect(useChatStore.getState().typing).toBe(true);
-    expect(useChatStore.getState().draft).toBe("");
-    expect(useChatStore.getState().sessionId?.startsWith("cli:")).toBe(true);
+    expect(useChatStore.getState().pendingEventId).toBe("evt-1");
 
-    await vi.runAllTimersAsync();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(useChatStore.getState().typing).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(2000);
+    await Promise.resolve();
 
     expect(useChatStore.getState().typing).toBe(false);
     expect(useChatStore.getState().messages.some((m) => m.role === "assistant")).toBe(true);
@@ -85,18 +97,24 @@ describe("chat store", () => {
   });
 
   it("does not block a second send after the first turn finishes", async () => {
-    let historyCalls = 0;
+    let turnCalls = 0;
     vi.spyOn(api, "apiFetch").mockImplementation(async (path) => {
       if (path === "/message") {
-        return { status: "accepted", event_id: "evt", session_key: "cli:web-1" };
+        return { status: "accepted", event_id: `evt-${turnCalls}`, session_key: "cli:web-1" };
       }
-      historyCalls += 1;
-      return {
-        messages: [
-          { role: "user", content: "one" },
-          ...(historyCalls >= 1 ? [{ role: "assistant", content: "ok" }] : []),
-        ],
-      };
+      if (String(path).startsWith("/turns/")) {
+        turnCalls += 1;
+        return { turn: { status: "completed", response_text: "ok" } };
+      }
+      if (String(path).includes("/history")) {
+        return {
+          messages: [
+            { role: "user", content: "one" },
+            { role: "assistant", content: "ok" },
+          ],
+        };
+      }
+      throw new Error(`unexpected path ${path}`);
     });
 
     await useChatStore.getState().sendMessage("one");

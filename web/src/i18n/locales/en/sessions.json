@@ -7,6 +7,8 @@
   "selectHint": "Select a session to view history",
   "toolCall": "Tool call: {{name}}",
   "toolResult": "Tool result: {{name}}",
+  "toolInput": "Input",
+  "toolOutput": "Output",
   "unknownTool": "unknown tool",
   "emptyContent": "(no content)",
   "loadOlder": "Load older messages",

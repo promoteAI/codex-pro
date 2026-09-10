@@ -14,5 +14,12 @@
   "historyError": "Failed to load session: {{error}}",
   "recentSessions": "Recent Sessions",
   "messages": "messages",
-  "loadMore": "Load more"
+  "loadMore": "Load more",
+  "toolCall": "Tool call: {{name}}",
+  "toolResult": "Tool result: {{name}}",
+  "toolInput": "Input",
+  "toolOutput": "Output",
+  "toolRunning": "Running {{name}}…",
+  "unknownTool": "unknown tool",
+  "emptyContent": "(empty)"
 }

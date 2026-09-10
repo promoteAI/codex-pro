@@ -10,7 +10,14 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { runMutation } from "../stores/toast";
 
 interface SessionItem { key: string; message_count: number; updated_at: string }
-interface Message { role: string; content: string; internal?: boolean; name?: string }
+interface Message {
+  role: string;
+  content: string;
+  internal?: boolean;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: Array<{ id: string; type?: string; function: { name: string; arguments: string } }>;
+}
 interface TurnRun {
   event_id: string; status: string; current_tool: string; error: string;
   created_at: string; completed_at: string; session_key: string;
@@ -158,18 +165,65 @@ export function Sessions() {
           {historyError && <div className="text-red-500 text-sm text-center mt-10">
             {String(historyError).includes("403") ? t("common:adminOnly") : t("historyFailed", { error: historyError })}
           </div>}
-          {!historyError && messages.map((message, index) => message.internal ? (
-            <details key={index} className="mx-auto w-full max-w-[90%] text-xs">
-              <summary className="cursor-pointer text-gray-500 hover:text-gray-700 py-1">
-                {message.role === "tool" ? t("toolResult", { name: message.name || t("unknownTool") }) : t("toolCall", { name: message.name || t("unknownTool") })}
-              </summary>
-              <div className="whitespace-pre-wrap break-words bg-gray-50 border rounded p-2 mt-1 font-mono">{message.content || t("emptyContent")}</div>
-            </details>
-          ) : <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[85%] md:max-w-[75%] rounded-lg px-4 py-2 text-sm ${message.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"}`}>
-              <MarkdownContent content={message.content} />
-            </div>
-          </div>)}
+          {!historyError && messages.map((message, index) => {
+            if (!message.internal && !(message.tool_calls && message.tool_calls.length)) {
+              return (
+                <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[85%] md:max-w-[75%] rounded-lg px-4 py-2 text-sm ${message.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"}`}>
+                    <MarkdownContent content={message.content} />
+                  </div>
+                </div>
+              );
+            }
+
+            const blocks: Array<{ key: string; title: string; input?: string; output?: string }> = [];
+            if (message.tool_calls?.length) {
+              for (const tc of message.tool_calls) {
+                blocks.push({
+                  key: `${index}-${tc.id}`,
+                  title: t("toolCall", { name: tc.function?.name || message.name || t("unknownTool") }),
+                  input: tc.function?.arguments || "",
+                });
+              }
+            } else if (message.role === "tool") {
+              blocks.push({
+                key: `${index}-tool`,
+                title: t("toolResult", { name: message.name || t("unknownTool") }),
+                output: message.content,
+              });
+            } else {
+              blocks.push({
+                key: `${index}-internal`,
+                title: t("toolCall", { name: message.name || t("unknownTool") }),
+                output: message.content,
+              });
+            }
+
+            return blocks.map((block) => (
+              <details key={block.key} className="mx-auto w-full max-w-[90%] text-xs">
+                <summary className="cursor-pointer text-gray-500 hover:text-gray-700 py-1">
+                  {block.title}
+                </summary>
+                <div className="mt-1 space-y-2">
+                  {block.input?.trim() && (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">{t("toolInput")}</div>
+                      <pre className="whitespace-pre-wrap break-words bg-gray-50 border rounded p-2 font-mono">{formatToolPayload(block.input)}</pre>
+                    </div>
+                  )}
+                  {block.output?.trim() && (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">{t("toolOutput")}</div>
+                      <pre className="whitespace-pre-wrap break-words bg-gray-50 border rounded p-2 font-mono">{block.output}</pre>
+                    </div>
+                  )}
+                  {!block.input?.trim() && !block.output?.trim() && (
+                    <div className="bg-gray-50 border rounded p-2 text-gray-400">{t("emptyContent")}</div>
+                  )}
+                </div>
+              </details>
+            ));
+          })}
           {!selected && <div className="text-gray-400 text-center mt-20">{t("selectHint")}</div>}
         </div>
         {selected && turns.length > 0 && <details className="border-t pt-2 mt-2 text-xs">
@@ -184,6 +238,16 @@ export function Sessions() {
       </div>
     </div>
   );
+}
+
+function formatToolPayload(raw: string): string {
+  const text = (raw ?? "").trim();
+  if (!text) return "";
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
 }
 
 function MarkdownContent({ content }: { content: string }) {

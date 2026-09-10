@@ -7,6 +7,8 @@
   "selectHint": "选择一个会话查看历史",
   "toolCall": "调用工具：{{name}}",
   "toolResult": "工具结果：{{name}}",
+  "toolInput": "输入",
+  "toolOutput": "输出",
   "unknownTool": "未知工具",
   "emptyContent": "（无内容）",
   "loadOlder": "加载更早消息",

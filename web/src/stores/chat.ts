@@ -1,12 +1,20 @@
 import { create } from "zustand";
 import { apiFetch } from "../lib/api";
 
+export interface ToolCallFn {
+  id: string;
+  type?: string;
+  function: { name: string; arguments: string };
+}
+
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   content: string;
   internal?: boolean;
   name?: string;
+  tool_call_id?: string;
+  tool_calls?: ToolCallFn[];
 }
 
 export interface GitRepo {
@@ -19,6 +27,37 @@ export interface GitBranch {
   name: string;
   is_current: boolean;
   is_remote: boolean;
+}
+
+type HistoryRow = {
+  role: string;
+  content: string;
+  internal?: boolean;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: ToolCallFn[];
+};
+
+function mapHistoryMessages(sessionId: string, rows: HistoryRow[]): ChatMessage[] {
+  return (rows ?? []).map((m, i) => {
+    const role: ChatMessage["role"] =
+      m.role === "user"
+        ? "user"
+        : m.role === "system"
+          ? "system"
+          : m.role === "tool"
+            ? "tool"
+            : "assistant";
+    return {
+      id: `${sessionId}-${i}`,
+      role,
+      content: m.content ?? "",
+      internal: m.internal,
+      name: m.name,
+      tool_call_id: m.tool_call_id,
+      tool_calls: m.tool_calls,
+    };
+  });
 }
 
 interface ChatState {
@@ -35,6 +74,7 @@ interface ChatState {
   loadingHistory: boolean;
   historyError: string | null;
   typing: boolean;
+  activeTool: string | null;
   pendingEventId: string | null;
   repos: GitRepo[];
   branches: GitBranch[];
@@ -51,7 +91,8 @@ interface ChatState {
   loadSessionHistory: (sessionId: string) => Promise<void>;
   loadRepos: () => Promise<void>;
   loadBranches: (repoPath: string) => Promise<void>;
-  _pollForResponse: (sessionId: string, priorAssistantCount?: number) => void;
+  _pollForResponse: (sessionId: string, eventId: string, priorAssistantCount?: number) => void;
+  _softReloadHistory: (sessionId: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -68,6 +109,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadingHistory: false,
   historyError: null,
   typing: false,
+  activeTool: null,
   pendingEventId: null,
   repos: [],
   branches: [],
@@ -87,6 +129,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       sessionId: null,
       chatting: false,
       typing: false,
+      activeTool: null,
       draft: "",
       historyError: null,
       pendingEventId: null,
@@ -96,7 +139,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const result = await apiFetch<{ repos: GitRepo[] }>("/git/repos");
       set({ repos: result.repos });
-      // Auto-select first repo's current branch
       if (result.repos.length > 0) {
         const first = result.repos[0];
         set({ project: first.name, branch: first.current_branch || "main" });
@@ -120,7 +162,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   sendMessage: async (text) => {
     const content = (text ?? get().draft).trim();
-    // `chatting` means "thread UI is open"; only block while a turn is in flight.
     if (!content || get().typing) return;
 
     const userMsg: ChatMessage = {
@@ -129,8 +170,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       content,
     };
 
-    // Loopback-only clients must present an explicit `cli:` session key — bare
-    // `local-*` keys are rejected as forbidden session_key (403).
     const sessionId = get().sessionId ?? `cli:web-${Date.now()}`;
     const priorAssistantCount = get().messages.filter(
       (m) => m.role === "assistant" && !m.internal,
@@ -141,6 +180,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       draft: "",
       chatting: true,
       typing: true,
+      activeTool: null,
       sessionId,
       historyError: null,
       pendingEventId: null,
@@ -165,49 +205,87 @@ export const useChatStore = create<ChatState>((set, get) => ({
         sessionId: resolvedSessionId,
         pendingEventId: result.event_id,
       });
-      get()._pollForResponse(resolvedSessionId, priorAssistantCount);
+      get()._pollForResponse(resolvedSessionId, result.event_id, priorAssistantCount);
     } catch (e: unknown) {
       set((s) => ({
-        // Keep the thread open if we already had messages; only drop back to
-        // the hero when this was the first failed send.
         chatting: s.messages.some((m) => m.id !== userMsg.id),
         typing: false,
+        activeTool: null,
         historyError: e instanceof Error ? e.message : String(e),
       }));
     }
   },
 
-  _pollForResponse: (sessionId: string, priorAssistantCount = 0) => {
+  _softReloadHistory: async (sessionId) => {
+    try {
+      const result = await apiFetch<{ messages: HistoryRow[] }>(
+        `/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`,
+      );
+      if (get().sessionId !== sessionId) return;
+      set({
+        messages: mapHistoryMessages(sessionId, result.messages ?? []),
+        chatting: true,
+      });
+    } catch {
+      // keep typing; next poll may succeed
+    }
+  },
+
+  _pollForResponse: (sessionId, eventId, priorAssistantCount = 0) => {
     let attempts = 0;
-    const maxAttempts = 40;
-    const pollInterval = 1500;
+    const maxAttempts = 240;
+    const pollInterval = 2000;
+    const terminal = new Set(["completed", "incomplete", "failed", "interrupted"]);
+
+    const finish = async () => {
+      set({ typing: false, activeTool: null });
+      await get().loadSessionHistory(sessionId);
+    };
 
     const poll = async () => {
+      if (get().sessionId !== sessionId || get().pendingEventId !== eventId) {
+        return;
+      }
       if (attempts >= maxAttempts) {
-        set({ typing: false });
+        await finish();
         return;
       }
       attempts++;
 
       try {
-        const result = await apiFetch<{
-          messages: Array<{ role: string; content: string; internal?: boolean; name?: string }>;
-        }>(`/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`);
-
-        const assistantCount = result.messages.filter(
-          (m) => m.role === "assistant" && !m.internal,
-        ).length;
-
-        if (assistantCount > priorAssistantCount) {
-          set({ typing: false });
-          await get().loadSessionHistory(sessionId);
-          return;
+        if (eventId) {
+          const turnResult = await apiFetch<{
+            turn: { status: string; current_tool?: string; response_text?: string };
+          }>(`/turns/${encodeURIComponent(eventId)}`);
+          const turn = turnResult.turn;
+          if (terminal.has(turn?.status)) {
+            await finish();
+            return;
+          }
+          set({ activeTool: turn?.current_tool || null });
+          // Stream tool traces into the thread while the turn is still running.
+          if (attempts % 2 === 0) {
+            await get()._softReloadHistory(sessionId);
+          }
+        } else {
+          const result = await apiFetch<{ messages: HistoryRow[] }>(
+            `/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`,
+          );
+          const messages = mapHistoryMessages(sessionId, result.messages ?? []);
+          const assistantCount = messages.filter(
+            (m) => m.role === "assistant" && !m.internal,
+          ).length;
+          set({ messages, chatting: true });
+          if (assistantCount > priorAssistantCount) {
+            await finish();
+            return;
+          }
         }
-
-        setTimeout(poll, pollInterval);
       } catch {
-        setTimeout(poll, pollInterval);
+        // Transient errors / turn not yet indexed — keep polling.
       }
+
+      setTimeout(poll, pollInterval);
     };
 
     setTimeout(poll, pollInterval);
@@ -216,25 +294,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadSessionHistory: async (sessionId) => {
     set({ loadingHistory: true, historyError: null, sessionId, chatting: true });
     try {
-      const result = await apiFetch<{
-        messages: Array<{ role: string; content: string; internal?: boolean; name?: string }>;
-      }>(`/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`);
-      const messages: ChatMessage[] = (result.messages ?? []).map((m, i) => ({
-        id: `${sessionId}-${i}`,
-        role: m.role === "user" ? "user" : m.role === "system" ? "system" : "assistant",
-        content: m.content,
-        internal: m.internal,
-        name: m.name,
-      }));
-      set({ messages, loadingHistory: false, chatting: messages.length > 0, typing: false });
+      const result = await apiFetch<{ messages: HistoryRow[] }>(
+        `/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`,
+      );
+      const messages = mapHistoryMessages(sessionId, result.messages ?? []);
+      set({
+        messages,
+        loadingHistory: false,
+        chatting: messages.length > 0,
+        typing: false,
+        activeTool: null,
+      });
     } catch (e: unknown) {
       set({
         messages: [],
         loadingHistory: false,
         historyError: e instanceof Error ? e.message : String(e),
         typing: false,
+        activeTool: null,
       });
     }
   },
 }));
-

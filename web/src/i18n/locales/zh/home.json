@@ -14,5 +14,12 @@
   "historyError": "无法加载会话：{{error}}",
   "recentSessions": "最近会话",
   "messages": "条消息",
-  "loadMore": "加载更多"
+  "loadMore": "加载更多",
+  "toolCall": "调用工具：{{name}}",
+  "toolResult": "工具结果：{{name}}",
+  "toolInput": "输入",
+  "toolOutput": "输出",
+  "toolRunning": "正在调用 {{name}}…",
+  "unknownTool": "未知工具",
+  "emptyContent": "（无内容）"
 }

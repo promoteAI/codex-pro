@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import sys
 from types import SimpleNamespace
 from pathlib import Path
 from typing import Any
@@ -13,9 +14,14 @@ from codex_pro.agent.proc_lifecycle import communicate_owned, spawn_shell
 from codex_pro.tools import Tool, ToolExecutionContext, ToolResult
 from codex_pro.security.guards import evaluate_code_execution
 
+# On Windows Python is registered as ``python``, not ``python3``. Use the
+# running interpreter so scripts are always evaluated under the same venv as
+# the agent itself — the same reasoning that drives prepend_interpreter_bin
+# for LocalExecutor / SandboxExecutor.
+_PYTHON_CMD = sys.executable if sys.platform == "win32" else "python3"
 
 _RUNNERS: dict[str, str] = {
-    "python": "python3 -",
+    "python": _PYTHON_CMD + " -",
     "javascript": "node",
     "bash": "bash",
 }

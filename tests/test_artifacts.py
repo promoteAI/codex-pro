@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -380,6 +381,10 @@ def test_artifact_config_rejects_escaping_root():
         Config(artifacts={"maxArtifactMb": 2, "maxTotalMb": 1})
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows requires elevated privileges to create symlinks",
+)
 def test_artifact_store_rejects_root_symlinked_outside_workspace(tmp_path):
     workspace = tmp_path / "workspace"
     outside = tmp_path / "outside"
@@ -488,6 +493,10 @@ async def test_artifact_sweeper_does_not_quota_delete_active_draft(tmp_path):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows requires elevated privileges to create symlinks",
+)
 async def test_artifact_create_rejects_precreated_session_symlink(tmp_path):
     store = _store(tmp_path)
     store.root.mkdir(parents=True)

@@ -212,6 +212,13 @@ class TestPromptYesNo:
             assert prompt_yes_no("Continue?") is False
 
 
+import sys as _sys
+
+
+@pytest.mark.skipif(
+    _sys.stdout.encoding and _sys.stdout.encoding.upper() not in ("UTF-8", "UTF8", "US-ASCII"),
+    reason="Windows console uses GBK/CP936 which cannot encode UI glyphs (✓, ✗, ●)",
+)
 def test_setup_ensures_credential_key(tmp_path, monkeypatch):
     """setup finalize 应在工作区生成 .credential_key（env 未设时）。"""
     monkeypatch.delenv("CODEX_PRO_CREDENTIAL_KEY", raising=False)

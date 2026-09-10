@@ -237,10 +237,24 @@ def test_resolve_install_paths_freezes_config(tmp_path, monkeypatch):
 
 def test_run_service_action_no_backend_exits_with_hints(monkeypatch, capsys):
     monkeypatch.delenv(base.GATEWAY_ENV_FLAG, raising=False)
-    with patch(f"{_PKG}.detect_backend", return_value=None):
+    with patch(f"{_PKG}.detect_backend", return_value=None), \
+         patch(f"{_PKG}.sys") as sysmod:
+        sysmod.platform = "linux"
         assert service.run_service_action("install") == 1
     out = capsys.readouterr().out
     assert "tmux" in out and "nohup" in out
+
+
+def test_run_service_action_no_backend_windows_hints(monkeypatch, capsys):
+    monkeypatch.delenv(base.GATEWAY_ENV_FLAG, raising=False)
+    with patch(f"{_PKG}.detect_backend", return_value=None), \
+         patch(f"{_PKG}.sys") as sysmod:
+        sysmod.platform = "win32"
+        assert service.run_service_action("restart") == 1
+    out = capsys.readouterr().out
+    assert "Native Windows" in out
+    assert "Start-Process" in out
+    assert "tmux" not in out
 
 
 def test_run_service_action_status_falls_back_when_uninstalled(monkeypatch):

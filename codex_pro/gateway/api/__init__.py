@@ -25,6 +25,9 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     from codex_pro.gateway.api.cron_api import CronAPI
     from codex_pro.gateway.api.logs import LogsAPI
     from codex_pro.gateway.api.analytics import AnalyticsAPI
+    from codex_pro.gateway.api.git import GitAPI
+    from codex_pro.gateway.api.files import FilesAPI
+    from codex_pro.gateway.api.prs import PrsAPI
 
     memory_api = MemoryAPI(server)
     skills_api = SkillsAPI(server)
@@ -36,6 +39,9 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     cron_api = CronAPI(server)
     logs_api = LogsAPI(server)
     analytics_api = AnalyticsAPI(server)
+    git_api = GitAPI(server)
+    files_api = FilesAPI(server)
+    prs_api = PrsAPI(server)
 
     app.router.add_get(f"{prefix}/memory", memory_api.list_entries)
     app.router.add_get(f"{prefix}/memory/stats", memory_api.stats)
@@ -62,12 +68,6 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_get(f"{prefix}/knowledge/documents", knowledge_api.list_documents)
     app.router.add_get(f"{prefix}/knowledge/jobs", knowledge_api.list_jobs)
     app.router.add_get(f"{prefix}/knowledge/jobs/{{id}}", knowledge_api.get_job)
-    app.router.add_delete(f"{prefix}/knowledge/jobs/{{id}}", knowledge_api.cancel_job)
-    # Tail-match the document path: list_documents returns paths relative to
-    # docs_dir, so nested docs come back as "sub/doc.md". A single-segment
-    # {path} could never match those — yarl decodes %2F back to "/" before
-    # routing, so the encoded form fell through to the SPA catch-all (GET only)
-    # and every nested delete answered 405. {path:.+} accepts both forms.
     app.router.add_delete(f"{prefix}/knowledge/documents/{{path:.+}}", knowledge_api.delete_document)
 
     app.router.add_get(f"{prefix}/config", config_api.get_config)
@@ -98,6 +98,16 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_get(f"{prefix}/analytics/skills", analytics_api.skill_usage)
     app.router.add_get(f"{prefix}/analytics/channels", analytics_api.channel_usage)
 
+    # Git operations for Composer dropdowns
+    app.router.add_get(f"{prefix}/git/repos", git_api.list_repos)
+    app.router.add_get(f"{prefix}/git/branches", git_api.list_branches)
+
+    # File browser for tools panel
+    app.router.add_get(f"{prefix}/files", files_api.list_dir)
+
+    # Pull requests
+    app.router.add_get(f"{prefix}/prs", prs_api.list_prs)
+
     # OpenAPI schema endpoint
     from codex_pro.gateway.api.openapi import generate_openapi_schema
 
@@ -106,4 +116,3 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
         return web.json_response(schema)
 
     app.router.add_get(f"{prefix}/openapi.json", _openapi_json)
-

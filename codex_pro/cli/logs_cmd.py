@@ -81,13 +81,14 @@ def run_logs_command(
     follow: bool = False,
     limit: int = 200,
     level: str | None = None,
-    workspace: Path | None = None,
+    workspace: Path | str | None = None,
     config_path: str | None = None,
 ) -> int:
     """Show gateway logs. Returns 0 on success."""
-    from codex_pro.cli.workspace import resolve_effective_workspace
+    from codex_pro.cli.workspace import load_config_and_workspace
 
-    ws = resolve_effective_workspace(config_path, workspace)
+    ws_arg = str(workspace) if workspace is not None else None
+    _, ws = load_config_and_workspace(config_path, ws_arg)
     log_path = _resolve_log_path(ws)
 
     if not follow:

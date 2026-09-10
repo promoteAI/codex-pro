@@ -2,8 +2,9 @@
 
 Backend selection: macOS → LaunchAgent; Linux with a live systemd → user
 scope by default, ``--system`` for the legacy root-managed unit. Everything
-else (Windows, WSL without systemd, containers) gets actionable guidance
-instead of a hard error.
+else (native Windows, WSL without systemd, containers) gets actionable
+guidance instead of a hard error. Resident-service registration is not
+supported on native Windows — use foreground/background process or WSL2.
 """
 
 from __future__ import annotations
@@ -20,8 +21,10 @@ def _fallback_hints() -> str:
     """Guidance for platforms with no supported service manager.
 
     WSL without `systemd=true` is the common case and has an extra option the
-    generic text hid: turning systemd on. A container cannot do that, so the
-    two must not share one message."""
+    generic text hid: turning systemd on. Native Windows has no launchd/
+    systemd equivalent here, so the hints must be PowerShell-shaped rather
+    than tmux/nohup.
+    """
     from codex_pro.cli.runtime_probe import is_wsl
 
     lines = ["No supported service manager found on this platform."]
@@ -34,14 +37,26 @@ def _fallback_hints() -> str:
             "  2. Run from Windows:       wsl --shutdown",
             "  3. Then:                   codex-pro gateway install",
         ]
-    lines += [
-        "",
-        "Or run the gateway in the foreground:",
-        "",
-        "  codex-pro gateway                                    # direct foreground",
-        "  tmux new -s codex-pro 'codex-pro gateway'           # persistent via tmux",
-        "  nohup codex-pro gateway > ~/.codex-pro/logs/gateway.log 2>&1 &  # background",
-    ]
+    if sys.platform == "win32":
+        lines += [
+            "",
+            "Native Windows does not support `codex-pro gateway install/start/restart`.",
+            "Run the gateway directly, or use WSL2 for full service support:",
+            "",
+            "  codex-pro gateway                                 # foreground",
+            "  Start-Process codex-pro -ArgumentList gateway -WindowStyle Hidden",
+            "",
+            "Recommended: install inside WSL2, then `codex-pro gateway install`.",
+        ]
+    else:
+        lines += [
+            "",
+            "Or run the gateway in the foreground:",
+            "",
+            "  codex-pro gateway                                    # direct foreground",
+            "  tmux new -s codex-pro 'codex-pro gateway'           # persistent via tmux",
+            "  nohup codex-pro gateway > ~/.codex-pro/logs/gateway.log 2>&1 &  # background",
+        ]
     return "\n".join(lines)
 
 

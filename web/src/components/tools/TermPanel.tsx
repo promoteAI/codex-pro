@@ -1,7 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { X, Plus } from "lucide-react";
 import { useShellStore } from "../../stores/shell";
-import { MOCK_TERM_LINES } from "../../mock/seeds";
 
 export function TermPanel() {
   const { t } = useTranslation("tools");
@@ -30,10 +29,12 @@ export function TermPanel() {
             <X size={14} />
           </button>
         </div>
-        <pre className="flex-1 overflow-auto px-3 py-2 font-mono text-[12px] text-[#c8c8c8] leading-relaxed">
-          {MOCK_TERM_LINES.join("\n")}
-          <span className="inline-block w-1.5 h-3.5 bg-[#c8c8c8] ml-0.5 align-middle animate-pulse" />
-        </pre>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-codex-muted text-sm">
+            <p>Terminal not available</p>
+            <p className="text-[11px] mt-1">Start the gateway with a terminal backend to enable this feature.</p>
+          </div>
+        </div>
       </div>
     </div>
   );

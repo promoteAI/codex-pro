@@ -1527,6 +1527,11 @@ class GatewayServer:
                 return web.json_response({"error": "server overloaded"}, status=503)
 
             published = True
+            # Broadcast admission to dashboard WS so chat UI can stay in sync
+            await self._web_ws.broadcast(
+                'session_message',
+                {'session_key': session_key, 'event_id': event.event_id},
+            )
             if durable_claimed:
                 await asyncio.shield(self._bus.mark_durable_idempotency_admitted(event.event_id))
                 durable_claimed = False

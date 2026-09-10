@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FileCode2, Globe, FolderTree, MessageSquare, Terminal, X } from "lucide-react";
 import { useShellStore, type ToolPane } from "../../stores/shell";
-import { MOCK_DIFF, MOCK_FILES } from "../../mock/seeds";
+import { useApi } from "../../hooks/use-api";
+import { MOCK_DIFF } from "../../mock/seeds";
 
 function Hub() {
   const { t } = useTranslation("tools");
@@ -47,23 +49,81 @@ function ReviewPane() {
   );
 }
 
+interface FileEntry {
+  path: string;
+  kind: "file" | "dir";
+  icon?: string;
+  ext?: string;
+}
+
 function FilesPane() {
   const { t } = useTranslation("tools");
+  const [currentPath, setCurrentPath] = useState("");
+
+  const { data, loading, error } = useApi<{ entries: FileEntry[]; path: string }>(
+    currentPath ? `/files?path=${encodeURIComponent(currentPath)}` : "/files",
+  );
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-codex-muted text-sm">
+        Loading files...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-codex-danger text-sm">
+        {error}
+      </div>
+    );
+  }
+
+  const entries = data?.entries ?? [];
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <h3 className="text-sm font-semibold text-[#e0e0e0] px-4 pt-3 pb-2">{t("files")}</h3>
+      <div className="flex items-center gap-1 px-4 pt-3 pb-2 text-[12px] text-codex-muted">
+        <span className="font-medium">{t("files")}</span>
+        {currentPath && (
+          <button
+            type="button"
+            onClick={() => setCurrentPath("")}
+            className="hover:text-codex-text ml-1"
+          >
+            {"←"} Back
+          </button>
+        )}
+      </div>
       <ul className="flex-1 overflow-auto px-2">
-        {MOCK_FILES.map((f) => (
-          <li key={f.path}>
-            <button
-              type="button"
-              className="w-full text-left px-2 py-1.5 rounded-md text-[13px] text-[#c8c8c8] hover:bg-codex-hover truncate"
-            >
-              {f.kind === "dir" ? "📁 " : "📄 "}
-              {f.path}
-            </button>
-          </li>
-        ))}
+        {entries.map((f) =>
+          f.kind === "dir" ? (
+            <li key={f.path}>
+              <button
+                type="button"
+                onClick={() => setCurrentPath(f.path)}
+                className="w-full text-left px-2 py-1.5 rounded-md text-[13px] text-[#c8c8c8] hover:bg-codex-hover flex items-center gap-2"
+              >
+                <span>📁</span>
+                <span className="truncate">{f.path.split("/").pop() || f.path}</span>
+              </button>
+            </li>
+          ) : (
+            <li key={f.path}>
+              <button
+                type="button"
+                className="w-full text-left px-6 py-1.5 rounded-md text-[13px] text-[#c8c8c8] hover:bg-codex-hover truncate flex items-center gap-2"
+              >
+                <span>📄 {f.icon || ""}</span>
+                <span className="truncate">{f.path}</span>
+              </button>
+            </li>
+          ),
+        )}
+        {entries.length === 0 && (
+          <li className="p-4 text-sm text-codex-muted">No files in this directory</li>
+        )}
       </ul>
     </div>
   );
@@ -87,7 +147,7 @@ function SidechatPane() {
       </div>
       <input
         className="mt-2 bg-codex-surface border border-codex-border rounded-lg px-3 py-2 text-sm outline-none"
-        placeholder="…"
+        placeholder={"…"}
       />
     </div>
   );

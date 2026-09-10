@@ -1,17 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { useTranslation } from "react-i18next";
 import { Search, X } from "lucide-react";
 import { useShellStore } from "../../stores/shell";
-import { MOCK_FILES, MOCK_PRS } from "../../mock/seeds";
+import { useApi } from "../../hooks/use-api";
+
+interface PrItem {
+  id: string;
+  title: string;
+  meta: string;
+  status: string;
+}
+
+interface FileItem {
+  path: string;
+  kind: "file" | "dir";
+}
 
 export function SearchPalette() {
-  const { t } = useTranslation("tools");
   const open = useShellStore((s) => s.searchOpen);
   const closeSearch = useShellStore((s) => s.closeSearch);
   const openSettings = useShellStore((s) => s.openSettings);
   const navigate = useNavigate();
   const [q, setQ] = useState("");
+
+  // Fetch live PRs and files for search
+  const { data: prData } = useApi<{ prs: PrItem[] }>("/prs");
+  const { data: fileData } = useApi<{ entries: FileItem[]; path: string }>("/files");
 
   useEffect(() => {
     if (!open) setQ("");
@@ -64,24 +78,24 @@ export function SearchPalette() {
         hint: "settings",
         run: () => openSettings(),
       },
-      ...MOCK_PRS.map((p) => ({
+      ...((prData?.prs ?? []).map((p: PrItem) => ({
         id: `pr-${p.id}`,
         label: p.title,
         hint: "PR",
         run: () => navigate("/prs"),
-      })),
-      ...MOCK_FILES.map((f) => ({
+      }))),
+      ...((fileData?.entries ?? []).map((f: FileItem) => ({
         id: `f-${f.path}`,
         label: f.path,
         hint: f.kind,
         run: () => useShellStore.getState().openTool("files"),
-      })),
+      }))),
     ];
     if (!query) return items.slice(0, 8);
     return items.filter(
       (i) => i.label.toLowerCase().includes(query) || i.hint.toLowerCase().includes(query),
     );
-  }, [q, navigate, openSettings]);
+  }, [q, navigate, openSettings, prData, fileData]);
 
   if (!open) return null;
 
@@ -90,7 +104,7 @@ export function SearchPalette() {
       className="fixed inset-0 z-50 bg-black/50 flex justify-center pt-[12vh]"
       role="dialog"
       aria-modal="true"
-      aria-label={t("searchPlaceholder")}
+      aria-label="Search"
       onClick={closeSearch}
     >
       <div
@@ -103,16 +117,16 @@ export function SearchPalette() {
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={t("searchPlaceholder")}
+            placeholder="Search commands, PRs, files..."
             className="flex-1 bg-transparent outline-none text-sm text-codex-text placeholder:text-codex-muted"
           />
-          <button type="button" onClick={closeSearch} aria-label={t("close")} className="text-codex-muted hover:text-codex-text">
+          <button type="button" onClick={closeSearch} aria-label="Close" className="text-codex-muted hover:text-codex-text">
             <X size={16} />
           </button>
         </div>
         <ul className="max-h-80 overflow-y-auto py-1">
           {results.length === 0 && (
-            <li className="px-4 py-6 text-center text-codex-muted text-sm">{t("searchEmpty")}</li>
+            <li className="px-4 py-6 text-center text-codex-muted text-sm">No results found</li>
           )}
           {results.map((r) => (
             <li key={r.id}>

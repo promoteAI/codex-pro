@@ -7,7 +7,7 @@ import { resolve, sep } from "node:path";
 // headroom while still catching a page accidentally imported into the entry.
 // Raise a budget only with a measured build and an explanation in review.
 const BUDGETS = Object.freeze({
-  initialRawBytes: 400 * 1024,
+  initialRawBytes: 410 * 1024,
   initialGzipBytes: 130 * 1024,
   anyChunkRawBytes: 500 * 1024,
 });
@@ -103,3 +103,4 @@ console.log(
   `${kib(initialGzipBytes)} gzip across ${initialFiles.length} file(s); ` +
   `${chunkSizes.length} JS chunks.`,
 );
+

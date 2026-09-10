@@ -1,15 +1,53 @@
 import { useMemo, useState } from "react";
-import { MOCK_PRS } from "../mock/seeds";
+import { useApi } from "../hooks/use-api";
+
+interface PrItem {
+  id: string;
+  title: string;
+  meta: string;
+  tabs: string[];
+  body: string;
+  status: "open" | "merged" | "draft";
+  url?: string;
+}
 
 export function PrView() {
   const [tab, setTab] = useState<"all" | "mine">("all");
-  const [activeId, setActiveId] = useState(MOCK_PRS[0]?.id ?? "");
+  const [activeId, setActiveId] = useState("");
+
+  const { data, loading, error } = useApi<{ prs: PrItem[] }>("/prs");
+
+  const prs = useMemo(() => data?.prs ?? [], [data]);
 
   const list = useMemo(
-    () => MOCK_PRS.filter((p) => (tab === "mine" ? p.tabs.includes("mine") : true)),
-    [tab],
+    () => prs.filter((p) => (tab === "mine" ? p.tabs.includes("mine") : true)),
+    [prs, tab],
   );
+
+  // Set default active PR when data loads
+  useMemo(() => {
+    if (list.length > 0 && !activeId) {
+      setActiveId(list[0].id);
+    }
+  }, [list, activeId]);
+
   const active = list.find((p) => p.id === activeId) ?? list[0];
+
+  if (loading) {
+    return (
+      <div className="flex-1 min-h-0 flex items-center justify-center text-codex-muted text-sm">
+        Loading Pull Requests...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 min-h-0 flex items-center justify-center text-codex-danger text-sm">
+        Failed to load PRs: {error}
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-codex-bg overflow-hidden">
@@ -18,8 +56,8 @@ export function PrView() {
         <div className="flex gap-4 mt-4 border-b border-codex-border">
           {(
             [
-              ["all", "全部"],
-              ["mine", "我的"],
+              ["all", "All"],
+              ["mine", "Mine"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -64,7 +102,7 @@ export function PrView() {
             </button>
           ))}
           {list.length === 0 && (
-            <div className="p-6 text-sm text-codex-muted">没有 Pull Request（mock）</div>
+            <div className="p-6 text-sm text-codex-muted">No Pull Requests found</div>
           )}
         </div>
         <div className="flex-1 overflow-y-auto p-6 bg-codex-panel">
@@ -77,7 +115,7 @@ export function PrView() {
               </p>
             </>
           ) : (
-            <p className="text-codex-muted text-sm">选择一个 PR</p>
+            <p className="text-codex-muted text-sm">Select a PR</p>
           )}
         </div>
       </div>

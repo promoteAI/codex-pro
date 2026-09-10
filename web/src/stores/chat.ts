@@ -51,7 +51,7 @@ interface ChatState {
   loadSessionHistory: (sessionId: string) => Promise<void>;
   loadRepos: () => Promise<void>;
   loadBranches: (repoPath: string) => Promise<void>;
-  _pollForResponse: (sessionId: string) => void;
+  _pollForResponse: (sessionId: string, priorAssistantCount?: number) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -120,7 +120,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   sendMessage: async (text) => {
     const content = (text ?? get().draft).trim();
-    if (!content || get().chatting) return;
+    // `chatting` means "thread UI is open"; only block while a turn is in flight.
+    if (!content || get().typing) return;
 
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
@@ -128,7 +129,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       content,
     };
 
-    const sessionId = get().sessionId ?? `local-${Date.now()}`;
+    // Loopback-only clients must present an explicit `cli:` session key — bare
+    // `local-*` keys are rejected as forbidden session_key (403).
+    const sessionId = get().sessionId ?? `cli:web-${Date.now()}`;
+    const priorAssistantCount = get().messages.filter(
+      (m) => m.role === "assistant" && !m.internal,
+    ).length;
 
     set((s) => ({
       messages: [...s.messages, userMsg],
@@ -159,17 +165,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
         sessionId: resolvedSessionId,
         pendingEventId: result.event_id,
       });
-      get()._pollForResponse(resolvedSessionId);
+      get()._pollForResponse(resolvedSessionId, priorAssistantCount);
     } catch (e: unknown) {
-      set({
-        chatting: false,
+      set((s) => ({
+        // Keep the thread open if we already had messages; only drop back to
+        // the hero when this was the first failed send.
+        chatting: s.messages.some((m) => m.id !== userMsg.id),
         typing: false,
         historyError: e instanceof Error ? e.message : String(e),
-      });
+      }));
     }
   },
 
-  _pollForResponse: (sessionId: string) => {
+  _pollForResponse: (sessionId: string, priorAssistantCount = 0) => {
     let attempts = 0;
     const maxAttempts = 40;
     const pollInterval = 1500;
@@ -184,13 +192,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       try {
         const result = await apiFetch<{
           messages: Array<{ role: string; content: string; internal?: boolean; name?: string }>;
-        }>(`/sessions/${encodeURIComponent(sessionId)}/history?limit=10&offset=0`);
+        }>(`/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`);
 
-        const hasAssistant = result.messages.some(
+        const assistantCount = result.messages.filter(
           (m) => m.role === "assistant" && !m.internal,
-        );
+        ).length;
 
-        if (hasAssistant) {
+        if (assistantCount > priorAssistantCount) {
           set({ typing: false });
           await get().loadSessionHistory(sessionId);
           return;

@@ -9,6 +9,7 @@ export function Composer() {
   const draft = useChatStore((s) => s.draft);
   const setDraft = useChatStore((s) => s.setDraft);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const typing = useChatStore((s) => s.typing);
   const project = useChatStore((s) => s.project);
   const env = useChatStore((s) => s.env);
   const branch = useChatStore((s) => s.branch);
@@ -65,7 +66,7 @@ export function Composer() {
   const permLabel =
     perm === "ask" ? "Ask" : perm === "agent" ? "Agent" : "Full";
   const effortLabel = [EFFORT_LABELS[0], EFFORT_LABELS[1], EFFORT_LABELS[2], EFFORT_LABELS[3]][effort] ?? EFFORT_LABELS[effort];
-  const canSend = draft.trim().length > 0;
+  const canSend = draft.trim().length > 0 && !typing;
 
   const toggle = (m: Menu) => setMenu((cur) => (cur === m ? null : m));
 
@@ -196,11 +197,12 @@ export function Composer() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey && !typing) {
                 e.preventDefault();
                 sendMessage();
               }
             }}
+            disabled={typing}
             placeholder="Describe your goal and define measurable outcomes for best results"
             rows={2}
             className="w-full resize-none bg-transparent outline-none text-[13.5px] text-codex-text placeholder:text-codex-muted leading-relaxed"
@@ -250,7 +252,7 @@ export function Composer() {
                 : "bg-[#2a2a2a] text-[#666]"
             }`}
           >
-            <ArrowUp size={16} />
+            {typing ? <Loader2 size={16} className="animate-spin" /> : <ArrowUp size={16} />}
           </button>
 
           {menu === "perm" && (

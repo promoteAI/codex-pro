@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Folder, Monitor, GitBranch, Plus, ShieldAlert, ArrowUp, Loader2 } from "lucide-react";
 import { useChatStore, type GitRepo, type GitBranch as GitBranchType } from "../../stores/chat";
-import { EFFORT_LABELS, MOCK_MODELS } from "../../mock/seeds";
+import { MOCK_MODELS } from "../../mock/seeds";
 
 type Menu = "project" | "env" | "branch" | "model" | "perm" | "add" | null;
 
 export function Composer() {
+  const { t } = useTranslation("composer");
   const draft = useChatStore((s) => s.draft);
   const setDraft = useChatStore((s) => s.setDraft);
   const sendMessage = useChatStore((s) => s.sendMessage);
@@ -33,12 +35,10 @@ export function Composer() {
   const rootRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load repos on mount
   useEffect(() => {
     void loadRepos();
   }, [loadRepos]);
 
-  // Load branches when project changes
   useEffect(() => {
     const repo = repos.find((r) => r.name === project);
     if (repo) {
@@ -62,16 +62,38 @@ export function Composer() {
   }, [draft]);
 
   const envLabel =
-    env === "local" ? "Local" : env === "worktree" ? "Worktree" : env === "codex-web" ? "Codex Web" : "Cloud";
+    env === "local"
+      ? t("envLocal")
+      : env === "worktree"
+        ? t("envWorktree")
+        : env === "codex-web"
+          ? t("envWeb")
+          : t("envCloud");
   const permLabel =
-    perm === "ask" ? "Ask" : perm === "agent" ? "Agent" : "Full";
-  const effortLabel = [EFFORT_LABELS[0], EFFORT_LABELS[1], EFFORT_LABELS[2], EFFORT_LABELS[3]][effort] ?? EFFORT_LABELS[effort];
+    perm === "ask" ? t("permAskShort") : perm === "agent" ? t("permAgentShort") : t("permFullShort");
+  const effortLabels = [t("effortLow"), t("effortMed"), t("effortHigh"), t("effortMax")];
+  const effortLabel = effortLabels[effort] ?? effortLabels[0];
   const canSend = draft.trim().length > 0 && !typing;
 
   const toggle = (m: Menu) => setMenu((cur) => (cur === m ? null : m));
 
   const menuBox =
     "absolute z-30 left-0 bottom-[calc(100%+6px)] min-w-[220px] max-h-72 overflow-auto p-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[10px] shadow-xl";
+
+  const envOptions = [
+    ["local", "envLocal"],
+    ["worktree", "envWorktree"],
+    ["codex-web", "envWeb"],
+    ["cloud", "envCloud"],
+  ] as const;
+
+  const permOptions = [
+    ["ask", "permAsk", "permAskDesc"],
+    ["agent", "permAgent", "permAgentDesc"],
+    ["full", "permFull", "permFullDesc"],
+  ] as const;
+
+  const addOptions = ["addFiles", "addTargets", "addPlanning"] as const;
 
   return (
     <div ref={rootRef} className="shrink-0 px-[clamp(16px,4vw,32px)] pb-[clamp(14px,2vw,22px)]">
@@ -81,7 +103,7 @@ export function Composer() {
             type="button"
             onClick={() => toggle("project")}
             className="inline-flex items-center gap-1.5 text-[12.5px] text-[#c0c0c0] px-2 py-1 rounded-md hover:bg-[#2a2a2a]"
-            aria-label="project"
+            aria-label={t("project")}
           >
             <Folder size={14} />
             <span>{project}</span>
@@ -90,7 +112,7 @@ export function Composer() {
             type="button"
             onClick={() => toggle("env")}
             className="inline-flex items-center gap-1.5 text-[12.5px] text-[#c0c0c0] px-2 py-1 rounded-md hover:bg-[#2a2a2a]"
-            aria-label="env"
+            aria-label={t("env")}
           >
             <Monitor size={14} />
             <span>{envLabel}</span>
@@ -99,7 +121,7 @@ export function Composer() {
             type="button"
             onClick={() => toggle("branch")}
             className="inline-flex items-center gap-1.5 text-[12.5px] text-[#c0c0c0] px-2 py-1 rounded-md hover:bg-[#2a2a2a]"
-            aria-label="branch"
+            aria-label={t("branch")}
           >
             <GitBranch size={14} />
             <span>{branch}</span>
@@ -109,7 +131,7 @@ export function Composer() {
         {menu === "project" && (
           <div className={menuBox} role="menu">
             {repos.length === 0 && (
-              <div className="px-2.5 py-2 text-[13px] text-codex-muted">No repos found</div>
+              <div className="px-2.5 py-2 text-[13px] text-codex-muted">{t("noRepos")}</div>
             )}
             {repos.map((p: GitRepo) => (
               <button
@@ -135,14 +157,7 @@ export function Composer() {
         )}
         {menu === "env" && (
           <div className={menuBox} role="menu">
-            {(
-              [
-                ["local", "Local"],
-                ["worktree", "Worktree"],
-                ["codex-web", "Codex Web"],
-                ["cloud", "Cloud"],
-              ] as const
-            ).map(([id, label]) => (
+            {envOptions.map(([id, labelKey]) => (
               <button
                 key={id}
                 type="button"
@@ -155,7 +170,7 @@ export function Composer() {
                   setMenu(null);
                 }}
               >
-                {label}
+                {t(labelKey)}
               </button>
             ))}
           </div>
@@ -165,10 +180,10 @@ export function Composer() {
             {loadingBranches ? (
               <div className="px-2.5 py-2 text-[13px] text-codex-muted flex items-center gap-2">
                 <Loader2 size={14} className="animate-spin" />
-                Loading branches...
+                {t("loadingBranches")}
               </div>
             ) : branches.length === 0 ? (
-              <div className="px-2.5 py-2 text-[13px] text-codex-muted">No branches found</div>
+              <div className="px-2.5 py-2 text-[13px] text-codex-muted">{t("noBranches")}</div>
             ) : (
               branches.map((b: GitBranchType) => (
                 <button
@@ -183,8 +198,12 @@ export function Composer() {
                   }}
                 >
                   <span className={b.is_current ? "text-codex-accent" : ""}>{b.name}</span>
-                  {b.is_current && <span className="ml-2 text-[11px] text-codex-muted">(current)</span>}
-                  {b.is_remote && <span className="ml-2 text-[11px] text-codex-muted">remote</span>}
+                  {b.is_current && (
+                    <span className="ml-2 text-[11px] text-codex-muted">({t("branchCurrent")})</span>
+                  )}
+                  {b.is_remote && (
+                    <span className="ml-2 text-[11px] text-codex-muted">{t("branchRemote")}</span>
+                  )}
                 </button>
               ))
             )}
@@ -203,7 +222,7 @@ export function Composer() {
               }
             }}
             disabled={typing}
-            placeholder="Describe your goal and define measurable outcomes for best results"
+            placeholder={t("placeholder")}
             rows={2}
             className="w-full resize-none bg-transparent outline-none text-[13.5px] text-codex-text placeholder:text-codex-muted leading-relaxed"
           />
@@ -214,8 +233,8 @@ export function Composer() {
             type="button"
             onClick={() => toggle("add")}
             className="w-7 h-7 rounded-md inline-flex items-center justify-center text-[#aaa] hover:bg-[#2a2a2a]"
-            aria-label="add"
-            title="Add"
+            aria-label={t("add")}
+            title={t("add")}
           >
             <Plus size={16} />
           </button>
@@ -235,7 +254,7 @@ export function Composer() {
             type="button"
             onClick={() => toggle("model")}
             className="inline-flex items-center gap-1.5 text-[12px] text-[#c0c0c0] px-2 py-1 rounded-md hover:bg-[#2a2a2a]"
-            aria-label="model"
+            aria-label={t("model")}
           >
             <span>{model}</span>
             <span className="text-codex-muted">{effortLabel}</span>
@@ -244,8 +263,8 @@ export function Composer() {
             type="button"
             disabled={!canSend}
             onClick={() => sendMessage()}
-            aria-label="send"
-            title="Send"
+            aria-label={t("send")}
+            title={t("send")}
             className={`w-8 h-8 rounded-full inline-flex items-center justify-center ${
               canSend
                 ? "bg-codex-accent text-white hover:bg-codex-accent-hover"
@@ -257,14 +276,8 @@ export function Composer() {
 
           {menu === "perm" && (
             <div className="absolute left-2 bottom-[calc(100%+4px)] w-[320px] p-2 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[10px] shadow-xl z-30">
-              <div className="text-[12px] text-codex-muted px-2 py-1 mb-1">How should actions be approved?</div>
-              {(
-                [
-                  ["ask", "Ask for approval", "Always ask when editing external files or using the internet"],
-                  ["agent", "Help me approve", "Only ask for risky operations"],
-                  ["full", "Full access", "Unrestricted access to the internet and files on this machine"],
-                ] as const
-              ).map(([id, label, desc]) => (
+              <div className="text-[12px] text-codex-muted px-2 py-1 mb-1">{t("permTitle")}</div>
+              {permOptions.map(([id, labelKey, descKey]) => (
                 <button
                   key={id}
                   type="button"
@@ -277,9 +290,9 @@ export function Composer() {
                   }`}
                 >
                   <div className={`text-[13px] font-medium ${id === "full" ? "text-codex-warn" : "text-[#e0e0e0]"}`}>
-                    {label}
+                    {t(labelKey)}
                   </div>
-                  <div className="text-[11.5px] text-codex-muted mt-0.5">{desc}</div>
+                  <div className="text-[11.5px] text-codex-muted mt-0.5">{t(descKey)}</div>
                 </button>
               ))}
             </div>
@@ -304,7 +317,7 @@ export function Composer() {
               <input
                 value={modelQuery}
                 onChange={(e) => setModelQuery(e.target.value)}
-                placeholder="Search models"
+                placeholder={t("searchModel")}
                 className="w-full bg-[#1e1e1e] border border-[#333] rounded-md px-2 py-1.5 text-[12.5px] mb-1 outline-none"
               />
               <div className="max-h-40 overflow-auto">
@@ -329,14 +342,14 @@ export function Composer() {
 
           {menu === "add" && (
             <div className="absolute left-2 bottom-[calc(100%+4px)] w-[260px] p-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[10px] shadow-xl z-30">
-              {["Files & Folders", "Targets", "Planning Mode"].map((label) => (
+              {addOptions.map((key) => (
                 <button
-                  key={label}
+                  key={key}
                   type="button"
                   className="w-full text-left px-2.5 py-2 rounded-md text-[13px] hover:bg-[#353535]"
                   onClick={() => setMenu(null)}
                 >
-                  {label}
+                  {t(key)}
                 </button>
               ))}
             </div>

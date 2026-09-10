@@ -4698,6 +4698,18 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     });
   }
 
+  /* ── Plan mode banner initialization ── */
+  function initPlanModeBanner() {
+    var planBanner = document.getElementById('planModeBanner');
+    var goalBtn = document.getElementById('goalBtn');
+    if (planBanner && goalBtn) {
+      updatePlanBanner();
+    }
+  }
+
+  // Call initialization after a short delay to ensure DOM is ready
+  setTimeout(initPlanModeBanner, 100);
+
   /* ── Layout toolbar: side tools + bottom terminal ── */
   var stage = document.getElementById('stage');
   var toolsPanel = document.getElementById('toolsPanel');

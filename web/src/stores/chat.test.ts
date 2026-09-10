@@ -19,6 +19,9 @@ beforeEach(() => {
     typing: false,
     pendingEventId: null,
     activeTool: null,
+    planMode: false,
+    goalMode: false,
+    planTask: "",
   });
   vi.useFakeTimers();
 });

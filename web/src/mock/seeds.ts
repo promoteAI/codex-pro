@@ -108,3 +108,40 @@ export const MOCK_FILES = [
   { path: "web/src/pages/HomeView.tsx", kind: "file" as const },
   { path: "docs/design/index.html", kind: "file" as const },
 ];
+
+export interface ReviewFile {
+  path: string;
+  add: number;
+  del: number;
+}
+
+export const MOCK_REVIEW_FILES: ReviewFile[] = [
+  { path: "web/src/App.tsx", add: 12, del: 4 },
+  { path: "web/src/pages/HomeView.tsx", add: 28, del: 2 },
+  { path: "web/src/components/home/Composer.tsx", add: 120, del: 15 },
+  { path: "uv.lock", add: 4913, del: 0 },
+];
+
+export const MOCK_FILE_PREVIEW = `import { Route } from "react-router";
+import { HomeView } from "./pages/HomeView";
+import { PrView } from "./pages/PrView";
+
+export function App() {
+  return (
+    <>
+      <Route index element={<HomeView />} />
+      <Route path="prs" element={<PrView />} />
+    </>
+  );
+}
+`;
+
+export const MOCK_BROWSER_TABS = [
+  { title: "codex ···", suffix: "· Chrome", url: "https://www.google.com/search?q=codex+..." },
+  { title: "如何 ···", suffix: "· Chrome", url: "https://www.google.com/search?q=%E5%A6%82%E4%BD..." },
+];
+
+export const MOCK_AGENT = {
+  name: "Agnes 2.0 Flash",
+  desc: "CCSwitchMulti managed worker pinned to 'agnes-2.0-flash'.",
+};

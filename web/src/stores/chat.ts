@@ -79,6 +79,9 @@ interface ChatState {
   repos: GitRepo[];
   branches: GitBranch[];
   loadingBranches: boolean;
+  planMode: boolean;
+  goalMode: boolean;
+  planTask: string;
   setProject: (project: string) => void;
   setEnv: (env: string) => void;
   setBranch: (branch: string) => void;
@@ -86,6 +89,9 @@ interface ChatState {
   setEffort: (effort: number) => void;
   setPerm: (perm: "ask" | "agent" | "full") => void;
   setDraft: (draft: string) => void;
+  setPlanMode: (on: boolean, task?: string) => void;
+  setGoalMode: (on: boolean) => void;
+  clearPlanMode: () => void;
   clearChat: () => void;
   sendMessage: (text?: string) => void;
   loadSessionHistory: (sessionId: string) => Promise<void>;
@@ -114,6 +120,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   repos: [],
   branches: [],
   loadingBranches: false,
+  planMode: false,
+  goalMode: false,
+  planTask: "",
 
   setProject: (project) => set({ project }),
   setEnv: (env) => set({ env }),
@@ -122,6 +131,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setEffort: (effort) => set({ effort }),
   setPerm: (perm) => set({ perm }),
   setDraft: (draft) => set({ draft }),
+  setPlanMode: (on, task) =>
+    set({
+      planMode: on,
+      planTask: on ? (task ?? "探索并比较架构方案") : "",
+      goalMode: on ? false : get().goalMode,
+    }),
+  setGoalMode: (on) =>
+    set({
+      goalMode: on,
+      planMode: on ? false : get().planMode,
+      planTask: on ? "" : get().planTask,
+    }),
+  clearPlanMode: () => set({ planMode: false, planTask: "", goalMode: false }),
 
   clearChat: () =>
     set({

@@ -15,7 +15,7 @@ import shutil
 import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
@@ -379,7 +379,10 @@ class SkillStore:
             if sub_dir.is_dir():
                 for f in sub_dir.rglob("*"):
                     if f.is_file():
-                        files.append(str(f.relative_to(skill_dir)))
+                        # Normalize to forward slashes so tests and API
+                        # consumers see consistent POSIX paths on every OS.
+                        rel = f.relative_to(skill_dir)
+                        files.append(str(PurePosixPath(*rel.parts)))
         return sorted(files)
 
     # ── CRUD operations ─────────────────────────────────────────────────────

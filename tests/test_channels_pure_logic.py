@@ -545,7 +545,7 @@ class TestTelegramMention:
     def test_mention_by_entity_case_insensitive(self):
         ch = _telegram_channel()
         text = "@Codex_Bot hello"
-        msg = {"entities": [{"type": "mention", "offset": 0, "length": 9}]}
+        msg = {"entities": [{"type": "mention", "offset": 0, "length": 10}]}
         assert ch._is_mentioned(msg, text) is True
 
     def test_mention_by_reply_to_bot(self):

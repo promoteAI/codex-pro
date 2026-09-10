@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
@@ -243,9 +243,14 @@ class KnowledgeAPI:
         for f in sorted(docs_dir.rglob("*")):
             if f.is_file() and not f.name.startswith("."):
                 stat = f.stat()
+                # Use PurePosixPath so the API always returns POSIX-style
+                # forward-slash paths regardless of OS (Windows would yield
+                # backslashes otherwise). Matches the upload/delete paths which
+                # already normalize with .replace("\\", "/").
+                rel = f.relative_to(docs_dir)
                 documents.append(
                     {
-                        "path": str(f.relative_to(docs_dir)),
+                        "path": str(PurePosixPath(*rel.parts)),
                         "size": stat.st_size,
                         "modified": stat.st_mtime,
                     }

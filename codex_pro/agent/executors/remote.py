@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import shlex
 import uuid
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from loguru import logger
 
@@ -185,7 +185,10 @@ class ContainerExecutor(BaseExecutor):
             return "/workspace"
         try:
             rel = Path(cwd).resolve().relative_to(self._workspace)
-            return str(Path("/workspace") / rel)
+            # Container paths are always POSIX; str(Path(...)) yields backslashes
+            # on Windows, which would break Docker exec args. Use PurePosixPath
+            # to keep the forward-slash separator regardless of host OS.
+            return str(PurePosixPath("/workspace") / rel)
         except ValueError:
             return "/workspace"
 

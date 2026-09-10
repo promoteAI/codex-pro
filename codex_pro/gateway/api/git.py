@@ -7,7 +7,6 @@ with live data from the agent's current environment.
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -17,10 +16,13 @@ if TYPE_CHECKING:
     from codex_pro.gateway.server import GatewayServer
 
 
+from codex_pro.agent.proc_lifecycle import run_owned
+
+
 def _run_git(cwd: Path, args: list[str]) -> tuple[int, str]:
     """Run a git command and return (returncode, stdout)."""
     try:
-        result = subprocess.run(
+        result = run_owned(
             ["git", *args],
             cwd=str(cwd),
             capture_output=True,
@@ -28,7 +30,7 @@ def _run_git(cwd: Path, args: list[str]) -> tuple[int, str]:
             timeout=10,
         )
         return result.returncode, result.stdout
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, TimeoutError):
         return 1, ""
 
 

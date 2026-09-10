@@ -1470,8 +1470,7 @@ class InferenceStage:
                 continue
             tool_call = d.tool_call
 
-            import time as _time
-            _tool_start_ts = _time.monotonic()
+            _tool_start_ts = time.monotonic()
             if ctx.activity is not None:
                 ctx.activity.enter_tool(tool_call.name)
             # Emit a "running" frame before execution so the cli TUI can flip
@@ -1494,7 +1493,7 @@ class InferenceStage:
                     )
                     result = self._respill(tool_call.name, d.exec_ctx, result)
 
-                _tool_duration_ms = int((_time.monotonic() - _tool_start_ts) * 1000)
+                _tool_duration_ms = int((time.monotonic() - _tool_start_ts) * 1000)
                 await self._emit_tool_call(
                     ctx.event, tool_call.name, tool_call.arguments,
                     "ok" if result.success else "err", result.text,

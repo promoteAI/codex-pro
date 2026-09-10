@@ -8,7 +8,6 @@ This avoids requiring the GitHub CLI while still surfacing PR-like data.
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -18,11 +17,14 @@ if TYPE_CHECKING:
     from codex_pro.gateway.server import GatewayServer
 
 
+from codex_pro.agent.proc_lifecycle import run_owned
+
+
 def _run(cmd: list[str], cwd: Path, timeout: float = 15.0) -> tuple[int, str]:
     try:
-        result = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout)
+        result = run_owned(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout)
         return result.returncode, result.stdout
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, TimeoutError):
         return 1, ""
 
 

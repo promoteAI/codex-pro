@@ -48,6 +48,13 @@ from loguru import logger
 
 _POSIX = os.name == "posix"
 
+# Sentinel used in place of SIGKILL on platforms that don't have it (Windows).
+# Chosen as the largest valid signal number so it never collides with a real
+# signal; _signal_group gates on `sig == _SIGKILL` before calling proc.kill()
+# (which is also the Windows-specific fast path), so a non-POSIX platform
+# simply falls through to the terminate() branch and lets the OS clean up.
+_SIGKILL = getattr(signal, "SIGKILL", 999)
+
 # Attribute stamped on the Process object holding the *trusted* PGID. Trusted
 # means: we spawned this child into its own session, so signalling the group
 # cannot reach anything but its descendants. Absence means "fall back to the
@@ -518,7 +525,7 @@ def _signal_group(proc: Any, sig: int) -> None:
         _killpg(pgid, sig)
         return
     try:
-        if sig == signal.SIGKILL:
+        if sig == _SIGKILL:
             proc.kill()
         else:
             proc.terminate()

@@ -94,6 +94,91 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .add-plugin-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;border-radius:7px;background:transparent;color:#e0e0e0;cursor:pointer;text-align:left;font-size:13px}
 .add-plugin-item:hover{background:#353535;color:#fff}
 .add-plugin-item svg{width:16px;height:16px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.pl-modal-overlay{position:fixed;inset:0;z-index:96;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.55)}
+.pl-modal-overlay.open{display:flex}
+.pl-modal{width:min(460px,100%);background:#2a2a2a;border:1px solid #3a3a3a;border-radius:14px;box-shadow:0 20px 48px rgba(0,0,0,.55);padding:20px 22px 18px}
+.pl-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}
+.pl-modal-title{font-size:17px;font-weight:600;color:#f0f0f0;margin:0}
+.pl-modal-close{width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:#888;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
+.pl-modal-close:hover{background:#353535;color:#ddd}
+.pl-modal-close svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.pl-modal-sub{font-size:12.5px;color:#8a8a8a;line-height:1.45;margin:0 0 18px;padding-right:28px}
+.pl-modal-sub a{color:#4c8dff;text-decoration:none}
+.pl-modal-sub a:hover{text-decoration:underline}
+.pl-modal-field{margin-bottom:14px}
+.pl-modal-label{display:block;font-size:12.5px;color:#9a9a9a;margin-bottom:7px}
+.pl-modal-input,.pl-modal-textarea{width:100%;box-sizing:border-box;background:#1e1e1e;border:1px solid #3a3a3a;border-radius:8px;color:#e4e4e4;font:inherit;font-size:13px;padding:9px 12px;outline:none}
+.pl-modal-input:focus,.pl-modal-textarea:focus{border-color:#4c8dff;box-shadow:0 0 0 1px rgba(76,141,255,.25)}
+.pl-modal-input::placeholder,.pl-modal-textarea::placeholder{color:#6a6a6a}
+.pl-modal-textarea{min-height:72px;resize:vertical;line-height:1.45}
+.pl-modal-foot{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:18px}
+.pl-modal-cancel{padding:7px 14px;border:1px solid #3a3a3a;border-radius:8px;background:#252525;color:#d0d0d0;font:inherit;font-size:13px;cursor:pointer}
+.pl-modal-cancel:hover{background:#2e2e2e;border-color:#4a4a4a;color:#fff}
+.pl-modal-submit{padding:7px 14px;border:1px solid #444;border-radius:8px;background:#3a3a3a;color:#f0f0f0;font:inherit;font-size:13px;cursor:pointer}
+.pl-modal-submit:hover{background:#454545;border-color:#555}
+.mcp-create{display:none;flex:1;min-height:0;flex-direction:column;padding:28px clamp(16px,4vw,40px) 48px;box-sizing:border-box;overflow-y:auto}
+.mcp-create.is-active{display:flex}
+.mcp-create-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+.mcp-create-title{font-size:22px;font-weight:600;color:#f0f0f0;margin:0 0 6px;letter-spacing:-.01em}
+.mcp-create-sub{font-size:12.5px;color:#6e6e6e;line-height:1.45;margin:0}
+.mcp-view-seg{display:inline-flex;align-items:center;background:#1a1a1a;border:1px solid #333;border-radius:999px;padding:2px;flex:0 0 auto}
+.mcp-view-seg button{padding:5px 14px;border:0;border-radius:999px;background:transparent;color:#8a8a8a;font:inherit;font-size:12.5px;cursor:pointer}
+.mcp-view-seg button:hover{color:#c8c8c8}
+.mcp-view-seg button.is-active{background:#2e2e2e;color:#e8e8e8}
+.mcp-create-card{background:#222;border:1px solid #2e2e2e;border-radius:12px;padding:18px 18px 8px;margin-bottom:18px}
+.mcp-create-row{display:flex;gap:14px;margin-bottom:14px;align-items:flex-end}
+.mcp-create-row.cols-3 > .mcp-field{flex:1;min-width:0}
+.mcp-field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.mcp-field.grow{flex:1}
+.mcp-field-label{font-size:12.5px;color:#9a9a9a}
+.mcp-input,.mcp-select{width:100%;box-sizing:border-box;background:#1e1e1e;border:1px solid #333;border-radius:8px;color:#e4e4e4;font:inherit;font-size:13px;padding:9px 12px;outline:none}
+.mcp-input:focus,.mcp-select:focus{border-color:#4c8dff;box-shadow:0 0 0 1px rgba(76,141,255,.25)}
+.mcp-input::placeholder{color:#6a6a6a}
+.mcp-select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23888' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 4.5 3 3 3-3'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.mcp-scope-wrap{position:relative;flex:0 0 auto;display:flex;flex-direction:column;gap:7px;align-items:flex-end}
+.mcp-scope-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border:1px solid #333;border-radius:8px;background:#1e1e1e;color:#e0e0e0;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+.mcp-scope-btn:hover{border-color:#444;background:#242424}
+.mcp-scope-btn svg.ico{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+.mcp-scope-btn .dropdown-arrow{opacity:.7}
+.mcp-scope-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:20;min-width:200px;padding:6px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.5)}
+.mcp-scope-menu.open{display:block}
+.mcp-scope-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:8px;background:transparent;color:#e4e4e4;cursor:pointer;text-align:left;font:inherit;font-size:13px}
+.mcp-scope-item:hover{background:#343434}
+.mcp-scope-item.is-active{background:#343434}
+.mcp-scope-item svg.ico{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto;opacity:.85}
+.mcp-scope-item .gn-dd-check{width:14px;height:14px;margin-left:auto;flex:0 0 auto;opacity:0;fill:none;stroke:#e8e8e8;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mcp-scope-item.is-active .gn-dd-check{opacity:1}
+.mcp-scope-sep{height:1px;margin:4px 8px;background:#3a3a3a}
+.mcp-scope-group{padding:8px 10px 4px;font-size:11.5px;color:#7a7a7a;font-weight:500}
+.mcp-env-toggle{display:flex;align-items:center;gap:8px;width:100%;padding:10px 2px 12px;border:0;background:transparent;color:#c8c8c8;font:inherit;font-size:13px;cursor:pointer;text-align:left}
+.mcp-env-toggle:hover{color:#eee}
+.mcp-env-toggle svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+.mcp-env-toggle.is-open svg{transform:rotate(180deg)}
+.mcp-env-body{display:none;padding:0 0 14px}
+.mcp-env-body.is-open{display:block}
+.mcp-env-body .mcp-textarea{width:100%;min-height:110px;box-sizing:border-box;background:#252525;border:1px solid #3a3a3a;border-radius:8px;color:#e0e0e0;font:inherit;font-size:13px;padding:12px 14px;outline:none;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;line-height:1.55}
+.mcp-env-body .mcp-textarea:focus{border-color:#4c8dff;box-shadow:0 0 0 1px rgba(76,141,255,.25);background:#222}
+.mcp-env-body .mcp-textarea::placeholder{color:#8a8a8a;opacity:1;white-space:pre-wrap}
+.mcp-json-pane{display:none}
+.mcp-json-pane.is-active{display:block}
+.mcp-form-pane.is-hidden{display:none}
+.mcp-json-toolbar{display:flex;justify-content:flex-end;margin-bottom:12px}
+.mcp-json-card{background:#222;border:1px solid #2e2e2e;border-radius:12px;padding:16px 18px 14px}
+.mcp-json-card-title{font-size:12.5px;color:#9a9a9a;margin:0 0 10px}
+.mcp-json-editor{width:100%;min-height:280px;box-sizing:border-box;background:#1a1a1a;border:1px solid #333;border-radius:10px;color:#e8e8e8;font:inherit;font-size:13px;padding:14px 16px;outline:none;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;line-height:1.55}
+.mcp-json-editor:focus{border-color:#4c8dff;box-shadow:0 0 0 1px rgba(76,141,255,.25)}
+.mcp-json-hint{margin:10px 2px 0;font-size:12px;color:#7a7a7a;line-height:1.45}
+.mcp-json-hint code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;color:#9a9a9a}
+.mcp-create-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:auto;padding-top:8px}
+.mcp-save-btn{padding:8px 16px;border:0;border-radius:8px;background:#e8e8e8;color:#1a1a1a;font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.mcp-save-btn:hover{background:#f2f2f2}
+.mcp-cancel-btn{padding:8px 12px;border:0;border-radius:8px;background:transparent;color:#c0c0c0;font:inherit;font-size:13px;cursor:pointer}
+.mcp-cancel-btn:hover{background:#2e2e2e;color:#fff}
+@media(max-width:720px){
+  .mcp-create-row,.mcp-create-row.cols-3{flex-direction:column;align-items:stretch}
+  .mcp-scope-wrap{align-items:stretch}
+  .mcp-scope-btn{width:100%;justify-content:space-between}
+}
 .skill-tabs{display:flex;align-items:center;gap:16px;padding:16px 0 12px;border-bottom:1px solid #2a2a2a;margin-bottom:4px}
 .tab{font-size:13px;color:#6e6e6e;cursor:pointer;padding:4px 2px;border-bottom:1.5px solid transparent;margin-bottom:-1px}
 .tab:hover{color:#a0a0a0}
@@ -893,37 +978,20 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .cc-empty-card{background:#222;border:1px solid #2e2e2e;border-radius:12px;padding:28px 16px;text-align:center;color:#666;font-size:13px}
 
 /* Browser settings page */
-.br-page-title{font-size:22px;font-weight:600;color:#f0f0f0;margin:0 0 6px;letter-spacing:-.01em}
-.br-page-sub{font-size:12.5px;color:#6e6e6e;line-height:1.5;margin:0 0 22px;max-width:580px}
-.br-hero{display:flex;align-items:center;gap:14px;background:#222;border:1px solid #2e2e2e;border-radius:12px;padding:16px 18px;margin-bottom:24px}
-.br-hero-icon{width:40px;height:40px;border-radius:10px;background:#2a3548;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.br-hero-icon svg{width:22px;height:22px;fill:none;stroke:#8eb6ff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.br-hero-info{flex:1;min-width:0}
-.br-hero-name{font-size:13.5px;font-weight:500;color:#e6e6e6;margin-bottom:3px}
-.br-hero-desc{font-size:12px;color:#6e6e6e;line-height:1.4}
-.br-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px}
-.br-section-title{font-size:13px;font-weight:500;color:#b8b8b8;letter-spacing:.02em}
-.br-import-btn{background:#2a2a2a;border:1px solid #3a3a3a;border-radius:6px;padding:4px 12px;font-size:12.5px;color:#c0c0c0;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
-.br-import-btn:hover{background:#323232;border-color:#4a4a4a;color:#e0e0e0}
-.br-import-btn svg{width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.br-card{background:#222;border:1px solid #2e2e2e;border-radius:12px;overflow:hidden;margin-bottom:24px}
+.br-page-title{font-size:22px;font-weight:600;color:#f0f0f0;margin:0 0 20px;letter-spacing:-.01em}
+.br-section-title{font-size:13px;font-weight:500;color:#b8b8b8;letter-spacing:.02em;margin:0 0 10px}
+.br-card{background:#222;border:1px solid #2e2e2e;border-radius:12px;overflow:hidden;margin-bottom:22px}
 .br-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border-bottom:1px solid #2a2a2a}
 .br-row:last-child{border-bottom:none}
 .br-row:hover{background:#262626}
 .br-row-left{flex:1;min-width:0}
 .br-row-label{font-size:13.5px;font-weight:500;color:#e0e0e0;margin-bottom:3px}
-.br-row-desc{font-size:12px;color:#6e6e6e;line-height:1.4}
+.br-row-desc{font-size:12px;color:#6e6e6e;line-height:1.45}
 .br-row-value{flex:0 0 auto;display:flex;align-items:center;gap:10px}
-.br-path{font-size:12px;color:#888;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-.br-select{background:#1e1e1e;border:1px solid #3a3a3a;border-radius:6px;color:#d4d4d4;font-size:12.5px;padding:5px 10px;min-width:120px;cursor:pointer}
-.br-select:focus{outline:none;border-color:#3866f0}
 .br-action{background:#2a2a2a;border:1px solid #3a3a3a;border-radius:6px;padding:5px 12px;font-size:12.5px;color:#c0c0c0;cursor:pointer;white-space:nowrap}
 .br-action:hover{background:#323232;border-color:#4a4a4a;color:#e0e0e0}
-.br-add-btn{background:#2a2a2a;border:1px solid #3a3a3a;border-radius:6px;padding:4px 12px;font-size:12.5px;color:#c0c0c0;cursor:pointer}
-.br-add-btn:hover{background:#323232;color:#e0e0e0}
-.br-site-empty{margin:4px 16px 16px;padding:22px;border:1px dashed #333;border-radius:10px;text-align:center;color:#666;font-size:12.5px}
-.br-dev-warn{display:inline-flex;align-items:center;gap:6px;color:#f79748}
-.br-dev-warn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.br-danger-btn{background:#c45c6a;border:1px solid #c45c6a;border-radius:6px;padding:5px 12px;font-size:12.5px;color:#fff;cursor:pointer;white-space:nowrap}
+.br-danger-btn:hover{background:#d46a78;border-color:#d46a78}
 
 /* Hooks page */
 .hk-page-title{font-size:22px;font-weight:600;color:#f0f0f0;margin:0 0 6px;letter-spacing:-.01em}
@@ -2407,7 +2475,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         </div>
           <div class="settings-content">
           <div id="pluginsPage" class="is-active" style="display:flex">
-          <div class="plugins-content">
+          <div class="plugins-content" id="pluginsListView">
           <div class="settings-header">
             <div>
               <h2>插件</h2>
@@ -2567,7 +2635,146 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
             </div>
           </div>
           </div>
+
+          <div class="mcp-create" id="mcpCreateView" hidden>
+            <div class="mcp-create-head">
+              <div>
+                <h2 class="mcp-create-title">新建 MCP 服务器</h2>
+                <p class="mcp-create-sub">填写新的 MCP 配置，保存后返回列表。</p>
+              </div>
+              <div class="mcp-view-seg" role="group" aria-label="编辑视图">
+                <button type="button" class="is-active" data-mcp-view="form">表单</button>
+                <button type="button" data-mcp-view="json">JSON</button>
+              </div>
+            </div>
+
+            <div class="mcp-form-pane" id="mcpFormPane">
+              <div class="mcp-create-card">
+                <div class="mcp-create-row" id="mcpFormTopRow">
+                  <div class="mcp-field grow">
+                    <label class="mcp-field-label" for="mcpName">名称</label>
+                    <input class="mcp-input" id="mcpName" type="text" placeholder="my-mcp-server" spellcheck="false" autocomplete="off">
+                  </div>
+                  <div class="mcp-scope-wrap" id="mcpScopeWrap">
+                    <div class="mcp-field-label">作用域</div>
+                    <button type="button" class="mcp-scope-btn" id="mcpScopeBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="mcpScopeMenu">
+                      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+                      <span id="mcpScopeLabel">用户</span>
+                      <span class="dropdown-arrow"></span>
+                    </button>
+                    <div class="mcp-scope-menu" id="mcpScopeMenu" role="listbox" aria-label="作用域" hidden>
+                      <button type="button" class="mcp-scope-item is-active" role="option" data-scope="用户" aria-selected="true">
+                        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+                        用户
+                        <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+                      </button>
+                      <div class="mcp-scope-sep" role="separator"></div>
+                      <div class="mcp-scope-group">工作区</div>
+                      <button type="button" class="mcp-scope-item" role="option" data-scope="codex-pro" aria-selected="false">
+                        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M3 7l2.5-3h5L13 7"/></svg>
+                        codex-pro
+                        <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+                      </button>
+                      <button type="button" class="mcp-scope-item" role="option" data-scope="default" aria-selected="false">
+                        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M3 7l2.5-3h5L13 7"/></svg>
+                        default
+                        <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mcp-create-row cols-3">
+                  <div class="mcp-field">
+                    <label class="mcp-field-label" for="mcpType">类型</label>
+                    <select class="mcp-select" id="mcpType">
+                      <option value="stdio" selected>stdio (本地命令)</option>
+                      <option value="sse">sse (Server-Sent Events)</option>
+                      <option value="http">streamable http</option>
+                    </select>
+                  </div>
+                  <div class="mcp-field">
+                    <label class="mcp-field-label" for="mcpTimeout">超时时间 MS</label>
+                    <input class="mcp-input" id="mcpTimeout" type="text" placeholder="30000" inputmode="numeric" spellcheck="false" autocomplete="off">
+                  </div>
+                  <div class="mcp-field">
+                    <label class="mcp-field-label" for="mcpProtocol">协议版本</label>
+                    <select class="mcp-select" id="mcpProtocol">
+                      <option value="auto" selected>自动 (推荐)</option>
+                      <option value="2024-11-05">2024-11-05</option>
+                      <option value="2025-03-26">2025-03-26</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="mcp-create-row">
+                  <div class="mcp-field grow">
+                    <label class="mcp-field-label" for="mcpCommand">命令</label>
+                    <input class="mcp-input" id="mcpCommand" type="text" placeholder="npx" spellcheck="false" autocomplete="off">
+                  </div>
+                </div>
+
+                <div class="mcp-create-row">
+                  <div class="mcp-field grow">
+                    <label class="mcp-field-label" for="mcpArgs">参数 (空格分隔)</label>
+                    <input class="mcp-input" id="mcpArgs" type="text" placeholder="-y @modelcontextprotocol/server-memory" spellcheck="false" autocomplete="off">
+                  </div>
+                </div>
+
+                <button type="button" class="mcp-env-toggle" id="mcpEnvToggle" aria-expanded="false" aria-controls="mcpEnvBody">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  环境变量 (可选)
+                </button>
+                <div class="mcp-env-body" id="mcpEnvBody" hidden>
+                  <textarea class="mcp-textarea" id="mcpEnv" placeholder='{
+  "MY_API_KEY": "your-key"
+}' spellcheck="false"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="mcp-json-pane" id="mcpJsonPane">
+              <div class="mcp-json-toolbar" id="mcpJsonToolbar"></div>
+              <div class="mcp-json-card">
+                <div class="mcp-json-card-title">完整配置</div>
+                <textarea class="mcp-json-editor" id="mcpJsonEditor" spellcheck="false" aria-label="完整配置"></textarea>
+                <p class="mcp-json-hint">支持直接粘贴 <code>{"server-name": {...}}</code> 或 <code>{"mcpServers": {"server-name": {...}}}</code>。</p>
+              </div>
+            </div>
+
+            <div class="mcp-create-foot">
+              <button type="button" class="mcp-save-btn" id="mcpCreateSave">保存</button>
+              <button type="button" class="mcp-cancel-btn" id="mcpCreateCancel">取消</button>
+            </div>
           </div>
+          </div>
+
+          <div class="pl-modal-overlay" id="plAddMarketModal" role="dialog" aria-modal="true" aria-labelledby="plAddMarketTitle" hidden>
+            <div class="pl-modal">
+              <div class="pl-modal-head">
+                <h3 class="pl-modal-title" id="plAddMarketTitle">添加插件市场</h3>
+                <button type="button" class="pl-modal-close" id="plAddMarketClose" aria-label="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+              </div>
+              <p class="pl-modal-sub">从 GitHub 仓库、Git URL 或本地文件夹添加。<a href="#" id="plAddMarketLearn">了解更多</a></p>
+              <div class="pl-modal-field">
+                <label class="pl-modal-label" for="plMarketSource">来源</label>
+                <input class="pl-modal-input" id="plMarketSource" type="text" placeholder="openai/plugins 或 git@github.com:org/repo.git" spellcheck="false" autocomplete="off">
+              </div>
+              <div class="pl-modal-field">
+                <label class="pl-modal-label" for="plMarketRef">Git 引用</label>
+                <input class="pl-modal-input" id="plMarketRef" type="text" placeholder="主分支" spellcheck="false" autocomplete="off">
+              </div>
+              <div class="pl-modal-field">
+                <label class="pl-modal-label" for="plMarketSparse">稀疏路径</label>
+                <textarea class="pl-modal-textarea" id="plMarketSparse" placeholder="plugins/codex" spellcheck="false"></textarea>
+              </div>
+              <div class="pl-modal-foot">
+                <button type="button" class="pl-modal-cancel" id="plAddMarketCancel">取消</button>
+                <button type="button" class="pl-modal-submit" id="plAddMarketSubmit">添加市场</button>
+              </div>
+            </div>
+          </div>
+
           <div class="gen-page" id="generalPage">
             <div class="gn-section-title">权限</div>
             <div class="gn-card">
@@ -4137,248 +4344,54 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
           </div><!-- /computerControlPage -->
           <div class="gen-page" id="browserPage">
             <div class="br-page-title">浏览器</div>
-            <p class="br-page-sub">管理内置浏览器。可在插件设置中配置浏览器扩展程序。</p>
-
-            <div class="br-hero">
-              <div class="br-hero-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 4 9 14 14 0 0 1-4 9 14 14 0 0 1-4-9 14 14 0 0 1 4-9z"/></svg>
-              </div>
-              <div class="br-hero-info">
-                <div class="br-hero-name">允许 CodexPro 控制内置浏览器</div>
-                <div class="br-hero-desc">开启后，CodexPro 可使用内置浏览器打开网页并与页面交互</div>
-              </div>
-              <label class="toggle"><input type="checkbox" id="brEnableControl" checked aria-label="允许 CodexPro 控制内置浏览器"><span class="toggle-slider"></span></label>
-            </div>
-
-            <div class="br-section-head">
-              <div class="br-section-title">常规</div>
-              <button class="br-import-btn" type="button">导入… <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
-            </div>
             <div class="br-card">
               <div class="br-row">
                 <div class="br-row-left">
-                  <div class="br-row-label">网页 URL 打开位置</div>
-                  <div class="br-row-desc">选择网页链接默认在何处打开</div>
+                  <div class="br-row-label">开启内置浏览器</div>
+                  <div class="br-row-desc">启用 Browser Use 官方插件，让新会话可以通过内置浏览器访问和操作网页。</div>
                 </div>
                 <div class="br-row-value">
-                  <select class="br-select" aria-label="网页 URL 打开位置">
-                    <option selected>默认浏览器</option>
-                    <option>CodexPro</option>
-                    <option>询问</option>
-                  </select>
-                </div>
-              </div>
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">本地 URL 打开位置</div>
-                  <div class="br-row-desc">选择本地文件链接默认在何处打开</div>
-                </div>
-                <div class="br-row-value">
-                  <select class="br-select" aria-label="本地 URL 打开位置">
-                    <option>默认浏览器</option>
-                    <option selected>CodexPro</option>
-                    <option>询问</option>
-                  </select>
-                </div>
-              </div>
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">显式屏蔽网址</div>
-                  <div class="br-row-desc">屏蔽跟踪器、假广告和风险链接</div>
-                </div>
-                <div class="br-row-value">
-                  <label class="toggle"><input type="checkbox" id="brBlockUrls" aria-label="显式屏蔽网址"><span class="toggle-slider"></span></label>
-                </div>
-              </div>
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">清除数据</div>
-                  <div class="br-row-desc">删除历史记录、缓存和网站数据</div>
-                </div>
-                <div class="br-row-value">
-                  <button class="br-action" type="button">清除浏览数据</button>
-                </div>
-              </div>
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">浏览历史</div>
-                  <div class="br-row-desc">查看和管理已访问的页面</div>
-                </div>
-                <div class="br-row-value">
-                  <button class="br-action" type="button">管理</button>
-                </div>
-              </div>
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">包含通知</div>
-                  <div class="br-row-desc">帮助 AI 更好地理解网站内容</div>
-                </div>
-                <div class="br-row-value">
-                  <select class="br-select" aria-label="包含通知">
-                    <option selected>始终包含</option>
-                    <option>询问</option>
-                    <option>从不</option>
-                  </select>
+                  <label class="toggle"><input type="checkbox" id="brEnableControl" checked aria-label="开启内置浏览器"><span class="toggle-slider"></span></label>
                 </div>
               </div>
             </div>
 
-            <div class="br-section-title" style="margin-bottom:10px">自动填充与密码</div>
+            <div class="br-section-title">安全</div>
             <div class="br-card">
               <div class="br-row">
                 <div class="br-row-left">
-                  <div class="br-row-label">密码管理器</div>
-                  <div class="br-row-desc">保存、查看和编辑已存密码</div>
+                  <div class="br-row-label">忽略证书校验</div>
+                  <div class="br-row-desc">开启后内置浏览器不再校验 HTTPS 证书，仅影响内置浏览器。修改后需重启生效。</div>
                 </div>
                 <div class="br-row-value">
-                  <button class="br-action" type="button">管理</button>
-                </div>
-              </div>
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">联系信息</div>
-                  <div class="br-row-desc">管理已保存的地址、电子邮箱和电话号码</div>
-                </div>
-                <div class="br-row-value">
-                  <button class="br-action" type="button">管理</button>
+                  <label class="toggle"><input type="checkbox" id="brIgnoreCert" checked aria-label="忽略证书校验"><span class="toggle-slider"></span></label>
                 </div>
               </div>
             </div>
 
-            <div class="br-section-title" style="margin-bottom:10px">下载</div>
+            <div class="br-section-title">浏览器数据</div>
             <div class="br-card">
               <div class="br-row">
                 <div class="br-row-left">
-                  <div class="br-row-label">位置</div>
-                  <div class="br-row-desc">选择默认下载文件夹</div>
+                  <div class="br-row-label">清除内置浏览器缓存</div>
+                  <div class="br-row-desc">清除 HTTP 缓存、Cache Storage 和 Service Worker，保留 Cookie 和本地站点数据。</div>
                 </div>
                 <div class="br-row-value">
-                  <span class="br-path" title="C:\Users\cheris\Downloads">C:\Users\cheris\Downloads</span>
-                  <button class="br-action" type="button">更改</button>
+                  <button class="br-action" type="button" id="brClearCache">清除缓存</button>
                 </div>
               </div>
               <div class="br-row">
                 <div class="br-row-left">
-                  <div class="br-row-label">下载前询问保存位置</div>
-                  <div class="br-row-desc">每次下载前选择保存位置</div>
+                  <div class="br-row-label">清除全部浏览器数据</div>
+                  <div class="br-row-desc">删除内置浏览器中的 Cookie、站点数据和缓存。此操作不可撤销。</div>
                 </div>
                 <div class="br-row-value">
-                  <label class="toggle"><input type="checkbox" id="brAskSave" aria-label="下载前询问保存位置"><span class="toggle-slider"></span></label>
-                </div>
-              </div>
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">下载历史记录</div>
-                  <div class="br-row-desc">查看通过内置浏览器下载的文件</div>
-                </div>
-                <div class="br-row-value">
-                  <button class="br-action" type="button">管理</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="br-section-head">
-              <div class="br-section-title">权限</div>
-            </div>
-            <div class="br-card">
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">网站设置</div>
-                  <div class="br-row-desc">管理摄像头、麦克风等网站权限</div>
-                </div>
-                <div class="br-row-value">
-                  <button class="br-action" type="button">管理</button>
-                </div>
-              </div>
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">麦克风</div>
-                  <div class="br-row-desc">网站请求使用麦克风时的默认行为</div>
-                </div>
-                <div class="br-row-value">
-                  <select class="br-select" aria-label="麦克风权限">
-                    <option>始终允许</option>
-                    <option selected>始终询问</option>
-                    <option>始终阻止</option>
-                  </select>
-                </div>
-              </div>
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">摄像头</div>
-                  <div class="br-row-desc">网站请求使用摄像头时的默认行为</div>
-                </div>
-                <div class="br-row-value">
-                  <select class="br-select" aria-label="摄像头权限">
-                    <option>始终允许</option>
-                    <option selected>始终询问</option>
-                    <option>始终阻止</option>
-                  </select>
-                </div>
-              </div>
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">位置</div>
-                  <div class="br-row-desc">网站请求位置信息时的默认行为</div>
-                </div>
-                <div class="br-row-value">
-                  <select class="br-select" aria-label="位置权限">
-                    <option selected>始终允许</option>
-                    <option>始终询问</option>
-                    <option>始终阻止</option>
-                  </select>
-                </div>
-              </div>
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">剪贴板</div>
-                  <div class="br-row-desc">网站请求读写剪贴板时的默认行为</div>
-                </div>
-                <div class="br-row-value">
-                  <select class="br-select" aria-label="剪贴板权限">
-                    <option>始终允许</option>
-                    <option selected>始终询问</option>
-                    <option>始终阻止</option>
-                  </select>
-                </div>
-              </div>
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label">允许 WebUSB</div>
-                  <div class="br-row-desc">允许网站通过 WebUSB 连接设备</div>
-                </div>
-                <div class="br-row-value">
-                  <label class="toggle"><input type="checkbox" id="brWebUsb" checked aria-label="允许 WebUSB"><span class="toggle-slider"></span></label>
-                </div>
-              </div>
-              <div class="br-row" style="border-bottom:none">
-                <div class="br-row-left">
-                  <div class="br-row-label">网站专属权限</div>
-                  <div class="br-row-desc">为特定网站单独配置权限</div>
-                </div>
-                <div class="br-row-value">
-                  <button class="br-add-btn" type="button">+ 添加</button>
-                </div>
-              </div>
-              <div class="br-site-empty">暂无网站专属权限</div>
-            </div>
-
-            <div class="br-section-title" style="margin-bottom:10px">开发者模式</div>
-            <div class="br-card">
-              <div class="br-row">
-                <div class="br-row-left">
-                  <div class="br-row-label br-dev-warn">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-                    启用完整 CDP 访问
-                  </div>
-                  <div class="br-row-desc">允许通过 Chrome DevTools Protocol 更深入地控制浏览器；可能带来安全风险</div>
-                </div>
-                <div class="br-row-value">
-                  <label class="toggle"><input type="checkbox" id="brCdp" checked aria-label="启用完整 CDP 访问"><span class="toggle-slider"></span></label>
+                  <button class="br-danger-btn" type="button" id="brClearAllData">清除全部</button>
                 </div>
               </div>
             </div>
           </div><!-- /browserPage -->
+
           <div class="gen-page" id="hooksPage">
             <div class="hk-page-title">钩子</div>
             <p class="hk-page-sub">通过配置和已具备的插件管理生命周期钩子。<a href="#">了解更多</a></p>
@@ -7148,7 +7161,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     '环境': '本地环境会告诉 CodexPro 如何为项目设置工作区',
     'Worktrees': '工作树根目录、清理与列表',
     '已归档的聊天': '查看、恢复或删除已归档聊天',
-    '浏览器': '管理内置浏览器与扩展程序',
+    '浏览器': '内置浏览器、安全与数据',
     '电脑操控': '管理 CodexPro 如何控制你电脑上的其他应用程序',
     '账户': '账户、收据与重置',
     '系统配置': '网关与运行时配置',
@@ -7168,8 +7181,13 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       pluginsPage.classList.remove('is-active');
       pluginsPage.style.display = 'none';
     }
-    var pluginsContent = document.querySelector('.plugins-content');
+    var pluginsContent = document.getElementById('pluginsListView') || document.querySelector('.plugins-content');
     if (pluginsContent) pluginsContent.style.display = '';
+    var mcpCreate = document.getElementById('mcpCreateView');
+    if (mcpCreate) {
+      mcpCreate.classList.remove('is-active');
+      mcpCreate.hidden = true;
+    }
     ['generalPage', 'modelsPage', 'genPage', 'appearancePage', 'importPage', 'voicePage', 'petsPage', 'personalizationPage', 'shortcutsPage', 'accountPage', 'computerControlPage', 'browserPage', 'hooksPage', 'connectionsPage', 'gitPage', 'environmentPage', 'worktreesPage', 'archivedChatsPage', 'adminSystemConfigPage', 'adminOverviewPage', 'adminSessionsPage', 'adminMemoryPage', 'adminKnowledgePage', 'adminChannelsPage', 'adminKanbanPage', 'adminLogsPage', 'adminAnalyticsPage'].forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) return;
@@ -7367,8 +7385,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       var kind = item.getAttribute('data-add');
       closeAddPluginMenu();
       if (kind === 'create-plugin') showProtoToast('创建插件（原型）');
-      else if (kind === 'add-market') showProtoToast('添加插件市场（原型）');
-      else if (kind === 'add-mcp') showProtoToast('添加 MCP 服务器（原型）');
+      else if (kind === 'add-market') openAddMarketModal();
+      else if (kind === 'add-mcp') openMcpCreateView();
     });
   }
   document.addEventListener('click', function (e) {
@@ -7377,6 +7395,303 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     if (wrap && wrap.contains(e.target)) return;
     closeAddPluginMenu();
   });
+
+  (function initMcpCreateView() {
+    var listView = document.getElementById('pluginsListView');
+    var createView = document.getElementById('mcpCreateView');
+    if (!createView) return;
+    var formPane = document.getElementById('mcpFormPane');
+    var jsonPane = document.getElementById('mcpJsonPane');
+    var jsonEditor = document.getElementById('mcpJsonEditor');
+    var scopeBtn = document.getElementById('mcpScopeBtn');
+    var scopeMenu = document.getElementById('mcpScopeMenu');
+    var scopeLabel = document.getElementById('mcpScopeLabel');
+    var envToggle = document.getElementById('mcpEnvToggle');
+    var envBody = document.getElementById('mcpEnvBody');
+    var nameInput = document.getElementById('mcpName');
+    var typeSelect = document.getElementById('mcpType');
+    var timeoutInput = document.getElementById('mcpTimeout');
+    var protocolSelect = document.getElementById('mcpProtocol');
+    var commandInput = document.getElementById('mcpCommand');
+    var argsInput = document.getElementById('mcpArgs');
+    var envInput = document.getElementById('mcpEnv');
+    var saveBtn = document.getElementById('mcpCreateSave');
+    var cancelBtn = document.getElementById('mcpCreateCancel');
+    var scopeWrap = document.getElementById('mcpScopeWrap');
+    var formTopRow = document.getElementById('mcpFormTopRow');
+    var jsonToolbar = document.getElementById('mcpJsonToolbar');
+    var scopeValue = '用户';
+
+    function closeScopeMenu() {
+      if (!scopeMenu) return;
+      scopeMenu.classList.remove('open');
+      scopeMenu.hidden = true;
+      if (scopeBtn) scopeBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    function placeScope(view) {
+      if (!scopeWrap) return;
+      if (view === 'json' && jsonToolbar) jsonToolbar.appendChild(scopeWrap);
+      else if (formTopRow) formTopRow.appendChild(scopeWrap);
+    }
+
+    function buildMcpConfig() {
+      var args = (argsInput && argsInput.value.trim())
+        ? argsInput.value.trim().split(/\s+/).filter(Boolean)
+        : [];
+      var env = {};
+      if (envInput && envInput.value.trim()) {
+        var raw = envInput.value.trim();
+        try {
+          var parsedEnv = JSON.parse(raw);
+          if (parsedEnv && typeof parsedEnv === 'object' && !Array.isArray(parsedEnv)) {
+            Object.keys(parsedEnv).forEach(function (k) {
+              env[k] = String(parsedEnv[k]);
+            });
+          }
+        } catch (err) {
+          raw.split(/\r?\n/).forEach(function (line) {
+            var idx = line.indexOf('=');
+            if (idx <= 0) return;
+            env[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+          });
+        }
+      }
+      var name = (nameInput && nameInput.value.trim()) || 'my-mcp-server';
+      var entry = {
+        type: (typeSelect && typeSelect.value) || 'stdio',
+        command: (commandInput && commandInput.value.trim()) || '',
+        args: args
+      };
+      if (timeoutInput && timeoutInput.value.trim()) {
+        entry.timeout_ms = Number(timeoutInput.value.trim()) || 30000;
+      }
+      if (protocolSelect && protocolSelect.value && protocolSelect.value !== 'auto') {
+        entry.protocol = protocolSelect.value;
+      }
+      if (Object.keys(env).length) entry.env = env;
+      return { name: name, scope: scopeValue, entry: entry };
+    }
+
+    function syncJsonFromForm() {
+      if (!jsonEditor) return;
+      var cfg = buildMcpConfig();
+      var doc = {};
+      doc[cfg.name] = cfg.entry;
+      jsonEditor.value = JSON.stringify(doc, null, 2);
+    }
+
+    function resetForm() {
+      if (nameInput) nameInput.value = '';
+      if (typeSelect) typeSelect.value = 'stdio';
+      if (timeoutInput) timeoutInput.value = '';
+      if (protocolSelect) protocolSelect.value = 'auto';
+      if (commandInput) commandInput.value = '';
+      if (argsInput) argsInput.value = '';
+      if (envInput) envInput.value = '';
+      scopeValue = '用户';
+      if (scopeLabel) scopeLabel.textContent = '用户';
+      if (scopeMenu) {
+        scopeMenu.querySelectorAll('.mcp-scope-item').forEach(function (item) {
+          var on = item.getAttribute('data-scope') === '用户';
+          item.classList.toggle('is-active', on);
+          item.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+      }
+      if (envToggle) {
+        envToggle.classList.remove('is-open');
+        envToggle.setAttribute('aria-expanded', 'false');
+      }
+      if (envBody) {
+        envBody.classList.remove('is-open');
+        envBody.hidden = true;
+      }
+      createView.querySelectorAll('[data-mcp-view]').forEach(function (btn) {
+        btn.classList.toggle('is-active', btn.getAttribute('data-mcp-view') === 'form');
+      });
+      if (formPane) formPane.classList.remove('is-hidden');
+      if (jsonPane) jsonPane.classList.remove('is-active');
+      placeScope('form');
+      syncJsonFromForm();
+      closeScopeMenu();
+    }
+
+    window.openMcpCreateView = function openMcpCreateView() {
+      resetForm();
+      if (listView) listView.style.display = 'none';
+      createView.hidden = false;
+      createView.classList.add('is-active');
+      setTimeout(function () { if (nameInput) nameInput.focus(); }, 0);
+    };
+
+    function closeMcpCreateView(opts) {
+      createView.classList.remove('is-active');
+      createView.hidden = true;
+      if (listView) listView.style.display = '';
+      placeScope('form');
+      closeScopeMenu();
+      if (opts && opts.switchToMcp) {
+        var mcpTab = document.querySelector('.skill-tabs .tab[data-tab="mcp"]');
+        if (mcpTab) mcpTab.click();
+      }
+    }
+
+    createView.querySelectorAll('[data-mcp-view]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var view = btn.getAttribute('data-mcp-view');
+        createView.querySelectorAll('[data-mcp-view]').forEach(function (b) {
+          b.classList.toggle('is-active', b === btn);
+        });
+        if (view === 'json') {
+          syncJsonFromForm();
+          if (formPane) formPane.classList.add('is-hidden');
+          if (jsonPane) jsonPane.classList.add('is-active');
+          placeScope('json');
+          closeScopeMenu();
+          setTimeout(function () { if (jsonEditor) jsonEditor.focus(); }, 0);
+        } else {
+          if (formPane) formPane.classList.remove('is-hidden');
+          if (jsonPane) jsonPane.classList.remove('is-active');
+          placeScope('form');
+          closeScopeMenu();
+        }
+      });
+    });
+
+    if (scopeBtn && scopeMenu) {
+      scopeBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = scopeMenu.classList.contains('open');
+        if (open) closeScopeMenu();
+        else {
+          scopeMenu.hidden = false;
+          scopeMenu.classList.add('open');
+          scopeBtn.setAttribute('aria-expanded', 'true');
+        }
+      });
+      scopeMenu.addEventListener('click', function (e) {
+        var item = e.target.closest('.mcp-scope-item');
+        if (!item) return;
+        e.stopPropagation();
+        scopeValue = item.getAttribute('data-scope') || '用户';
+        if (scopeLabel) scopeLabel.textContent = scopeValue;
+        scopeMenu.querySelectorAll('.mcp-scope-item').forEach(function (el) {
+          var on = el === item;
+          el.classList.toggle('is-active', on);
+          el.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        closeScopeMenu();
+      });
+      document.addEventListener('click', function (e) {
+        if (!scopeMenu.classList.contains('open')) return;
+        if (scopeBtn.contains(e.target) || scopeMenu.contains(e.target)) return;
+        closeScopeMenu();
+      });
+    }
+
+    if (envToggle && envBody) {
+      envToggle.addEventListener('click', function () {
+        var open = !envBody.classList.contains('is-open');
+        envToggle.classList.toggle('is-open', open);
+        envToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        envBody.classList.toggle('is-open', open);
+        envBody.hidden = !open;
+      });
+    }
+
+    if (cancelBtn) cancelBtn.addEventListener('click', function () { closeMcpCreateView(); });
+    if (saveBtn) {
+      saveBtn.addEventListener('click', function () {
+        var name = '';
+        if (jsonPane && jsonPane.classList.contains('is-active') && jsonEditor) {
+          try {
+            var parsed = JSON.parse(jsonEditor.value || '{}');
+            if (parsed && parsed.mcpServers && typeof parsed.mcpServers === 'object') parsed = parsed.mcpServers;
+            var keys = Object.keys(parsed || {});
+            name = keys[0] || '';
+          } catch (err) {
+            showProtoToast('JSON 格式无效');
+            return;
+          }
+        } else {
+          name = (nameInput && nameInput.value.trim()) || '';
+        }
+        if (!name) {
+          if (nameInput) nameInput.focus();
+          showProtoToast('请填写名称');
+          return;
+        }
+        closeMcpCreateView({ switchToMcp: true });
+        showProtoToast('已添加 MCP：' + name);
+      });
+    }
+  })();
+
+  (function initAddMarketModal() {
+    var modal = document.getElementById('plAddMarketModal');
+    if (!modal) return;
+    var source = document.getElementById('plMarketSource');
+    var ref = document.getElementById('plMarketRef');
+    var sparse = document.getElementById('plMarketSparse');
+    var closeBtn = document.getElementById('plAddMarketClose');
+    var cancelBtn = document.getElementById('plAddMarketCancel');
+    var submitBtn = document.getElementById('plAddMarketSubmit');
+    var learn = document.getElementById('plAddMarketLearn');
+    window.openAddMarketModal = function openAddMarketModal() {
+      if (source) source.value = '';
+      if (ref) ref.value = '';
+      if (sparse) sparse.value = '';
+      modal.hidden = false;
+      modal.classList.add('open');
+      setTimeout(function () { if (source) source.focus(); }, 0);
+    };
+    function closeAddMarketModal() {
+      modal.classList.remove('open');
+      modal.hidden = true;
+    }
+    if (closeBtn) closeBtn.addEventListener('click', closeAddMarketModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeAddMarketModal);
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeAddMarketModal();
+    });
+    if (learn) {
+      learn.addEventListener('click', function (e) {
+        e.preventDefault();
+        showProtoToast('插件市场说明（原型）');
+      });
+    }
+    if (submitBtn) {
+      submitBtn.addEventListener('click', function () {
+        var src = source ? source.value.trim() : '';
+        if (!src) {
+          if (source) source.focus();
+          showProtoToast('请填写来源');
+          return;
+        }
+        closeAddMarketModal();
+        showProtoToast('已添加市场：' + src);
+      });
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modal.classList.contains('open')) closeAddMarketModal();
+    });
+  })();
+
+  (function initBrowserSettingsPage() {
+    var clearCache = document.getElementById('brClearCache');
+    var clearAll = document.getElementById('brClearAllData');
+    if (clearCache) {
+      clearCache.addEventListener('click', function () {
+        showProtoToast('已清除内置浏览器缓存（原型）');
+      });
+    }
+    if (clearAll) {
+      clearAll.addEventListener('click', function () {
+        showProtoToast('已清除全部浏览器数据（原型）');
+      });
+    }
+  })();
+
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && addPluginMenu && addPluginMenu.classList.contains('open')) {
       e.preventDefault();

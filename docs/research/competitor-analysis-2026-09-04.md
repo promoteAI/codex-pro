@@ -99,7 +99,7 @@
 | 差距 | 优先级 | 说明 |
 |------|--------|------|
 | 专用代码 Agent 模式 | P0 | OpenDevin 的 SWE-agent 模式针对代码任务优化，有专门的 tool 集和 evaluation 流程 |
-| 浏览器自动化 | P1 | OpenDevin 有完整的浏览器控制能力，Codex-Pro 的 browser 工具较基础 |
+| 浏览器自动化 | P1 | OpenDevin 有完整的浏览器能力，Codex-Pro 的 browser 工具较基础 |
 | 多文件并行编辑 | P2 | OpenDevin 支持 diff-based 并行编辑，Codex-Pro 的 patch 工具是串行的 |
 
 **借鉴思路**:

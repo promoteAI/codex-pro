@@ -518,7 +518,7 @@ export function ConnectionsPage() {
 
 export function GitPage() {
   const { t } = useTranslation("settings");
-  const [prefix, setPrefix] = useState("codec/");
+  const [prefix, setPrefix] = useState("codex_pro");
   const [merge, setMerge] = useState("merge");
   const [force, setForce] = useState(false);
 

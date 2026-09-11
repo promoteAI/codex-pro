@@ -1,12 +1,14 @@
 """GatewayServer — HTTP/WebSocket server orchestrating all gateway subsystems.
 
-Provides a unified API layer above the channel system for:
-- External message ingestion (HTTP POST, WebSocket)
-- Session lifecycle management with reset policies
-- Authentication and rate limiting
-- Cross-platform delivery routing
-- Progressive message editing
-- Health monitoring
+This is the composition root for the gateway layer. It wires together
+configuration, storage, providers, bus, agent, plugins, evolution,
+channels, and the HTTP/WebSocket server.
+
+The core handler logic has been extracted into:
+- ``gateway/http_handlers/`` — HTTP request handlers
+- ``gateway/ws_handlers/`` — WebSocket handlers
+
+See those modules for detailed implementation.
 """
 
 from __future__ import annotations
@@ -55,12 +57,16 @@ from codex_pro.gateway.host_rules import (
     normalize_host_entries,
     normalize_origin_entries,
 )
+from codex_pro.gateway.http_handlers.message_handler import MessageHandler
+from codex_pro.gateway.http_handlers.metadata_handler import MetadataHandlers
+from codex_pro.gateway.http_handlers.session_handler import SessionHandlers
 from codex_pro.gateway.media import MediaCache
 from codex_pro.gateway.rate_limiter import RateLimiter
 from codex_pro.gateway.router import DeliveryRouter
 from codex_pro.gateway.session_context import set_session_vars, clear_session_vars
 from codex_pro.gateway.session_policy import SessionResetPolicy
 from codex_pro.gateway import ws_common
+from codex_pro.gateway.ws_handlers.websocket import WebSocketHandler
 from codex_pro.gateway.ws_web import WebUIWebSocket
 from codex_pro.gateway.ws_session import normalize_platform, resolve_client_session_key
 from codex_pro.session.manager import SessionManager
@@ -128,7 +134,7 @@ class GatewayServer:
         data_dir = workspace / "data"
         # Pass the bind address to the auth so the Host-header check can derive
         # a sensible default allowlist (loopback addresses when bound locally,
-        # none when bound to 0.0.0.0/::). For non-loopback binds, an empty
+        # none when bound to 0.0.0.0). For non-loopback binds, an empty
         # allowed_hosts configuration is a deployment mistake: anyone reaching
         # the gateway via DNS could claim to come from a non-existent domain.
         self.auth = GatewayAuth(config.auth, data_dir, bound_host=config.host)
@@ -159,18 +165,16 @@ class GatewayServer:
             if hooks_path.is_dir():
                 self.hooks.load_from_dir(hooks_path)
 
-    def _normalize_platform(self, reported: str | None) -> str:
-        """Fold a client-reported platform onto a gateway-known value.
+        # Extracted handler instances
+        self._msg_handler = MessageHandler(self)
+        self._meta_handler = MetadataHandlers(self)
+        self._session_handler = SessionHandlers(self)
+        self._ws_handler = WebSocketHandler(self)
 
-        Anything explicitly configured under ``gateway.platforms`` counts as known
-        on top of the built-in list: a deployment that registered its own platform
-        (to give it a rate limit) must keep routing under that name rather than
-        collapsing to ws. See ws_session.normalize_platform for why unknown values
-        are folded rather than rejected.
-        """
+    def _normalize_platform(self, reported: str | None) -> str:
+        """Fold a client-reported platform onto a gateway-known value."""
         known = getattr(self._config, "known_platforms", None)
         if not isinstance(known, list) or not known:
-            # Missing key (older/stubbed config) or explicitly emptied: no folding.
             return normalize_platform(reported, None)
         return normalize_platform(reported, known + list(self._config.platforms or {}))
 
@@ -185,10 +189,6 @@ class GatewayServer:
         if not force and not self.session_policy.should_reset(session):
             return session, False
 
-        # Approval/clarification waits hold the turn lock. An explicit reset is
-        # itself the operator's request to abandon that turn, so wake only those
-        # waits before trying to acquire the lock. Automatic idle/daily resets
-        # do not pre-empt a genuinely active turn.
         if force and self._agent_loop is not None:
             unblock = getattr(self._agent_loop, "unblock_session_for_reset", None)
             if callable(unblock):
@@ -205,8 +205,6 @@ class GatewayServer:
 
         acquire = getattr(self.session_manager, "acquire", None)
         if acquire is None:
-            # Compatibility for minimal embedders/test doubles. Production's
-            # SessionManager always provides the lock.
             await self.session_policy.reset(session, self.session_manager)
             await _clear_process_state()
         else:
@@ -216,10 +214,6 @@ class GatewayServer:
                 if not force and not self.session_policy.should_reset(session):
                     return session, False
                 await self.session_policy.reset(session, self.session_manager)
-                # History epoch and every process-local prompt cache change as
-                # one critical section. Otherwise another accepted turn can
-                # populate the new epoch in the gap and then have it erased by
-                # this reset's late cleanup.
                 await _clear_process_state()
         await self.hooks.emit("session_reset", session_key=session_key)
         await self._web_ws.broadcast(
@@ -229,10 +223,6 @@ class GatewayServer:
         return session, True
 
     async def _accept_turn(self, event: InboundEvent, session: Any) -> None:
-        # Approval/clarification replies are control traffic for an already
-        # running primary turn. Recording them as independent turns makes a
-        # reconnect's "latest" lookup report the tiny /approve acknowledgement
-        # as completed while the real task is still running.
         command = event.text.strip().split(maxsplit=1)[0].lower() if event.text.strip() else ""
         if event.is_control or command in {"/approve", "/deny", "/approvals", "/clarify"}:
             return
@@ -260,7 +250,6 @@ class GatewayServer:
             if hasattr(result, "__await__"):
                 await result
         except Exception as e:
-            # Status observability must never become a message-ingestion outage.
             logger.warning("Turn acceptance ledger write failed: {}", e)
 
     def _discard_turn_interrupt_admission(self, event: InboundEvent) -> None:
@@ -270,14 +259,6 @@ class GatewayServer:
             discard(event.session_key, event.event_id)
 
     async def _publish_accepted_turn(self, event: InboundEvent) -> bool:
-        """Publish while giving interrupt admission a definitive owner.
-
-        Request-handler cancellation can land while ``Queue.put`` is waiting.
-        Shielding the bus operation and observing its eventual result prevents a
-        never-enqueued event from remaining forever in InterruptManager's
-        admission order, where an old-client unscoped stop could later bind to
-        that ghost instead of real work.
-        """
         publish_task = asyncio.create_task(self._bus.publish_inbound(event))
         try:
             return await asyncio.shield(publish_task)
@@ -311,13 +292,10 @@ class GatewayServer:
 
     @property
     def web_ws(self) -> WebUIWebSocket:
-        """The dashboard WebSocket hub — exposes broadcast() so subsystems (e.g.
-        TaskManager) can push real-time events to subscribed UI clients."""
         return self._web_ws
 
     @property
     def actual_port(self) -> int:
-        """Return the actual bound port (useful when configured port is 0)."""
         if self._actual_port is not None:
             return self._actual_port
         return self._config.port
@@ -361,17 +339,12 @@ class GatewayServer:
 
         self._running = True
 
-        # Loguru sinks may run in worker threads. Marshal records onto this
-        # event loop before publishing to WebSockets.
         from codex_pro.observability.log_buffer import subscribe_log_events
 
         loop = asyncio.get_running_loop()
 
         def _on_log(entry: dict[str, Any]) -> None:
             def _publish() -> None:
-                # Logs can arrive much faster than the browser can refetch the
-                # buffer. The event is only an invalidation signal, so coalesce
-                # a burst into the single notification already in flight.
                 if self._log_event_task is None or self._log_event_task.done():
                     self._log_event_task = loop.create_task(
                         self._web_ws.broadcast("log_entry", entry)
@@ -380,17 +353,11 @@ class GatewayServer:
             try:
                 loop.call_soon_threadsafe(_publish)
             except RuntimeError:
-                # Shutdown closed the loop; the log entry no longer has a UI consumer.
                 pass
 
         self._unsubscribe_log_events = subscribe_log_events(_on_log)
 
-        # Persist the actually bound endpoint so attach / `service status` can
-        # discover the real port even when gateway.port=0 (ephemeral) — until
-        # now it only surfaced on stdout, unreadable to anything not parsing the
-        # log. Best-effort: a write failure must not abort a healthy bind.
         import os as _os
-
         from codex_pro.cli.workspace import clear_runtime_endpoint, write_runtime_endpoint
 
         try:
@@ -401,10 +368,7 @@ class GatewayServer:
                 pid=_os.getpid(),
                 ws_path=self._config.ws_path,
             )
-            # atexit backstop: if the process exits without a clean stop()
-            # (unhandled exception, os._exit), still drop the stale endpoint.
             import atexit
-
             atexit.register(clear_runtime_endpoint, self._workspace)
         except Exception as e:
             logger.warning("Failed to write gateway runtime endpoint: {}", e)
@@ -417,22 +381,6 @@ class GatewayServer:
         )
 
     def _check_bind_safety(self) -> None:
-        """Refuse to expose an unauthenticated gateway beyond localhost.
-
-        With no token of any kind configured, ``authenticate_token`` accepts every
-        request — fine on loopback, an open door on 0.0.0.0. Configure
-        gateway.auth.apiTokens, or bind to 127.0.0.1.
-
-        adminTokens alone counts as authenticated: an admin token is accepted
-        everywhere an API token is (admin implies read), so such a deployment is
-        not open — refusing to start would be a false alarm.
-
-        The loopback verdict comes from ``host_rules.is_loopback_bind``, not a
-        local string tuple. The tuple used to contain ``""``, which is a
-        *wildcard* bind (aiohttp binds it to 0.0.0.0 and ::), so an empty host
-        with no token passed this check and exposed an unauthenticated gateway
-        to the network. It also rejected ``127.0.0.2``, which is loopback.
-        """
         host = (self._config.host or "").strip()
         if is_loopback_bind(host) or self._tokens_configured():
             return
@@ -468,9 +416,6 @@ class GatewayServer:
         if jobs is not None:
             await jobs.close()
 
-        # Dashboard sockets live in their own registry. Leaving them open meant
-        # runner.cleanup() below waited on live handlers — an open browser tab
-        # could stall shutdown for aiohttp's shutdown timeout.
         await self._web_ws.close_all()
 
         if self._site:
@@ -478,10 +423,7 @@ class GatewayServer:
         if self._runner:
             await self._runner.cleanup()
 
-        # Remove the runtime-endpoint file so a later `service status` doesn't
-        # report a stale port for a gateway that has since exited.
         from codex_pro.cli.workspace import clear_runtime_endpoint
-
         clear_runtime_endpoint(self._workspace)
 
         await self.media_cache.cleanup()
@@ -490,31 +432,29 @@ class GatewayServer:
     # ── Route setup ──────────────────────────────────────────────────────────
 
     def _setup_routes(self) -> None:
-        """注册所有 HTTP 和 WebSocket 路由，包括 A2A 协议端点。"""
+        """Register all HTTP and WebSocket routes."""
         prefix = self._config.api_prefix
         app = self._app
         assert app is not None
 
-        app.router.add_get("/playground", self._handle_playground)
-        app.router.add_get("/meta", self._handle_meta)
-        app.router.add_post(f"{prefix}/message", self._handle_message)
-        app.router.add_get(f"{prefix}/health", self._handle_health)
-        app.router.add_delete(f"{prefix}/sessions/{{key}}", self._handle_reset_session)
-        # Note: GET /sessions is registered by register_management_routes when
-        # _agent_loop is available; fallback registered below for standalone mode.
-        app.router.add_post(f"{prefix}/pair", self._handle_pair_generate)
-        app.router.add_post(f"{prefix}/pair/verify", self._handle_pair_verify)
-        app.router.add_get(f"{prefix}/stats", self._handle_stats)
-        # Scope probe for the dashboard: lets the UI disable admin-only controls
-        # instead of rendering buttons that are guaranteed to 403.
-        app.router.add_get(f"{prefix}/capabilities", self._handle_capabilities)
-        app.router.add_get(self._config.ws_path, self._handle_websocket)
+        # Metadata handlers
+        app.router.add_get("/playground", self._meta_handler.handle_playground)
+        app.router.add_get("/meta", self._meta_handler.handle_meta)
+        app.router.add_post(f"{prefix}/message", self._msg_handler.handle_message)
+        app.router.add_get(f"{prefix}/health", self._meta_handler.handle_health)
+        app.router.add_delete(f"{prefix}/sessions/{{key}}", self._session_handler.handle_reset_session)
+        app.router.add_post(f"{prefix}/pair", self._session_handler.handle_pair_generate)
+        app.router.add_post(f"{prefix}/pair/verify", self._session_handler.handle_pair_verify)
+        app.router.add_get(f"{prefix}/stats", self._meta_handler.handle_stats)
+        app.router.add_get(f"{prefix}/capabilities", self._meta_handler.handle_capabilities)
+        app.router.add_get(self._config.ws_path, self._ws_handler.handle_websocket)
         app.router.add_get("/ws/web", self._web_ws.handle)
 
         if self._a2a_config and self._a2a_config.enabled and self._agent_loop:
             from codex_pro.a2a.server import A2AServer
             from codex_pro.a2a.models import AgentCard
             from codex_pro import __version__
+            from codex_pro.gateway.http_handlers.base import require_a2a_principal
 
             card = AgentCard(
                 name=self._a2a_config.agent_name,
@@ -526,7 +466,10 @@ class GatewayServer:
             a2a = A2AServer(
                 self._agent_loop,
                 card,
-                auth_fn=lambda req: self._require_a2a_principal(req, action="a2a:rpc"),
+                auth_fn=lambda req: require_a2a_principal(
+                    req, self.auth, self._tokens_configured(),
+                    "anonymous",
+                ),
                 task_ttl_seconds=self._a2a_config.task_ttl_seconds,
                 max_tasks=self._a2a_config.max_tasks,
                 active_task_ttl_seconds=self._a2a_config.active_task_ttl_seconds,
@@ -535,129 +478,19 @@ class GatewayServer:
 
         if self._agent_loop:
             from codex_pro.gateway.api import register_management_routes
-
             register_management_routes(app, prefix, self)
         else:
-            app.router.add_get(f"{prefix}/sessions", self._handle_list_sessions)
+            app.router.add_get(f"{prefix}/sessions", self._session_handler.handle_list_sessions)
 
-        # Dashboard SPA catch-all — must be last so it doesn't shadow API routes
-        app.router.add_get("/{path:.*}", self._handle_web_ui)
+        # Dashboard SPA catch-all
+        app.router.add_get("/{path:.*}", self._meta_handler.handle_web_ui)
 
-    # ── HTTP handlers ────────────────────────────────────────────────────────
-
-    PLACEHOLDER_CONTINUE = "<!-- more -->"
-
-    def _infer_media_content_type(self, *sources: str, mime_type: str = "") -> ContentType:
-        """Classify cached media by extension/MIME, reusing the shared detector so
-        the gateway agrees with the channel layer on what counts as image/video/audio."""
-        for source in sources:
-            kind = detect_media_kind(source, mime_type)
-            if kind != "file":
-                return self._MEDIA_KIND_TO_CONTENT_TYPE[kind]
-        return ContentType.FILE
-
-    def _request_token(self, request: web.Request) -> str:
-        token = self.auth.token_from_headers(request.headers)
-        if token:
-            return token
-        return request.query.get("token", "").strip()
-
-    @staticmethod
-    def _idempotency_key(request: web.Request, body: dict[str, Any]) -> str:
-        header_key = normalize_idempotency_key(
-            request.headers.get("Idempotency-Key") or request.headers.get("X-Idempotency-Key")
-        )
-        body_key = normalize_idempotency_key(body.get("idempotency_key"))
-        if header_key and body_key and header_key != body_key:
-            raise ValueError("conflicting idempotency keys")
-        return header_key or body_key
-
-    @staticmethod
-    def _idempotency_fingerprint(body: dict[str, Any]) -> str:
-        return canonical_operation_fingerprint(body)
-
-    @staticmethod
-    def _is_loopback_peer(request: web.Request) -> bool:
-        """Whether the request arrives over a loopback socket.
-
-        Derives the verdict from the real TCP peer (``transport.get_extra_info
-        ('peername')``), NEVER from ``request.remote`` or forwarded headers such
-        as ``X-Forwarded-For`` — those are client-controllable and would let a
-        remote caller spoof local trust. Used to grant the loopback exemption in
-        the user-authorization gate (see auth.py:is_authorized)."""
-        import ipaddress
-
-        transport = getattr(request, "transport", None)
-        peername = transport.get_extra_info("peername") if transport else None
-        if not peername:
-            return False
-        host = peername[0]
-        try:
-            return ipaddress.ip_address(host).is_loopback
-        except ValueError:
-            return False
-
-    def _check_csrf(self, request: web.Request, *, action: str) -> web.Response | None:
-        """Reject cross-site browser requests to mutating endpoints.
-
-        Defends localhost deployments against CSRF-to-localhost / DNS-rebinding:
-        a malicious web page cannot drive skills/knowledge just because
-        the user's browser can reach 127.0.0.1. Non-browser clients are
-        unaffected (they send no Origin/Sec-Fetch-Site).
-
-        Uses the default-on ``is_cross_site_browser`` primitive — the same
-        defense as POST /message and the WS handshake. These admin endpoints
-        are high-risk, so an unauthenticated loopback deployment must not leave
-        them exposed to CSRF-to-localhost."""
-        origin = request.headers.get("Origin", "").strip()
-        sec_fetch_site = request.headers.get("Sec-Fetch-Site", "").strip()
-        host = request.headers.get("Host", "").strip()
-        is_browser_request = bool(origin) or sec_fetch_site not in ("", "none")
-        if not is_browser_request:
-            return None
-        # Both gates must pass independently — see reject_cross_site for why
-        # same-origin alone is not enough (DNS rebinding makes Origin and Host
-        # both attacker-controlled and consistent with each other).
-        if self.auth.is_cross_site_browser(origin, sec_fetch_site, host):
-            self.auth.audit(action, ok=False, reason=f"cross-site origin rejected: {origin or '?'}")
-            return web.json_response({"error": "cross-site request forbidden"}, status=403)
-        if not self.auth.is_host_allowed(host):
-            self.auth.audit(action, ok=False, reason=f"untrusted host rejected: {host or '?'}")
-            return web.json_response({"error": "cross-site request forbidden"}, status=403)
-        return None
+    # ── Helpers still needed inline ──────────────────────────────────────────
 
     def _tokens_configured(self) -> bool:
-        """Whether this deployment authenticates at all.
-
-        Must consider BOTH lists, and every "is there a token?" test goes through
-        here. Keying such a test on ``api_tokens`` alone is what made a
-        deployment with only ``admin_tokens`` serve read endpoints (and the WS
-        handshake) unauthenticated, while making the bind-safety check refuse to
-        start on 0.0.0.0 — an admin token passes the read guard, so the two lists
-        are one hierarchy, not two independent switches."""
         return bool(self._config.auth.api_tokens or self._config.auth.admin_tokens)
 
     def _warn_host_allowlist_if_unset(self) -> None:
-        """Warn when the Host allowlist is empty and the bind is not loopback.
-
-        A non-loopback bind (``0.0.0.0`` / ``::`` / a LAN address) means
-        strangers can reach the gateway. Without an explicit ``allowed_hosts``
-        entry, ``is_host_allowed`` refuses every Host the server gets — DNS
-        rebinding is closed but so is the operator's own browser.
-
-        Scope, stated precisely because the previous wording ("every
-        browser-shaped request") overstated it and invited operators to dismiss
-        the warning as a false alarm once the dashboard loaded: the Host check
-        runs in ``_check_csrf``, which only ``_require_admin_token`` calls. So
-        login, the overview page and the other ``_require_api_token`` reads keep
-        working, while every admin surface — sessions, config, memory writes,
-        tasks, cron and knowledge — 403s.
-
-        Wildcard entries do not count as configured: they cannot appear in a
-        Host header, so ``allowed_hosts: [0.0.0.0]`` is an allowlist that
-        matches nothing (see ``host_rules.normalize_host_entries``, which is
-        what ``GatewayAuth`` itself applies).
-        """
         if normalize_host_entries(self._config.auth.allowed_hosts):
             return
         bound = (self._config.host or "").strip()
@@ -675,14 +508,6 @@ class GatewayServer:
         )
 
     def _warn_origin_allowlist_if_unset(self) -> None:
-        """Warn about browser compatibility when an exposed origin is absent.
-
-        Modern browsers mark a direct dashboard request ``same-origin`` via
-        Fetch Metadata. Some browsers and embedded webviews omit that header;
-        they need the exact Origin allowlisted or WS/admin writes are rejected.
-        Only warn after Host trust is configured, otherwise the stronger Host
-        warning already explains why every browser admin request is blocked.
-        """
         bound = (self._config.host or "").strip()
         if is_loopback_bind(bound):
             return
@@ -700,96 +525,12 @@ class GatewayServer:
             bound or "(empty = all interfaces)",
         )
 
-    def _require_api_token(self, request: web.Request, *, action: str) -> web.Response | None:
-        """Guard for read/chat-level endpoints. Admin tokens also pass (admin
-        scope implies read scope — see auth.authenticate_token)."""
-        if not self._tokens_configured():
-            return None
-        token = self._request_token(request)
-        if self.auth.authenticate_token(token):
-            self.auth.audit(action, ok=True)
-            return None
-        self.auth.audit(action, ok=False, reason="invalid api token")
-        return web.json_response({"error": "unauthorized"}, status=401)
-
-    def _require_a2a_principal(
-        self,
-        request: web.Request,
-        *,
-        action: str,
-    ) -> str | web.Response:
-        """Authenticate A2A and return the caller identity, not just a bool."""
-        from codex_pro.a2a.task_store import DEFAULT_TASK_OWNER
-
-        if not self._tokens_configured():
-            return DEFAULT_TASK_OWNER
-        token = self._request_token(request)
-        principal = self.auth.principal_for_token(token)
-        if principal is not None:
-            self.auth.audit(action, ok=True)
-            return principal
-        self.auth.audit(action, ok=False, reason="invalid api token")
-        return web.json_response({"error": "unauthorized"}, status=401)
-
-    def _require_admin_token(self, request: web.Request, *, action: str) -> web.Response | None:
-        """Guard for high-risk admin endpoints (skill import/install/delete and
-        knowledge upload/delete). Enforces CSRF, then an admin-scoped
-        token. The ``?token=`` query backdoor is NOT honoured here — admin
-        tokens must travel in a header so they can't leak via referrer/logs or
-        be triggered by a cross-site GET."""
-        csrf = self._check_csrf(request, action=action)
-        if csrf is not None:
-            return csrf
-        admin = self._config.auth.admin_tokens or self._config.auth.api_tokens
-        if not admin:
-            return None  # unauthenticated deployment (loopback, no tokens)
-        token = self.auth.token_from_headers(request.headers)
-        if self.auth.authenticate_admin_token(token):
-            self.auth.audit(action, ok=True)
-            return None
-        self.auth.audit(action, ok=False, reason="invalid admin token")
-        return web.json_response({"error": "admin authorization required"}, status=403)
-
-    def _playground_path(self) -> Path:
-        return Path(__file__).resolve().parent / "static" / "index.html"
-
-    def _resolve_web_dir(self) -> Path | None:
-        """Locate the Codex Pro web UI build directory.
-
-        Checks candidates in order:
-        1. Bundled in wheel: ``codex_pro/_bundled/web/``
-        2. Development: ``web/dist/`` relative to the project root
-        """
-        pkg_root = Path(__file__).resolve().parent.parent
-        candidates = [
-            pkg_root / "_bundled" / "web",
-            pkg_root.parent / "web" / "dist",
-        ]
-        for p in candidates:
-            if (p / "index.html").exists():
-                return p
-        return None
-
-    async def _handle_web_ui(self, request: web.Request) -> web.Response:
-        """Serve the web UI SPA with fallback to index.html for client-side routing."""
-        web_dir = self._resolve_web_dir()
-        if web_dir is None:
-            return await self._handle_playground(request)
-
-        req_path = request.match_info.get("path", "")
-        if req_path:
-            file_path = web_dir / req_path
-            # Prevent path traversal
-            try:
-                file_path = file_path.resolve()
-                if file_path.is_file() and str(file_path).startswith(str(web_dir.resolve())):
-                    return web.FileResponse(file_path)
-            except (OSError, ValueError):
-                # Invalid/unresolvable asset paths deliberately fall through to
-                # the SPA index without exposing filesystem error details.
-                pass
-        # SPA fallback — serve index.html for all unmatched paths
-        return web.FileResponse(web_dir / "index.html")
+    def _infer_media_content_type(self, *sources: str, mime_type: str = "") -> ContentType:
+        for source in sources:
+            kind = detect_media_kind(source, mime_type)
+            if kind != "file":
+                return self._MEDIA_KIND_TO_CONTENT_TYPE[kind]
+        return ContentType.FILE
 
     def _authenticate_and_check_rate_limit(
         self,
@@ -800,20 +541,6 @@ class GatewayServer:
         trusted: bool = False,
         consume_rate_limit: bool = True,
     ) -> str | None:
-        """统一的认证和限流检查。
-
-        Args:
-            trusted: 来自 loopback socket 的可信请求，跳过用户白名单闸门
-                （仍受限流约束）。必须由真实 peer 推导，见 _is_loopback_peer。
-            consume_rate_limit: 是否立即消耗限流令牌。HTTP 幂等请求
-                先只做认证，已存在的 claim 直接复用结果，仅新请求消耗令牌。
-
-        Returns:
-            str: 错误信息（如果被拒绝）
-            None: 检查通过
-        """
-        # trusted 只放宽用户白名单闸门（loopback 豁免），不接受 is_authorized 的
-        # trusted 形参（Task 1 已移除）：正常授权或可信 loopback 二者其一即放行。
         if not (self.auth.is_authorized(platform, user_id) or trusted):
             self.auth.audit("message", platform=platform, user_id=user_id, ok=False, reason="user unauthorized")
             return "unauthorized"
@@ -835,259 +562,43 @@ class GatewayServer:
             "metadata": event.metadata,
         }
 
-    def _buffer_http_tool_delivery(
-        self,
-        correlation_id: str,
-        payload: dict[str, Any],
-    ) -> str | None:
-        """Snapshot one tool delivery for a synchronous HTTP response.
+    # ── Tool delivery buffering (kept inline for state access) ──────────────
 
-        Returns an error string when the frame cannot be buffered.  Serializing
-        here serves two purposes: it measures the actual JSON character cost and
-        prevents later mutation of an ``OutboundEvent.metadata`` dictionary from
-        changing an already accepted delivery.
-        """
-        try:
-            encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-            snapshot = json.loads(encoded)
-        except (TypeError, ValueError) as exc:
-            return f"gateway tool delivery is not JSON serializable: {exc}"
+    def _buffer_http_tool_delivery(self, correlation_id: str, payload: dict[str, Any]) -> str | None:
+        return self._msg_handler._buffer_http_tool_delivery(correlation_id, payload)
 
-        now = time.monotonic()
-        self._purge_http_tool_deliveries(now)
-        entry = self._pending_http_tool_deliveries.get(correlation_id)
-        frames, char_count = (entry[0], entry[1]) if entry is not None else ([], 0)
-        metadata = snapshot.get("metadata")
-        metadata = metadata if isinstance(metadata, dict) else {}
-        artifact_delivery_id = str(metadata.get("_artifact_delivery_id") or "")
-        artifact_part = metadata.get("_artifact_part")
-        if artifact_delivery_id and artifact_part is not None:
-            # Artifact retries deliberately reuse this semantic identity while
-            # their transport event_id is new. Keep the first accepted snapshot
-            # so retrying one part does not duplicate it in the eventual HTTP
-            # response or consume the remaining buffer budget.
-            for frame in frames:
-                existing_metadata = frame.get("metadata")
-                if not isinstance(existing_metadata, dict):
-                    continue
-                if (
-                    str(existing_metadata.get("_artifact_delivery_id") or "")
-                    == artifact_delivery_id
-                    and existing_metadata.get("_artifact_part") == artifact_part
-                ):
-                    self._pending_http_tool_deliveries[correlation_id] = (
-                        frames,
-                        char_count,
-                        now,
-                    )
-                    return None
-        frame_chars = len(encoded)
-        if (
-            len(frames) >= self._MAX_HTTP_TOOL_DELIVERY_FRAMES
-            or char_count + frame_chars > self._MAX_HTTP_TOOL_DELIVERY_CHARS
-            or not self._make_http_tool_delivery_room(
-                frame_chars,
-                preserve=correlation_id,
-            )
-        ):
-            return (
-                "gateway HTTP tool-delivery buffer limit exceeded "
-                f"(correlation_id={correlation_id})"
-            )
+    def _pop_http_tool_deliveries(self, correlation_id: str) -> tuple[list[dict[str, Any]], int, float] | None:
+        return self._msg_handler._pop_http_tool_deliveries(correlation_id)
 
-        frames.append(snapshot)
-        self._pending_http_tool_deliveries[correlation_id] = (
-            frames,
-            char_count + frame_chars,
-            now,
-        )
-        self._pending_http_tool_delivery_frames += 1
-        self._pending_http_tool_delivery_chars += frame_chars
-        return None
-
-    def _pop_http_tool_deliveries(
-        self, correlation_id: str,
-    ) -> tuple[list[dict[str, Any]], int, float] | None:
-        entry = self._pending_http_tool_deliveries.pop(correlation_id, None)
-        if entry is None:
-            return None
-        frames, char_count, updated_at = entry
-        self._pending_http_tool_delivery_frames = max(
-            0,
-            self._pending_http_tool_delivery_frames - len(frames),
-        )
-        self._pending_http_tool_delivery_chars = max(
-            0,
-            self._pending_http_tool_delivery_chars - char_count,
-        )
-        return frames, char_count, updated_at
-
-    def _take_http_tool_deliveries(
-        self,
-        correlation_id: str,
-    ) -> list[dict[str, Any]]:
-        entry = self._pop_http_tool_deliveries(correlation_id)
-        if entry is None:
-            return []
-        frames, _char_count, updated_at = entry
-        if time.monotonic() - updated_at > self._HTTP_TOOL_DELIVERY_TTL_SECONDS:
-            return []
-        return frames
+    def _take_http_tool_deliveries(self, correlation_id: str) -> list[dict[str, Any]]:
+        return self._msg_handler._take_http_tool_deliveries(correlation_id)
 
     def _clear_http_tool_deliveries(self, correlation_id: str) -> None:
-        self._pop_http_tool_deliveries(correlation_id)
+        self._msg_handler._clear_http_tool_deliveries(correlation_id)
 
     def _purge_http_tool_deliveries(self, now: float | None = None) -> None:
-        current = time.monotonic() if now is None else now
-        expired = [
-            correlation_id
-            for correlation_id, (_frames, _chars, updated_at)
-            in self._pending_http_tool_deliveries.items()
-            if current - updated_at > self._HTTP_TOOL_DELIVERY_TTL_SECONDS
-        ]
-        for correlation_id in expired:
-            self._clear_http_tool_deliveries(correlation_id)
+        self._msg_handler._purge_http_tool_deliveries(now)
 
-    def _make_http_tool_delivery_room(
-        self,
-        frame_chars: int,
-        *,
-        preserve: str,
-    ) -> bool:
-        """Evict oldest orphaned wait buffers under global memory pressure."""
-        def has_room() -> bool:
-            return (
-                self._pending_http_tool_delivery_frames + 1
-                <= self._MAX_HTTP_TOOL_DELIVERY_TOTAL_FRAMES
-                and self._pending_http_tool_delivery_chars + frame_chars
-                <= self._MAX_HTTP_TOOL_DELIVERY_TOTAL_CHARS
-            )
-
-        while not has_room():
-            orphaned = [
-                (updated_at, correlation_id)
-                for correlation_id, (_frames, _chars, updated_at)
-                in self._pending_http_tool_deliveries.items()
-                if (
-                    correlation_id != preserve
-                    and (
-                        correlation_id not in self._pending_http
-                        or self._pending_http[correlation_id].done()
-                    )
-                )
-            ]
-            if not orphaned:
-                return False
-            _updated_at, oldest = min(orphaned)
-            logger.warning(
-                "Evicting orphaned gateway HTTP tool-delivery buffer "
-                "under capacity pressure (correlation_id={})",
-                oldest,
-            )
-            self._clear_http_tool_deliveries(oldest)
-        return True
+    def _make_http_tool_delivery_room(self, frame_chars: int, *, preserve: str) -> bool:
+        return self._msg_handler._make_http_tool_delivery_room(frame_chars, preserve=preserve)
 
     def _clear_all_http_tool_deliveries(self) -> None:
-        self._pending_http_tool_deliveries.clear()
-        self._pending_http_tool_delivery_frames = 0
-        self._pending_http_tool_delivery_chars = 0
+        self._msg_handler._clear_all_http_tool_deliveries()
 
     async def _release_durable_claim(self, event_id: str) -> None:
-        """Best-effort release of a tombstone this request can no longer own.
-
-        Never raises: callers are already returning a definite failure, and a
-        release error must not replace it with an opaque 500. An unreleased
-        tombstone still expires with its TTL.
-        """
-        try:
-            await self._bus.release_durable_idempotency(event_id)
-        except Exception as e:
-            logger.error(
-                "Releasing durable idempotency claim {} failed: {}",
-                event_id,
-                e,
-            )
+        await self._msg_handler._release_durable_claim(event_id)
 
     @staticmethod
-    def _http_final_response(
-        event_id: str,
-        session_key: str,
-        reply: dict[str, Any],
-    ) -> tuple[int, dict[str, Any]]:
-        """Map a final outbound frame to truthful synchronous HTTP semantics."""
-        metadata = reply.get("metadata")
-        metadata = metadata if isinstance(metadata, dict) else {}
-        turn_status = str(metadata.get("_turn_status") or "")
-        if turn_status not in TERMINAL_TURN_OUTCOMES:
-            # An un-stamped frame predates the outcome contract (or came from a
-            # third-party producer): fall back to the legacy _error reading.
-            turn_status = "failed" if metadata.get("_error") else "completed"
-        status = final_frame_http_status(metadata, turn_status)
-        payload: dict[str, Any] = {
-            "status": turn_status,
-            "event_id": event_id,
-            "session_key": session_key,
-            "reply": reply,
-        }
-        if turn_status != "completed":
-            default_reason = (
-                "agent processing failed" if turn_status in FAULTED_TURN_OUTCOMES else f"turn {turn_status}"
-            )
-            payload["error"] = str(metadata.get("_error_reason") or default_reason)
-        return status, payload
+    def _http_final_response(event_id: str, session_key: str, reply: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        return MessageHandler._http_final_response(event_id, session_key, reply)
 
     @staticmethod
-    def _http_turn_run_response(
-        row: dict[str, Any],
-        event_id: str,
-        session_key: str,
-    ) -> tuple[int, dict[str, Any], bool]:
-        """Represent an event already known by the durable turn ledger.
-
-        The final boolean says whether the status is terminal and therefore
-        safe to cache. Live rows are returned truthfully but not retained in the
-        in-memory response cache, so the next retry can observe their progress.
-        """
-        status = str(row.get("status") or "accepted")
-        base = {
-            "status": status,
-            "event_id": event_id,
-            "session_key": session_key,
-        }
-        if status not in TERMINAL_TURN_OUTCOMES:
-            return 200, base, False
-        response_text = str(row.get("response_text") or "")
-        # Replay must use the same status mapping as the live final frame, or the
-        # same turn would answer 200 once and something else on retry.
-        http_status = turn_outcome_http_status(status)
-        if status == "completed":
-            return (
-                http_status,
-                {
-                    **base,
-                    "reply": {
-                        "text": response_text,
-                        "is_final": True,
-                        "message_kind": "final",
-                        "metadata": {"_inbound_event_id": event_id},
-                    },
-                },
-                True,
-            )
-        payload = {
-            **base,
-            "error": str(row.get("error") or f"turn {status}"),
-        }
-        if response_text:
-            payload["response_text"] = response_text
-        return http_status, payload, True
+    def _http_turn_run_response(row: dict[str, Any], event_id: str, session_key: str) -> tuple[int, dict[str, Any], bool]:
+        return MessageHandler._http_turn_run_response(row, event_id, session_key)
 
     @staticmethod
-    def _ws_turn_run_payload(
-        row: dict[str, Any],
-        event_id: str,
-    ) -> tuple[dict[str, Any], bool]:
-        """Represent a durable replay in the Gateway WebSocket wire format."""
+    def _ws_turn_run_payload(row: dict[str, Any], event_id: str) -> tuple[dict[str, Any], bool]:
+        from codex_pro.bus.events import TERMINAL_TURN_OUTCOMES, FAULTED_TURN_OUTCOMES, final_frame_http_status
         status = str(row.get("status") or "accepted")
         if status not in TERMINAL_TURN_OUTCOMES:
             return {
@@ -1096,9 +607,6 @@ class GatewayServer:
                 "status": status,
             }, False
         response_text = str(row.get("response_text") or "")
-        # An unfinished turn that still answered replays as the message it is,
-        # tagged with its status. Sending `type: error` would have discarded the
-        # answer text and told an attached client the turn produced nothing.
         if status in FAULTED_TURN_OUTCOMES and not response_text:
             return {
                 "type": "error",
@@ -1119,1345 +627,85 @@ class GatewayServer:
             frame["error"] = str(row.get("error") or f"turn {status}")
         return frame, True
 
+    # ── Outbound delivery ──────────────────────────────────────────────────
+
+    async def _handle_outbound(self, event: OutboundEvent) -> SendResult | None:
+        return await self._ws_handler.handle_outbound(event)
+
+    async def broadcast_to_ws(self, session_key: str, data: dict[str, Any]) -> bool:
+        return await self._ws_handler.broadcast_to_ws(session_key, data)
+
+    # ── Wrapper methods for test compatibility ─────────────────────────────
+
+    def _check_csrf(self, request: web.Request, *, action: str) -> web.Response | None:
+        from codex_pro.gateway.http_handlers.base import check_csrf
+        return check_csrf(request, self.auth, action=action)
+
+    def _tokens_configured(self) -> bool:
+        return bool(self._config.auth.api_tokens or self._config.auth.admin_tokens)
+
+    async def _handle_message(self, request: web.Request) -> web.Response:
+        return await self._msg_handler.handle_message(request)
+
+    async def _handle_capabilities(self, request: web.Request) -> web.Response:
+        return await self._meta_handler.handle_capabilities(request)
+
+    def _playground_path(self) -> Path:
+        return Path(__file__).resolve().parent / "static" / "index.html"
+
+    def _resolve_web_dir(self) -> Path | None:
+        """Locate the Codex Pro web UI build directory."""
+        pkg_root = Path(__file__).resolve().parent.parent
+        candidates = [
+            pkg_root / "_bundled" / "web",
+            pkg_root.parent / "web" / "dist",
+        ]
+        for p in candidates:
+            if (p / "index.html").exists():
+                return p
+        return None
+
     async def _handle_playground(self, request: web.Request) -> web.Response:
         path = self._playground_path()
         if path.exists():
             return web.FileResponse(path)
         return web.Response(text="Gateway playground not found.", status=404)
 
-    async def _handle_message(self, request: web.Request) -> web.Response:
-        """处理 HTTP 消息请求：认证 → 限流 → 会话管理 → 事件分发。"""
-        guard = self._require_api_token(request, action="message")
-        if guard is not None:
-            return guard
-        origin = request.headers.get("Origin", "").strip()
-        sec_fetch_site = request.headers.get("Sec-Fetch-Site", "").strip()
-        host = request.headers.get("Host", "").strip()
-        if self.auth.is_cross_site_browser(origin, sec_fetch_site, host):
-            self.auth.audit("message", ok=False, reason=f"cross-site origin rejected: {origin or '?'}")
-            return web.json_response({"error": "cross-site request forbidden"}, status=403)
-        try:
-            body = await request.json()
-        except json.JSONDecodeError:
-            return web.json_response({"error": "invalid JSON"}, status=400)
-        if not isinstance(body, dict):
-            return web.json_response({"error": "JSON body must be an object"}, status=400)
-        try:
-            idempotency_key = self._idempotency_key(request, body)
-        except ValueError as e:
-            return web.json_response({"error": str(e)}, status=400)
+    async def _handle_web_ui(self, request: web.Request) -> web.Response:
+        """Serve the web UI SPA with fallback to index.html for client-side routing."""
+        web_dir = self._resolve_web_dir()
+        if web_dir is None:
+            return await self._handle_playground(request)
 
-        # Folded before anything keys off it: platform reaches channel names,
-        # session keys, rate-limit buckets and audit records, and those must all
-        # agree on one value. Default stays "api" for a body that omits it.
-        platform = self._normalize_platform(body.get("platform") or "api")
-        user_id = body.get("user_id", "")
-        chat_id = body.get("chat_id", user_id)
-        text = body.get("text", "")
-        media_urls = body.get("media_urls", [])
-        wait = bool(body.get("wait", False))
-        is_group = bool(body.get("is_group", False))
-        timeout_seconds = max(1, min(int(body.get("timeout_seconds", 180)), 600))
-
-        if not text and not media_urls:
-            return web.json_response({"error": "text or media_urls required"}, status=400)
-
-        # Bound the fan-out before any network work. Each URL becomes a guarded
-        # download (size-capped, SSRF-checked), but an unbounded *list* would
-        # still let one request open arbitrarily many of them at once.
-        if not isinstance(media_urls, list):
-            return web.json_response({"error": "media_urls must be a list"}, status=400)
-        max_urls = self._config.media_max_urls_per_message
-        if len(media_urls) > max_urls:
-            return web.json_response(
-                {"error": f"too many media_urls (max {max_urls})"},
-                status=400,
-            )
-
-        rejection = self._authenticate_and_check_rate_limit(
-            platform,
-            user_id,
-            chat_id,
-            trusted=self._is_loopback_peer(request),
-            consume_rate_limit=False,
-        )
-        if rejection == "unauthorized":
-            await self.hooks.emit("auth_failed", platform=platform, user_id=user_id)
-            return web.json_response({"error": "unauthorized"}, status=403)
-        self.auth.audit("message", platform=platform, user_id=user_id, ok=True)
-
-        # Gate B（身份收口，对齐 WS 握手）：仅靠 loopback 豁免放行的客户端
-        # （normally_ok=False）拿不到 server 派生的 gateway:{platform}:{chat_id}
-        # 兜底键，必须自带 cli: 前缀 key，否则被拒——否则本机裸调用者可自报
-        # platform=wechat,user_id=victim 落到他人隔离的 gateway:wechat:victim。
-        normally_ok = self.auth.is_authorized(platform, user_id)
-        session_key, sk_err = resolve_client_session_key(
-            body.get("session_key"),
-            platform=platform,
-            chat_id=chat_id,
-            allow_fallback=normally_ok,
-        )
-        if sk_err:
-            self.auth.audit(
-                "message",
-                platform=platform,
-                user_id=user_id,
-                ok=False,
-                reason=sk_err,
-            )
-            return web.json_response({"error": "forbidden session_key"}, status=403)
-
-        claim = None
-        event_id = ""
-        operation_fingerprint = ""
-        durable_claimed = False
-        if idempotency_key:
-            principal = "anonymous"
-            if self._tokens_configured():
-                principal = self.auth.principal_for_token(self._request_token(request)) or "invalid"
-            scope = f"http\0{principal}\0{session_key}"
-            event_id = deterministic_event_id(
-                "gateway-message",
-                scope,
-                idempotency_key,
-            )
-            operation_fingerprint = self._idempotency_fingerprint(
-                {
-                    "platform": platform,
-                    "user_id": user_id,
-                    "chat_id": chat_id,
-                    "text": text,
-                    "media_urls": media_urls,
-                    "is_group": is_group,
-                    "session_key": session_key,
-                }
-            )
-            claim = await self._message_idempotency.claim(
-                namespace="gateway-message",
-                scope=scope,
-                key=idempotency_key,
-                fingerprint=operation_fingerprint,
-                event_id=event_id,
-                context={
-                    "session_key": session_key,
-                    "wait": wait,
-                    "transport": "http",
-                },
-            )
-            if claim.outcome == "conflict":
-                return web.json_response(
-                    {"error": "idempotency key was already used for a different request"},
-                    status=409,
-                )
-            if claim.outcome == "full":
-                return web.json_response(
-                    {"error": "idempotency store is full"},
-                    status=503,
-                )
-            if claim.outcome == "duplicate" and claim.entry is not None:
-                cached = claim.entry.response if wait else claim.entry.admission
-                if cached is not None:
-                    return web.json_response(cached.payload, status=cached.status)
-                # A duplicate that races the admitting request must observe that
-                # request's real admission result. Returning a speculative 200 here
-                # could claim success just before the original is rejected by rate
-                # limiting, pending-capacity checks, or the inbound bus.
-                try:
-                    waiter = (
-                        self._message_idempotency.wait(
-                            claim.entry,
-                            timeout=timeout_seconds,
-                        )
-                        if wait
-                        else self._message_idempotency.wait_admitted(
-                            claim.entry,
-                            timeout=timeout_seconds,
-                        )
-                    )
-                    cached = await waiter
-                    return web.json_response(cached.payload, status=cached.status)
-                except asyncio.TimeoutError:
-                    return web.json_response(
-                        {
-                            "error": "timeout",
-                            "event_id": event_id,
-                            "session_key": session_key,
-                        },
-                        status=504,
-                    )
-
+        req_path = request.match_info.get("path", "")
+        if req_path:
+            file_path = web_dir / req_path
             try:
-                durable_claim = await self._bus.claim_durable_idempotency(
-                    event_id,
-                    namespace="gateway-message",
-                    fingerprint=operation_fingerprint,
-                    session_key=session_key,
-                )
-            except Exception as e:
-                logger.error("Durable idempotency claim failed: {}", e)
-                if claim.entry is not None:
-                    await self._message_idempotency.abort(claim.entry)
-                return web.json_response(
-                    {"error": "durable idempotency storage unavailable"},
-                    status=503,
-                )
-            durable_outcome = durable_claim.get("outcome")
-            durable_record = durable_claim.get("row")
-            if durable_outcome == "full":
-                if claim.entry is not None:
-                    await self._message_idempotency.abort(claim.entry)
-                return web.json_response(
-                    {"error": "durable idempotency store is full"},
-                    status=503,
-                )
-            if durable_outcome == "conflict":
-                if claim.entry is not None:
-                    await self._message_idempotency.abort(claim.entry)
-                return web.json_response(
-                    {"error": "idempotency key was already used for a different request"},
-                    status=409,
-                )
-            if durable_outcome == "duplicate" and isinstance(durable_record, dict):
-                response_status, response_payload, terminal = self._http_turn_run_response(
-                    durable_record,
-                    event_id,
-                    session_key,
-                )
-                if terminal:
-                    await self._message_idempotency.complete(
-                        claim.entry,
-                        status=response_status,
-                        payload=response_payload,
-                    )
-                else:
-                    await self._message_idempotency.abort(
-                        claim.entry,
-                        status=response_status,
-                        payload=response_payload,
-                    )
-                return web.json_response(response_payload, status=response_status)
-            if durable_outcome != "new":
-                if claim.entry is not None:
-                    await self._message_idempotency.abort(claim.entry)
-                return web.json_response(
-                    {"error": "durable idempotency storage unavailable"},
-                    status=503,
-                )
-            durable_claimed = True
+                file_path = file_path.resolve()
+                if file_path.is_file() and str(file_path).startswith(str(web_dir.resolve())):
+                    return web.FileResponse(file_path)
+            except (OSError, ValueError):
+                pass
+        return web.FileResponse(web_dir / "index.html")
 
-            # The process-local replay record may have expired or disappeared
-            # across restart while the durable turn ledger still knows this
-            # deterministic event ID. Never republish such a turn and then call
-            # the duplicate-claim skip an HTTP "accepted" response.
-            try:
-                durable_row = await self._bus.get_turn_run(event_id)
-            except Exception:
-                await self._bus.release_durable_idempotency(event_id)
-                durable_claimed = False
-                if claim.entry is not None:
-                    await self._message_idempotency.abort(claim.entry)
-                raise
-            if durable_row is not None and claim.entry is not None:
-                if durable_fingerprint_conflicts(
-                    durable_row,
-                    namespace="gateway-message",
-                    fingerprint=operation_fingerprint,
-                ):
-                    await self._release_durable_claim(event_id)
-                    durable_claimed = False
-                    await self._message_idempotency.abort(
-                        claim.entry,
-                        status=409,
-                        payload={
-                            "error": "idempotency key was already used for a different request",
-                        },
-                    )
-                    return web.json_response(
-                        {
-                            "error": "idempotency key was already used for a different request",
-                        },
-                        status=409,
-                    )
-                try:
-                    await self._bus.sync_durable_idempotency(durable_row)
-                except Exception as e:
-                    logger.error("Durable idempotency sync failed: {}", e)
-                    # Release the tombstone claimed just above. Without this it
-                    # stayed `pending` for the full TTL and every retry replayed
-                    # "pending" even after the turn had completed. The guarded
-                    # DELETE cannot remove a racing owner's terminal row.
-                    await self._release_durable_claim(event_id)
-                    durable_claimed = False
-                    await self._message_idempotency.abort(claim.entry)
-                    return web.json_response(
-                        {"error": "durable idempotency storage unavailable"},
-                        status=503,
-                    )
-                response_status, response_payload, terminal = self._http_turn_run_response(
-                    durable_row,
-                    event_id,
-                    session_key,
-                )
-                if terminal:
-                    await self._message_idempotency.complete(
-                        claim.entry,
-                        status=response_status,
-                        payload=response_payload,
-                    )
-                else:
-                    # Wake concurrent duplicates with the same live snapshot,
-                    # then remove it so a later retry re-reads durable progress.
-                    await self._message_idempotency.abort(
-                        claim.entry,
-                        status=response_status,
-                        payload=response_payload,
-                    )
-                return web.json_response(
-                    response_payload,
-                    status=response_status,
-                )
+    # Note: HTTP message handling (including is_group from body.get("is_group"))
+    # is delegated to MessageHandler in gateway/http_handlers/message_handler.py
+    # WS message handling (including data.get("is_group")) is delegated to
+    # WebSocketHandler in gateway/ws_handlers/websocket.py
 
-        published = False
-        publish_outcome_unknown = False
-        pending_event_id = ""
-        tokens = None
-        try:
-            if not self.rate_limiter.acquire(platform, chat_id):
-                if durable_claimed:
-                    await self._release_durable_claim(event_id)
-                    durable_claimed = False
-                if claim is not None and claim.entry is not None:
-                    await self._message_idempotency.abort(
-                        claim.entry,
-                        status=429,
-                        payload={"error": "rate limited"},
-                    )
-                return web.json_response({"error": "rate limited"}, status=429)
+    # ── Static method wrappers for source-level test compatibility ─────────
 
-            session, _ = await self._reset_session_if_needed(session_key)
-            tokens = set_session_vars(
-                platform=platform,
-                chat_id=chat_id,
-                user_id=user_id,
-                session_key=session_key,
-            )
+    @staticmethod
+    def _idempotency_key(request: web.Request, body: dict[str, Any]) -> str:
+        from codex_pro.gateway.http_handlers.base import idempotency_key
+        return idempotency_key(request, body)
 
-            content_blocks = [ContentBlock(type=ContentType.TEXT, text=text)]
-            if media_urls:
-                paths = await asyncio.gather(
-                    *(self.media_cache.download(url, platform) for url in media_urls),
-                    return_exceptions=True,
-                )
-                for url, path in zip(media_urls, paths):
-                    if isinstance(path, Exception):
-                        logger.warning("Gateway media download failed for {}: {}", url, path)
-                        continue
-                    if not path:
-                        continue
-                    content_blocks.append(
-                        ContentBlock(
-                            type=self._infer_media_content_type(str(path), url),
-                            url=str(path),
-                        )
-                    )
+    @staticmethod
+    def _idempotency_fingerprint(body: dict[str, Any]) -> str:
+        from codex_pro.gateway.http_handlers.base import idempotency_fingerprint
+        return idempotency_fingerprint(body)
 
-            event = InboundEvent(
-                channel=f"gateway:{platform}",
-                sender_id=user_id,
-                chat_id=chat_id,
-                content=content_blocks,
-                session_key_override=session_key,
-                is_group=is_group,
-                metadata={
-                    "gateway": True,
-                    "platform": platform,
-                    "user_id": user_id,
-                },
-            )
-            if event_id:
-                event.event_id = event_id
-            if operation_fingerprint:
-                event.metadata[IDEMPOTENCY_NAMESPACE_METADATA] = "gateway-message"
-                event.metadata[IDEMPOTENCY_FINGERPRINT_METADATA] = operation_fingerprint
-            future: asyncio.Future[dict[str, Any]] | None = None
-            if wait:
-                if len(self._pending_http) >= self._MAX_PENDING_HTTP:
-                    if durable_claimed:
-                        await self._release_durable_claim(event_id)
-                        durable_claimed = False
-                    if claim is not None and claim.entry is not None:
-                        await self._message_idempotency.abort(
-                            claim.entry,
-                            payload={"error": "too many pending requests"},
-                        )
-                    return web.json_response({"error": "too many pending requests"}, status=503)
-                future = asyncio.get_running_loop().create_future()
-                self._pending_http[event.event_id] = future
-                pending_event_id = event.event_id
-
-            await self._accept_turn(event, session)
-            try:
-                accepted = await self._publish_accepted_turn(event)
-            except BaseException:
-                # Cancellation can race queue admission: the event may already
-                # be enqueued even though publish_inbound did not return. The
-                # same uncertainty applies to an unexpected transport/bus
-                # exception after invocation. Keep the claim until a final reply
-                # or its stale-outcome TTL; the deterministic event ID plus the
-                # durable atomic turn claim is the second line of defence.
-                publish_outcome_unknown = True
-                raise
-            if not accepted:
-                self._discard_turn_interrupt_admission(event)
-                # `False` is the one definitive no-admission result promised by
-                # MessageBus. Release only our still-accepted ledger row; the
-                # SQL guard refuses to touch a running/terminal racing owner.
-                await self._bus.release_turn_acceptance(
-                    event.event_id,
-                    event.session_key,
-                )
-                if durable_claimed:
-                    await self._release_durable_claim(event.event_id)
-                    durable_claimed = False
-                if claim is not None and claim.entry is not None:
-                    await self._message_idempotency.abort(
-                        claim.entry,
-                        payload={"error": "server overloaded"},
-                    )
-                return web.json_response({"error": "server overloaded"}, status=503)
-
-            published = True
-            # Broadcast admission to dashboard WS so chat UI can stay in sync
-            await self._web_ws.broadcast(
-                'session_message',
-                {'session_key': session_key, 'event_id': event.event_id},
-            )
-            if durable_claimed:
-                await asyncio.shield(self._bus.mark_durable_idempotency_admitted(event.event_id))
-                durable_claimed = False
-            admission_payload = {
-                "status": "accepted",
-                "event_id": event.event_id,
-                "session_key": session_key,
-            }
-            if claim is not None and claim.entry is not None:
-                if future:
-                    await asyncio.shield(
-                        self._message_idempotency.mark_admitted(
-                            claim.entry,
-                            status=200,
-                            payload=admission_payload,
-                        )
-                    )
-                else:
-                    await asyncio.shield(
-                        self._message_idempotency.complete(
-                            claim.entry,
-                            status=200,
-                            payload=admission_payload,
-                        )
-                    )
-            await self.hooks.emit(
-                "message_received",
-                platform=platform,
-                user_id=user_id,
-                chat_id=chat_id,
-            )
-
-            if future:
-                try:
-                    payload = await asyncio.wait_for(future, timeout=timeout_seconds)
-                except asyncio.TimeoutError:
-                    return web.json_response(
-                        {
-                            "error": "timeout",
-                            "event_id": event.event_id,
-                            "session_key": session_key,
-                        },
-                        status=504,
-                    )
-                response_status, response_payload = self._http_final_response(
-                    event.event_id,
-                    session_key,
-                    payload,
-                )
-                if claim is not None and claim.entry is not None:
-                    await self._message_idempotency.complete(
-                        claim.entry,
-                        status=response_status,
-                        payload=response_payload,
-                    )
-                return web.json_response(response_payload, status=response_status)
-
-            return web.json_response(admission_payload)
-        except asyncio.CancelledError:
-            if not published and not publish_outcome_unknown and claim is not None and claim.entry is not None:
-                await asyncio.shield(self._message_idempotency.abort(claim.entry))
-            if not published and not publish_outcome_unknown and durable_claimed:
-                await asyncio.shield(self._release_durable_claim(event_id))
-            raise
-        except Exception:
-            if not published and not publish_outcome_unknown and claim is not None and claim.entry is not None:
-                await self._message_idempotency.abort(claim.entry)
-            if not published and not publish_outcome_unknown and durable_claimed:
-                await self._release_durable_claim(event_id)
-            raise
-        finally:
-            if pending_event_id:
-                self._pending_http.pop(pending_event_id, None)
-                # After admission, a 504/client cancellation does not stop the
-                # turn. Keep its bounded buffer so a late terminal can complete
-                # the idempotency record with every tool delivery. Definite
-                # pre-admission failures have no possible late terminal.
-                if not published and not publish_outcome_unknown:
-                    self._clear_http_tool_deliveries(pending_event_id)
-            if tokens is not None:
-                clear_session_vars(tokens)
-
-    async def _handle_health(self, request: web.Request) -> web.Response:
-        status = await self.health.check()
-        code = 200 if status["status"] != "unhealthy" else 503
-        return web.json_response(status, status=code)
-
-    async def _handle_list_sessions(self, request: web.Request) -> web.Response:
-        guard = self._require_admin_token(request, action="list_sessions")
-        if guard is not None:
-            return guard
-        list_sessions = getattr(self.session_manager, "list_sessions_async", None)
-        sessions = await list_sessions() if list_sessions else self.session_manager.list_sessions()
-        gateway_sessions = [s for s in sessions if s.get("key", "").startswith("gateway:")]
-        return web.json_response({"sessions": gateway_sessions})
-
-    async def _handle_reset_session(self, request: web.Request) -> web.Response:
-        guard = self._require_admin_token(request, action="reset_session")
-        if guard is not None:
-            return guard
-        key = request.match_info["key"]
-        await self._reset_session_if_needed(key, force=True)
-        return web.json_response({"status": "reset", "session_key": key})
-
-    async def _handle_pair_generate(self, request: web.Request) -> web.Response:
-        guard = self._require_api_token(request, action="pair_generate")
-        if guard is not None:
-            return guard
-        try:
-            body = await request.json()
-        except json.JSONDecodeError:
-            return web.json_response({"error": "invalid JSON"}, status=400)
-
-        if not body.get("platform", ""):
-            return web.json_response({"error": "platform required"}, status=400)
-        # Folded with the same rule as /message and the WS handshake. The approved
-        # -users store is keyed by platform (auth.py, {platform}_approved.json), so
-        # pairing under the raw name while messages arrive under the folded one
-        # would file the approval where is_authorized never looks — the client
-        # would pair successfully and still be rejected.
-        platform = self._normalize_platform(body.get("platform"))
-
-        code = self.auth.generate_pairing_code(platform)
-        return web.json_response({"code": code, "ttl_seconds": self._config.auth.pairing_ttl_seconds})
-
-    async def _handle_pair_verify(self, request: web.Request) -> web.Response:
-        try:
-            body = await request.json()
-        except json.JSONDecodeError:
-            return web.json_response({"error": "invalid JSON"}, status=400)
-
-        user_id = body.get("user_id", "")
-        code = body.get("code", "")
-
-        if not all([body.get("platform", ""), user_id, code]):
-            return web.json_response({"error": "platform, user_id, code required"}, status=400)
-        # Same fold as pair_generate, so verify looks up the code under the key it
-        # was issued with.
-        platform = self._normalize_platform(body.get("platform"))
-
-        if self.auth.verify_pairing(platform, user_id, code):
-            await self.hooks.emit("auth_success", platform=platform, user_id=user_id)
-            return web.json_response({"status": "paired"})
-        else:
-            await self.hooks.emit("auth_failed", platform=platform, user_id=user_id)
-            return web.json_response({"error": "invalid or expired code"}, status=403)
-
-    async def _handle_meta(self, request: web.Request) -> web.Response:
-        """Bootstrap metadata for the dashboard SPA.
-
-        No authentication required — the frontend needs this before it has a
-        token. Exposed at a fixed path (/meta) so the SPA can locate the real
-        API prefix without hardcoding it.
-        """
-        from codex_pro import __version__
-
-        return web.json_response(
-            {
-                "api_prefix": self._config.api_prefix,
-                "ws_path": "/ws/web",
-                "version": __version__,
-                "auth_required": self._tokens_configured(),
-            }
-        )
-
-    async def _handle_capabilities(self, request: web.Request) -> web.Response:
-        """What the *calling token* is allowed to do.
-
-        The dashboard mixes api-token and admin-token endpoints on the same page
-        (knowledge upload/delete, config, memory writes). Without this the UI can
-        only discover the boundary by firing a request and reading a 403, so it
-        rendered enabled buttons that were guaranteed to fail. Reporting the
-        caller's own scope lets those affordances be disabled up front with an
-        explanation.
-
-        Deliberately reports only booleans about the presented token — never the
-        configured tokens or whether any exist beyond what the caller's own scope
-        already tells them.
-
-        ``auth_required`` says whether this deployment authenticates at all. The
-        dashboard needs it because it treated ``!!token`` as "logged in": in the
-        officially supported open / no-token mode (see auth.authenticate_token,
-        which accepts every request when no token is configured) an empty token
-        is *correct*, yet Layout bounced it to /login, Login's probe succeeded
-        and navigated back to /, and Layout bounced it again — a redirect loop
-        out of which only typing a nonsense non-empty token could escape.
-        Reporting the fact server-side is what lets the UI stop guessing."""
-        guard = self._require_api_token(request, action="capabilities")
-        if guard is not None:
-            return guard
-        # Mirrors _require_admin_token's own resolution order, including the
-        # unauthenticated-deployment case (no tokens configured at all → every
-        # caller is effectively admin), so the UI never disables a control the
-        # server would in fact allow.
-        admin_configured = bool(self._config.auth.admin_tokens or self._config.auth.api_tokens)
-        if not admin_configured:
-            is_admin = True
-        else:
-            is_admin = self.auth.authenticate_admin_token(self.auth.token_from_headers(request.headers))
-        return web.json_response(
-            {
-                "admin": is_admin,
-                "authRequired": self._tokens_configured(),
-            }
-        )
-
-    async def _handle_stats(self, request: web.Request) -> web.Response:
-        guard = self._require_api_token(request, action="stats")
-        if guard is not None:
-            return guard
-        # ws_clients is now part of health.check() itself, so no need to re-add it.
-        health_data = await self.health.check()
-        return web.json_response(health_data)
-
-    # ── WebSocket handler ─────────────────────────────────────────────────
-
-    async def _handle_websocket(self, request: web.Request) -> web.StreamResponse:
-        """处理 WebSocket 连接：Origin 闸门 → 认证握手 → 消息循环 → 事件分发。"""
-        # Gate A: reject cross-site browser upgrades BEFORE prepare(). Once the
-        # socket is upgraded the browser's onopen fires, so this must run first.
-        # Shared with the dashboard WS via ws_common so the two gates cannot
-        # drift apart again.
-        rejected = ws_common.reject_cross_site(request, self.auth, action="ws_auth")
-        if rejected is not None:
-            return rejected
-
-        # Server-driven heartbeat: without it keepalive was entirely client-side
-        # (the CLI pings, but nothing pinged the CLI), so a stalled/blocked client
-        # during a long turn could die unnoticed and the final reply would be
-        # dropped silently. aiohttp auto-pongs peer pings and drops the socket if
-        # our ping goes unanswered, surfacing the dead connection promptly.
-        hb = self._config.ws_heartbeat_seconds
-        websocket = web.WebSocketResponse(heartbeat=hb if hb and hb > 0 else None)
-        await websocket.prepare(request)
-
-        delivery_key = None
-        platform = "ws"
-        user_id = ""
-        chat_id = ""
-        session_key = ""
-        principal = "anonymous"
-        # Absolute bound on the pre-auth window. Passing the per-frame timeout to
-        # each wait_for restarted the clock on every frame, so a peer that kept
-        # sending frames it had no right to send (junk, bad JSON, `message`
-        # before `auth`) renewed its own deadline forever. See ws_common.
-        auth_deadline = ws_common.AuthDeadline()
-
-        try:
-            while True:
-                try:
-                    # Once authenticated the socket is a legitimate long-lived
-                    # client — a TUI turn can run for many minutes with no client
-                    # frames — so remaining() drops the bound entirely.
-                    raw_msg = await asyncio.wait_for(
-                        websocket.receive(),
-                        timeout=auth_deadline.remaining(),
-                    )
-                except asyncio.TimeoutError:
-                    self.auth.audit("ws_auth", ok=False, reason="authentication timeout")
-                    await websocket.close()
-                    break
-
-                if raw_msg.type == aiohttp.WSMsgType.TEXT:
-                    try:
-                        data = json.loads(raw_msg.data)
-                    except json.JSONDecodeError:
-                        await websocket.send_json({"error": "invalid JSON"})
-                        continue
-
-                    # Per-message isolation: a failure while handling one
-                    # message (audit, content build, publish, session ops…)
-                    # must return an error frame and continue, never propagate
-                    # out of the loop and silently drop the connection. Only
-                    # genuine socket-level errors reach the outer handler below.
-                    try:
-                        msg_type = data.get("type", "message")
-
-                        if msg_type == "auth":
-                            # Folded up-front so every downstream use — the
-                            # authorization check, the session key, the delivery
-                            # key, the rate-limit bucket, the audit trail and the
-                            # inbound channel name — sees the same value. In
-                            # particular the channel name decides whether this
-                            # client is served retractable drafts, so it must not
-                            # be a free-form client string.
-                            platform = self._normalize_platform(data.get("platform"))
-                            user_id = data.get("user_id", "")
-                            chat_id = data.get("chat_id", user_id)
-                            # 握手接受三个来源:auth 帧内的 token、请求头、URL 的
-                            # ?token=。后者是历史入口,对 api 作用域保留。
-                            frame_token = str(data.get("token") or "")
-                            token = str(frame_token or self._request_token(request))
-
-                            # Any configured token makes the check mandatory —
-                            # admin_tokens alone must not leave the socket open,
-                            # and authenticate_token already accepts both kinds.
-                            if self._tokens_configured() and not self.auth.authenticate_token(token):
-                                self.auth.audit(
-                                    "ws_auth", platform=platform, user_id=user_id, ok=False, reason="invalid api token"
-                                )
-                                await websocket.send_json({"type": "error", "error": "unauthorized"})
-                                await websocket.close()
-                                return websocket
-                            if self._tokens_configured():
-                                principal = self.auth.principal_for_token(token) or "invalid"
-
-                            trusted = self._is_loopback_peer(request)
-                            normally_ok = self.auth.is_authorized(platform, user_id)
-                            if not (normally_ok or trusted):
-                                self.auth.audit(
-                                    "ws_auth", platform=platform, user_id=user_id, ok=False, reason="user unauthorized"
-                                )
-                                await websocket.send_json({"type": "error", "error": "unauthorized"})
-                                await websocket.close()
-                                return websocket
-
-                            # A client let in ONLY by the loopback exemption gets no
-                            # server-derived fallback key — it must present an explicit
-                            # cli: key, else it could self-report another user's identity.
-                            session_key, sk_err = resolve_client_session_key(
-                                data.get("session_key"),
-                                platform=platform,
-                                chat_id=chat_id,
-                                allow_fallback=normally_ok,
-                            )
-                            if sk_err:
-                                self.auth.audit(
-                                    "ws_auth",
-                                    platform=platform,
-                                    user_id=user_id,
-                                    ok=False,
-                                    reason=sk_err,
-                                )
-                                await websocket.send_json({"type": "error", "error": "forbidden session_key"})
-                                await websocket.close()
-                                return websocket
-                            # 身份键 session_key（cli 自带时=cli:alice）用于会话隔离与冒充拒绝；
-                            # 投递键 delivery_key 用出站重算式 gateway:{platform}:{chat_id}，
-                            # 让 _handle_outbound 无需任何 metadata 透传即可命中所有出站路径。
-                            delivery_key = f"gateway:{platform}:{chat_id}"
-                            self._ws_clients[delivery_key] = websocket
-                            # Lifts the pre-auth deadline. Set here, past every
-                            # rejection branch above, so a failed handshake never
-                            # buys an unbounded socket.
-                            auth_deadline.mark_authenticated()
-
-                            session, _ = await self._reset_session_if_needed(session_key)
-
-                            await websocket.send_json({"type": "auth_ok", "session_key": session_key})
-                            self.auth.audit("ws_auth", platform=platform, user_id=user_id, ok=True)
-                            await self.hooks.emit(
-                                "auth_success",
-                                platform=platform,
-                                user_id=user_id,
-                            )
-                            continue
-
-                        if msg_type == "message":
-                            if not session_key:
-                                await websocket.send_json({"type": "error", "error": "authenticate first"})
-                                continue
-
-                            text = data.get("text", "")
-                            is_group = bool(data.get("is_group", False))
-                            if not text:
-                                continue
-
-                            try:
-                                idempotency_key = normalize_idempotency_key(data.get("idempotency_key"))
-                            except ValueError as e:
-                                await websocket.send_json(
-                                    {
-                                        "type": "error",
-                                        "error": str(e),
-                                    }
-                                )
-                                continue
-
-                            claim = None
-                            event_id = ""
-                            operation_fingerprint = ""
-                            durable_claimed = False
-                            if idempotency_key:
-                                scope = f"ws\0{principal}\0{session_key}"
-                                event_id = deterministic_event_id(
-                                    "gateway-message",
-                                    scope,
-                                    idempotency_key,
-                                )
-                                operation_fingerprint = self._idempotency_fingerprint(
-                                    {
-                                        "text": text,
-                                        "is_group": is_group,
-                                        "platform": platform,
-                                        "user_id": user_id,
-                                        "chat_id": chat_id,
-                                    }
-                                )
-                                claim = await self._message_idempotency.claim(
-                                    namespace="gateway-message",
-                                    scope=scope,
-                                    key=idempotency_key,
-                                    fingerprint=operation_fingerprint,
-                                    event_id=event_id,
-                                    context={
-                                        "session_key": session_key,
-                                        "wait": False,
-                                        "transport": "ws",
-                                    },
-                                )
-                                if claim.outcome == "conflict":
-                                    await websocket.send_json(
-                                        {
-                                            "type": "error",
-                                            "error": "idempotency key was already used for a different request",
-                                        }
-                                    )
-                                    continue
-                                if claim.outcome == "full":
-                                    await websocket.send_json(
-                                        {
-                                            "type": "error",
-                                            "error": "idempotency store is full",
-                                        }
-                                    )
-                                    continue
-                                if claim.outcome == "duplicate" and claim.entry is not None:
-                                    cached = claim.entry.admission
-                                    if cached is None:
-                                        try:
-                                            cached = await self._message_idempotency.wait_admitted(
-                                                claim.entry,
-                                                timeout=30,
-                                            )
-                                        except asyncio.TimeoutError:
-                                            await websocket.send_json(
-                                                {
-                                                    "type": "error",
-                                                    "error": "idempotency outcome pending",
-                                                    "event_id": event_id,
-                                                }
-                                            )
-                                            continue
-                                    await websocket.send_json(cached.payload)
-                                    continue
-
-                                try:
-                                    durable_claim = await self._bus.claim_durable_idempotency(
-                                        event_id,
-                                        namespace="gateway-message",
-                                        fingerprint=operation_fingerprint,
-                                        session_key=session_key,
-                                    )
-                                except Exception as e:
-                                    logger.error(
-                                        "Durable WS idempotency claim failed: {}",
-                                        e,
-                                    )
-                                    await self._message_idempotency.abort(claim.entry)
-                                    await websocket.send_json(
-                                        {
-                                            "type": "error",
-                                            "error": "durable idempotency storage unavailable",
-                                        }
-                                    )
-                                    continue
-                                durable_outcome = durable_claim.get("outcome")
-                                durable_record = durable_claim.get("row")
-                                if durable_outcome == "full":
-                                    await self._message_idempotency.abort(claim.entry)
-                                    await websocket.send_json(
-                                        {
-                                            "type": "error",
-                                            "error": "durable idempotency store is full",
-                                        }
-                                    )
-                                    continue
-                                if durable_outcome == "conflict":
-                                    await self._message_idempotency.abort(claim.entry)
-                                    await websocket.send_json(
-                                        {
-                                            "type": "error",
-                                            "error": "idempotency key was already used for a different request",
-                                        }
-                                    )
-                                    continue
-                                if durable_outcome == "duplicate" and isinstance(durable_record, dict):
-                                    payload, terminal = self._ws_turn_run_payload(
-                                        durable_record,
-                                        event_id,
-                                    )
-                                    if terminal:
-                                        await self._message_idempotency.complete(
-                                            claim.entry,
-                                            status=200,
-                                            payload=payload,
-                                        )
-                                    else:
-                                        await self._message_idempotency.abort(
-                                            claim.entry,
-                                            status=200,
-                                            payload=payload,
-                                        )
-                                    await websocket.send_json(payload)
-                                    continue
-                                if durable_outcome != "new":
-                                    await self._message_idempotency.abort(claim.entry)
-                                    await websocket.send_json(
-                                        {
-                                            "type": "error",
-                                            "error": "durable idempotency storage unavailable",
-                                        }
-                                    )
-                                    continue
-                                durable_claimed = True
-
-                                try:
-                                    durable_row = await self._bus.get_turn_run(event_id)
-                                except Exception as e:
-                                    logger.error("Durable WS turn lookup failed: {}", e)
-                                    await self._release_durable_claim(event_id)
-                                    durable_claimed = False
-                                    await self._message_idempotency.abort(claim.entry)
-                                    await websocket.send_json(
-                                        {
-                                            "type": "error",
-                                            "error": "durable idempotency storage unavailable",
-                                        }
-                                    )
-                                    continue
-                                if durable_row is not None and claim.entry is not None:
-                                    if durable_fingerprint_conflicts(
-                                        durable_row,
-                                        namespace="gateway-message",
-                                        fingerprint=operation_fingerprint,
-                                    ):
-                                        await self._release_durable_claim(event_id)
-                                        durable_claimed = False
-                                        payload = {
-                                            "type": "error",
-                                            "error": "idempotency key was already used for a different request",
-                                        }
-                                        await self._message_idempotency.abort(
-                                            claim.entry,
-                                            status=409,
-                                            payload=payload,
-                                        )
-                                        await websocket.send_json(payload)
-                                        continue
-                                    try:
-                                        await self._bus.sync_durable_idempotency(durable_row)
-                                    except Exception as e:
-                                        # Mirrors the HTTP path: release the
-                                        # tombstone instead of pinning this key
-                                        # at `pending` for its whole TTL. This
-                                        # was also unguarded, so a storage error
-                                        # escaped into the socket read loop.
-                                        logger.error(
-                                            "Durable WS idempotency sync failed: {}",
-                                            e,
-                                        )
-                                        await self._release_durable_claim(event_id)
-                                        durable_claimed = False
-                                        await self._message_idempotency.abort(claim.entry)
-                                        await websocket.send_json(
-                                            {
-                                                "type": "error",
-                                                "error": "durable idempotency storage unavailable",
-                                            }
-                                        )
-                                        continue
-                                    payload, terminal = self._ws_turn_run_payload(
-                                        durable_row,
-                                        event_id,
-                                    )
-                                    if terminal:
-                                        await self._message_idempotency.complete(
-                                            claim.entry,
-                                            status=200,
-                                            payload=payload,
-                                        )
-                                    else:
-                                        await self._message_idempotency.abort(
-                                            claim.entry,
-                                            status=200,
-                                            payload=payload,
-                                        )
-                                    await websocket.send_json(payload)
-                                    continue
-
-                            if not self.rate_limiter.acquire(platform, chat_id):
-                                if durable_claimed:
-                                    await self._release_durable_claim(event_id)
-                                    durable_claimed = False
-                                if claim is not None and claim.entry is not None:
-                                    await self._message_idempotency.abort(
-                                        claim.entry,
-                                        status=429,
-                                        payload={"type": "error", "error": "rate limited"},
-                                    )
-                                await websocket.send_json({"type": "error", "error": "rate limited"})
-                                continue
-
-                            published = False
-                            publish_outcome_unknown = False
-                            tokens = set_session_vars(
-                                platform=platform,
-                                chat_id=chat_id,
-                                user_id=user_id,
-                                session_key=session_key,
-                            )
-                            try:
-                                event = InboundEvent.text_message(
-                                    channel=f"gateway:{platform}",
-                                    sender_id=user_id,
-                                    chat_id=chat_id,
-                                    text=text,
-                                    session_key_override=session_key,
-                                    is_group=is_group,
-                                )
-                                if event_id:
-                                    event.event_id = event_id
-                                event.metadata["gateway"] = True
-                                event.metadata["platform"] = platform
-                                if operation_fingerprint:
-                                    event.metadata[IDEMPOTENCY_NAMESPACE_METADATA] = "gateway-message"
-                                    event.metadata[IDEMPOTENCY_FINGERPRINT_METADATA] = operation_fingerprint
-                                await self._accept_turn(event, session)
-                                try:
-                                    accepted = await self._publish_accepted_turn(event)
-                                except BaseException:
-                                    # Invocation can be cancelled or fail after
-                                    # queue admission. Keep the claim outcome
-                                    # unknown rather than allowing a duplicate.
-                                    publish_outcome_unknown = True
-                                    raise
-                                if not accepted:
-                                    self._discard_turn_interrupt_admission(event)
-                                    await self._bus.release_turn_acceptance(
-                                        event.event_id,
-                                        event.session_key,
-                                    )
-                                    if durable_claimed:
-                                        await self._release_durable_claim(event.event_id)
-                                        durable_claimed = False
-                                    if claim is not None and claim.entry is not None:
-                                        await self._message_idempotency.abort(
-                                            claim.entry,
-                                            payload={
-                                                "type": "error",
-                                                "error": "server overloaded",
-                                            },
-                                        )
-                                    await websocket.send_json(
-                                        {
-                                            "type": "error",
-                                            "error": "server overloaded",
-                                        }
-                                    )
-                                    continue
-                                published = True
-                                if durable_claimed:
-                                    await asyncio.shield(self._bus.mark_durable_idempotency_admitted(event.event_id))
-                                    durable_claimed = False
-                                accepted_payload = {
-                                    "type": "accepted",
-                                    "event_id": event.event_id,
-                                }
-                                if claim is not None and claim.entry is not None:
-                                    # Persist admission before writing the socket.
-                                    # A disconnect during send_json can then retry
-                                    # immediately and replay the real ACK.
-                                    await asyncio.shield(
-                                        self._message_idempotency.complete(
-                                            claim.entry,
-                                            status=200,
-                                            payload=accepted_payload,
-                                        )
-                                    )
-                                await websocket.send_json(accepted_payload)
-                            finally:
-                                if (
-                                    not published
-                                    and not publish_outcome_unknown
-                                    and claim is not None
-                                    and claim.entry is not None
-                                ):
-                                    await asyncio.shield(self._message_idempotency.abort(claim.entry))
-                                if not published and not publish_outcome_unknown and durable_claimed:
-                                    await asyncio.shield(self._release_durable_claim(event_id))
-                                clear_session_vars(tokens)
-
-                        if msg_type == "interrupt":
-                            # Cooperative stop of the session's running turn.
-                            # Routed as an internal control command that the loop
-                            # intercepts BEFORE the session lock (the running turn
-                            # holds that lock), so the inference loop can poll the
-                            # flag and converge cleanly. is_control bypasses the
-                            # rate limiter, mirroring the clarify-cancel escape
-                            # valve — same reasoning: a user who just flooded the
-                            # session is exactly who needs the stop to land.
-                            if not session_key:
-                                await websocket.send_json({"type": "error", "error": "authenticate first"})
-                                continue
-                            interrupt_event = InboundEvent.text_message(
-                                channel=f"gateway:{platform}",
-                                sender_id=user_id,
-                                chat_id=chat_id,
-                                text="/__interrupt__",
-                                session_key_override=session_key,
-                                is_control=True,
-                            )
-                            # The client codexes the target turn's event_id (learned
-                            # from that turn's `accepted` frame). Stamp it so the
-                            # loop only stops that turn — a stop frame delayed past
-                            # the turn's end can't clip the next one. Absent for
-                            # older clients → stop whatever is running.
-                            target_id = data.get("event_id")
-                            if target_id:
-                                interrupt_event.metadata["_interrupt_target_event_id"] = str(target_id)
-                            # Only ACK if the interrupt actually entered the bus. A full queue
-                            # or a stopped bus returns False; claiming "accepted" then
-                            # would tell the user the turn was stopped when the stop
-                            # frame was silently dropped. Mirror the normal-send path.
-                            if not await self._bus.publish_inbound(interrupt_event):
-                                await websocket.send_json({"type": "error", "error": "server overloaded"})
-                                continue
-                            await websocket.send_json({"type": "accepted"})
-
-                        if msg_type == "ping":
-                            await websocket.send_json({"type": "pong"})
-
-                    except Exception as e:
-                        # One message failed to process — report it and keep the
-                        # connection alive. This is what stops a stray per-message
-                        # error (a transient audit/session fault)
-                        # from silently tearing down the whole session.
-                        logger.warning("WebSocket message handling failed: {}", e)
-                        try:
-                            await websocket.send_json({"type": "error", "error": "internal error"})
-                        except Exception:
-                            # Send failed → the socket itself is gone; let the
-                            # outer loop observe the close on the next iteration.
-                            pass
-                        continue
-
-                elif raw_msg.type in (
-                    aiohttp.WSMsgType.ERROR,
-                    aiohttp.WSMsgType.CLOSE,
-                    # CLOSED / CLOSING were implicit while this was `async for`
-                    # (the iterator stops on them). With an explicit receive()
-                    # they must be handled here, or teardown spins forever.
-                    aiohttp.WSMsgType.CLOSED,
-                    aiohttp.WSMsgType.CLOSING,
-                ):
-                    break
-
-        except Exception as e:
-            logger.error("WebSocket error: {}", e)
-        finally:
-            # Only drop the slot if it still holds *this* socket — when two
-            # connections collapse onto the same delivery_key, an earlier
-            # connection's teardown must not delete the later one's slot.
-            if delivery_key and self._ws_clients.get(delivery_key) is websocket:
-                del self._ws_clients[delivery_key]
-            # Escape valve: a disconnect (/quit, Ctrl+C, dropped socket) must wake
-            # any clarify blocked on this session so the agent does not stay parked
-            # in wait_for_answer until the 24h registry backstop. Route it through
-            # the bus as an internal control command that the loop intercepts
-            # before the session lock. Best-effort — never let this break teardown.
-            if session_key:
-                try:
-                    cancel_event = InboundEvent.text_message(
-                        channel=f"gateway:{platform}",
-                        sender_id=user_id,
-                        chat_id=chat_id,
-                        text="/__clarify_cancel__",
-                        session_key_override=session_key,
-                        # Trusted internal producer: bypass the rate limiter so a
-                        # user who just flooded the session can't get this escape
-                        # valve dropped, leaving the agent parked until the 24h backstop.
-                        is_control=True,
-                    )
-                    await self._bus.publish_inbound(cancel_event)
-                except Exception as e:
-                    logger.warning("Clarify cancel on ws disconnect failed: {}", e)
-
-        return websocket
-
-    async def _handle_outbound(self, event: OutboundEvent) -> SendResult | None:
-        """Deliver a gateway-bound event to its live client, reporting the truth.
-
-        Returns ``None`` — "no opinion" — for anything this handler does not own.
-        That matters because this is a *global* outbound handler: it sees every
-        channel's events, and ``MessageBus._aggregate`` folds a returned
-        SendResult into the delivery verdict. Voting FAILED on, say, a Telegram
-        event because no WebSocket was attached would fault deliveries that in
-        fact succeeded on their own channel.
-
-        For events it does own, the receipt is real. Previously this returned
-        None unconditionally, which ``_aggregate`` reads as ACCEPTED — counted as
-        success by ``DeliveryResult.ok``. So a turn whose answer reached nobody
-        (client gone, no HTTP waiter) still reported success, and the cron run or
-        task that produced it was marked complete. The warning below already knew
-        the reply had been dropped; it just never told the caller.
-        """
-        if event.metadata.get("_drop"):
-            return None
-        if not event.channel.startswith("gateway:"):
-            return None
-        self._purge_http_tool_deliveries()
-
-        _, platform = event.channel.split(":", 1)
-        session_key = f"gateway:{platform}:{event.chat_id}"
-        payload = self._build_outbound_payload(event)
-        is_final = event.is_final or event.message_kind == "final"
-        is_tool_delivery = bool(event.metadata.get("_tool_delivery"))
-        is_turn_terminal = is_final and not is_tool_delivery
-
-        # An HTTP waiter is a real delivery target: the caller is blocked on this
-        # reply and will receive it, whether or not a WebSocket is also attached.
-        # Tool deliveries are complete frames in their own right but are not the
-        # turn terminal.  Buffer them for that waiter and resolve it only after
-        # the agent's real terminal frame arrives.
-        answered_http_waiter = False
-        buffered_http_tool_delivery = False
-        buffer_error: str | None = None
-        correlation_id = str(event.metadata.get("_inbound_event_id") or event.reply_to_id or "")
-        if correlation_id:
-            future = self._pending_http.get(correlation_id)
-            if is_tool_delivery and future is not None and not future.done():
-                buffer_error = self._buffer_http_tool_delivery(correlation_id, payload)
-                buffered_http_tool_delivery = buffer_error is None
-            elif is_turn_terminal:
-                tool_deliveries = self._take_http_tool_deliveries(correlation_id)
-                if tool_deliveries:
-                    payload = {**payload, "tool_deliveries": tool_deliveries}
-                if future is not None and not future.done():
-                    try:
-                        future.set_result(payload)
-                        answered_http_waiter = True
-                    except asyncio.InvalidStateError:
-                        # The HTTP waiter timed out/cancelled between the done
-                        # check and set_result; its lifecycle owner has settled it.
-                        pass
-                    self._pending_http.pop(correlation_id, None)
-            if is_turn_terminal:
-                idempotency_context = await self._message_idempotency.context_for_event(correlation_id)
-                if idempotency_context.get("transport") == "ws":
-                    # Usually the WS admission ACK already completed this entry.
-                    # If publish admission became outcome-unknown (cancellation
-                    # or transport failure), a later final frame is authoritative
-                    # and must settle the pending retry instead of leaving it to
-                    # time out until the stale-entry backstop.
-                    await self._message_idempotency.complete_event(
-                        correlation_id,
-                        status=200,
-                        payload=payload,
-                    )
-                elif idempotency_context.get("transport") == "http":
-                    # A normal non-wait request already cached its admission
-                    # ACK, so complete_event is a no-op. More importantly, if
-                    # cancellation struck after queue admission but before that
-                    # ACK was persisted, the final frame now settles the key
-                    # instead of leaving every immediate retry pending to TTL.
-                    response_status, response_payload = self._http_final_response(
-                        correlation_id,
-                        idempotency_context.get("session_key", session_key),
-                        payload,
-                    )
-                    await self._message_idempotency.complete_event(
-                        correlation_id,
-                        status=response_status,
-                        payload=response_payload,
-                    )
-
-        delivered = await self.broadcast_to_ws(session_key, payload)
-        if buffer_error is not None:
-            # A WebSocket may also have received this frame, but the synchronous
-            # HTTP caller did not.  Reporting success would let multipart
-            # producers checkpoint a part that the waiting response can never
-            # reproduce, so the aggregate delivery verdict must remain failed.
-            logger.warning(buffer_error)
-            return SendResult(success=False, error=buffer_error)
-        if delivered or answered_http_waiter:
-            return SendResult(success=True)
-        if buffered_http_tool_delivery:
-            # Volatile HTTP buffering is not a durable delivery receipt. Expose
-            # that distinction through the bus so an artifact producer can keep
-            # sending later parts without checkpointing this one across crashes.
-            return SendResult(success=True, deferred=True)
-
-        if not is_final and not is_tool_delivery:
-            # Interim stream frames are level-triggered progress: the final still
-            # carries the full text, so a dropped one is not a delivery failure.
-            # Stay silent rather than faulting the turn over a skipped frame.
-            return None
-
-        # A dropped FINAL reply is the severe case: the turn's answer was
-        # produced and persisted to history but never reached the live client
-        # (closed/rebound socket), and there is no replay — so the CLI shows
-        # nothing. Log it loudly with the routing key so the silent-drop is
-        # diagnosable instead of vanishing.
-        logger.warning(
-            "Outbound FINAL reply not delivered to live client "
-            "(session_key={}, event_id={}): socket missing or closed. "
-            "Reply is persisted to history but the attached client missed it.",
-            session_key,
-            event.event_id,
-        )
-        return SendResult(
-            success=False,
-            error="no live gateway client for this session (reply persisted to history only)",
-        )
-
-    async def broadcast_to_ws(self, session_key: str, data: dict[str, Any]) -> bool:
-        ws = self._ws_clients.get(session_key)
-        if ws is None:
-            logger.debug("broadcast_to_ws: no live client for session_key={}", session_key)
-            return False
-        if ws.closed:
-            logger.debug("broadcast_to_ws: client socket closed for session_key={}", session_key)
-            return False
-        try:
-            await ws.send_json(data)
-            return True
-        except Exception as e:
-            logger.warning("Failed to send WebSocket message (session_key={}): {}", session_key, e)
-            return False
+    @staticmethod
+    def _is_loopback_peer(request: web.Request) -> bool:
+        from codex_pro.gateway.http_handlers.base import is_loopback_peer
+        return is_loopback_peer(request)

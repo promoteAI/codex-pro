@@ -1368,6 +1368,14 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .gn-shortcut{display:inline-flex;align-items:center;gap:6px;color:#c8c8c8;font-size:12.5px;padding:4px 6px;border-radius:6px;cursor:pointer;border:0;background:transparent}
 .gn-shortcut:hover{background:#2a2a2a;color:#eee}
 .gn-shortcut svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
+.gn-hotkey-wrap{display:inline-flex;align-items:center;gap:10px}
+.gn-hotkey-edit{display:none;align-items:center;gap:10px}
+.gn-hotkey-wrap.is-recording .gn-shortcut{display:none}
+.gn-hotkey-wrap.is-recording .gn-hotkey-edit{display:inline-flex}
+.gn-hotkey-capture{min-width:108px;padding:5px 12px;border:1.5px solid #4c8dff;border-radius:8px;background:#1e1e1e;color:#f0f0f0;font-size:12.5px;line-height:1.3;outline:none;box-shadow:0 0 0 1px rgba(76,141,255,.25);cursor:text;user-select:none;white-space:nowrap}
+.gn-hotkey-capture:focus{border-color:#6ba0ff;box-shadow:0 0 0 2px rgba(76,141,255,.28)}
+.gn-hotkey-cancel{border:0;background:transparent;padding:0;color:#c8c8c8;font:inherit;font-size:12.5px;cursor:pointer}
+.gn-hotkey-cancel:hover{color:#eee}
 .gn-kbd{font-size:11.5px;color:#9a9a9a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 
 /* Account settings page */
@@ -2625,7 +2633,10 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                   <div class="gn-row-desc">界面与系统提示所用语言</div>
                 </div>
                 <div class="gn-row-value">
-                  <button class="dropdown-btn" type="button" id="gnLang">自动检测 <span class="dropdown-arrow"></span></button>
+                  <button class="dropdown-btn" type="button" id="gnLang" aria-haspopup="listbox" aria-expanded="false" aria-controls="gnLangMenu">
+                    <span id="gnLangLabel">简体中文</span>
+                    <span class="dropdown-arrow"></span>
+                  </button>
                 </div>
               </div>
               <div class="gn-row">
@@ -2647,15 +2658,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                     <button type="button" class="gn-seg-btn is-active" data-pos="bottom">底部</button>
                     <button type="button" class="gn-seg-btn" data-pos="right">右侧</button>
                   </div>
-                </div>
-              </div>
-              <div class="gn-row">
-                <div class="gn-row-left">
-                  <div class="gn-row-label">开源许可证</div>
-                  <div class="gn-row-desc">查看本应用使用的开源组件许可证</div>
-                </div>
-                <div class="gn-row-value">
-                  <button class="gn-action-btn" type="button" id="gnLicenses">查看</button>
                 </div>
               </div>
               <div class="gn-row">
@@ -2694,7 +2696,10 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                   <div class="gn-row-desc">选择按 Enter 时是发送提示还是插入新行</div>
                 </div>
                 <div class="gn-row-value">
-                  <button class="dropdown-btn" type="button" id="gnSendKey">按 Enter 键 <span class="dropdown-arrow"></span></button>
+                  <button class="dropdown-btn" type="button" id="gnSendKey" aria-haspopup="listbox" aria-expanded="false" aria-controls="gnSendKeyMenu">
+                    <span id="gnSendKeyLabel">按 Enter 键</span>
+                    <span class="dropdown-arrow"></span>
+                  </button>
                 </div>
               </div>
               <div class="gn-row">
@@ -2719,10 +2724,16 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                   <div class="gn-row-desc">为弹出窗口设置全局快捷键。不设置则保持关闭。</div>
                 </div>
                 <div class="gn-row-value">
-                  <button type="button" class="gn-shortcut" id="gnPopupHotkey" aria-label="编辑弹出窗口快捷键">
-                    <span>关闭</span>
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-                  </button>
+                  <div class="gn-hotkey-wrap" id="gnPopupHotkeyWrap">
+                    <button type="button" class="gn-shortcut" id="gnPopupHotkey" aria-label="编辑弹出窗口快捷键">
+                      <span id="gnPopupHotkeyLabel">关闭</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </button>
+                    <div class="gn-hotkey-edit" id="gnPopupHotkeyEdit">
+                      <div class="gn-hotkey-capture" id="gnPopupHotkeyCapture" tabindex="0" role="textbox" aria-label="按下快捷键">按下快捷键</div>
+                      <button type="button" class="gn-hotkey-cancel" id="gnPopupHotkeyCancel">取消</button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="gn-row">
@@ -2744,7 +2755,10 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                   <div class="gn-row-desc">设置 ChatGPT 完成后何时提醒你</div>
                 </div>
                 <div class="gn-row-value">
-                  <button class="dropdown-btn" type="button" id="gnTurnNotify">仅在未聚焦时 <span class="dropdown-arrow"></span></button>
+                  <button class="dropdown-btn" type="button" id="gnTurnNotify" aria-haspopup="listbox" aria-expanded="false" aria-controls="gnTurnNotifyMenu">
+                    <span id="gnTurnNotifyLabel">仅在未聚焦时</span>
+                    <span class="dropdown-arrow"></span>
+                  </button>
                 </div>
               </div>
               <div class="gn-row">
@@ -3409,6 +3423,47 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                 <span class="gn-env-item-desc">在 WSL 中运行智能体</span>
               </span>
               <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+          </div>
+
+          <div class="gn-dd-menu" id="gnLangMenu" role="listbox" aria-label="语言" hidden>
+            <button type="button" class="gn-dd-item is-active" role="option" data-value="简体中文" aria-selected="true">
+              简体中文
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item" role="option" data-value="English" aria-selected="false">
+              English
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+          </div>
+
+          <div class="gn-dd-menu" id="gnSendKeyMenu" role="listbox" aria-label="发送快捷键" hidden>
+            <button type="button" class="gn-dd-item is-active" role="option" data-value="按 Enter 键" aria-selected="true">
+              按 Enter 键
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item" role="option" data-value="Shift + Enter 用于多行提示" aria-selected="false">
+              Shift + Enter 用于多行提示
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item" role="option" data-value="总是使用 Shift + Enter" aria-selected="false">
+              总是使用 Shift + Enter
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+          </div>
+
+          <div class="gn-dd-menu" id="gnTurnNotifyMenu" role="listbox" aria-label="轮次完成通知" hidden>
+            <button type="button" class="gn-dd-item" role="option" data-value="从不" aria-selected="false">
+              从不
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item is-active" role="option" data-value="仅在未聚焦时" aria-selected="true">
+              仅在未聚焦时
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item" role="option" data-value="始终" aria-selected="false">
+              始终
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
             </button>
           </div>
 
@@ -7194,12 +7249,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         showProtoToast('选择无项目任务文件夹（原型）');
       });
     }
-    var licenses = document.getElementById('gnLicenses');
-    if (licenses) {
-      licenses.addEventListener('click', function () {
-        showProtoToast('开源许可证（原型）');
-      });
-    }
     var learn = document.getElementById('gnFullAccessLearn');
     if (learn) {
       learn.addEventListener('click', function (e) {
@@ -7207,19 +7256,66 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         showProtoToast('完整访问权限说明（原型）');
       });
     }
-    var popupHotkey = document.getElementById('gnPopupHotkey');
-    if (popupHotkey) {
-      popupHotkey.addEventListener('click', function () {
-        showProtoToast('设置弹出窗口快捷键（原型）');
+    (function initPopupHotkey() {
+      var wrap = document.getElementById('gnPopupHotkeyWrap');
+      var trigger = document.getElementById('gnPopupHotkey');
+      var label = document.getElementById('gnPopupHotkeyLabel');
+      var capture = document.getElementById('gnPopupHotkeyCapture');
+      var cancelBtn = document.getElementById('gnPopupHotkeyCancel');
+      if (!wrap || !trigger || !capture || !cancelBtn) return;
+      var recording = false;
+      function formatHotkey(e) {
+        var parts = [];
+        if (e.ctrlKey || e.metaKey) parts.push(e.metaKey && !e.ctrlKey ? 'Cmd' : 'Ctrl');
+        if (e.altKey) parts.push('Alt');
+        if (e.shiftKey) parts.push('Shift');
+        var key = e.key;
+        if (!key || key === 'Control' || key === 'Shift' || key === 'Alt' || key === 'Meta') return null;
+        if (key === ' ') key = 'Space';
+        else if (key === 'Escape') return 'Escape';
+        else if (key.length === 1) key = key.toUpperCase();
+        parts.push(key);
+        return parts.join(' + ');
+      }
+      function stopRecord() {
+        recording = false;
+        wrap.classList.remove('is-recording');
+        capture.textContent = '按下快捷键';
+      }
+      function startRecord() {
+        recording = true;
+        wrap.classList.add('is-recording');
+        capture.textContent = '按下快捷键';
+        setTimeout(function () { capture.focus(); }, 0);
+      }
+      trigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        startRecord();
       });
-    }
-    [['gnLang', '语言'], ['gnSendKey', '发送快捷键'], ['gnTurnNotify', '轮次完成通知']].forEach(function (pair) {
-      var el = document.getElementById(pair[0]);
-      if (!el) return;
-      el.addEventListener('click', function () {
-        showProtoToast(pair[1] + '（原型下拉）');
+      cancelBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        stopRecord();
       });
-    });
+      capture.addEventListener('keydown', function (e) {
+        if (!recording) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key === 'Escape') {
+          stopRecord();
+          return;
+        }
+        var combo = formatHotkey(e);
+        if (!combo || combo === 'Escape') return;
+        if (label) label.textContent = combo;
+        stopRecord();
+        showProtoToast('弹出窗口快捷键：' + combo);
+      });
+      document.addEventListener('click', function (e) {
+        if (!recording) return;
+        if (wrap.contains(e.target)) return;
+        stopRecord();
+      });
+    })();
 
     var protoDdClosers = [];
     function closeAllProtoDd() {
@@ -7294,6 +7390,27 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       menuId: 'gnShellMenu',
       labelId: 'gnShellLabel',
       minWidth: 180
+    });
+
+    bindProtoDropdown({
+      triggerId: 'gnLang',
+      menuId: 'gnLangMenu',
+      labelId: 'gnLangLabel',
+      minWidth: 140
+    });
+
+    bindProtoDropdown({
+      triggerId: 'gnSendKey',
+      menuId: 'gnSendKeyMenu',
+      labelId: 'gnSendKeyLabel',
+      minWidth: 220
+    });
+
+    bindProtoDropdown({
+      triggerId: 'gnTurnNotify',
+      menuId: 'gnTurnNotifyMenu',
+      labelId: 'gnTurnNotifyLabel',
+      minWidth: 150
     });
 
     bindProtoDropdown({

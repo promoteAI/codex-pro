@@ -271,9 +271,6 @@ export function GeneralPage() {
             ]}
           />
         </SettingsRow>
-        <SettingsRow label={t("openSourceLicenses")} desc={t("openSourceLicensesDesc")}>
-          <ActionBtn>{t("view")}</ActionBtn>
-        </SettingsRow>
         <SettingsRow label={t("pluginsToggle")} desc={t("pluginsToggleDesc")}>
           <Toggle checked={plugins} onChange={setPlugins} label={t("pluginsToggle")} />
         </SettingsRow>

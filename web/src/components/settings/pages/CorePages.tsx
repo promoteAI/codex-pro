@@ -450,6 +450,7 @@ export function AgentConfigPage() {
   const { t } = useTranslation("settings");
   const [ultra, setUltra] = useState(false);
   const [deps, setDeps] = useState(true);
+  const [webSearch, setWebSearch] = useState(true);
 
   return (
     <div className="max-w-[720px]">
@@ -460,8 +461,7 @@ export function AgentConfigPage() {
         <div className="px-4 pt-4">
           <SectionTitle>{t("agentDefaults")}</SectionTitle>
         </div>
-        <div className="flex items-center justify-between px-4 pb-2">
-          <DropdownBtn>{t("userConfig")}</DropdownBtn>
+        <div className="flex items-center justify-end px-4 pb-2">
           <button type="button" className="text-[12.5px] text-codex-accent hover:underline">
             {t("openConfigToml")}
           </button>
@@ -473,7 +473,7 @@ export function AgentConfigPage() {
           <DropdownBtn>{t("fullAccess")}</DropdownBtn>
         </SettingsRow>
         <SettingsRow label={t("webSearch")} desc={t("webSearchDesc")}>
-          <DropdownBtn>{t("realtime")}</DropdownBtn>
+          <Toggle checked={webSearch} onChange={setWebSearch} label={t("webSearch")} />
         </SettingsRow>
         <SettingsRow label={t("verbosity")} desc={t("verbosityDesc")}>
           <DropdownBtn>{t("modelDefault")}</DropdownBtn>

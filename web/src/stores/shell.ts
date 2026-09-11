@@ -10,7 +10,6 @@ export type SettingsSection =
   | "voice"
   | "agent"
   | "personalization"
-  | "pets"
   | "shortcuts"
   | "account"
   | "computer"

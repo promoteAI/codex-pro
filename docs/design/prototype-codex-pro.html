@@ -733,8 +733,14 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .voice-toggle-label{font-size:12.5px;color:#6e6e6e;cursor:pointer}
 .voice-add-btn{background:#2a2a2a;border:1px solid #3a3a3a;border-radius:6px;padding:5px 12px;font-size:12.5px;color:#c0c0c0;cursor:pointer}
 .voice-add-btn:hover{background:#323232;border-color:#4a4a4a;color:#e0e0e0}
-.voice-dict-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #2a2a2a;margin-top:4px}
-.voice-dict-input{flex:1;background:#1e1e1e;border:1px solid #3a3a3a;border-radius:6px;color:#d4d4d4;font-size:12.5px;padding:5px 10px}
+.voice-dict-list{display:flex;flex-direction:column}
+.voice-dict-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #2a2a2a;margin-top:0}
+.voice-dict-row:first-child{margin-top:4px}
+.voice-dict-input{flex:1;min-width:0;background:#1e1e1e;border:1px solid #3a3a3a;border-radius:6px;color:#d4d4d4;font-size:12.5px;padding:5px 10px;font:inherit;outline:none}
+.voice-dict-input:focus{border-color:#4c8dff}
+.voice-dict-del{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:0;border-radius:6px;background:transparent;color:#666;cursor:pointer;flex:0 0 auto;padding:0}
+.voice-dict-del:hover{background:#2a2a2a;color:#e0e0e0}
+.voice-dict-del svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 .config-card{background:#222;border:1px solid #2e2e2e;border-radius:12px;padding:0;margin-bottom:24px;overflow:visible}
 .config-section-title{font-size:13px;font-weight:500;color:#b8b8b8;padding:16px 20px 10px;letter-spacing:.02em}
@@ -752,7 +758,9 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .dropdown-btn{background:#2a2a2a;border:1px solid #3a3a3a;border-radius:6px;padding:5px 12px;font-size:12.5px;color:#c0c0c0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;max-width:100%}
 .dropdown-btn:hover{background:#323232;border-color:#4a4a4a;color:#e0e0e0}
 .dropdown-arrow{display:inline-block;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:4px solid currentColor;vertical-align:middle}
-.badge-pill{font-size:12px;color:#999;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:20px;padding:3px 10px;white-space:nowrap}
+.badge-pill{font-size:12px;color:#c0c0c0;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:20px;padding:3px 10px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font:inherit;line-height:1.3}
+.badge-pill:hover{background:#323232;border-color:#4a4a4a;color:#e0e0e0}
+.badge-pill .dropdown-arrow{border-top-color:currentColor;opacity:.75}
 .search-btn{flex:0 0 auto;background:transparent;border:1px solid #3a3a3a;border-radius:6px;padding:5px 10px;font-size:12px;color:#888;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .search-btn:hover{background:#2a2a2a;border-color:#4a4a4a;color:#c0c0c0}
 .cancel-btn{flex:0 0 auto;background:#3a1a1a;border:1px solid #5a2a2a;border-radius:6px;padding:5px 12px;font-size:12.5px;color:#f87171;cursor:pointer;white-space:nowrap}
@@ -853,10 +861,14 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .kb-row-info{flex:1;min-width:0}
 .kb-row-name{font-size:13.5px;font-weight:500;color:#e6e6e6;margin-bottom:3px}
 .kb-row-desc{font-size:12px;color:#6e6e6e;line-height:1.4}
-.kb-row-keys{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px;flex:0 1 auto;max-width:46%}
+.kb-row-keys{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px;flex:0 1 auto;min-width:0}
 .kb-key{display:inline-flex;align-items:center;padding:3px 8px;border-radius:6px;background:#2a2a2a;border:1px solid #363636;font-size:11.5px;color:#b8b8b8;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap;letter-spacing:.01em}
 .kb-unassigned{font-size:12.5px;color:#666}
 .kb-row-actions{display:flex;align-items:center;gap:2px;flex:0 0 auto}
+.kb-row-normal{display:flex;align-items:center;gap:10px;flex:0 1 auto;max-width:58%;justify-content:flex-end}
+.kb-row-edit{display:none;align-items:center;gap:10px;flex:0 0 auto}
+.kb-row.is-recording .kb-row-normal{display:none}
+.kb-row.is-recording .kb-row-edit{display:inline-flex}
 .kb-icon-btn{width:28px;height:28px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:#666;background:transparent;border:0;cursor:pointer}
 .kb-icon-btn:hover{background:#2a2a2a;color:#c0c0c0}
 .kb-icon-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
@@ -1349,7 +1361,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .gn-openin-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:8px;background:transparent;color:#e4e4e4;cursor:pointer;text-align:left;font:inherit;font-size:13px}
 .gn-openin-item:hover,.gn-openin-item.is-active{background:#343434}
 .gn-openin-item .dd-ico{width:16px;height:16px;border-radius:3px;flex:0 0 auto}
-.gn-env-menu{display:none;position:fixed;z-index:120;min-width:280px;max-width:min(360px,calc(100vw - 24px));padding:6px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.5)}
+.gn-env-menu{display:none;position:fixed;z-index:120;min-width:280px;max-width:min(420px,calc(100vw - 24px));padding:6px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.5)}
 .gn-env-menu.open{display:block}
 .gn-env-item{display:flex;align-items:flex-start;gap:12px;width:100%;padding:10px 12px;border:0;border-radius:10px;background:transparent;color:#e4e4e4;cursor:pointer;text-align:left;font:inherit}
 .gn-env-item:hover{background:#343434}
@@ -1365,6 +1377,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .gn-dd-item:hover{background:#343434}
 .gn-dd-item .gn-dd-check{width:14px;height:14px;flex:0 0 auto;opacity:0;fill:none;stroke:#e8e8e8;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .gn-dd-item.is-active .gn-dd-check{opacity:1}
+.gn-dd-sep{height:1px;margin:4px 8px;background:#3a3a3a;border:0;padding:0;pointer-events:none}
+.gn-dd-item-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gn-shortcut{display:inline-flex;align-items:center;gap:6px;color:#c8c8c8;font-size:12.5px;padding:4px 6px;border-radius:6px;cursor:pointer;border:0;background:transparent}
 .gn-shortcut:hover{background:#2a2a2a;color:#eee}
 .gn-shortcut svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
@@ -1717,7 +1731,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
           </div>
           <div class="perm-menu" id="permMenu" role="menu" aria-label="批准模式" hidden>
             <div class="perm-menu-head">
-              <div class="perm-menu-title">应如何批准 ChatGPT 操作？</div>
+              <div class="perm-menu-title">应如何批准 CodexPro 操作？</div>
               <a class="perm-menu-link" href="#" id="permLearnMore">了解更多</a>
             </div>
             <div class="perm-menu-list" role="group">
@@ -1828,7 +1842,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
           </div>
           <div class="sch-inner">
             <h1 class="sch-title">已安排的任务</h1>
-            <p class="sch-sub">让 ChatGPT 安排任务、设置提醒或监测更新</p>
+            <p class="sch-sub">让 CodexPro 安排任务、设置提醒或监测更新</p>
             <div class="sch-search">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg>
               <input type="search" id="schSearch" placeholder="搜索已安排任务" aria-label="搜索已安排任务">
@@ -2365,7 +2379,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 
 
             <div class="settings-item" role="button" tabindex="0" data-section="个性化"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>个性化</div>
-            <div class="settings-item" role="button" tabindex="0" data-section="宠物"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="1.8"/><circle cx="16" cy="8" r="1.8"/><circle cx="5.2" cy="12.5" r="1.6"/><circle cx="18.8" cy="12.5" r="1.6"/><path d="M8.5 16.5c1.2 2.2 5.8 2.2 7 0"/><ellipse cx="12" cy="17.2" rx="3.8" ry="3.2"/></svg>宠物</div>
             <div class="settings-item" role="button" tabindex="0" data-section="键盘快捷键"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>键盘快捷键</div>
             <div class="settings-item" role="button" tabindex="0" data-section="账户"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>账户</div>
             <div class="section-label">集成</div>
@@ -2561,7 +2574,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="gn-row">
                 <div class="gn-row-left">
                   <div class="gn-row-label">默认权限</div>
-                  <div class="gn-row-desc">允许 ChatGPT 读取和编辑工作区中的文件</div>
+                  <div class="gn-row-desc">允许 CodexPro 读取和编辑工作区中的文件</div>
                 </div>
                 <div class="gn-row-value">
                   <label class="toggle"><input type="checkbox" id="gnDefaultPerm" checked aria-label="默认权限"><span class="toggle-slider"></span></label>
@@ -2570,7 +2583,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="gn-row">
                 <div class="gn-row-left">
                   <div class="gn-row-label">完整访问权限</div>
-                  <div class="gn-row-desc">授予完整访问权限时，ChatGPT 可访问电脑上的任意文件，并运行命令与使用网络。<a href="#" class="gn-link" id="gnFullAccessLearn">了解更多</a></div>
+                  <div class="gn-row-desc">授予完整访问权限时，CodexPro 可访问电脑上的任意文件，并运行命令与使用网络。<a href="#" class="gn-link" id="gnFullAccessLearn">了解更多</a></div>
                 </div>
                 <div class="gn-row-value">
                   <label class="toggle"><input type="checkbox" id="gnFullAccess" checked aria-label="完整访问权限"><span class="toggle-slider"></span></label>
@@ -2663,7 +2676,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="gn-row">
                 <div class="gn-row-left">
                   <div class="gn-row-label">插件</div>
-                  <div class="gn-row-desc">重启 ChatGPT 以应用此更改</div>
+                  <div class="gn-row-desc">重启 CodexPro 以应用此更改</div>
                 </div>
                 <div class="gn-row-value">
                   <label class="toggle"><input type="checkbox" id="gnPlugins" checked aria-label="插件"><span class="toggle-slider"></span></label>
@@ -2705,7 +2718,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="gn-row">
                 <div class="gn-row-left">
                   <div class="gn-row-label">跟进处理方式</div>
-                  <div class="gn-row-desc">在 ChatGPT 运行时将后续消息加入队列，或调整当前运行的方向。按 <span class="gn-kbd">Ctrl+↵</span> 可对单条消息执行相反操作</div>
+                  <div class="gn-row-desc">在 CodexPro 运行时将后续消息加入队列，或调整当前运行的方向。按 <span class="gn-kbd">Ctrl+↵</span> 可对单条消息执行相反操作</div>
                 </div>
                 <div class="gn-row-value">
                   <div class="gn-seg" id="gnFollowUp" role="group" aria-label="跟进处理方式">
@@ -2724,9 +2737,9 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                   <div class="gn-row-desc">为弹出窗口设置全局快捷键。不设置则保持关闭。</div>
                 </div>
                 <div class="gn-row-value">
-                  <div class="gn-hotkey-wrap" id="gnPopupHotkeyWrap">
+                  <div class="gn-hotkey-wrap" id="gnPopupHotkeyWrap" data-hotkey-toast="弹出窗口快捷键">
                     <button type="button" class="gn-shortcut" id="gnPopupHotkey" aria-label="编辑弹出窗口快捷键">
-                      <span id="gnPopupHotkeyLabel">关闭</span>
+                      <span class="gn-hotkey-label" id="gnPopupHotkeyLabel">关闭</span>
                       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                     </button>
                     <div class="gn-hotkey-edit" id="gnPopupHotkeyEdit">
@@ -2752,7 +2765,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="gn-row">
                 <div class="gn-row-left">
                   <div class="gn-row-label">轮次完成通知</div>
-                  <div class="gn-row-desc">设置 ChatGPT 完成后何时提醒你</div>
+                  <div class="gn-row-desc">设置 CodexPro 完成后何时提醒你</div>
                 </div>
                 <div class="gn-row-value">
                   <button class="dropdown-btn" type="button" id="gnTurnNotify" aria-haspopup="listbox" aria-expanded="false" aria-controls="gnTurnNotifyMenu">
@@ -2989,10 +3002,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 
             <div class="config-card">
               <div class="config-section-title">智能体默认设置</div>
-              <div class="config-top-row">
-                <div class="config-top-row-left">
-                  <button class="dropdown-btn">用户配置 <span class="dropdown-arrow"></span></button>
-                </div>
+              <div class="config-top-row" style="justify-content:flex-end">
                 <div class="config-top-row-right">
                   <a href="#">打开 config.toml <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
                 </div>
@@ -3000,46 +3010,58 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="config-row">
                 <div class="config-row-left">
                   <div class="config-row-label">批准策略</div>
-                  <div class="config-row-desc">选择 ChatGPT 何时请求批准</div>
+                  <div class="config-row-desc">选择 CodexPro 何时请求批准</div>
                 </div>
                 <div class="config-row-value">
-                  <button class="dropdown-btn">从不请求审批 <span class="dropdown-arrow"></span></button>
+                  <button class="dropdown-btn" type="button" id="genApproval" aria-haspopup="listbox" aria-expanded="false" aria-controls="genApprovalMenu">
+                    <span id="genApprovalLabel">从不请求审批</span>
+                    <span class="dropdown-arrow"></span>
+                  </button>
                 </div>
               </div>
               <div class="config-row">
                 <div class="config-row-left">
                   <div class="config-row-label">沙盒设置</div>
-                  <div class="config-row-desc">选择 ChatGPT 运行命令时的权限范围</div>
+                  <div class="config-row-desc">选择 CodexPro 运行命令时的权限范围</div>
                 </div>
                 <div class="config-row-value">
-                  <button class="dropdown-btn">完整访问权限 <span class="dropdown-arrow"></span></button>
+                  <button class="dropdown-btn" type="button" id="genSandbox" aria-haspopup="listbox" aria-expanded="false" aria-controls="genSandboxMenu">
+                    <span id="genSandboxLabel">完整访问权限</span>
+                    <span class="dropdown-arrow"></span>
+                  </button>
                 </div>
               </div>
               <div class="config-row">
                 <div class="config-row-left">
                   <div class="config-row-label">网页搜索</div>
-                  <div class="config-row-desc">选择 ChatGPT 访问网络的方式</div>
+                  <div class="config-row-desc">允许 CodexPro 搜索网页以获取最新信息</div>
                 </div>
                 <div class="config-row-value">
-                  <button class="dropdown-btn">实时 <span class="dropdown-arrow"></span></button>
+                  <label class="toggle"><input type="checkbox" checked aria-label="网页搜索"><span class="toggle-slider"></span></label>
                 </div>
               </div>
               <div class="config-row">
                 <div class="config-row-left">
                   <div class="config-row-label">输出详细程度</div>
-                  <div class="config-row-desc">选择 ChatGPT 回复包含细节的详细程度</div>
+                  <div class="config-row-desc">选择 CodexPro 回复包含细节的详细程度</div>
                 </div>
                 <div class="config-row-value">
-                  <button class="dropdown-btn">模型默认 <span class="dropdown-arrow"></span></button>
+                  <button class="dropdown-btn" type="button" id="genVerbosity" aria-haspopup="listbox" aria-expanded="false" aria-controls="genVerbosityMenu">
+                    <span id="genVerbosityLabel">模型默认</span>
+                    <span class="dropdown-arrow"></span>
+                  </button>
                 </div>
               </div>
               <div class="config-row">
                 <div class="config-row-left">
                   <div class="config-row-label">推理摘要</div>
-                  <div class="config-row-desc">选择 ChatGPT 总结其推理的方式</div>
+                  <div class="config-row-desc">选择 CodexPro 总结其推理的方式</div>
                 </div>
                 <div class="config-row-value">
-                  <button class="dropdown-btn">自动 <span class="dropdown-arrow"></span></button>
+                  <button class="dropdown-btn" type="button" id="genReasoning" aria-haspopup="listbox" aria-expanded="false" aria-controls="genReasoningMenu">
+                    <span id="genReasoningLabel">自动</span>
+                    <span class="dropdown-arrow"></span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -3052,7 +3074,10 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                   <div class="config-row-desc">选择要在模型控件中显示哪些推理强度级别。可用性因模型而异</div>
                 </div>
                 <div class="config-row-value">
-                  <span class="badge-pill">已选择 6 个</span>
+                  <button type="button" class="badge-pill" id="genEffort" aria-haspopup="listbox" aria-expanded="false" aria-controls="genEffortMenu">
+                    <span id="genEffortLabel">已选择 5 个</span>
+                    <span class="dropdown-arrow"></span>
+                  </button>
                 </div>
               </div>
               <div class="config-row">
@@ -3071,7 +3096,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="config-row">
                 <div class="config-row-left">
                   <div class="config-row-label">Codex 依赖项</div>
-                  <div class="config-row-desc">允许 ChatGPT 安装并提供随附的 Node.js 和 Python 工具</div>
+                  <div class="config-row-desc">允许 CodexPro 安装并提供随附的 Node.js 和 Python 工具</div>
                 </div>
                 <div class="config-row-value">
                   <label class="toggle"><input type="checkbox" checked aria-label="Codex 依赖项"><span class="toggle-slider"></span></label>
@@ -3296,7 +3321,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                 <div class="pref-row">
                   <div>
                     <div class="pref-label">UI 字号</div>
-                    <div class="pref-desc">调整 ChatGPT 界面使用的基准字号</div>
+                    <div class="pref-desc">调整 CodexPro 界面使用的基准字号</div>
                   </div>
                   <div style="display:flex;align-items:center">
                     <input class="pref-input" type="number" value="14" />
@@ -3330,7 +3355,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
             <div class="settings-header">
               <div>
                 <div class="import-settings-h2">导入</div>
-                <div class="settings-subtitle">将其他 AI 应用的设置、项目和聊天导入 ChatGPT</div>
+                <div class="settings-subtitle">将其他 AI 应用的设置、项目和聊天导入 CodexPro</div>
               </div>
             </div>
             <div class="import-section-title">开启自动同步</div>
@@ -3355,7 +3380,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               </div>
             </div>
             <div class="import-section-title">从其他 AI 应用导入</div>
-            <div class="import-desc">检测到可添加到 ChatGPT 的配置</div>
+            <div class="import-desc">检测到可添加到 CodexPro 的配置</div>
             <div class="import-card">
               <div class="import-row">
                 <div class="import-row-left">
@@ -3426,6 +3451,135 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
             </button>
           </div>
 
+          <div class="gn-env-menu" id="genApprovalMenu" role="listbox" aria-label="批准策略" hidden>
+            <button type="button" class="gn-env-item" role="option" data-value="按请求" aria-selected="false">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">按请求</span>
+                <span class="gn-env-item-desc">Ask when escalation is requested</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-env-item is-active" role="option" data-value="从不请求审批" aria-selected="true">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">从不请求审批</span>
+                <span class="gn-env-item-desc">Blocked actions fail instead of requesting approval</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+          </div>
+
+          <div class="gn-env-menu" id="genSandboxMenu" role="listbox" aria-label="沙盒设置" hidden>
+            <button type="button" class="gn-env-item" role="option" data-value="只读" aria-selected="false">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">只读</span>
+                <span class="gn-env-item-desc">Can read files, but cannot edit them</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-env-item" role="option" data-value="工作空间写入" aria-selected="false">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">工作空间写入</span>
+                <span class="gn-env-item-desc">Can edit files, but only in this workspace</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-env-item is-active" role="option" data-value="完整访问权限" aria-selected="true">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">完整访问权限</span>
+                <span class="gn-env-item-desc">Can edit files outside this workspace</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+          </div>
+
+          <div class="gn-env-menu" id="genVerbosityMenu" role="listbox" aria-label="输出详细程度" hidden>
+            <button type="button" class="gn-env-item is-active" role="option" data-value="模型默认" aria-selected="true">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">模型默认</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-env-item" role="option" data-value="低" aria-selected="false">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">低</span>
+                <span class="gn-env-item-desc">保持回复简洁</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-env-item" role="option" data-value="中" aria-selected="false">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">中</span>
+                <span class="gn-env-item-desc">兼顾细节与简洁</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-env-item" role="option" data-value="高" aria-selected="false">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">高</span>
+                <span class="gn-env-item-desc">在回复中包含更多细节</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+          </div>
+
+          <div class="gn-env-menu" id="genReasoningMenu" role="listbox" aria-label="推理摘要" hidden>
+            <button type="button" class="gn-env-item is-active" role="option" data-value="自动" aria-selected="true">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">自动</span>
+                <span class="gn-env-item-desc">让模型选择摘要详细程度</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-env-item" role="option" data-value="简洁" aria-selected="false">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">简洁</span>
+                <span class="gn-env-item-desc">显示简要推理摘要</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-env-item" role="option" data-value="详细" aria-selected="false">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">详细</span>
+                <span class="gn-env-item-desc">显示更详细的推理摘要</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-env-item" role="option" data-value="无" aria-selected="false">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">无</span>
+                <span class="gn-env-item-desc">不显示推理摘要</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+          </div>
+
+          <div class="gn-dd-menu" id="genEffortMenu" role="listbox" aria-multiselectable="true" aria-label="可用推理强度" hidden>
+            <button type="button" class="gn-dd-item is-active" role="option" data-value="轻度" aria-selected="true">
+              轻度
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item is-active" role="option" data-value="中" aria-selected="true">
+              中
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item is-active" role="option" data-value="高" aria-selected="true">
+              高
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item is-active" role="option" data-value="极高" aria-selected="true">
+              极高
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item" role="option" data-value="最高" aria-selected="false">
+              最高
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item is-active" role="option" data-value="Ultra" aria-selected="true">
+              Ultra
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+          </div>
+
           <div class="gn-dd-menu" id="gnLangMenu" role="listbox" aria-label="语言" hidden>
             <button type="button" class="gn-dd-item is-active" role="option" data-value="简体中文" aria-selected="true">
               简体中文
@@ -3463,6 +3617,30 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
             </button>
             <button type="button" class="gn-dd-item" role="option" data-value="始终" aria-selected="false">
               始终
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+          </div>
+
+          <div class="gn-dd-menu" id="voiceMicMenu" role="listbox" aria-label="麦克风" hidden>
+            <button type="button" class="gn-dd-item is-active" role="option" data-value="系统默认" aria-selected="true">
+              <span class="gn-dd-item-label">系统默认</span>
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <div class="gn-dd-sep" role="separator"></div>
+            <button type="button" class="gn-dd-item" role="option" data-value="通讯 - 麦克风 (ToDesk Virtual Audio)" aria-selected="false">
+              <span class="gn-dd-item-label">通讯 - 麦克风 (ToDesk Virtual Audio)</span>
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item" role="option" data-value="麦克风 (ToDesk Virtual Audio)" aria-selected="false">
+              <span class="gn-dd-item-label">麦克风 (ToDesk Virtual Audio)</span>
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item" role="option" data-value="麦克风阵列 (UU远程虚拟音频设备)" aria-selected="false">
+              <span class="gn-dd-item-label">麦克风阵列 (UU远程虚拟音频设备)</span>
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item" role="option" data-value="麦克风阵列 (Synaptics Audio)" aria-selected="false">
+              <span class="gn-dd-item-label">麦克风阵列 (Synaptics Audio)</span>
               <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
             </button>
           </div>
@@ -3538,7 +3716,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               </div>
               <div class="imp-modal-foot">
                 <button type="button" class="imp-cancel" id="impModalCancel">取消</button>
-                <button type="button" class="imp-primary" id="impModalConfirm">导入到 ChatGPT</button>
+                <button type="button" class="imp-primary" id="impModalConfirm">导入到 CodexPro</button>
               </div>
             </div>
           </div>          <div class="gen-page" id="voicePage">
@@ -3556,9 +3734,10 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                   <div class="voice-row-desc">用于语音聊天和听写</div>
                 </div>
                 <div class="voice-row-value">
-                  <select class="voice-select">
-                    <option>系统默认</option>
-                  </select>
+                  <button class="dropdown-btn" type="button" id="voiceMic" aria-haspopup="listbox" aria-expanded="false" aria-controls="voiceMicMenu">
+                    <span id="voiceMicLabel">系统默认</span>
+                    <span class="dropdown-arrow"></span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -3579,8 +3758,16 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                   <div class="voice-row-desc">在桌面任意位置按住，即可在光标处听写</div>
                 </div>
                 <div class="voice-row-value">
-                  <span class="voice-toggle-label">关闭</span>
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#666" stroke-width="2" style="cursor:pointer"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                  <div class="gn-hotkey-wrap" id="voiceHoldHotkeyWrap" data-hotkey-toast="按住听写快捷键">
+                    <button type="button" class="gn-shortcut" id="voiceHoldHotkey" aria-label="编辑按住听写快捷键">
+                      <span class="gn-hotkey-label">关闭</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </button>
+                    <div class="gn-hotkey-edit">
+                      <div class="gn-hotkey-capture" tabindex="0" role="textbox" aria-label="按下快捷键">按下快捷键</div>
+                      <button type="button" class="gn-hotkey-cancel">取消</button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="voice-row">
@@ -3589,24 +3776,34 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                   <div class="voice-row-desc">在桌面任意位置按一次开始听写，再按一次停止</div>
                 </div>
                 <div class="voice-row-value">
-                  <span class="voice-toggle-label">关闭</span>
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#666" stroke-width="2" style="cursor:pointer"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                  <div class="gn-hotkey-wrap" id="voiceToggleHotkeyWrap" data-hotkey-toast="切换听写快捷键">
+                    <button type="button" class="gn-shortcut" id="voiceToggleHotkey" aria-label="编辑切换听写快捷键">
+                      <span class="gn-hotkey-label">关闭</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </button>
+                    <div class="gn-hotkey-edit">
+                      <div class="gn-hotkey-capture" tabindex="0" role="textbox" aria-label="按下快捷键">按下快捷键</div>
+                      <button type="button" class="gn-hotkey-cancel">取消</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-            <div class="voice-card">
+            <div class="voice-card" id="voiceDictCard">
               <div class="voice-row">
                 <div class="voice-row-left">
                   <div class="voice-row-label">听写词典</div>
                   <div class="voice-row-desc">听写应能识别的单词或短语</div>
                 </div>
                 <div class="voice-row-value">
-                  <button class="voice-add-btn">+ 添加条目</button>
+                  <button type="button" class="voice-add-btn" id="voiceAddDict">+ 添加条目</button>
                 </div>
               </div>
-              <div class="voice-dict-row">
-                <div class="voice-dict-input">Jane Doe</div>
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#666" stroke-width="2" style="cursor:pointer;flex-shrink:0"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              <div class="voice-dict-list" id="voiceDictList">
+                <div class="voice-dict-row">
+                  <input class="voice-dict-input" type="text" value="Jane Doe" aria-label="词典条目">
+                  <button type="button" class="voice-dict-del" aria-label="删除条目"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                </div>
               </div>
             </div>
             <div class="voice-card">
@@ -3816,7 +4013,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="acct-profile-info">
                 <div class="acct-name">custom</div>
                 <div class="acct-email">custom@example.com</div>
-                <div class="acct-plan" title="当前方案">ChatGPT Plus</div>
+                <div class="acct-plan" title="当前方案">CodexPro</div>
               </div>
             </div>
 
@@ -3847,7 +4044,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="acct-row">
                 <div class="acct-row-left">
                   <div class="acct-row-label">退出登录</div>
-                  <div class="acct-row-desc">从此设备退出当前 ChatGPT 账户</div>
+                  <div class="acct-row-desc">从此设备退出当前 CodexPro 账户</div>
                 </div>
                 <div class="acct-row-value">
                   <button class="acct-btn" type="button" id="acctSignOut">退出登录</button>
@@ -3869,7 +4066,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="acct-row">
                 <div class="acct-row-left">
                   <div class="acct-row-label">删除账户</div>
-                  <div class="acct-row-desc">永久删除 ChatGPT 账户及关联数据</div>
+                  <div class="acct-row-desc">永久删除 CodexPro 账户及关联数据</div>
                 </div>
                 <div class="acct-row-value">
                   <button class="acct-btn danger" type="button" id="acctDelete">删除账户</button>
@@ -3880,7 +4077,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 
           <div class="gen-page" id="computerControlPage">
             <div class="cc-page-title">电脑操控</div>
-            <p class="cc-page-sub">管理 ChatGPT 如何控制你电脑上的其他应用程序</p>
+            <p class="cc-page-sub">管理 CodexPro 如何控制你电脑上的其他应用程序</p>
 
             <div class="cc-section-title">控制</div>
             <div class="cc-card">
@@ -3890,7 +4087,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                 </div>
                 <div class="cc-info">
                   <div class="cc-name">任意屏幕</div>
-                  <div class="cc-desc">允许 ChatGPT 导航和控制屏幕上的内容</div>
+                  <div class="cc-desc">允许 CodexPro 导航和控制屏幕上的内容</div>
                 </div>
                 <div class="cc-actions">
                   <label class="toggle"><input type="checkbox" id="ccAnyScreen" checked aria-label="启用任意屏幕"><span class="toggle-slider"></span></label>
@@ -3927,7 +4124,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                 </div>
                 <div class="cc-info">
                   <div class="cc-name">Microsoft Excel</div>
-                  <div class="cc-desc">允许 ChatGPT 使用 Microsoft Excel 加载项以获得更多数据视图</div>
+                  <div class="cc-desc">允许 CodexPro 使用 Microsoft Excel 加载项以获得更多数据视图</div>
                 </div>
                 <div class="cc-actions">
                   <label class="toggle"><input type="checkbox" id="ccExcel" checked aria-label="启用 Microsoft Excel"><span class="toggle-slider"></span></label>
@@ -3947,10 +4144,10 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 4 9 14 14 0 0 1-4 9 14 14 0 0 1-4-9 14 14 0 0 1 4-9z"/></svg>
               </div>
               <div class="br-hero-info">
-                <div class="br-hero-name">允许 ChatGPT 控制内置浏览器</div>
-                <div class="br-hero-desc">开启后，ChatGPT 可使用内置浏览器打开网页并与页面交互</div>
+                <div class="br-hero-name">允许 CodexPro 控制内置浏览器</div>
+                <div class="br-hero-desc">开启后，CodexPro 可使用内置浏览器打开网页并与页面交互</div>
               </div>
-              <label class="toggle"><input type="checkbox" id="brEnableControl" checked aria-label="允许 ChatGPT 控制内置浏览器"><span class="toggle-slider"></span></label>
+              <label class="toggle"><input type="checkbox" id="brEnableControl" checked aria-label="允许 CodexPro 控制内置浏览器"><span class="toggle-slider"></span></label>
             </div>
 
             <div class="br-section-head">
@@ -3966,7 +4163,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                 <div class="br-row-value">
                   <select class="br-select" aria-label="网页 URL 打开位置">
                     <option selected>默认浏览器</option>
-                    <option>ChatGPT</option>
+                    <option>CodexPro</option>
                     <option>询问</option>
                   </select>
                 </div>
@@ -3979,7 +4176,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                 <div class="br-row-value">
                   <select class="br-select" aria-label="本地 URL 打开位置">
                     <option>默认浏览器</option>
-                    <option selected>ChatGPT</option>
+                    <option selected>CodexPro</option>
                     <option>询问</option>
                   </select>
                 </div>
@@ -4240,7 +4437,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="git-row">
                 <div class="git-row-left">
                   <div class="git-row-label">分支前缀</div>
-                  <div class="git-row-desc">ChatGPT 刷新分支时使用的前缀</div>
+                  <div class="git-row-desc">CodexPro 刷新分支时使用的前缀</div>
                 </div>
                 <div class="git-row-value">
                   <input class="git-input" id="gitBranchPrefix" type="text" value="codec/" aria-label="分支前缀">
@@ -4249,7 +4446,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="git-row">
                 <div class="git-row-left">
                   <div class="git-row-label">Pull Request 合并方法</div>
-                  <div class="git-row-desc">选择 ChatGPT 合并 Pull Request 的方式</div>
+                  <div class="git-row-desc">选择 CodexPro 合并 Pull Request 的方式</div>
                 </div>
                 <div class="git-row-value">
                   <div class="git-seg" role="group" aria-label="合并方法">
@@ -4261,7 +4458,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="git-row">
                 <div class="git-row-left">
                   <div class="git-row-label">强制推送</div>
-                  <div class="git-row-desc">从 ChatGPT 推送时使用 --force-with-lease</div>
+                  <div class="git-row-desc">从 CodexPro 推送时使用 --force-with-lease</div>
                 </div>
                 <div class="git-row-value">
                   <label class="toggle"><input type="checkbox" id="gitForcePush" aria-label="强制推送"><span class="toggle-slider"></span></label>
@@ -4270,7 +4467,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="git-row">
                 <div class="git-row-left">
                   <div class="git-row-label">创建草稿 Pull Request</div>
-                  <div class="git-row-desc">从 ChatGPT 创建 PR 时默认使用草稿</div>
+                  <div class="git-row-desc">从 CodexPro 创建 PR 时默认使用草稿</div>
                 </div>
                 <div class="git-row-value">
                   <label class="toggle"><input type="checkbox" id="gitDraftPr" checked aria-label="创建草稿 Pull Request"><span class="toggle-slider"></span></label>
@@ -4323,7 +4520,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 
           <div class="gen-page" id="environmentPage">
             <div class="env-page-title">环境</div>
-            <p class="env-page-sub">本地环境会告诉 ChatGPT 如何为项目设置工作区。<a href="#">了解更多</a></p>
+            <p class="env-page-sub">本地环境会告诉 CodexPro 如何为项目设置工作区。<a href="#">了解更多</a></p>
 
             <div class="env-list-head">
               <span class="env-list-label">选择项目</span>
@@ -4404,7 +4601,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/></svg>
               </button>
             </div>
-            <div class="wt-empty">ChatGPT 创建的工作树将列在此处</div>
+            <div class="wt-empty">CodexPro 创建的工作树将列在此处</div>
           </div><!-- /worktreesPage -->
           <div class="gen-page" id="archivedChatsPage">
             <div class="ac-page-head">
@@ -6938,22 +7135,21 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   var PAGE_SUBS = {
     '常规': '权限、工作区路径与终端偏好',
     '模型': '管理自定义模型供应商，配置后可在聊天时选择使用。',
-    '导入': '将其他 AI 应用的设置、项目和聊天导入 ChatGPT',
+    '导入': '将其他 AI 应用的设置、项目和聊天导入 CodexPro',
     '外观': '主题、字体密度与界面元素',
     '语音': '语言模型倾向与语音输入',
     '配置': '配置新聊天的权限、网页访问和智能体回复',
     '个性化': '自定义说明与本机记忆',
     '键盘快捷键': '自定义与查看应用快捷键',
-    '宠物': '选择桌面伴侣与外观',
     '插件': '管理插件、技能和 MCP',
     '钩子': '通过配置管理生命周期钩子',
     '连接': '来自此电脑的 SSH 连接',
     'Git': '分支、合并与 Pull Request 偏好',
-    '环境': '本地环境会告诉 ChatGPT 如何为项目设置工作区',
+    '环境': '本地环境会告诉 CodexPro 如何为项目设置工作区',
     'Worktrees': '工作树根目录、清理与列表',
     '已归档的聊天': '查看、恢复或删除已归档聊天',
     '浏览器': '管理内置浏览器与扩展程序',
-    '电脑操控': '管理 ChatGPT 如何控制你电脑上的其他应用程序',
+    '电脑操控': '管理 CodexPro 如何控制你电脑上的其他应用程序',
     '账户': '账户、收据与重置',
     '系统配置': '网关与运行时配置',
     '概览': '系统健康、会话与任务摘要',
@@ -7021,8 +7217,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       showSettingsPage('importPage');
     } else if (txt === '语音') {
       showSettingsPage('voicePage');
-    } else if (txt === '宠物') {
-      showSettingsPage('petsPage');
     } else if (txt === '个性化') {
       showSettingsPage('personalizationPage');
     } else if (txt === '键盘快捷键') {
@@ -7256,14 +7450,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         showProtoToast('完整访问权限说明（原型）');
       });
     }
-    (function initPopupHotkey() {
-      var wrap = document.getElementById('gnPopupHotkeyWrap');
-      var trigger = document.getElementById('gnPopupHotkey');
-      var label = document.getElementById('gnPopupHotkeyLabel');
-      var capture = document.getElementById('gnPopupHotkeyCapture');
-      var cancelBtn = document.getElementById('gnPopupHotkeyCancel');
-      if (!wrap || !trigger || !capture || !cancelBtn) return;
-      var recording = false;
+    (function initHotkeyEditors() {
+      var stopFns = [];
       function formatHotkey(e) {
         var parts = [];
         if (e.ctrlKey || e.metaKey) parts.push(e.metaKey && !e.ctrlKey ? 'Cmd' : 'Ctrl');
@@ -7277,43 +7465,96 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         parts.push(key);
         return parts.join(' + ');
       }
-      function stopRecord() {
-        recording = false;
-        wrap.classList.remove('is-recording');
-        capture.textContent = '按下快捷键';
+      function stopAll() {
+        stopFns.forEach(function (fn) { fn(); });
       }
-      function startRecord() {
-        recording = true;
-        wrap.classList.add('is-recording');
-        capture.textContent = '按下快捷键';
-        setTimeout(function () { capture.focus(); }, 0);
-      }
-      trigger.addEventListener('click', function (e) {
-        e.stopPropagation();
-        startRecord();
-      });
-      cancelBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        stopRecord();
-      });
-      capture.addEventListener('keydown', function (e) {
-        if (!recording) return;
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.key === 'Escape') {
-          stopRecord();
-          return;
+      document.querySelectorAll('.gn-hotkey-wrap').forEach(function (wrap) {
+        var trigger = wrap.querySelector('.gn-shortcut');
+        var label = wrap.querySelector('.gn-hotkey-label');
+        var capture = wrap.querySelector('.gn-hotkey-capture');
+        var cancelBtn = wrap.querySelector('.gn-hotkey-cancel');
+        if (!trigger || !capture || !cancelBtn) return;
+        var recording = false;
+        var toastName = wrap.getAttribute('data-hotkey-toast') || '快捷键';
+        function stopRecord() {
+          recording = false;
+          wrap.classList.remove('is-recording');
+          capture.textContent = '按下快捷键';
         }
-        var combo = formatHotkey(e);
-        if (!combo || combo === 'Escape') return;
-        if (label) label.textContent = combo;
-        stopRecord();
-        showProtoToast('弹出窗口快捷键：' + combo);
+        stopFns.push(stopRecord);
+        function startRecord() {
+          stopAll();
+          recording = true;
+          wrap.classList.add('is-recording');
+          capture.textContent = '按下快捷键';
+          setTimeout(function () { capture.focus(); }, 0);
+        }
+        trigger.addEventListener('click', function (e) {
+          e.stopPropagation();
+          startRecord();
+        });
+        cancelBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          stopRecord();
+        });
+        capture.addEventListener('keydown', function (e) {
+          if (!recording) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.key === 'Escape') {
+            stopRecord();
+            return;
+          }
+          var combo = formatHotkey(e);
+          if (!combo || combo === 'Escape') return;
+          if (label) label.textContent = combo;
+          stopRecord();
+          showProtoToast(toastName + '：' + combo);
+        });
+        document.addEventListener('click', function (e) {
+          if (!recording) return;
+          if (wrap.contains(e.target)) return;
+          stopRecord();
+        });
       });
-      document.addEventListener('click', function (e) {
-        if (!recording) return;
-        if (wrap.contains(e.target)) return;
-        stopRecord();
+    })();
+
+    (function initVoiceDict() {
+      var list = document.getElementById('voiceDictList');
+      var addBtn = document.getElementById('voiceAddDict');
+      if (!list || !addBtn) return;
+      var trashSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+      function makeRow(value) {
+        var row = document.createElement('div');
+        row.className = 'voice-dict-row';
+        var input = document.createElement('input');
+        input.className = 'voice-dict-input';
+        input.type = 'text';
+        input.value = value || '';
+        input.setAttribute('aria-label', '词典条目');
+        input.placeholder = '输入单词或短语';
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'voice-dict-del';
+        del.setAttribute('aria-label', '删除条目');
+        del.innerHTML = trashSvg;
+        row.appendChild(input);
+        row.appendChild(del);
+        return row;
+      }
+      addBtn.addEventListener('click', function () {
+        var row = makeRow('');
+        list.appendChild(row);
+        var input = row.querySelector('.voice-dict-input');
+        if (input) {
+          input.focus();
+        }
+      });
+      list.addEventListener('click', function (e) {
+        var del = e.target.closest('.voice-dict-del');
+        if (!del) return;
+        var row = del.closest('.voice-dict-row');
+        if (row) row.remove();
       });
     })();
 
@@ -7414,6 +7655,13 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     });
 
     bindProtoDropdown({
+      triggerId: 'voiceMic',
+      menuId: 'voiceMicMenu',
+      labelId: 'voiceMicLabel',
+      minWidth: 280
+    });
+
+    bindProtoDropdown({
       triggerId: 'gnAgentEnv',
       menuId: 'gnAgentEnvMenu',
       labelId: 'gnAgentEnvLabel',
@@ -7423,6 +7671,97 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         showProtoToast('智能体环境：' + name);
       }
     });
+
+    bindProtoDropdown({
+      triggerId: 'genApproval',
+      menuId: 'genApprovalMenu',
+      labelId: 'genApprovalLabel',
+      itemSelector: '.gn-env-item',
+      minWidth: 320
+    });
+
+    bindProtoDropdown({
+      triggerId: 'genSandbox',
+      menuId: 'genSandboxMenu',
+      labelId: 'genSandboxLabel',
+      itemSelector: '.gn-env-item',
+      minWidth: 300
+    });
+
+    bindProtoDropdown({
+      triggerId: 'genVerbosity',
+      menuId: 'genVerbosityMenu',
+      labelId: 'genVerbosityLabel',
+      itemSelector: '.gn-env-item',
+      minWidth: 240
+    });
+
+    bindProtoDropdown({
+      triggerId: 'genReasoning',
+      menuId: 'genReasoningMenu',
+      labelId: 'genReasoningLabel',
+      itemSelector: '.gn-env-item',
+      minWidth: 280
+    });
+
+    (function bindGenEffortMulti() {
+      var trigger = document.getElementById('genEffort');
+      var menu = document.getElementById('genEffortMenu');
+      var label = document.getElementById('genEffortLabel');
+      if (!trigger || !menu || !label) return;
+      function closeMenu() {
+        menu.classList.remove('open');
+        menu.hidden = true;
+        menu.style.top = '';
+        menu.style.left = '';
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+      protoDdClosers.push(closeMenu);
+      function syncLabel() {
+        var n = menu.querySelectorAll('.gn-dd-item.is-active').length;
+        label.textContent = '已选择 ' + n + ' 个';
+      }
+      function openMenu() {
+        closeAllProtoDd();
+        var rect = trigger.getBoundingClientRect();
+        var width = Math.max(140, Math.round(rect.width));
+        menu.hidden = false;
+        menu.classList.add('open');
+        menu.style.minWidth = width + 'px';
+        var left = rect.right - width;
+        if (left < 8) left = 8;
+        var top = rect.bottom + 6;
+        if (top + menu.offsetHeight > window.innerHeight - 8) {
+          top = Math.max(8, rect.top - menu.offsetHeight - 6);
+        }
+        menu.style.left = Math.round(left) + 'px';
+        menu.style.top = Math.round(top) + 'px';
+        trigger.setAttribute('aria-expanded', 'true');
+      }
+      trigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (menu.classList.contains('open')) closeMenu();
+        else openMenu();
+      });
+      menu.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var item = e.target.closest('.gn-dd-item');
+        if (!item) return;
+        var on = !item.classList.contains('is-active');
+        item.classList.toggle('is-active', on);
+        item.setAttribute('aria-selected', on ? 'true' : 'false');
+        syncLabel();
+      });
+      document.addEventListener('click', function (e) {
+        if (!menu.classList.contains('open')) return;
+        if (trigger.contains(e.target) || menu.contains(e.target)) return;
+        closeMenu();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && menu.classList.contains('open')) closeMenu();
+      });
+      syncLabel();
+    })();
 
     bindProtoDropdown({
       triggerId: 'gnOpenIn',
@@ -9006,20 +9345,20 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     { name: '创建 PR', desc: '打开 Pull Request 创建选项', keys: [] },
     { name: '合并 PR', desc: '打开 Pull Request 合并选项', keys: [] },
     { name: '在 GitHub 上打开 PR', desc: '打开与当前聊天关联的 Pull Request', keys: [] },
-    { name: '打开文件夹', desc: '将本地项目添加到 ChatGPT', keys: ['Ctrl+O'] },
+    { name: '打开文件夹', desc: '将本地项目添加到 CodexPro', keys: ['Ctrl+O'] },
     { name: '强制重新加载技能', desc: '刷新当前上下文的技能目录', keys: [] },
     { name: '前往技能', desc: '浏览已安装和推荐的技能', keys: [] },
     { name: '从其他 AI 应用导入', desc: '从其他 AI 应用导入', keys: [] },
     { name: '键盘快捷方式', desc: '自定义键盘快捷键', keys: [] },
     { name: 'MCP', desc: '配置 MCP 服务器', keys: [] },
     { name: '全部标为已读', desc: '将所有聊天和已安排任务更新标记为已读', keys: ['Shift+Esc'] },
-    { name: '反馈', desc: '向 ChatGPT 团队发送产品反馈', keys: [] },
-    { name: '注销', desc: '退出登录 ChatGPT', keys: [] },
+    { name: '反馈', desc: '向 CodexPro 团队发送产品反馈', keys: [] },
+    { name: '注销', desc: '退出登录 CodexPro', keys: [] },
     { name: '管理已安排任务', desc: '从当前页面创建或管理已安排任务', keys: [] },
     { name: '显示或隐藏虚拟宠物', desc: '随时随地切换虚拟宠物的显示状态', keys: ['Alt+Win+P'] },
     { name: '打开控制窗口', desc: '打开语音聊天控制窗口', keys: [] },
     { name: '重做上一步操作', desc: '重做最近撤销的应用操作', keys: ['Ctrl+Y', 'Ctrl+Shift+Z'] },
-    { name: '设置', desc: '打开 ChatGPT 设置', keys: ['Ctrl+,'] },
+    { name: '设置', desc: '打开 CodexPro 设置', keys: ['Ctrl+,'] },
     { name: '撤销上一步操作', desc: '撤销最近的应用操作', keys: ['Ctrl+Z'] },
     { name: '批准请求', desc: '批准已开启的请求', keys: ['⏎'] },
     { name: '拒绝请求', desc: '拒绝当前请求', keys: ['Esc'] },
@@ -9040,7 +9379,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     { name: '在后台发送消息', desc: '无需打开聊天即可发送当前编辑器中的消息', keys: ['Ctrl+⏎'] },
     { name: '切换快速模式', desc: '在当前编辑器中开启或关闭快速模式', keys: [] },
     { name: '切换规划模式', desc: '在当前编辑器中开启或关闭方案模式', keys: [] },
-    { name: '切换云端/本地', desc: '切换 ChatGPT Work 的云端和本地执行', keys: [] },
+    { name: '切换云端/本地', desc: '切换 CodexPro Work 的云端和本地执行', keys: [] },
     { name: '切换本地/工作树', desc: '在本地与新工作树之间切换当前编辑器', keys: [] },
     { name: '复制为 Markdown', desc: '将当前聊天复制为 Markdown', keys: [] },
     { name: '复制对话路径', desc: '复制当前聊天路径', keys: ['Ctrl+Alt+Shift+C'] },
@@ -9077,13 +9416,73 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   var kbSearch = document.getElementById('kbSearch');
   var ICON_EDIT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   var ICON_TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
+  var kbRecordingRow = null;
+  var kbCaptureHandler = null;
 
   function escapeHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function formatKbHotkey(e) {
+    var parts = [];
+    if (e.ctrlKey || e.metaKey) parts.push(e.metaKey && !e.ctrlKey ? 'Cmd' : 'Ctrl');
+    if (e.altKey) parts.push('Alt');
+    if (e.shiftKey) parts.push('Shift');
+    var key = e.key;
+    if (!key || key === 'Control' || key === 'Shift' || key === 'Alt' || key === 'Meta') return null;
+    if (key === ' ') key = 'Space';
+    else if (key === 'Escape') return 'Escape';
+    else if (key.length === 1) key = key.toUpperCase();
+    parts.push(key);
+    return parts.join('+');
+  }
+
+  function stopKbRecord() {
+    if (kbCaptureHandler) {
+      document.removeEventListener('keydown', kbCaptureHandler, true);
+      kbCaptureHandler = null;
+    }
+    if (kbRecordingRow) {
+      kbRecordingRow.classList.remove('is-recording');
+      var capture = kbRecordingRow.querySelector('.gn-hotkey-capture');
+      if (capture) capture.textContent = '按下快捷键';
+      kbRecordingRow = null;
+    }
+  }
+
+  function startKbRecord(row) {
+    stopKbRecord();
+    if (!row) return;
+    kbRecordingRow = row;
+    row.classList.add('is-recording');
+    var capture = row.querySelector('.gn-hotkey-capture');
+    if (capture) {
+      capture.textContent = '按下快捷键';
+      setTimeout(function () { capture.focus(); }, 0);
+    }
+    kbCaptureHandler = function (e) {
+      if (!kbRecordingRow) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') {
+        stopKbRecord();
+        return;
+      }
+      var combo = formatKbHotkey(e);
+      if (!combo || combo === 'Escape') return;
+      var name = kbRecordingRow.getAttribute('data-name') || '';
+      var item = SHORTCUTS.find(function (s) { return s.name === name; });
+      if (item) item.keys = [combo];
+      stopKbRecord();
+      renderShortcuts(kbSearch ? kbSearch.value : '');
+      showProtoToast(name + '：' + combo);
+    };
+    document.addEventListener('keydown', kbCaptureHandler, true);
+  }
+
   function renderShortcuts(query) {
     if (!kbList) return;
+    stopKbRecord();
     var q = (query || '').trim().toLowerCase();
     var items = SHORTCUTS.filter(function (item) {
       if (!q) return true;
@@ -9098,13 +9497,18 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       var keysHtml = (item.keys && item.keys.length)
         ? item.keys.map(function (k) { return '<span class="kb-key">' + escapeHtml(k) + '</span>'; }).join('')
         : '<span class="kb-unassigned">未分配</span>';
-      return '<div class="kb-row" role="listitem">' +
+      return '<div class="kb-row" role="listitem" data-name="' + escapeHtml(item.name) + '">' +
         '<div class="kb-row-info"><div class="kb-row-name">' + escapeHtml(item.name) + '</div>' +
         '<div class="kb-row-desc">' + escapeHtml(item.desc) + '</div></div>' +
+        '<div class="kb-row-normal">' +
         '<div class="kb-row-keys">' + keysHtml + '</div>' +
         '<div class="kb-row-actions">' +
-        '<button class="kb-icon-btn" type="button" title="编辑" aria-label="编辑 ' + escapeHtml(item.name) + '">' + ICON_EDIT + '</button>' +
-        '<button class="kb-icon-btn" type="button" title="重置" aria-label="重置 ' + escapeHtml(item.name) + '">' + ICON_TRASH + '</button>' +
+        '<button class="kb-icon-btn kb-edit-btn" type="button" title="编辑" aria-label="编辑 ' + escapeHtml(item.name) + '">' + ICON_EDIT + '</button>' +
+        '<button class="kb-icon-btn kb-reset-btn" type="button" title="重置" aria-label="重置 ' + escapeHtml(item.name) + '">' + ICON_TRASH + '</button>' +
+        '</div></div>' +
+        '<div class="kb-row-edit">' +
+        '<div class="gn-hotkey-capture" tabindex="0" role="textbox" aria-label="按下快捷键">按下快捷键</div>' +
+        '<button type="button" class="gn-hotkey-cancel">取消</button>' +
         '</div></div>';
     }).join('');
   }
@@ -9112,6 +9516,39 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   renderShortcuts('');
   if (kbSearch) {
     kbSearch.addEventListener('input', function () { renderShortcuts(kbSearch.value); });
+  }
+  if (kbList) {
+    kbList.addEventListener('click', function (e) {
+      var editBtn = e.target.closest('.kb-edit-btn');
+      if (editBtn) {
+        e.stopPropagation();
+        startKbRecord(editBtn.closest('.kb-row'));
+        return;
+      }
+      var cancelBtn = e.target.closest('.gn-hotkey-cancel');
+      if (cancelBtn) {
+        e.stopPropagation();
+        stopKbRecord();
+        return;
+      }
+      var resetBtn = e.target.closest('.kb-reset-btn');
+      if (resetBtn) {
+        e.stopPropagation();
+        var row = resetBtn.closest('.kb-row');
+        var name = row && row.getAttribute('data-name');
+        var item = SHORTCUTS.find(function (s) { return s.name === name; });
+        if (item) {
+          item.keys = [];
+          renderShortcuts(kbSearch ? kbSearch.value : '');
+          showProtoToast('已重置 ' + name);
+        }
+      }
+    });
+    document.addEventListener('click', function (e) {
+      if (!kbRecordingRow) return;
+      if (kbRecordingRow.contains(e.target)) return;
+      stopKbRecord();
+    });
   }
 
   /* ── Git: segmented controls ── */

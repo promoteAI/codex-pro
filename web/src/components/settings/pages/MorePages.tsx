@@ -238,7 +238,7 @@ export function AccountPage() {
           <div className="text-[15px] font-semibold text-[#f0f0f0]">custom</div>
           <div className="text-[12.5px] text-[#7a7a7a]">custom@example.com</div>
           <div className="inline-flex mt-2 px-2.5 py-0.5 rounded-full bg-[#2a3548] border border-[#3a4a66] text-[11.5px] text-[#9eb6ff]">
-            ChatGPT Plus
+            CodexPro
           </div>
         </div>
       </div>

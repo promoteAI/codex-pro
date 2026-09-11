@@ -8,7 +8,6 @@ import { ModelsPage, ImportPage } from "./pages/ModelsImport";
 import {
   VoicePage,
   PersonalizationPage,
-  PetsPage,
   ShortcutsPage,
   AccountPage,
   ComputerPage,
@@ -42,7 +41,6 @@ const SECTIONS: Array<{ id: SettingsSection; group: NavGroup }> = [
   { id: "voice", group: "personal" },
   { id: "agent", group: "personal" },
   { id: "personalization", group: "personal" },
-  { id: "pets", group: "personal" },
   { id: "shortcuts", group: "personal" },
   { id: "account", group: "personal" },
   { id: "computer", group: "integrations" },
@@ -75,7 +73,6 @@ const PROTO_PAGES: Partial<Record<SettingsSection, ComponentType>> = {
   voice: VoicePage,
   agent: AgentConfigPage,
   personalization: PersonalizationPage,
-  pets: PetsPage,
   shortcuts: ShortcutsPage,
   account: AccountPage,
   computer: ComputerPage,

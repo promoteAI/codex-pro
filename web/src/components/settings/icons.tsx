@@ -70,16 +70,6 @@ export const SETTINGS_ICONS: Record<SettingsSection, ReactNode> = {
       <path d="M2 12l10 5 10-5" />
     </Icon>
   ),
-  pets: (
-    <Icon>
-      <circle cx="8" cy="8" r="1.8" />
-      <circle cx="16" cy="8" r="1.8" />
-      <circle cx="5.2" cy="12.5" r="1.6" />
-      <circle cx="18.8" cy="12.5" r="1.6" />
-      <path d="M8.5 16.5c1.2 2.2 5.8 2.2 7 0" />
-      <ellipse cx="12" cy="17.2" rx="3.8" ry="3.2" />
-    </Icon>
-  ),
   shortcuts: (
     <Icon>
       <rect x="2" y="3" width="20" height="14" rx="2" />

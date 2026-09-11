@@ -53,6 +53,10 @@ from codex_pro.agent.streaming import (
 )
 from codex_pro.agent.progress_heartbeat import ProgressHeartbeat, SharedActivityState
 from codex_pro.agent.degraded_notice import GENERIC_FALLBACK_TEXT
+from codex_pro.agent.commands.approval import ApprovalCommands
+from codex_pro.agent.commands.clarify import ClarifyCommands
+from codex_pro.agent.commands.interrupt import InterruptCommands
+from codex_pro.agent.commands.stream_params import StreamParams
 
 
 
@@ -1587,8 +1591,8 @@ class AgentLoop:
         # routing the decision through a separate lock-free path (not _process_event)
         # is what lets it wake the waiter without deadlocking on that same lock.
         # Do not move this below sessions.acquire().
-        if self._is_approval_command(event.text):
-            response_text = await self._handle_approval_command(event)
+        if ApprovalCommands.is_approval_command(self, event.text):
+            response_text = await ApprovalCommands.handle_approval_command(self, event)
             if response_text is not None:
                 out = OutboundEvent.from_text_with_media(
                     channel=event.channel,
@@ -1609,8 +1613,8 @@ class AgentLoop:
         # the session lock — the blocked agent holds that lock while parked in
         # wait_for_answer, so resolving must run on a lock-free path. Do not move
         # this below sessions.acquire().
-        if self._is_clarify_command(event.text):
-            response_text = await self._handle_clarify_command(event)
+        if ClarifyCommands.is_clarify_command(event.text):
+            response_text = await ClarifyCommands.handle_clarify_command(self, event)
             if response_text is not None:
                 out = OutboundEvent.from_text_with_media(
                     channel=event.channel,
@@ -1631,8 +1635,8 @@ class AgentLoop:
         # same reason as clarify answers: the agent blocked in wait_for_answer
         # holds the lock, so the wake must run on a lock-free path. Synthesized by
         # the gateway on ws disconnect; internal control command, no reply.
-        if self._is_clarify_cancel_command(event.text):
-            await self._handle_clarify_cancel(event)
+        if ClarifyCommands.is_clarify_cancel_command(event.text):
+            await ClarifyCommands.handle_clarify_cancel(self, event)
             return
         # Turn-interrupt escape valve. Handled BEFORE the session lock for the
         # same reason as clarify-cancel: the running turn holds the lock, so the
@@ -1640,8 +1644,8 @@ class AgentLoop:
         # inference loop polls the flag at its next checkpoint and stops cleanly.
         # Synthesized by the gateway from a Ctrl+C interrupt frame; internal
         # control command, no reply.
-        if self._is_interrupt_command(event.text):
-            await self._handle_interrupt(event)
+        if InterruptCommands.is_interrupt_command(event.text):
+            await InterruptCommands.handle_interrupt(self, event)
             return
         # IM follow-up continuation. On IM channels a clarify tool call cannot
         # block the turn, so the agent's question was remembered per session
@@ -1650,7 +1654,7 @@ class AgentLoop:
         # so the model sees WHAT is being answered — otherwise a bare "A" reads
         # as an isolated, ambiguous message. This runs on IM channels only; CLI
         # uses the blocking /clarify path and never registers an IM pending.
-        self._maybe_bind_im_clarify_answer(event)
+        ClarifyCommands.maybe_bind_im_clarify_answer(self, event)
         session_lock = await self.sessions.acquire(event.session_key)
         async with session_lock:
             trace_id = uuid.uuid4().hex[:12]
@@ -1833,7 +1837,7 @@ class AgentLoop:
             )
             if not claimed:
                 raise DuplicateTurnClaim(event.event_id)
-        command_response = await self._handle_approval_command(event)
+        command_response = await ApprovalCommands.handle_approval_command(self, event)
         if command_response is not None:
             session.add_message("user", event.text)
             session.add_message("assistant", command_response)
@@ -1853,13 +1857,13 @@ class AgentLoop:
             except Exception as e:
                 logger.debug("Recorder begin_turn failed: {}", e)
 
-        should_introduce = self._should_introduce(session)
-        intro_text = self._build_introduction(event) if should_introduce else ""
-        _flush_chars, _flush_interval_ms, _paragraph_mode = self._stream_flush_params(event.channel)
+        should_introduce = StreamParams.should_introduce(self, session)
+        intro_text = StreamParams.build_introduction(self, event) if should_introduce else ""
+        _flush_chars, _flush_interval_ms, _paragraph_mode = StreamParams.stream_flush_params(self, event.channel)
         stream_publisher = _TokenStreamPublisher(
             self.bus,
             event,
-            enabled=publish_response and self._should_stream_channel(event.channel),
+            enabled=publish_response and StreamParams.should_stream_channel(self, event.channel),
             flush_chars=_flush_chars,
             flush_interval_ms=_flush_interval_ms,
             paragraph_mode=_paragraph_mode,
@@ -1924,276 +1928,62 @@ class AgentLoop:
             termination_reason=result.termination_reason,
         )
 
-    async def _handle_approval_command(self, event: InboundEvent) -> str | None:
-        text = event.text.strip()
-        if not self._is_approval_command(text):
-            return None
-        parts = text.split(maxsplit=2)
-        command = parts[0].lower()
+    # ── Command handler wrappers for test compatibility ─────────────────────
+    # The actual logic has been extracted to codex_pro.agent.commands.* modules.
+    # These wrappers preserve the public API for existing tests.
 
-        if command == "/approvals":
-            pending = self.approval.get_pending()
-            visible = [req for req in pending if self._can_decide_approval(event.sender_id, req)]
-            if not visible:
-                return "No pending approval requests."
-            lines = ["Pending approval requests:"]
-            for req in visible:
-                lines.append(f"- {req.id}: {req.tool_name or req.action} requested by {req.user_id}")
-            return "\n".join(lines)
-
-        if len(parts) < 2:
-            return f"Usage: `{command} <request_id>`"
-        request_id = parts[1]
-        req = self.approval.get(request_id)
-        if not req:
-            # Not pending — distinguish "already decided / expired" from "never existed"
-            # so users don't see a misleading "not found" for a request they just acted on.
-            return self._describe_inactive_approval(request_id)
-        if not self._can_decide_approval(event.sender_id, req):
-            return "You are not allowed to decide this approval request."
-
-        if command == "/approve":
-            level = parts[2] if len(parts) >= 3 else ""
-            ok = self.approval.approve(request_id, level=level, decided_by=event.sender_id)
-            # `ok` is True on the happy path: get()/approve() both read _pending and
-            # no await separates the check above from this act, so today nothing can
-            # decide the request in between. The `else` is a check-then-act (TOCTOU)
-            # guard: if a future change introduces an await in that window, a
-            # concurrent decision could pop the request first — then approve()
-            # returns False and we describe its now-historic state instead of
-            # silently dropping the user's command. See the redeny test for the
-            # forced-False path.
-            return f"Approval request {request_id} approved." if ok else self._describe_inactive_approval(request_id)
-
-        reason = parts[2] if len(parts) >= 3 else ""
-        ok = self.approval.deny(request_id, reason=reason, decided_by=event.sender_id)
-        # Same check-then-act guard as /approve above.
-        return f"Approval request {request_id} denied." if ok else self._describe_inactive_approval(request_id)
-
-    def _describe_inactive_approval(self, request_id: str) -> str:
-        """Explain why a non-pending request can't be acted on, based on its history.
-
-        A request leaves `_pending` once it is approved, denied, or times out. The
-        command layer only looks at `_pending`, so without this lookup all three
-        cases collapse into a misleading "not found".
-        """
-        historic = self.approval._find_history(request_id)
-        if historic is None:
-            return f"Approval request not found: {request_id}"
-        status = historic.status
-        if status == ApprovalStatus.APPROVED:
-            when = historic.decided_at or "earlier"
-            return f"Approval request {request_id} was already approved ({when}); no action needed."
-        if status == ApprovalStatus.DENIED:
-            suffix = f": {historic.reason}" if historic.reason else ""
-            return f"Approval request {request_id} was already denied{suffix}."
-        if status == ApprovalStatus.EXPIRED:
-            return (
-                f"Approval request {request_id} expired before it was approved; "
-                "the action did not run. Please re-trigger it to get a fresh request."
-            )
-        return f"Approval request not found: {request_id}"
-
-    def _is_approval_command(self, text: str) -> bool:
-        stripped = text.strip()
-        if not stripped.startswith("/"):
-            return False
-        command = stripped.split(maxsplit=1)[0].lower()
-        return command in {"/approvals", "/approve", "/deny"}
-
-    def _is_clarify_command(self, text: str) -> bool:
-        return text.strip().split(maxsplit=1)[0].lower() == "/clarify" if text.strip() else False
-
-    def _maybe_bind_im_clarify_answer(self, event: InboundEvent) -> None:
-        """Bind an IM message to a pending follow-up question on its session.
-
-        The agent asked a question on an IM channel last turn; that question was
-        remembered (register_im_pending). We surface it to the model by reusing
-        the reply-quote injection path: setting reply_to_text makes
-        build_user_message_with_reply prepend the question (and any options) to
-        the history copy, so the model sees the user is answering it — without
-        rewriting event.text (retrieval/history keep the raw reply). We do NOT
-        force-map "A" → option ourselves; the model resolves the choice from the
-        full quoted context, which also handles free-text answers uniformly.
-
-        No-ops when: the event is not a real user message (cron / unattended /
-        internal control events must not consume pending — they reuse the source
-        session key and would otherwise mis-bind to the last question); the loop
-        has no clarify manager wired (lightweight __new__ construction paths); the
-        session has no pending; the pending expired (TTL); or the message already
-        carries its own quote. In the quoted case the explicit user reference wins
-        over the implicit follow-up binding, but the stale pending is still cleared
-        so it cannot bind to a later unrelated message.
-        """
-        # 仅真实用户的常规消息才能消费待答状态。定时任务(cron/unattended)与内部
-        # 控制事件复用同一 source_session_key 时,不应把 TTL 内的下一次调度误当成
-        # “回答上次问题”而绑定到 pending。
-        if event.event_type != EventType.MESSAGE or event.unattended or event.is_control:
-            return
-        # clarify 兜底:__new__ 绕过 __init__ 的构造路径(如部分轻量测试)不接线
-        # self.clarify,此处安全 no-op 而非抛 AttributeError。
-        clarify = getattr(self, "clarify", None)
-        if clarify is None:
-            return
-        session_key = event.session_key
-        if not session_key:
-            return
-        # 用户显式引用了某条消息:引用意图优先于隐式追问绑定,不再改写 reply_to_text。
-        # 但仍要清理本 session 的待答状态,否则旧问题会残留 —— 引用回答成功后,下一条
-        # 无关消息会被误绑到已被回答过的旧问题上。
-        if event.reply_to_text:
-            clarify.clear_im_pending(session_key)
-            return
-        ttl = float(self.config.session.im_clarify_pending_ttl_seconds)
-        req = clarify.take_im_pending(session_key, ttl)
-        if req is None:
-            return
-        question = (req.question or "").strip()
-        if not question:
-            return
-        if req.options:
-            choices = "；".join(f"{chr(65 + i)}. {opt}" for i, opt in enumerate(req.options))
-            quoted = f"{question}\n可选项：{choices}"
-        else:
-            quoted = question
-        event.reply_to_text = quoted
-        event.reply_to_is_own = True
-        event.reply_to_sender = None
-
+    # Keep these as class attributes for test compatibility
     _CLARIFY_CANCEL_CMD = "/__clarify_cancel__"
-
-    def _is_clarify_cancel_command(self, text: str) -> bool:
-        return text.strip() == self._CLARIFY_CANCEL_CMD
-
-    async def _handle_clarify_cancel(self, event: InboundEvent) -> None:
-        # Wake any clarify blocked on this session with the interrupt sentinel,
-        # so a disconnected/quit CLI does not leave the agent parked in
-        # wait_for_answer until the 24h registry backstop. Internal control
-        # command — no user-facing reply.
-        self.clarify.cancel_session(event.session_key)
-        # Same reasoning for approvals: a turn parked on wait_for_decision is
-        # waiting for a human who is no longer connected, and it holds the session
-        # lock while it waits. Releasing only clarify left that case blocked for
-        # the full wait_timeout_seconds (300s), during which the user's next
-        # message queued behind a decision nobody could make. Denying is the safe
-        # direction — the call needed a human and none is present.
-        self.approval.cancel_session(event.session_key)
-
     _INTERRUPT_CMD = "/__interrupt__"
 
-    def _is_interrupt_command(self, text: str) -> bool:
-        return text.strip() == self._INTERRUPT_CMD
+    async def _handle_approval_command(self, event: InboundEvent) -> str | None:
+        return await ApprovalCommands.handle_approval_command(self, event)
 
-    async def _handle_interrupt(self, event: InboundEvent) -> None:
-        # Flag the session's running turn for a cooperative stop. Also cancel any
-        # clarify parked on this session: a Ctrl+C while the agent waits for an
-        # answer should unblock it (mirrors the disconnect escape valve), not
-        # sit idle. Internal control command — no user-facing reply; the turn
-        # itself emits the "stopped" text when it converges at the checkpoint.
-        # The gateway stamps the turn the user meant to stop into metadata; pass
-        # it through so a delayed stop frame can't land on a later turn. Empty
-        # means "stop whatever is running" (older clients that don't track IDs).
-        target_event_id = str(event.metadata.get("_interrupt_target_event_id", ""))
-        targets_running = self.interrupt.targets_running(
-            event.session_key,
-            target_event_id,
-        )
-        self.interrupt.interrupt(event.session_key, target_event_id)
-        if not targets_running:
-            # A targeted control may have been retained for admitted-but-queued
-            # work. It must not mutate the clarification/approval owned by a
-            # different turn that happens to be current for this session.
-            return
-        self.clarify.cancel_session(event.session_key)
-        # A turn parked on an approval must be stoppable too. The interrupt flag
-        # is only polled at the inference loop's checkpoints, and a turn blocked
-        # in wait_for_decision never reaches one — so a Ctrl+C would appear to do
-        # nothing until the 300s approval timeout expired. Deny the prompt to
-        # unblock it, mirroring the disconnect escape valve.
-        self.approval.cancel_session(event.session_key, reason="interrupted by user")
-
-    async def _handle_clarify_command(self, event: InboundEvent) -> str | None:
-        # Format: /clarify <clarify_id> <answer...>
-        #
-        # Only the command word and the id are whitespace-delimited; everything
-        # after the id is the answer verbatim. split(maxsplit=2) was wrong for
-        # a whitespace-only answer: it collapsed "/clarify c1   " down to two
-        # tokens, so an answer the user really did send arrived as "" and was
-        # indistinguishable from "no answer argument at all" — the model then
-        # learned nothing and re-asked the same question. Splitting off exactly
-        # the two leading tokens keeps the answer's own leading/trailing
-        # whitespace intact, and lets a missing id (the only genuinely
-        # malformed case) still be reported as such.
-        head = event.text.lstrip()
-        parts = head.split(maxsplit=1)
-        if len(parts) < 2:
-            return "用法:`/clarify <id> <答案>`"
-        rest = parts[1]
-        clarify_id = rest.split(maxsplit=1)[0]
-        # Slice the answer out by offset rather than re-splitting: split() would
-        # discard exactly the whitespace this parse exists to preserve. Only the
-        # single separator between the id and the answer is dropped.
-        answer = rest[len(clarify_id) :]
-        if answer[:1].isspace():
-            answer = answer[1:]
-        ok = self.clarify.resolve(clarify_id, answer)
-        if ok:
-            return f"已回复澄清请求 {clarify_id}。"
-        return f"澄清请求未找到或已处理:{clarify_id}"
+    def _is_approval_command(self, text: str) -> bool:
+        return ApprovalCommands.is_approval_command(self, text)
 
     def _can_decide_approval(self, user_id: str, request: Any) -> bool:
-        if user_id in (self.config.permissions.admin_users or []):
-            return True
-        if not self.config.permissions.admin_users:
-            return not request.user_id or request.user_id == user_id
-        return False
+        return ApprovalCommands.can_decide_approval(self, user_id, request)
+
+    def _describe_inactive_approval(self, request_id: str) -> str:
+        return ApprovalCommands.describe_inactive_approval(self, request_id)
+
+    def _is_clarify_command(self, text: str) -> bool:
+        return ClarifyCommands.is_clarify_command(text)
+
+    def _is_clarify_cancel_command(self, text: str) -> bool:
+        return ClarifyCommands.is_clarify_cancel_command(text)
+
+    async def _handle_clarify_cancel(self, event: InboundEvent) -> None:
+        await ClarifyCommands.handle_clarify_cancel(self, event)
+
+    def _is_interrupt_command(self, text: str) -> bool:
+        return InterruptCommands.is_interrupt_command(text)
+
+    async def _handle_interrupt(self, event: InboundEvent) -> None:
+        await InterruptCommands.handle_interrupt(self, event)
+
+    async def _handle_clarify_command(self, event: InboundEvent) -> str | None:
+        return await ClarifyCommands.handle_clarify_command(self, event)
 
     def _should_introduce(self, session: Session) -> bool:
-        if not self.config.session.introduction_enabled:
-            return False
-        return not any(msg.get("role") == "assistant" for msg in session.messages)
+        return StreamParams.should_introduce(self, session)
 
     def _build_introduction(self, event: InboundEvent) -> str:
-        template = self.config.session.introduction_template.strip()
-        if not template:
-            if event.channel in {"wecom", "weixin"}:
-                template = "你好，我是 {agent_name}，很高兴为你服务。"
-            else:
-                template = "Hello, I'm {agent_name}. How can I help?"
-
-        values = {
-            "agent_name": self.context.agent_name,
-            "channel": event.channel,
-            "chat_id": event.chat_id,
-            "session_key": event.session_key,
-        }
-        try:
-            return template.format(**values).strip()
-        except Exception:
-            logger.warning("Invalid session introduction template, using raw text")
-            return template
+        return StreamParams.build_introduction(self, event)
 
     @staticmethod
     def _channel_matches(channel: str, patterns: list[str]) -> bool:
-        # Thin alias kept for existing call sites/tests; the implementation lives
-        # in agent.streaming so the inference stage can share it.
-        return _channel_matches(channel, patterns)
+        return StreamParams.channel_matches(channel, patterns)
 
     def _should_stream_channel(self, channel: str) -> bool:
-        return _channel_matches(channel, self.config.channels.stream_channels)
+        return StreamParams.should_stream_channel(self, channel)
 
     def _stream_flush_params(self, channel: str) -> tuple[int, int, bool]:
-        """Return (flush_chars, flush_interval_ms, paragraph_mode) for a channel.
+        return StreamParams.stream_flush_params(self, channel)
 
-        Local channels (cli, gateway websocket) get the low-latency tier: frames
-        cost nothing and the TUI redraws in place, so there is no reason to sit
-        on tokens for a 180-char paragraph boundary. IM channels keep the
-        paragraph-mode defaults, which exist to stay inside edit-API budgets.
-        """
-        ch = self.config.channels
-        if ch.stream_local_flush_chars > 0 and _channel_matches(channel, ch.stream_local_channels):
-            return (ch.stream_local_flush_chars, ch.stream_local_flush_interval_ms, False)
-        return (ch.stream_flush_chars, ch.stream_flush_interval_ms, ch.stream_paragraph_mode)
+    def _maybe_bind_im_clarify_answer(self, event: InboundEvent) -> None:
+        ClarifyCommands.maybe_bind_im_clarify_answer(self, event)
 
     async def process_direct(self, content: str, session_key: str = "cli:direct", channel: str = "cli") -> str:
         """Process a message directly (for CLI or testing)."""

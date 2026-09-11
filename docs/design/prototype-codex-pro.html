@@ -991,19 +991,64 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .home-view{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .home-view.is-hidden{display:none}
 .home-view.is-chatting .hero{display:none}
-.chat-view{display:none;flex:1;min-height:0;overflow:auto;padding:24px clamp(16px,4vw,48px) 200px;scrollbar-gutter:stable}
+.home-view.is-chatting .ctx-bar{display:none}
+.home-view.is-chatting .composer{max-height:clamp(108px,16vh,148px)}
+.home-view.is-chatting .composer:focus-within{max-height:clamp(140px,22vh,200px)}
+.chat-view{display:none;flex:1;min-height:0;overflow:auto;padding:20px clamp(16px,4vw,48px) 200px;scrollbar-gutter:stable;position:relative}
 .home-view.is-chatting .chat-view{display:block}
-.chat-thread{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
-.chat-msg{display:flex;flex-direction:column;gap:6px;max-width:100%}
-.chat-msg.is-user{align-items:flex-end}
-.chat-msg.is-assistant{align-items:flex-start}
-.chat-msg-role{font-size:11.5px;color:#777;padding:0 4px}
+.chat-thread{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:6px;position:relative}
+.chat-msg{display:flex;flex-direction:column;gap:4px;max-width:100%;padding:4px 0}
+.chat-msg.is-user{align-items:flex-end;margin:8px 0 14px}
+.chat-msg.is-assistant{align-items:stretch}
 .chat-msg-bubble{padding:10px 14px;border-radius:14px;font-size:13.5px;line-height:1.55;color:#e4e4e4;max-width:min(100%,560px);white-space:pre-wrap;word-break:break-word}
 .chat-msg.is-user .chat-msg-bubble{background:#2a2a2a;border:1px solid #333;border-bottom-right-radius:4px}
-.chat-msg.is-assistant .chat-msg-bubble{background:#1e1e1e;border:1px solid #2a2a2a;border-bottom-left-radius:4px}
+.chat-msg.is-assistant .chat-msg-bubble{background:transparent;border:0;padding:2px 2px 8px;max-width:100%;border-radius:0}
+.chat-turn{display:flex;flex-direction:column;gap:10px;width:100%;padding:4px 0 8px}
+.chat-activity{display:flex;flex-direction:column;gap:2px}
+.act-item{display:flex;flex-direction:column;gap:4px;padding:2px 0;border-radius:8px}
+.act-item.is-focus{outline:1px solid #2f6fed;outline-offset:2px}
+.act-head{display:flex;align-items:center;gap:8px;color:#bdbdbd;font-size:13px;line-height:1.4;user-select:none}
+.act-ico{width:14px;height:14px;flex:0 0 auto;color:#8a8a8a;display:inline-flex}
+.act-ico svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.act-verb{color:#cfcfcf;font-weight:500}
+.act-summary{display:flex;align-items:flex-start;gap:6px;margin:0 0 2px 22px;padding:2px 0;border:0;background:transparent;color:#8f8f8f;font-size:12.5px;line-height:1.45;text-align:left;cursor:pointer;font:inherit;max-width:100%}
+.act-summary:hover{color:#b8b8b8}
+.act-summary-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act-chev{width:12px;height:12px;flex:0 0 auto;margin-top:3px;opacity:.75;transition:transform .15s}
+.act-chev svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.act-item.is-open .act-chev{transform:rotate(180deg)}
+.act-body{display:none;margin:2px 0 4px 22px}
+.act-item.is-open .act-body{display:block}
+.shell-card{position:relative;background:#1a1a1a;border:1px solid #2c2c2c;border-radius:10px;padding:10px 12px 28px;overflow:hidden}
+.shell-label{font-size:11.5px;color:#7a7a7a;margin-bottom:6px;letter-spacing:.02em}
+.shell-pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#d0d0d0;white-space:pre-wrap;word-break:break-word}
+.shell-pre .cmd{color:#e8e8e8}
+.shell-pre .out{color:#a8a8a8}
+.shell-badge{position:absolute;right:10px;bottom:8px;display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:#8a8a8a}
+.shell-badge.is-ok{color:#8a8a8a}
+.shell-badge.is-ok svg{color:#3fb950}
+.shell-badge.is-run{color:#8eb6ff}
+.shell-badge svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.act-item.is-running .act-verb{color:#9ec1ff}
+.chat-md{font-size:14px;line-height:1.65;color:#e2e2e2;padding:4px 2px 8px;max-width:100%}
+.chat-md h1,.chat-md h2,.chat-md h3{color:#f0f0f0;font-weight:650;margin:14px 0 8px;line-height:1.35}
+.chat-md h1{font-size:22px}.chat-md h2{font-size:18px}.chat-md h3{font-size:16px}
+.chat-md p{margin:0 0 10px}
+.chat-md code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;background:#242424;border:1px solid #333;border-radius:5px;padding:1px 5px;color:#e6e6e6}
+.chat-md pre{background:#1a1a1a;border:1px solid #2c2c2c;border-radius:10px;padding:12px;overflow:auto;margin:8px 0 12px}
+.chat-md pre code{background:none;border:0;padding:0;font-size:12px}
+.chat-md ul,.chat-md ol{margin:0 0 10px;padding-left:1.3em}
+.chat-md li{margin:3px 0}
+.chat-md table{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:13px}
+.chat-md th,.chat-md td{border-bottom:1px solid #2e2e2e;padding:8px 10px;text-align:left;color:#d4d4d4}
+.chat-md th{color:#9a9a9a;font-weight:500;font-size:12.5px}
+.chat-md .md-arrow{display:inline-block;margin-left:4px;color:#777;vertical-align:-1px}
+.chat-cursor{display:inline-block;width:7px;height:1.05em;background:#aaa;margin-left:2px;vertical-align:-2px;animation:chatBlink 1s steps(1) infinite}
+@keyframes chatBlink{50%{opacity:0}}
 @media(max-width:720px){
   .sch-view{padding:20px 20px 36px}
   .sch-create-wrap{right:20px;top:16px}
+  .act-summary-text{white-space:normal}
 }
 
 /* Pull Request main view (list + detail) */
@@ -1532,22 +1577,22 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
             <button type="button" class="proj-menu-item is-disabled" role="menuitem" data-env="cloud" disabled aria-disabled="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 17.5h9.2a3.8 3.8 0 0 0 .3-7.6 5.2 5.2 0 0 0-10.1 1.4A3.4 3.4 0 0 0 7.5 17.5Z"/></svg><span class="proj-menu-item-label">云端</span></button>
           </div>
           <div class="composer-body">
-            <textarea placeholder="描述你的目标，定义可衡量的成果，以获得最佳效果"></textarea>
+            <textarea placeholder="随心输入"></textarea>
           </div>
           <div class="composer-foot">
             <div class="add-btn" id="composerAdd" role="button" tabindex="0" title="添加文件等内容 @" aria-label="添加文件等内容" aria-haspopup="menu" aria-expanded="false" aria-controls="addMenu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></div>
             <div class="perm-btn" id="permBtn" role="button" tabindex="0" aria-label="完全访问" aria-haspopup="menu" aria-expanded="false" aria-controls="permMenu" data-perm="full"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5.5 5.8v5.4c0 4.2 2.7 7.9 6.5 9.3 3.8-1.4 6.5-5.1 6.5-9.3V5.8L12 3Z"/><path d="M12 8.2v4.2"/><circle cx="12" cy="15.2" r=".7" fill="currentColor"/></svg><span class="perm-label">完全访问</span></div>
             <div class="goal-btn" id="goalBtn" role="button" tabindex="0" aria-label="目标" data-mode="goal" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg><span class="goal-label">目标</span></div>
             <span class="spacer"></span>
-            <div class="model-btn" id="modelBtn" role="button" tabindex="0" aria-label="模型" aria-haspopup="dialog" aria-expanded="false" aria-controls="modelMenu" data-model="agnes-2.5-flash" data-effort="3"><span class="model-name">agnes-2.5-flash</span> <span class="seg model-effort">极高</span></div>
+            <div class="model-btn" id="modelBtn" role="button" tabindex="0" aria-label="模型" aria-haspopup="dialog" aria-expanded="false" aria-controls="modelMenu" data-model="agnes-2.5-flash" data-effort="3"><span class="model-name">自定义</span> <span class="seg model-effort">最高</span></div>
             <div class="send-btn" role="button" tabindex="0" title="发送" aria-label="发送"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></div>
           </div>
           <div class="model-menu" id="modelMenu" role="dialog" aria-label="模型与推理强度" hidden>
             <div class="model-menu-panel model-menu-panel-effort" id="modelEffortPanel">
               <div class="model-menu-top">
                 <button type="button" class="model-menu-info" id="modelInfoBtn" aria-label="选择模型" aria-haspopup="listbox" aria-expanded="false">
-                  <span class="model-menu-level" id="modelLevelBtn">极高 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
-                  <div class="model-menu-name" id="modelMenuName">agnes-2.5-flash</div>
+                  <span class="model-menu-level" id="modelLevelBtn">最高 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+                  <div class="model-menu-name" id="modelMenuName">自定义</div>
                 </button>
                 <button type="button" class="model-menu-reset" id="modelReset" title="重置" aria-label="重置推理强度"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.2-5.5"/><path d="M20 4v5h-5"/></svg></button>
               </div>
@@ -7479,10 +7524,14 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     var list = document.getElementById('modelList');
     var search = document.getElementById('modelSearch');
     if (!trigger || !menu || !range) return;
-    var LEVELS = ['低', '中', '高', '极高'];
+    var LEVELS = ['低', '中', '高', '最高'];
     var DEFAULT_EFFORT = 1;
     var nameLabel = trigger.querySelector('.model-name');
     var effortLabel = trigger.querySelector('.model-effort');
+    var MODEL_LABELS = { 'agnes-2.5-flash': '自定义', 'agnes-2.0-flash': '自定义' };
+    function displayModelName(name) {
+      return MODEL_LABELS[name] || name || '自定义';
+    }
     function effortIndex() {
       var n = parseInt(range.value, 10);
       return isNaN(n) ? DEFAULT_EFFORT : Math.max(0, Math.min(LEVELS.length - 1, n));
@@ -7505,8 +7554,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     function setModel(name) {
       if (!name) return;
       trigger.setAttribute('data-model', name);
-      if (nameLabel) nameLabel.textContent = name;
-      if (nameEl) nameEl.textContent = name;
+      if (nameLabel) nameLabel.textContent = displayModelName(name);
+      if (nameEl) nameEl.textContent = displayModelName(name);
       if (list) {
         list.querySelectorAll('.model-list-item').forEach(function (item) {
           var on = item.getAttribute('data-model') === name;
@@ -7699,6 +7748,348 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   }
 
   var chatThread = document.getElementById('chatThread');
+  var chatViewEl = document.getElementById('chatView');
+  var chatStreamToken = 0;
+  var chatBusy = false;
+
+  var ICO_DOC = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="12" height="16" rx="1.5"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>';
+  var ICO_CHEV = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+  var ICO_OK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
+  var ICO_SPIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 1-7.5 5.2"/></svg>';
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function scrollChatBottom(force) {
+    if (!chatViewEl) return;
+    var near = chatViewEl.scrollHeight - chatViewEl.scrollTop - chatViewEl.clientHeight < 120;
+    if (force || near) chatViewEl.scrollTop = chatViewEl.scrollHeight;
+  }
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  /* Lightweight markdown for streamed assistant text (prototype). */
+  function renderChatMarkdown(src) {
+    var text = String(src || '');
+    var fences = [];
+    text = text.replace(/```([\w-]*)\n?([\s\S]*?)```/g, function (_, lang, code) {
+      var i = fences.length;
+      fences.push('<pre><code class="lang-' + escapeHtml(lang || '') + '">' + escapeHtml(code.replace(/\n$/, '')) + '</code></pre>');
+      return '\u0000FENCE' + i + '\u0000';
+    });
+    var lines = text.split('\n');
+    var html = [];
+    var inTable = false;
+    var i = 0;
+    while (i < lines.length) {
+      var line = lines[i];
+      if (/^\u0000FENCE\d+\u0000$/.test(line.trim())) {
+        if (inTable) { html.push('</tbody></table>'); inTable = false; }
+        html.push(line.trim());
+        i++;
+        continue;
+      }
+      var h = /^(#{1,3})\s+(.+)$/.exec(line);
+      if (h) {
+        if (inTable) { html.push('</tbody></table>'); inTable = false; }
+        var lvl = h[1].length;
+        html.push('<h' + lvl + '>' + inlineMd(h[2]) + '</h' + lvl + '>');
+        i++;
+        continue;
+      }
+      if (/^\|.+\|$/.test(line) && i + 1 < lines.length && /^\|[\s:|-]+\|$/.test(lines[i + 1])) {
+        if (inTable) { html.push('</tbody></table>'); }
+        var heads = line.split('|').slice(1, -1).map(function (c) { return c.trim(); });
+        html.push('<table><thead><tr>' + heads.map(function (c) {
+          return '<th>' + inlineMd(c) + '</th>';
+        }).join('') + '</tr></thead><tbody>');
+        inTable = true;
+        i += 2;
+        while (i < lines.length && /^\|.+\|$/.test(lines[i])) {
+          var cells = lines[i].split('|').slice(1, -1).map(function (c) { return c.trim(); });
+          html.push('<tr>' + cells.map(function (c) {
+            return '<td>' + inlineMd(c) + '</td>';
+          }).join('') + '</tr>');
+          i++;
+        }
+        html.push('</tbody></table>');
+        inTable = false;
+        continue;
+      }
+      if (/^[-*]\s+/.test(line)) {
+        if (inTable) { html.push('</tbody></table>'); inTable = false; }
+        html.push('<ul>');
+        while (i < lines.length && /^[-*]\s+/.test(lines[i])) {
+          html.push('<li>' + inlineMd(lines[i].replace(/^[-*]\s+/, '')) + '</li>');
+          i++;
+        }
+        html.push('</ul>');
+        continue;
+      }
+      if (!line.trim()) {
+        if (inTable) { html.push('</tbody></table>'); inTable = false; }
+        i++;
+        continue;
+      }
+      if (inTable) { html.push('</tbody></table>'); inTable = false; }
+      html.push('<p>' + inlineMd(line) + '</p>');
+      i++;
+    }
+    if (inTable) html.push('</tbody></table>');
+    return html.join('').replace(/\u0000FENCE(\d+)\u0000/g, function (_, idx) {
+      return fences[Number(idx)] || '';
+    });
+  }
+  function inlineMd(s) {
+    return escapeHtml(s)
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/↓/g, '<span class="md-arrow">↓</span>');
+  }
+
+  function appendUserMessage(text) {
+    if (!chatThread) return;
+    var row = document.createElement('div');
+    row.className = 'chat-msg is-user';
+    row.innerHTML = '<div class="chat-msg-bubble"></div>';
+    row.querySelector('.chat-msg-bubble').textContent = text;
+    chatThread.appendChild(row);
+    scrollChatBottom(true);
+  }
+
+  function createAssistantTurn() {
+    var wrap = document.createElement('div');
+    wrap.className = 'chat-msg is-assistant';
+    wrap.innerHTML =
+      '<div class="chat-turn">' +
+        '<div class="chat-activity" data-role="activity"></div>' +
+        '<div class="chat-md" data-role="md" hidden></div>' +
+      '</div>';
+    chatThread.appendChild(wrap);
+    scrollChatBottom(true);
+    return {
+      root: wrap,
+      activity: wrap.querySelector('[data-role="activity"]'),
+      md: wrap.querySelector('[data-role="md"]')
+    };
+  }
+
+  function toolVerb(name) {
+    var map = {
+      exec: '运行了命令', process: '运行了命令', execute_code: '运行了代码',
+      read_file: '读取了文件', write_file: '写入了文件', edit_file: '编辑了文件',
+      list_dir: '列出了目录', search_files: '搜索了文件', web_search: '联网搜索',
+      web_fetch: '抓取了网页', memory: '使用了记忆', browser: '操作了浏览器'
+    };
+    return map[name] || ('调用了 ' + name);
+  }
+
+  function mountToolBlock(activityEl, tool) {
+    var item = document.createElement('div');
+    item.className = 'act-item is-running';
+    item.dataset.toolId = tool.id;
+    var summary = tool.summary || ('已运行 ' + (tool.command || tool.name));
+    item.innerHTML =
+      '<div class="act-head"><span class="act-ico">' + ICO_DOC + '</span><span class="act-verb"></span></div>' +
+      '<button type="button" class="act-summary" aria-expanded="false">' +
+        '<span class="act-summary-text"></span><span class="act-chev">' + ICO_CHEV + '</span>' +
+      '</button>' +
+      '<div class="act-body">' +
+        '<div class="shell-card">' +
+          '<div class="shell-label">Shell</div>' +
+          '<pre class="shell-pre"><span class="cmd"></span>\n<span class="out"></span></pre>' +
+          '<div class="shell-badge is-run">' + ICO_SPIN + '<span>运行中</span></div>' +
+        '</div>' +
+      '</div>';
+    item.querySelector('.act-verb').textContent = toolVerb(tool.name);
+    item.querySelector('.act-summary-text').textContent = summary;
+    item.querySelector('.cmd').textContent = '$ ' + (tool.command || '');
+    item.querySelector('.out').textContent = '';
+    var summaryBtn = item.querySelector('.act-summary');
+    summaryBtn.addEventListener('click', function () {
+      var open = item.classList.toggle('is-open');
+      summaryBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    activityEl.appendChild(item);
+    scrollChatBottom(true);
+    return item;
+  }
+
+  function finishToolBlock(item, tool) {
+    if (!item) return;
+    item.classList.remove('is-running', 'is-focus');
+    item.classList.add('is-done');
+    if (tool.open !== false) item.classList.add('is-open');
+    var summaryBtn = item.querySelector('.act-summary');
+    if (summaryBtn) summaryBtn.setAttribute('aria-expanded', item.classList.contains('is-open') ? 'true' : 'false');
+    if (tool.summary) item.querySelector('.act-summary-text').textContent = tool.summary;
+    if (tool.output != null) item.querySelector('.out').textContent = tool.output;
+    var badge = item.querySelector('.shell-badge');
+    if (badge) {
+      badge.className = 'shell-badge is-ok';
+      badge.innerHTML = ICO_OK + '<span>成功</span>';
+    }
+    scrollChatBottom(true);
+  }
+
+  async function streamShellOutput(item, output, token, durationMs) {
+    var outEl = item && item.querySelector('.out');
+    var text = String(output || '');
+    if (!outEl || !text) {
+      await sleep(durationMs || 400);
+      return;
+    }
+    var shown = '';
+    var i = 0;
+    var started = Date.now();
+    while (i < text.length) {
+      if (token !== chatStreamToken) return;
+      var step = text[i] === '\n' ? 1 : Math.min(4, text.length - i);
+      shown += text.slice(i, i + step);
+      i += step;
+      outEl.textContent = shown;
+      scrollChatBottom(false);
+      await sleep(28);
+    }
+    var remain = (durationMs || 400) - (Date.now() - started);
+    if (remain > 0) await sleep(remain);
+  }
+
+  /* Mirrors backend turn shape: cog tool_call(running→ok) then streamed text deltas. */
+  function buildDemoEvents(userText) {
+    var q = String(userText || '').trim();
+    if (/架构|方案|比较|探索/.test(q)) {
+      return {
+        tools: [
+          {
+            id: 'tc1', name: 'search_files',
+            command: 'rg -n "gateway|AgentLoop|MessageBus" codex_pro --glob "*.py" | head',
+            summary: '已运行 rg -n "gateway|AgentLoop|MessageBus" …',
+            output: 'codex_pro/agent/loop.py\ncodex_pro/gateway/server.py\ncodex_pro/bus/queue.py',
+            open: true, delay: 360, runMs: 560
+          },
+          {
+            id: 'tc2', name: 'read_file',
+            command: 'sed -n "1,80p" docs/design/prototype-codex-pro.html',
+            summary: '已读取 docs/design/prototype-codex-pro.html',
+            output: '<!-- prototype shell -->',
+            open: false, delay: 240, runMs: 420
+          }
+        ],
+        markdown:
+          '可以从三条线比较候选架构：\n\n' +
+          '1. **模块边界** — agent / gateway / channels 解耦程度\n' +
+          '2. **状态流** — 会话历史、turn 状态与认知帧如何回流 UI\n' +
+          '3. **部署拓扑** — 单机 TUI、自托管 gateway、多渠道接入\n\n' +
+          '需要我先画一版候选架构吗？'
+      };
+    }
+    /* Default demo matches the Cursor-style agent transcript (tool shells + markdown). */
+    return {
+      tools: [
+        {
+          id: 'tc1', name: 'exec',
+          command: 'cd E:\\workspace\\codex-pro && uv run ruff check codex_pro/config/ && uv run python -c "from codex_pro.config.schema import AppConfig; print(\'ok\')"',
+          summary: '已运行 cd E:\\workspace\\codex-pro && uv run ruff check…',
+          output: 'All checks passed!\nOK',
+          open: true, delay: 380, runMs: 720
+        },
+        {
+          id: 'tc2', name: 'exec',
+          command: 'cd E:\\workspace\\codex-pro && uv run ruff check codex_pro/ --select F403',
+          summary: '已运行 cd E:\\workspace\\codex-pro && uv run ruff check codex_pro/ --select F403',
+          output: 'All checks passed!',
+          open: false, delay: 260, runMs: 500
+        },
+        {
+          id: 'tc3', name: 'exec',
+          command: 'cd E:\\workspace\\codex-pro && uv run pytest tests/config -q',
+          summary: '已运行 cd E:\\workspace\\codex-pro && uv run pytest tests/config -q',
+          output: '........                                                          [100%]\n8 passed in 0.42s',
+          open: true, delay: 300, runMs: 680
+        }
+      ],
+      markdown:
+        '清理完成。重构总结：\n\n' +
+        '## Schema 拆分完成\n\n' +
+        '变更: `codex_pro/config/schema.py` (4581行) → 10 个子文件 ↓\n\n' +
+        '| 模块 | 行数 | 配置类 |\n' +
+        '| --- | --- | --- |\n' +
+        '| `schema_defs/agent.py` | 412 | AgentConfig |\n' +
+        '| `schema_defs/models.py` | 528 | ModelsConfig |\n' +
+        '| `schema_defs/memory.py` | 386 | MemoryConfig |\n' +
+        '| `schema_defs/channels.py` | 441 | ChannelsConfig |\n' +
+        '| `schema_defs/tools.py` | 294 | ToolsConfig |\n'
+    };
+  }
+
+  async function streamAssistantTurn(userText, token) {
+    var demo = buildDemoEvents(userText);
+    var turn = createAssistantTurn();
+    var openBlocks = [];
+
+    for (var ti = 0; ti < demo.tools.length; ti++) {
+      if (token !== chatStreamToken) return;
+      var tool = demo.tools[ti];
+      await sleep(tool.delay || 300);
+      if (token !== chatStreamToken) return;
+      openBlocks.forEach(function (b) { b.classList.remove('is-open', 'is-focus'); });
+      var block = mountToolBlock(turn.activity, tool);
+      block.classList.add('is-open', 'is-focus');
+      var summaryBtn = block.querySelector('.act-summary');
+      if (summaryBtn) summaryBtn.setAttribute('aria-expanded', 'true');
+      await streamShellOutput(block, tool.output, token, tool.runMs || 500);
+      if (token !== chatStreamToken) return;
+      finishToolBlock(block, tool);
+      if (tool.open === false) {
+        block.classList.remove('is-open');
+        if (summaryBtn) summaryBtn.setAttribute('aria-expanded', 'false');
+      }
+      openBlocks.push(block);
+      block.classList.remove('is-focus');
+    }
+
+    if (token !== chatStreamToken) return;
+    turn.md.hidden = false;
+    turn.md.innerHTML = '';
+    var full = demo.markdown || '';
+    var shown = '';
+    var cursor = document.createElement('span');
+    cursor.className = 'chat-cursor';
+    /* Stream in chunks to mimic TokenStreamPublisher paragraph/char flushes. */
+    var i = 0;
+    while (i < full.length) {
+      if (token !== chatStreamToken) return;
+      var step = full[i] === '\n' ? 1 : (full[i] === '|' ? 8 : 3);
+      shown += full.slice(i, i + step);
+      i += step;
+      turn.md.innerHTML = renderChatMarkdown(shown);
+      turn.md.appendChild(cursor);
+      scrollChatBottom(false);
+      await sleep(18);
+    }
+    if (token !== chatStreamToken) return;
+    turn.md.innerHTML = renderChatMarkdown(full);
+    scrollChatBottom(true);
+  }
+
+  function renderStaticSeed(list) {
+    if (!chatThread) return;
+    chatThread.innerHTML = '';
+    (list || []).forEach(function (m) {
+      if (m.role === 'user') appendUserMessage(m.text);
+      else {
+        var turn = createAssistantTurn();
+        turn.md.hidden = false;
+        turn.md.innerHTML = renderChatMarkdown(m.text);
+      }
+    });
+    scrollChatBottom(true);
+  }
+
   var CHAT_SEEDS = {
     'eko-pro': [
       { role: 'user', text: '探索并比较架构方案' },
@@ -7710,33 +8101,39 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     ],
     'codex-pro': []
   };
-  function renderChatMessages(list) {
-    if (!chatThread) return;
-    chatThread.innerHTML = '';
-    (list || []).forEach(function (m) {
-      var row = document.createElement('div');
-      row.className = 'chat-msg is-' + m.role;
-      row.innerHTML = '<div class="chat-msg-role"></div><div class="chat-msg-bubble"></div>';
-      row.querySelector('.chat-msg-role').textContent = m.role === 'user' ? '你' : 'Codex';
-      row.querySelector('.chat-msg-bubble').textContent = m.text;
-      chatThread.appendChild(row);
-    });
-    var view = document.getElementById('chatView');
-    if (view) view.scrollTop = view.scrollHeight;
-  }
-  function enterChatMode(seedKey, userText) {
+
+  async function enterChatMode(seedKey, userText) {
     showHomeView();
     if (homeView) homeView.classList.add('is-chatting');
-    var msgs = (CHAT_SEEDS[seedKey] || []).slice();
+    ['projectMenu', 'envMenu', 'branchMenu'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove('open');
+      el.hidden = true;
+    });
+    document.querySelectorAll('#homeView .ctx-item.is-open').forEach(function (el) {
+      el.classList.remove('is-open');
+      el.setAttribute('aria-expanded', 'false');
+    });
+    chatStreamToken += 1;
+    var token = chatStreamToken;
+    if (chatThread) chatThread.innerHTML = '';
     if (userText) {
-      msgs.push({ role: 'user', text: userText });
-      msgs.push({ role: 'assistant', text: '已收到（原型）：我会基于「' + userText.slice(0, 80) + '」继续推进。' });
-    } else if (!msgs.length) {
+      appendUserMessage(userText);
+      chatBusy = true;
+      try { await streamAssistantTurn(userText, token); }
+      finally { if (token === chatStreamToken) chatBusy = false; }
+      return;
+    }
+    var msgs = (CHAT_SEEDS[seedKey] || []).slice();
+    if (!msgs.length) {
       msgs.push({ role: 'assistant', text: '发送一条消息开始这个线程。' });
     }
-    renderChatMessages(msgs);
+    renderStaticSeed(msgs);
   }
   function exitChatMode() {
+    chatStreamToken += 1;
+    chatBusy = false;
     if (homeView) homeView.classList.remove('is-chatting');
     if (chatThread) chatThread.innerHTML = '';
   }
@@ -7749,44 +8146,40 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   function syncSend() {
     if (!ta || !send) return;
     var has = (ta.value || '').trim().length > 0;
-    send.classList.toggle('is-active', has);
-    send.setAttribute('aria-disabled', has ? 'false' : 'true');
-    if (has) send.style.background = '#525252';
+    send.classList.toggle('is-active', has && !chatBusy);
+    send.setAttribute('aria-disabled', has && !chatBusy ? 'false' : 'true');
+    if (has && !chatBusy) send.style.background = '#525252';
     else send.style.background = '#3a3a3a';
   }
-  function submitComposer() {
-    if (!ta) return;
+  async function submitComposer() {
+    if (!ta || chatBusy) return;
     var text = (ta.value || '').trim();
     if (!text) return;
     var active = document.querySelector('.chat-row.active');
     var key = (active && active.getAttribute('data-chat')) || 'codex-pro';
-    var existing = (CHAT_SEEDS[key] || []).slice();
-    if (homeView && homeView.classList.contains('is-chatting') && chatThread && chatThread.children.length) {
-      var userRow = document.createElement('div');
-      userRow.className = 'chat-msg is-user';
-      userRow.innerHTML = '<div class="chat-msg-role">你</div><div class="chat-msg-bubble"></div>';
-      userRow.querySelector('.chat-msg-bubble').textContent = text;
-      chatThread.appendChild(userRow);
-      setTimeout(function () {
-        var a = document.createElement('div');
-        a.className = 'chat-msg is-assistant';
-        a.innerHTML = '<div class="chat-msg-role">Codex</div><div class="chat-msg-bubble"></div>';
-        a.querySelector('.chat-msg-bubble').textContent = '已收到（原型）：' + text;
-        chatThread.appendChild(a);
-        var view = document.getElementById('chatView');
-        if (view) view.scrollTop = view.scrollHeight;
-      }, 220);
-    } else {
-      enterChatMode(key, text);
-    }
     ta.value = '';
     syncSend();
+    if (homeView && homeView.classList.contains('is-chatting') && chatThread) {
+      appendUserMessage(text);
+      chatStreamToken += 1;
+      var token = chatStreamToken;
+      chatBusy = true;
+      syncSend();
+      try { await streamAssistantTurn(text, token); }
+      finally {
+        if (token === chatStreamToken) chatBusy = false;
+        syncSend();
+      }
+    } else {
+      await enterChatMode(key, text);
+      syncSend();
+    }
   }
   if (ta && send) {
     ta.addEventListener('input', syncSend);
     syncSend();
     ta.addEventListener('keydown', function (e) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         submitComposer();
       }

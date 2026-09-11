@@ -154,6 +154,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .opt-group .opt-chip:last-child{border-right:none}
 .action-btn{flex:0 0 auto;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:6px;padding:5px 12px;font-size:12.5px;color:#c0c0c0;cursor:pointer;white-space:nowrap}
 .action-btn:hover{background:#323232;border-color:#4a4a4a;color:#e0e0e0}
+.action-btn:disabled{opacity:.45;cursor:not-allowed}
+.action-btn:disabled:hover{background:#2a2a2a;border-color:#3a3a3a;color:#c0c0c0}
 .edit-icon{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.6}
 .dropdown-trigger{flex:0 0 auto;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:6px;padding:5px 12px;font-size:12.5px;color:#c0c0c0;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap}
 .dropdown-trigger:hover{background:#323232;border-color:#4a4a4a;color:#e0e0e0}
@@ -620,7 +622,27 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .theme-preview-card.selected{border-color:#3866f0}
 .theme-preview-img{height:72px;background:#2a2a2a;display:flex;align-items:center;justify-content:center}
 .theme-preview-label{font-size:12px;color:#888;text-align:center;padding:6px 0;background:#222}
-.code-preview-bar{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:10px 14px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:2px 6px;font-size:12px;font-family:'Segoe UI',sans-serif;color:#d4d4d4;line-height:1.6}
+.code-preview-bar{background:#141414;border:1px solid #2a2a2a;border-radius:10px;margin-bottom:20px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#d4d4d4}
+.code-diff-pane{min-width:0;position:relative;display:flex;flex-direction:column}
+.code-diff-pane+.code-diff-pane{border-left:1px solid #2a2a2a}
+.code-diff-body{flex:1;padding:10px 0 4px;overflow:auto}
+.code-diff-line{display:grid;grid-template-columns:28px 1fr;align-items:stretch;min-height:20px}
+.code-diff-ln{color:#555;text-align:right;padding:0 8px 0 6px;user-select:none;font-variant-numeric:tabular-nums}
+.code-diff-code{padding:0 12px 0 10px;white-space:pre;overflow:hidden;text-overflow:ellipsis;position:relative}
+.code-diff-line.is-del .code-diff-code,.code-diff-line.is-del .code-diff-ln{background:rgba(239,68,68,.12)}
+.code-diff-line.is-add .code-diff-code,.code-diff-line.is-add .code-diff-ln{background:rgba(34,197,94,.12)}
+.code-diff-line.is-del .code-diff-code::before,.code-diff-line.is-add .code-diff-code::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.code-diff-line.is-del .code-diff-code::before{background:#ef4444}
+.code-diff-line.is-add .code-diff-code::before{background:#22c55e}
+.code-diff-kw{color:#7c9cff}
+.code-diff-id{color:#e8b86d}
+.code-diff-type{color:#c4b5fd}
+.code-diff-prop{color:#e8b86d}
+.code-diff-str{color:#86efac}
+.code-diff-num{color:#7dd3fc}
+.code-diff-pun{color:#a3a3a3}
+.code-diff-nav{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:6px 10px 8px;color:#555}
+.code-diff-nav svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
 .color-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #2a2a2a}
 .color-row:last-child{border-bottom:none}
 .color-row-left{flex:1;min-width:0}
@@ -666,6 +688,36 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .import-row-value{flex:0 0 auto;display:flex;align-items:center;gap:8px}
 .import-btn{background:#2a2a2a;border:1px solid #3a3a3a;border-radius:6px;padding:5px 14px;font-size:12.5px;color:#c0c0c0;cursor:pointer}
 .import-btn:hover{background:#323232;border-color:#4a4a4a;color:#e0e0e0}
+.imp-modal-overlay{position:fixed;inset:0;z-index:95;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.55)}
+.imp-modal-overlay.open{display:flex}
+.imp-modal{width:min(480px,100%);background:#1e1e1e;border:1px solid #333;border-radius:14px;box-shadow:0 20px 48px rgba(0,0,0,.55);padding:20px 22px 18px}
+.imp-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px}
+.imp-modal-title{font-size:17px;font-weight:600;color:#f0f0f0;margin:0}
+.imp-modal-sub{font-size:12.5px;color:#7a7a7a;line-height:1.45;margin:0 0 16px;padding-right:28px}
+.imp-modal-close{width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:#888;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
+.imp-modal-close:hover{background:#2e2e2e;color:#ddd}
+.imp-modal-close svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.imp-modal-list{border:1px solid #333;border-radius:12px;overflow:hidden;background:#222}
+.imp-item{display:flex;align-items:center;gap:12px;padding:14px 14px;border-bottom:1px solid #2c2c2c}
+.imp-item:last-child{border-bottom:0}
+.imp-item-ico{width:36px;height:36px;border-radius:10px;background:#2a2a2a;border:1px solid #353535;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;color:#c8c8c8}
+.imp-item-ico svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.imp-item-body{flex:1;min-width:0}
+.imp-item-title{font-size:13.5px;font-weight:500;color:#e8e8e8;margin:0 0 2px}
+.imp-item-desc{font-size:12px;color:#6e6e6e;margin:0;line-height:1.4}
+.imp-item-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.imp-icon-btn{width:28px;height:28px;border-radius:50%;border:1px solid #3a3a3a;background:#252525;color:#9a9a9a;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.imp-icon-btn:hover{background:#2e2e2e;color:#ddd}
+.imp-icon-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.imp-check{appearance:none;-webkit-appearance:none;width:18px;height:18px;border-radius:4px;border:1.5px solid #4a4a4a;background:#1a1a1a;cursor:pointer;position:relative;flex:0 0 auto}
+.imp-check:checked{background:var(--accent);border-color:var(--accent)}
+.imp-check:checked::after{content:"";position:absolute;left:5px;top:2px;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.imp-modal-foot{display:flex;align-items:center;justify-content:flex-end;gap:14px;margin-top:18px}
+.imp-cancel{border:0;background:transparent;color:#9a9a9a;font:inherit;font-size:13px;cursor:pointer;padding:6px 4px}
+.imp-cancel:hover{color:#e0e0e0}
+.imp-primary{border:0;background:#f0f0f0;color:#111;font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:8px 16px;border-radius:999px}
+.imp-primary:hover{background:#fff}
+.imp-primary:disabled{opacity:.45;cursor:not-allowed}
 
 .voice-section-title{font-size:13px;font-weight:500;color:#b8b8b8;margin:0 0 12px;letter-spacing:.02em}
 .voice-card{background:#222;border:1px solid #2e2e2e;border-radius:12px;padding:16px 20px;margin-bottom:12px}
@@ -1281,7 +1333,42 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .gn-row-left{flex:1;min-width:0}
 .gn-row-label{font-size:13.5px;font-weight:500;color:#e0e0e0;margin-bottom:3px}
 .gn-row-desc{font-size:12px;color:#6e6e6e;line-height:1.4}
-.gn-row-value{flex:0 0 auto;display:flex;align-items:center;gap:8px}
+.gn-row-desc a,.gn-link{color:#6ea8fe;text-decoration:none}
+.gn-row-desc a:hover,.gn-link:hover{text-decoration:underline;color:#8ebcff}
+.gn-row-value{flex:0 0 auto;display:flex;align-items:center;gap:8px;max-width:58%}
+.gn-path{font-size:12.5px;color:#a8a8a8;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.gn-action-btn{background:#2a2a2a;border:1px solid #3a3a3a;border-radius:6px;padding:5px 12px;font-size:12.5px;color:#c8c8c8;cursor:pointer;white-space:nowrap}
+.gn-action-btn:hover{background:#323232;border-color:#4a4a4a;color:#eee}
+.gn-seg{display:inline-flex;align-items:center;background:#1a1a1a;border:1px solid #333;border-radius:8px;overflow:hidden;padding:2px}
+.gn-seg-btn{padding:5px 12px;font-size:12.5px;color:#8a8a8a;border:0;background:transparent;border-radius:6px;cursor:pointer}
+.gn-seg-btn:hover{color:#c8c8c8}
+.gn-seg-btn.is-active{background:#2e2e2e;color:#e8e8e8}
+.dropdown-btn .dd-ico{width:14px;height:14px;flex:0 0 auto;border-radius:3px}
+.gn-openin-menu{display:none;position:fixed;z-index:120;min-width:196px;padding:6px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.5)}
+.gn-openin-menu.open{display:block}
+.gn-openin-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:8px;background:transparent;color:#e4e4e4;cursor:pointer;text-align:left;font:inherit;font-size:13px}
+.gn-openin-item:hover,.gn-openin-item.is-active{background:#343434}
+.gn-openin-item .dd-ico{width:16px;height:16px;border-radius:3px;flex:0 0 auto}
+.gn-env-menu{display:none;position:fixed;z-index:120;min-width:280px;max-width:min(360px,calc(100vw - 24px));padding:6px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.5)}
+.gn-env-menu.open{display:block}
+.gn-env-item{display:flex;align-items:flex-start;gap:12px;width:100%;padding:10px 12px;border:0;border-radius:10px;background:transparent;color:#e4e4e4;cursor:pointer;text-align:left;font:inherit}
+.gn-env-item:hover{background:#343434}
+.gn-env-item.is-active{background:#343434}
+.gn-env-item-body{flex:1;min-width:0}
+.gn-env-item-title{font-size:13.5px;font-weight:500;color:#f0f0f0;margin:0 0 3px}
+.gn-env-item-desc{font-size:12px;color:#8a8a8a;line-height:1.4;margin:0}
+.gn-env-check{width:16px;height:16px;flex:0 0 auto;margin-top:2px;opacity:0;fill:none;stroke:#e8e8e8;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.gn-env-item.is-active .gn-env-check{opacity:1}
+.gn-dd-menu{display:none;position:fixed;z-index:120;min-width:180px;padding:6px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.5)}
+.gn-dd-menu.open{display:block}
+.gn-dd-item{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;padding:8px 12px;border:0;border-radius:8px;background:transparent;color:#e8e8e8;cursor:pointer;text-align:left;font:inherit;font-size:13px}
+.gn-dd-item:hover{background:#343434}
+.gn-dd-item .gn-dd-check{width:14px;height:14px;flex:0 0 auto;opacity:0;fill:none;stroke:#e8e8e8;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.gn-dd-item.is-active .gn-dd-check{opacity:1}
+.gn-shortcut{display:inline-flex;align-items:center;gap:6px;color:#c8c8c8;font-size:12.5px;padding:4px 6px;border-radius:6px;cursor:pointer;border:0;background:transparent}
+.gn-shortcut:hover{background:#2a2a2a;color:#eee}
+.gn-shortcut svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
+.gn-kbd{font-size:11.5px;color:#9a9a9a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 
 /* Account settings page */
 .acct-page-title{font-size:22px;font-weight:600;color:#f0f0f0;margin:0 0 22px;letter-spacing:-.01em}
@@ -1367,7 +1454,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .ms-enable-btn{padding:5px 12px;border-radius:999px;border:1px solid #333;background:#252525;color:#9a9a9a;font:inherit;font-size:12.5px;cursor:pointer}
 .ms-enable-btn:hover{background:#2c2c2c;color:#d0d0d0}
 .ms-enable-btn.is-on{background:#163221;border-color:#256f42;color:#4ade80}
-.ms-enable-btn.is-off{background:#2a2a2a;border-color:#444;color:#e0e0e0}
+.ms-enable-btn.is-off{background:#3a2a2a;border-color:#6b3a3a;color:#f87171}
+.ms-enable-btn[aria-pressed="true"]{box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
 .ms-detail-head .ms-icon-btn.danger{margin-left:auto}
 .ms-field{margin-bottom:16px}
 .ms-field-label{display:block;font-size:12.5px;color:#9a9a9a;margin-bottom:7px}
@@ -2460,107 +2548,221 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
           </div>
           </div>
           <div class="gen-page" id="generalPage">
-            <div class="gn-page-title">常规</div>
-            <p class="gn-page-sub">通用偏好、语言与新线程默认行为</p>
-
-            <div class="gn-section-title">应用</div>
+            <div class="gn-section-title">权限</div>
             <div class="gn-card">
+              <div class="gn-row">
+                <div class="gn-row-left">
+                  <div class="gn-row-label">默认权限</div>
+                  <div class="gn-row-desc">允许 ChatGPT 读取和编辑工作区中的文件</div>
+                </div>
+                <div class="gn-row-value">
+                  <label class="toggle"><input type="checkbox" id="gnDefaultPerm" checked aria-label="默认权限"><span class="toggle-slider"></span></label>
+                </div>
+              </div>
+              <div class="gn-row">
+                <div class="gn-row-left">
+                  <div class="gn-row-label">完整访问权限</div>
+                  <div class="gn-row-desc">授予完整访问权限时，ChatGPT 可访问电脑上的任意文件，并运行命令与使用网络。<a href="#" class="gn-link" id="gnFullAccessLearn">了解更多</a></div>
+                </div>
+                <div class="gn-row-value">
+                  <label class="toggle"><input type="checkbox" id="gnFullAccess" checked aria-label="完整访问权限"><span class="toggle-slider"></span></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="gn-section-title">常规</div>
+            <div class="gn-card">
+              <div class="gn-row">
+                <div class="gn-row-left">
+                  <div class="gn-row-label">无项目任务文件夹</div>
+                  <div class="gn-row-desc">未关联项目时，任务文件的默认存放位置</div>
+                </div>
+                <div class="gn-row-value">
+                  <span class="gn-path" id="gnTaskFolder" title="C:\Users\cheris\Documents\Codex">C:\Users\cheris\Documents\Codex</span>
+                  <button class="gn-action-btn" type="button" id="gnChangeFolder">更改</button>
+                </div>
+              </div>
+              <div class="gn-row">
+                <div class="gn-row-left">
+                  <div class="gn-row-label">默认文件打开位置</div>
+                  <div class="gn-row-desc">从聊天打开文件时使用的应用</div>
+                </div>
+                <div class="gn-row-value" style="position:relative">
+                  <button class="dropdown-btn" type="button" id="gnOpenIn" aria-haspopup="listbox" aria-expanded="false" aria-controls="gnOpenInMenu">
+                    <svg class="dd-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#0078d4" d="M2 2h9.5v9.5H2zm10.5 0H22v9.5h-9.5zM2 12.5H11.5V22H2zm10.5 0H22V22h-9.5z"/></svg>
+                    <span id="gnOpenInLabel">VS Code</span>
+                    <span class="dropdown-arrow"></span>
+                  </button>
+                </div>
+              </div>
+              <div class="gn-row">
+                <div class="gn-row-left">
+                  <div class="gn-row-label">智能体环境</div>
+                  <div class="gn-row-desc">智能体执行命令与工具的运行环境</div>
+                </div>
+                <div class="gn-row-value" style="position:relative">
+                  <button class="dropdown-btn" type="button" id="gnAgentEnv" aria-haspopup="listbox" aria-expanded="false" aria-controls="gnAgentEnvMenu">
+                    <span id="gnAgentEnvLabel">Windows 原生</span>
+                    <span class="dropdown-arrow"></span>
+                  </button>
+                </div>
+              </div>
+              <div class="gn-row">
+                <div class="gn-row-left">
+                  <div class="gn-row-label">集成终端 Shell</div>
+                  <div class="gn-row-desc">内置终端默认使用的 Shell</div>
+                </div>
+                <div class="gn-row-value">
+                  <button class="dropdown-btn" type="button" id="gnShell" aria-haspopup="listbox" aria-expanded="false" aria-controls="gnShellMenu">
+                    <span id="gnShellLabel">PowerShell</span>
+                    <span class="dropdown-arrow"></span>
+                  </button>
+                </div>
+              </div>
               <div class="gn-row">
                 <div class="gn-row-left">
                   <div class="gn-row-label">语言</div>
                   <div class="gn-row-desc">界面与系统提示所用语言</div>
                 </div>
                 <div class="gn-row-value">
-                  <button class="dropdown-btn" type="button">简体中文 <span class="dropdown-arrow"></span></button>
+                  <button class="dropdown-btn" type="button" id="gnLang">自动检测 <span class="dropdown-arrow"></span></button>
                 </div>
               </div>
               <div class="gn-row">
                 <div class="gn-row-left">
-                  <div class="gn-row-label">开机时启动</div>
-                  <div class="gn-row-desc">登录 Windows 后自动打开 ChatGPT</div>
+                  <div class="gn-row-label">底部面板</div>
+                  <div class="gn-row-desc">在标题栏中显示底部面板控件</div>
                 </div>
                 <div class="gn-row-value">
-                  <label class="toggle"><input type="checkbox" id="gnLaunchAtLogin" aria-label="开机时启动"><span class="toggle-slider"></span></label>
+                  <label class="toggle"><input type="checkbox" id="gnBottomPanel" checked aria-label="底部面板"><span class="toggle-slider"></span></label>
                 </div>
               </div>
               <div class="gn-row">
                 <div class="gn-row-left">
-                  <div class="gn-row-label">启动时打开</div>
-                  <div class="gn-row-desc">应用启动时显示的界面</div>
+                  <div class="gn-row-label">默认终端位置</div>
+                  <div class="gn-row-desc">打开终端时停靠的位置</div>
                 </div>
                 <div class="gn-row-value">
-                  <button class="dropdown-btn" type="button">主页 <span class="dropdown-arrow"></span></button>
+                  <div class="gn-seg" id="gnTermPos" role="group" aria-label="默认终端位置">
+                    <button type="button" class="gn-seg-btn is-active" data-pos="bottom">底部</button>
+                    <button type="button" class="gn-seg-btn" data-pos="right">右侧</button>
+                  </div>
                 </div>
               </div>
               <div class="gn-row">
                 <div class="gn-row-left">
-                  <div class="gn-row-label">通知</div>
-                  <div class="gn-row-desc">任务完成与需要审批时发送系统通知</div>
+                  <div class="gn-row-label">开源许可证</div>
+                  <div class="gn-row-desc">查看本应用使用的开源组件许可证</div>
                 </div>
                 <div class="gn-row-value">
-                  <label class="toggle"><input type="checkbox" id="gnNotify" checked aria-label="通知"><span class="toggle-slider"></span></label>
-                </div>
-              </div>
-            </div>
-
-            <div class="gn-section-title">新聊天</div>
-            <div class="gn-card">
-              <div class="gn-row">
-                <div class="gn-row-left">
-                  <div class="gn-row-label">默认项目</div>
-                  <div class="gn-row-desc">新建聊天时使用的项目上下文</div>
-                </div>
-                <div class="gn-row-value">
-                  <button class="dropdown-btn" type="button">上次使用的项目 <span class="dropdown-arrow"></span></button>
+                  <button class="gn-action-btn" type="button" id="gnLicenses">查看</button>
                 </div>
               </div>
               <div class="gn-row">
                 <div class="gn-row-left">
-                  <div class="gn-row-label">默认模型</div>
-                  <div class="gn-row-desc">新线程的默认模型与推理强度</div>
+                  <div class="gn-row-label">插件</div>
+                  <div class="gn-row-desc">重启 ChatGPT 以应用此更改</div>
                 </div>
                 <div class="gn-row-value">
-                  <button class="dropdown-btn" type="button">5.6 Luna · 中 <span class="dropdown-arrow"></span></button>
-                </div>
-              </div>
-              <div class="gn-row">
-                <div class="gn-row-left">
-                  <div class="gn-row-label">进入发送</div>
-                  <div class="gn-row-desc">按 Enter 发送消息，Shift+Enter 换行</div>
-                </div>
-                <div class="gn-row-value">
-                  <label class="toggle"><input type="checkbox" id="gnEnterSend" checked aria-label="进入发送"><span class="toggle-slider"></span></label>
+                  <label class="toggle"><input type="checkbox" id="gnPlugins" checked aria-label="插件"><span class="toggle-slider"></span></label>
                 </div>
               </div>
             </div>
 
-            <div class="gn-section-title">隐私与更新</div>
+            <div class="gn-section-title">编辑器</div>
             <div class="gn-card">
               <div class="gn-row">
                 <div class="gn-row-left">
-                  <div class="gn-row-label">改进产品</div>
-                  <div class="gn-row-desc">分享匿名使用数据以帮助改进 ChatGPT</div>
+                  <div class="gn-row-label">纯文本编辑器</div>
+                  <div class="gn-row-desc">编写消息时，将代码、Markdown 和链接保留为纯文本</div>
                 </div>
                 <div class="gn-row-value">
-                  <label class="toggle"><input type="checkbox" id="gnTelemetry" checked aria-label="改进产品"><span class="toggle-slider"></span></label>
+                  <label class="toggle"><input type="checkbox" id="gnPlainEditor" aria-label="纯文本编辑器"><span class="toggle-slider"></span></label>
                 </div>
               </div>
               <div class="gn-row">
                 <div class="gn-row-left">
-                  <div class="gn-row-label">自动更新</div>
-                  <div class="gn-row-desc">有可用版本时在后台下载并提示安装</div>
+                  <div class="gn-row-label">显示上下文窗口使用情况</div>
                 </div>
                 <div class="gn-row-value">
-                  <label class="toggle"><input type="checkbox" id="gnAutoUpdate" checked aria-label="自动更新"><span class="toggle-slider"></span></label>
+                  <label class="toggle"><input type="checkbox" id="gnContextUsage" aria-label="显示上下文窗口使用情况"><span class="toggle-slider"></span></label>
                 </div>
               </div>
               <div class="gn-row">
                 <div class="gn-row-left">
-                  <div class="gn-row-label">检查更新</div>
-                  <div class="gn-row-desc">当前版本 1.2026.3.12</div>
+                  <div class="gn-row-label">发送快捷键</div>
+                  <div class="gn-row-desc">选择按 Enter 时是发送提示还是插入新行</div>
                 </div>
                 <div class="gn-row-value">
-                  <button class="dropdown-btn" type="button" id="gnCheckUpdate">检查更新</button>
+                  <button class="dropdown-btn" type="button" id="gnSendKey">按 Enter 键 <span class="dropdown-arrow"></span></button>
+                </div>
+              </div>
+              <div class="gn-row">
+                <div class="gn-row-left">
+                  <div class="gn-row-label">跟进处理方式</div>
+                  <div class="gn-row-desc">在 ChatGPT 运行时将后续消息加入队列，或调整当前运行的方向。按 <span class="gn-kbd">Ctrl+↵</span> 可对单条消息执行相反操作</div>
+                </div>
+                <div class="gn-row-value">
+                  <div class="gn-seg" id="gnFollowUp" role="group" aria-label="跟进处理方式">
+                    <button type="button" class="gn-seg-btn is-active" data-mode="queue">加入队列</button>
+                    <button type="button" class="gn-seg-btn" data-mode="steer">调整方向</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="gn-section-title">弹出窗口</div>
+            <div class="gn-card">
+              <div class="gn-row">
+                <div class="gn-row-left">
+                  <div class="gn-row-label">弹出窗口快捷键</div>
+                  <div class="gn-row-desc">为弹出窗口设置全局快捷键。不设置则保持关闭。</div>
+                </div>
+                <div class="gn-row-value">
+                  <button type="button" class="gn-shortcut" id="gnPopupHotkey" aria-label="编辑弹出窗口快捷键">
+                    <span>关闭</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="gn-row">
+                <div class="gn-row-left">
+                  <div class="gn-row-label">默认使用独立聊天</div>
+                  <div class="gn-row-desc">在任何项目外开始新聊天</div>
+                </div>
+                <div class="gn-row-value">
+                  <label class="toggle"><input type="checkbox" id="gnStandaloneChat" aria-label="默认使用独立聊天"><span class="toggle-slider"></span></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="gn-section-title">通知</div>
+            <div class="gn-card">
+              <div class="gn-row">
+                <div class="gn-row-left">
+                  <div class="gn-row-label">轮次完成通知</div>
+                  <div class="gn-row-desc">设置 ChatGPT 完成后何时提醒你</div>
+                </div>
+                <div class="gn-row-value">
+                  <button class="dropdown-btn" type="button" id="gnTurnNotify">仅在未聚焦时 <span class="dropdown-arrow"></span></button>
+                </div>
+              </div>
+              <div class="gn-row">
+                <div class="gn-row-left">
+                  <div class="gn-row-label">启用权限通知</div>
+                  <div class="gn-row-desc">在需要通知权限时显示提醒</div>
+                </div>
+                <div class="gn-row-value">
+                  <label class="toggle"><input type="checkbox" id="gnPermNotify" checked aria-label="启用权限通知"><span class="toggle-slider"></span></label>
+                </div>
+              </div>
+              <div class="gn-row">
+                <div class="gn-row-left">
+                  <div class="gn-row-label">启用问题通知</div>
+                  <div class="gn-row-desc">需要输入才能继续时显示提醒</div>
+                </div>
+                <div class="gn-row-value">
+                  <label class="toggle"><input type="checkbox" id="gnQuestionNotify" checked aria-label="启用问题通知"><span class="toggle-slider"></span></label>
                 </div>
               </div>
             </div>
@@ -2610,8 +2812,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                     <button type="button" class="ms-icon-btn" id="msRenameProvider" title="重命名" aria-label="重命名供应商"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
                   </div>
                   <div class="ms-enable-group" role="group" aria-label="启用状态">
-                    <button type="button" class="ms-enable-btn is-on" id="msEnableBtn" data-state="on">已启用</button>
-                    <button type="button" class="ms-enable-btn" id="msDisableBtn" data-state="off">禁用</button>
+                    <button type="button" class="ms-enable-btn is-on" id="msEnableBtn" data-state="on" aria-pressed="true">已启用</button>
+                    <button type="button" class="ms-enable-btn" id="msDisableBtn" data-state="off" aria-pressed="false">禁用</button>
                   </div>
                   <button type="button" class="ms-icon-btn danger" id="msDeleteProvider" title="删除" aria-label="删除供应商"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
                 </div>
@@ -2914,12 +3116,33 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                 <div class="theme-preview-label">深色</div>
               </div>
             </div>
-            <div class="code-preview-bar">
-              <span>const themePreview: ThemeConfig = {</span>
-              <span style="color:#f97316">surface:</span><span style="color:#a5d6ff">"sidebar-aligned"</span><span>,</span>
-              <span style="color:#f97316">accent:</span><span style="color:#a5d6ff">"#3866f0"</span><span>,</span>
-              <span style="color:#f97316">contrast:</span><span style="color:#a5d6ff">42</span>
-              <span>}</span>
+            <div class="code-preview-bar" aria-label="主题预览 diff">
+              <div class="code-diff-pane">
+                <div class="code-diff-body">
+                  <div class="code-diff-line"><span class="code-diff-ln">1</span><span class="code-diff-code"><span class="code-diff-kw">const</span> <span class="code-diff-id">themePreview</span><span class="code-diff-pun">:</span> <span class="code-diff-type">ThemeConfig</span> <span class="code-diff-pun">= {</span></span></div>
+                  <div class="code-diff-line is-del"><span class="code-diff-ln">2</span><span class="code-diff-code">  <span class="code-diff-prop">surface</span><span class="code-diff-pun">:</span> <span class="code-diff-str">"sidebar"</span><span class="code-diff-pun">,</span></span></div>
+                  <div class="code-diff-line is-del"><span class="code-diff-ln">3</span><span class="code-diff-code">  <span class="code-diff-prop">accent</span><span class="code-diff-pun">:</span> <span class="code-diff-str">"#2563eb"</span><span class="code-diff-pun">,</span></span></div>
+                  <div class="code-diff-line is-del"><span class="code-diff-ln">4</span><span class="code-diff-code">  <span class="code-diff-prop">contrast</span><span class="code-diff-pun">:</span> <span class="code-diff-num">42</span><span class="code-diff-pun">,</span></span></div>
+                  <div class="code-diff-line"><span class="code-diff-ln">5</span><span class="code-diff-code"><span class="code-diff-pun">};</span></span></div>
+                </div>
+                <div class="code-diff-nav" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                  <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                </div>
+              </div>
+              <div class="code-diff-pane">
+                <div class="code-diff-body">
+                  <div class="code-diff-line"><span class="code-diff-ln">1</span><span class="code-diff-code"><span class="code-diff-kw">const</span> <span class="code-diff-id">themePreview</span><span class="code-diff-pun">:</span> <span class="code-diff-type">ThemeConfig</span> <span class="code-diff-pun">= {</span></span></div>
+                  <div class="code-diff-line is-add"><span class="code-diff-ln">2</span><span class="code-diff-code">  <span class="code-diff-prop">surface</span><span class="code-diff-pun">:</span> <span class="code-diff-str">"sidebar-elevated"</span><span class="code-diff-pun">,</span></span></div>
+                  <div class="code-diff-line is-add"><span class="code-diff-ln">3</span><span class="code-diff-code">  <span class="code-diff-prop">accent</span><span class="code-diff-pun">:</span> <span class="code-diff-str">"#0ea5e9"</span><span class="code-diff-pun">,</span></span></div>
+                  <div class="code-diff-line is-add"><span class="code-diff-ln">4</span><span class="code-diff-code">  <span class="code-diff-prop">contrast</span><span class="code-diff-pun">:</span> <span class="code-diff-num">68</span><span class="code-diff-pun">,</span></span></div>
+                  <div class="code-diff-line"><span class="code-diff-ln">5</span><span class="code-diff-code"><span class="code-diff-pun">};</span></span></div>
+                </div>
+                <div class="code-diff-nav" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                  <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                </div>
+              </div>
             </div>
             <div class="appearance-card">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -3101,19 +3324,19 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               <div class="import-row">
                 <div class="import-row-left">
                   <div class="import-row-label">保持导入同步</div>
-                  <div class="import-row-desc">Sync paused. Your content selections are saved</div>
+                  <div class="import-row-desc" id="importKeepSyncDesc">自动同步已连接来源中的新增和更新内容</div>
                 </div>
                 <div class="import-row-value">
-                  <label class="toggle"><input type="checkbox" aria-label="保持导入同步"><span class="toggle-slider"></span></label>
+                  <label class="toggle"><input type="checkbox" id="importKeepSync" checked aria-label="保持导入同步"><span class="toggle-slider"></span></label>
                 </div>
               </div>
               <div class="import-row">
                 <div class="import-row-left">
-                  <div class="import-row-label">Content to sync</div>
-                  <div class="import-row-desc">Available after your first import</div>
+                  <div class="import-row-label">要同步的内容</div>
+                  <div class="import-row-desc">首次导入后可用</div>
                 </div>
                 <div class="import-row-value">
-                  <button class="action-btn">Customize</button>
+                  <button class="action-btn" id="importContentCustomize" type="button">自定义</button>
                 </div>
               </div>
             </div>
@@ -3132,7 +3355,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                   </div>
                 </div>
                 <div class="import-row-value">
-                  <button class="import-btn">导入</button>
+                  <button class="import-btn" type="button" data-import-source="Claude Code">导入</button>
                 </div>
               </div>
               <div class="import-row">
@@ -3147,12 +3370,123 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                   </div>
                 </div>
                 <div class="import-row-value">
-                  <button class="import-btn">导入</button>
+                  <button class="import-btn" type="button" data-import-source="Cursor">导入</button>
                 </div>
               </div>
             </div>
           </div><!-- /importPage -->
-          <div class="gen-page" id="voicePage">
+
+          <div class="gn-dd-menu" id="gnShellMenu" role="listbox" aria-label="集成终端 Shell" hidden>
+            <button type="button" class="gn-dd-item is-active" role="option" data-value="PowerShell" aria-selected="true">
+              PowerShell
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item" role="option" data-value="Command Prompt" aria-selected="false">
+              Command Prompt
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item" role="option" data-value="Git Bash" aria-selected="false">
+              Git Bash
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-dd-item" role="option" data-value="WSL" aria-selected="false">
+              WSL
+              <svg class="gn-dd-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+          </div>
+
+          <div class="gn-env-menu" id="gnAgentEnvMenu" role="listbox" aria-label="智能体环境" hidden>
+            <button type="button" class="gn-env-item is-active" role="option" data-value="Windows 原生" aria-selected="true">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">Windows 原生</span>
+                <span class="gn-env-item-desc">直接在 Windows 中运行智能体</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+            <button type="button" class="gn-env-item" role="option" data-value="适用于 Linux 的 Windows 子系统" aria-selected="false">
+              <span class="gn-env-item-body">
+                <span class="gn-env-item-title">适用于 Linux 的 Windows 子系统</span>
+                <span class="gn-env-item-desc">在 WSL 中运行智能体</span>
+              </span>
+              <svg class="gn-env-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+          </div>
+
+          <div class="gn-openin-menu" id="gnOpenInMenu" role="listbox" aria-label="默认文件打开位置" hidden>
+            <button type="button" class="gn-openin-item is-active" role="option" data-openin="VS Code" aria-selected="true">
+              <svg class="dd-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#0078d4" d="M2 2h9.5v9.5H2zm10.5 0H22v9.5h-9.5zM2 12.5H11.5V22H2zm10.5 0H22V22h-9.5z"/></svg>
+              VS Code
+            </button>
+            <button type="button" class="gn-openin-item" role="option" data-openin="Cursor" aria-selected="false">
+              <svg class="dd-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#e8e8e8" d="M12 2.5 3.5 8.2v7.6L12 21.5l8.5-5.7V8.2L12 2.5zm0 2.3 6.2 4.1v6.2L12 19.2l-6.2-4.1V8.9L12 4.8z"/><path fill="#1a1a1a" d="M12 8.2 8.2 12 12 15.8 15.8 12 12 8.2z"/></svg>
+              Cursor
+            </button>
+            <button type="button" class="gn-openin-item" role="option" data-openin="Default app" aria-selected="false">
+              <svg class="dd-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#f0c14a" d="M3.5 7.5A2 2 0 0 1 5.5 5.5h4l1.8 2H18.5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-7z"/><path fill="#fff" d="M14.2 11.2h3.1v1.1h-1v3.3h-1.1v-3.3h-1z"/><path fill="#3b82f6" d="M11.2 12.8h1.6v2.8h-1.6z"/></svg>
+              Default app
+            </button>
+            <button type="button" class="gn-openin-item" role="option" data-openin="File Explorer" aria-selected="false">
+              <svg class="dd-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#f0c14a" d="M3.5 7.5A2 2 0 0 1 5.5 5.5h4l1.8 2H18.5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-7z"/><path fill="#e6b422" d="M3.5 10.5h17v1.2h-17z"/></svg>
+              File Explorer
+            </button>
+            <button type="button" class="gn-openin-item" role="option" data-openin="Git Bash" aria-selected="false">
+              <svg class="dd-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="4" fill="#3c3c3c"/><path fill="#e44d26" d="M2 2h10v10H2z"/><path fill="#f1e05a" d="M12 2h10v10H12z"/><path fill="#89e051" d="M2 12h10v10H2z"/><path fill="#00a4ef" d="M12 12h10v10H12z"/><path fill="#fff" d="M6.2 8.2h1.3l2.2 3.4V8.2h1.2v6.1H9.6L7.4 10.9v3.4H6.2zm8.4 0h3.8v1.1h-2.5v1.3h2.2v1.1h-2.2v1.5h2.6v1.1h-3.9z"/></svg>
+              Git Bash
+            </button>
+            <button type="button" class="gn-openin-item" role="option" data-openin="PyCharm" aria-selected="false">
+              <svg class="dd-ico" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="pcg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#21d789"/><stop offset="100%" stop-color="#fcf84a"/></linearGradient></defs><rect width="24" height="24" rx="4" fill="url(#pcg)"/><text x="12" y="15.5" text-anchor="middle" font-size="9" font-weight="700" font-family="Arial,sans-serif" fill="#1a1a1a">PC</text></svg>
+              PyCharm
+            </button>
+          </div>
+
+          <div class="imp-modal-overlay" id="importSelectModal" role="dialog" aria-modal="true" aria-labelledby="impModalTitle" hidden>
+            <div class="imp-modal">
+              <div class="imp-modal-head">
+                <h3 class="imp-modal-title" id="impModalTitle">选择要导入的项目</h3>
+                <button type="button" class="imp-modal-close" id="impModalClose" aria-label="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+              </div>
+              <p class="imp-modal-sub">选择要迁移的内容。现有设置不会受影响。</p>
+              <div class="imp-modal-list" role="group" aria-label="导入内容">
+                <div class="imp-item" data-imp="tools">
+                  <div class="imp-item-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+                  <div class="imp-item-body">
+                    <div class="imp-item-title">工具和设置</div>
+                    <p class="imp-item-desc">设置、说明、插件、技能</p>
+                  </div>
+                  <div class="imp-item-actions">
+                    <button type="button" class="imp-icon-btn" title="展开" aria-label="展开工具和设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+                    <input class="imp-check" type="checkbox" checked aria-label="导入工具和设置">
+                  </div>
+                </div>
+                <div class="imp-item" data-imp="projects">
+                  <div class="imp-item-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 8a2 2 0 0 1 2-2h4l2 2.3h7a2 2 0 0 1 2 2V16a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></svg></div>
+                  <div class="imp-item-body">
+                    <div class="imp-item-title">项目 (7)</div>
+                    <p class="imp-item-desc">使用现有项目文件夹</p>
+                  </div>
+                  <div class="imp-item-actions">
+                    <button type="button" class="imp-icon-btn" title="了解更多" aria-label="项目说明"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></button>
+                    <input class="imp-check" type="checkbox" checked aria-label="导入项目">
+                  </div>
+                </div>
+                <div class="imp-item" data-imp="chats">
+                  <div class="imp-item-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+                  <div class="imp-item-body">
+                    <div class="imp-item-title">聊天会话 (14)</div>
+                    <p class="imp-item-desc">最近聊天</p>
+                  </div>
+                  <div class="imp-item-actions">
+                    <button type="button" class="imp-icon-btn" title="了解更多" aria-label="聊天会话说明"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></button>
+                    <input class="imp-check" type="checkbox" checked aria-label="导入聊天会话">
+                  </div>
+                </div>
+              </div>
+              <div class="imp-modal-foot">
+                <button type="button" class="imp-cancel" id="impModalCancel">取消</button>
+                <button type="button" class="imp-primary" id="impModalConfirm">导入到 ChatGPT</button>
+              </div>
+            </div>
+          </div>          <div class="gen-page" id="voicePage">
             <div class="settings-header">
               <div>
                 <div class="import-settings-h2">语音</div>
@@ -6547,7 +6881,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 
   // Map: section name → page subtitle (only for pages we can describe briefly)
   var PAGE_SUBS = {
-    '常规': '通用偏好、语言与新线程默认行为',
+    '常规': '权限、工作区路径与终端偏好',
     '模型': '管理自定义模型供应商，配置后可在聊天时选择使用。',
     '导入': '将其他 AI 应用的设置、项目和聊天导入 ChatGPT',
     '外观': '主题、字体密度与界面元素',
@@ -6829,6 +7163,179 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       lsSet(LS_TOGGLE_STATE, cur);
     });
   });
+
+  /* ── General settings page (权限 + 常规) ── */
+  (function initGeneralPage() {
+    var termPos = document.getElementById('gnTermPos');
+    if (termPos) {
+      termPos.addEventListener('click', function (e) {
+        var btn = e.target.closest('.gn-seg-btn');
+        if (!btn) return;
+        termPos.querySelectorAll('.gn-seg-btn').forEach(function (b) {
+          b.classList.toggle('is-active', b === btn);
+        });
+        showProtoToast('默认终端位置：' + (btn.getAttribute('data-pos') === 'right' ? '右侧' : '底部'));
+      });
+    }
+    var followUp = document.getElementById('gnFollowUp');
+    if (followUp) {
+      followUp.addEventListener('click', function (e) {
+        var btn = e.target.closest('.gn-seg-btn');
+        if (!btn) return;
+        followUp.querySelectorAll('.gn-seg-btn').forEach(function (b) {
+          b.classList.toggle('is-active', b === btn);
+        });
+        showProtoToast('跟进处理：' + (btn.getAttribute('data-mode') === 'steer' ? '调整方向' : '加入队列'));
+      });
+    }
+    var changeFolder = document.getElementById('gnChangeFolder');
+    if (changeFolder) {
+      changeFolder.addEventListener('click', function () {
+        showProtoToast('选择无项目任务文件夹（原型）');
+      });
+    }
+    var licenses = document.getElementById('gnLicenses');
+    if (licenses) {
+      licenses.addEventListener('click', function () {
+        showProtoToast('开源许可证（原型）');
+      });
+    }
+    var learn = document.getElementById('gnFullAccessLearn');
+    if (learn) {
+      learn.addEventListener('click', function (e) {
+        e.preventDefault();
+        showProtoToast('完整访问权限说明（原型）');
+      });
+    }
+    var popupHotkey = document.getElementById('gnPopupHotkey');
+    if (popupHotkey) {
+      popupHotkey.addEventListener('click', function () {
+        showProtoToast('设置弹出窗口快捷键（原型）');
+      });
+    }
+    [['gnLang', '语言'], ['gnSendKey', '发送快捷键'], ['gnTurnNotify', '轮次完成通知']].forEach(function (pair) {
+      var el = document.getElementById(pair[0]);
+      if (!el) return;
+      el.addEventListener('click', function () {
+        showProtoToast(pair[1] + '（原型下拉）');
+      });
+    });
+
+    var protoDdClosers = [];
+    function closeAllProtoDd() {
+      protoDdClosers.forEach(function (fn) { fn(); });
+    }
+
+    function bindProtoDropdown(opts) {
+      var trigger = document.getElementById(opts.triggerId);
+      var menu = document.getElementById(opts.menuId);
+      var label = opts.labelId ? document.getElementById(opts.labelId) : null;
+      if (!trigger || !menu) return null;
+      var itemSel = opts.itemSelector || '.gn-dd-item';
+      var valueAttr = opts.valueAttr || 'data-value';
+      function closeMenu() {
+        menu.classList.remove('open');
+        menu.hidden = true;
+        menu.style.top = '';
+        menu.style.left = '';
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+      protoDdClosers.push(closeMenu);
+      function openMenu() {
+        closeAllProtoDd();
+        var rect = trigger.getBoundingClientRect();
+        var width = Math.max(opts.minWidth || 180, Math.round(rect.width));
+        menu.hidden = false;
+        menu.classList.add('open');
+        menu.style.minWidth = width + 'px';
+        var left = rect.right - width;
+        if (left < 8) left = 8;
+        var top = rect.bottom + 6;
+        if (top + menu.offsetHeight > window.innerHeight - 8) {
+          top = Math.max(8, rect.top - menu.offsetHeight - 6);
+        }
+        menu.style.left = Math.round(left) + 'px';
+        menu.style.top = Math.round(top) + 'px';
+        trigger.setAttribute('aria-expanded', 'true');
+      }
+      function setValue(name) {
+        if (label) label.textContent = name;
+        menu.querySelectorAll(itemSel).forEach(function (item) {
+          var on = item.getAttribute(valueAttr) === name;
+          item.classList.toggle('is-active', on);
+          item.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        if (opts.onSelect) opts.onSelect(name);
+      }
+      trigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (menu.classList.contains('open')) closeMenu();
+        else openMenu();
+      });
+      menu.addEventListener('click', function (e) {
+        var item = e.target.closest(itemSel);
+        if (!item) return;
+        setValue(item.getAttribute(valueAttr) || '');
+        closeMenu();
+      });
+      document.addEventListener('click', function (e) {
+        if (!menu.classList.contains('open')) return;
+        if (trigger.contains(e.target) || menu.contains(e.target)) return;
+        closeMenu();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && menu.classList.contains('open')) closeMenu();
+      });
+      return { closeMenu: closeMenu, setValue: setValue };
+    }
+
+    bindProtoDropdown({
+      triggerId: 'gnShell',
+      menuId: 'gnShellMenu',
+      labelId: 'gnShellLabel',
+      minWidth: 180
+    });
+
+    bindProtoDropdown({
+      triggerId: 'gnAgentEnv',
+      menuId: 'gnAgentEnvMenu',
+      labelId: 'gnAgentEnvLabel',
+      itemSelector: '.gn-env-item',
+      minWidth: 300,
+      onSelect: function (name) {
+        showProtoToast('智能体环境：' + name);
+      }
+    });
+
+    bindProtoDropdown({
+      triggerId: 'gnOpenIn',
+      menuId: 'gnOpenInMenu',
+      labelId: 'gnOpenInLabel',
+      itemSelector: '.gn-openin-item',
+      valueAttr: 'data-openin',
+      minWidth: 196,
+      onSelect: function (name) {
+        var trigger = document.getElementById('gnOpenIn');
+        var menu = document.getElementById('gnOpenInMenu');
+        if (!trigger || !menu) return;
+        var item = null;
+        menu.querySelectorAll('.gn-openin-item').forEach(function (el) {
+          if (el.getAttribute('data-openin') === name) item = el;
+        });
+        var ico = item && item.querySelector('.dd-ico');
+        var existing = trigger.querySelector('.dd-ico');
+        if (existing && ico) {
+          var wrap = document.createElement('div');
+          wrap.innerHTML = ico.outerHTML;
+          var next = wrap.firstElementChild;
+          if (next) {
+            next.classList.add('dd-ico');
+            existing.replaceWith(next);
+          }
+        }
+      }
+    });
+  })();
 
   /* ── Project picker (ctx-bar) ── */
   (function initProjectMenu() {
@@ -8709,6 +9216,89 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   var wtRefresh = document.querySelector('.wt-refresh');
   if (wtRefresh) wtRefresh.addEventListener('click', function () { showProtoToast('已刷新工作树列表（原型）'); });
 
+  /* ── Import keep-sync toggle ── */
+  (function initImportKeepSync() {
+    var toggle = document.getElementById('importKeepSync');
+    var keepDesc = document.getElementById('importKeepSyncDesc');
+    var customize = document.getElementById('importContentCustomize');
+    if (!toggle || !keepDesc) return;
+    var ON = '自动同步已连接来源中的新增和更新内容';
+    var OFF = '同步已暂停，内容选择已保存';
+    function syncUI() {
+      keepDesc.textContent = toggle.checked ? ON : OFF;
+      keepDesc.hidden = false;
+    }
+    toggle.addEventListener('change', syncUI);
+    syncUI();
+    if (customize) {
+      customize.addEventListener('click', function () {
+        showProtoToast('自定义同步内容（原型）');
+      });
+    }
+  })();
+
+  /* ── Import select modal ── */
+  (function initImportModal() {
+    var modal = document.getElementById('importSelectModal');
+    if (!modal) return;
+    var source = '';
+    function openModal(src) {
+      source = src || '';
+      modal.hidden = false;
+      modal.classList.add('open');
+      modal.querySelectorAll('.imp-check').forEach(function (c) { c.checked = true; });
+      syncConfirm();
+    }
+    function closeModal() {
+      modal.classList.remove('open');
+      modal.hidden = true;
+      source = '';
+    }
+    function syncConfirm() {
+      var confirm = document.getElementById('impModalConfirm');
+      if (!confirm) return;
+      var any = Array.prototype.some.call(modal.querySelectorAll('.imp-check'), function (c) { return c.checked; });
+      confirm.disabled = !any;
+    }
+    document.querySelectorAll('#importPage .import-btn[data-import-source]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openModal(btn.getAttribute('data-import-source') || '');
+      });
+    });
+    var closeBtn = document.getElementById('impModalClose');
+    var cancelBtn = document.getElementById('impModalCancel');
+    var confirmBtn = document.getElementById('impModalConfirm');
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    if (confirmBtn) confirmBtn.addEventListener('click', function () {
+      if (confirmBtn.disabled) return;
+      var picked = [];
+      modal.querySelectorAll('.imp-item').forEach(function (item) {
+        var check = item.querySelector('.imp-check');
+        if (check && check.checked) {
+          var title = (item.querySelector('.imp-item-title') || {}).textContent || '';
+          picked.push(title.trim());
+        }
+      });
+      closeModal();
+      showProtoToast('已从 ' + (source || '应用') + ' 导入：' + picked.join('、'));
+    });
+    modal.addEventListener('change', function (e) {
+      if (e.target && e.target.classList.contains('imp-check')) syncConfirm();
+    });
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+    });
+    modal.querySelectorAll('.imp-icon-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        showProtoToast((btn.getAttribute('aria-label') || '详情') + '（原型）');
+      });
+    });
+  })();
+
   /* ── Model settings page ── */
   (function initModelSettings() {
     var providers = {
@@ -8807,13 +9397,31 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     }
 
     function setEnabledUI(on) {
-      if (enableBtn) enableBtn.classList.toggle('is-on', !!on);
-      if (disableBtn) {
-        disableBtn.classList.toggle('is-on', false);
-        disableBtn.classList.toggle('is-off', !on);
+      var enabled = !!on;
+      if (enableBtn) {
+        enableBtn.classList.toggle('is-on', enabled);
+        enableBtn.classList.remove('is-off');
+        enableBtn.textContent = enabled ? '已启用' : '未启用';
+        enableBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        enableBtn.setAttribute('data-state', enabled ? 'on' : 'off');
       }
-      var activeBtn = document.querySelector('.ms-provider.is-active .ms-provider-dot');
-      if (activeBtn) activeBtn.classList.toggle('on', !!on);
+      if (disableBtn) {
+        disableBtn.classList.remove('is-off');
+        disableBtn.classList.toggle('is-on', !enabled);
+        disableBtn.textContent = enabled ? '禁用' : '启用';
+        disableBtn.setAttribute('aria-pressed', enabled ? 'false' : 'true');
+        disableBtn.setAttribute('data-state', enabled ? 'off' : 'on');
+        disableBtn.setAttribute('aria-label', enabled ? '禁用' : '启用');
+      }
+      var activeDot = document.querySelector('.ms-provider.is-active .ms-provider-dot');
+      if (activeDot) activeDot.classList.toggle('on', enabled);
+    }
+
+    function setProviderEnabled(on) {
+      if (!providers[activeId]) return;
+      providers[activeId].enabled = !!on;
+      setEnabledUI(!!on);
+      showProtoToast((on ? '已启用' : '已禁用') + ' ' + providers[activeId].name);
     }
 
     function showDetail() {
@@ -8950,16 +9558,20 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       });
     });
     if (enableBtn) enableBtn.addEventListener('click', function () {
-      if (providers[activeId]) providers[activeId].enabled = true;
-      setEnabledUI(true);
-      showProtoToast('已启用 ' + (providers[activeId] && providers[activeId].name));
+      setProviderEnabled(true);
     });
     if (disableBtn) disableBtn.addEventListener('click', function () {
-      if (providers[activeId]) providers[activeId].enabled = false;
-      setEnabledUI(false);
-      showProtoToast('已禁用 ' + (providers[activeId] && providers[activeId].name));
+      var currentlyOn = !!(providers[activeId] && providers[activeId].enabled);
+      setProviderEnabled(!currentlyOn);
     });
-    var toggleKey = document.getElementById('msToggleKey');
+    var enableGroup = document.querySelector('.ms-enable-group');
+    if (enableGroup) {
+      enableGroup.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        setProviderEnabled(e.key === 'ArrowLeft');
+      });
+    }    var toggleKey = document.getElementById('msToggleKey');
     if (toggleKey && keyEl) {
       toggleKey.addEventListener('click', function () {
         keyEl.type = keyEl.type === 'password' ? 'text' : 'password';

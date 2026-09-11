@@ -290,14 +290,14 @@ function SegEnable({
 
 export function ImportPage() {
   const { t } = useTranslation("settings");
-  const [sync, setSync] = useState(false);
+  const [sync, setSync] = useState(true);
   return (
     <div className="max-w-[720px]">
       <PageTitle>{t("import")}</PageTitle>
       <PageSub>{t("importDesc")}</PageSub>
       <div className="text-[13px] font-medium text-[#b8b8b8] mb-2.5">{t("autoSync")}</div>
       <SettingsCard>
-        <SettingsRow label={t("keepSync")} desc={t("keepSyncDesc")}>
+        <SettingsRow label={t("keepSync")} desc={sync ? t("keepSyncDescOn") : t("keepSyncDesc")}>
           <Toggle checked={sync} onChange={setSync} label={t("keepSync")} />
         </SettingsRow>
         <SettingsRow label={t("contentToSync")} desc={t("contentToSyncDesc")}>

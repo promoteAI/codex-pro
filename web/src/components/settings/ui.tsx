@@ -71,18 +71,21 @@ export function ActionBtn({
   children,
   onClick,
   danger,
+  disabled,
   type = "button",
 }: {
   children: ReactNode;
   onClick?: () => void;
   danger?: boolean;
+  disabled?: boolean;
   type?: "button" | "submit";
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
-      className={`shrink-0 rounded-md px-3 py-1.5 text-[12.5px] border whitespace-nowrap ${
+      disabled={disabled}
+      className={`shrink-0 rounded-md px-3 py-1.5 text-[12.5px] border whitespace-nowrap disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:bg-[#2a2a2a] disabled:hover:text-[#c0c0c0] ${
         danger
           ? "bg-[#3a1a1a] border-[#5a2a2a] text-[#f87171] hover:bg-[#4a2020]"
           : "bg-[#2a2a2a] border-[#3a3a3a] text-[#c0c0c0] hover:bg-[#323232] hover:text-[#e0e0e0]"

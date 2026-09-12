@@ -635,24 +635,91 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .tp-pane-title{font-size:14px;font-weight:600;color:#e0e0e0;margin:0 0 12px;padding:12px 16px 0}
 .tp-pane-empty{flex:1;display:flex;align-items:center;justify-content:center;color:#666;font-size:13px;text-align:center;padding:24px}
 /* Unified session tabs: review / terminal / browser / sidechat coexist */
-.tp-tabs{display:none;align-items:center;gap:4px;padding:6px 10px;border-bottom:1px solid #2a2a2a;flex:0 0 auto;background:#141414;min-height:36px;overflow-x:auto;min-width:0}
+.tp-tabs{display:none;align-items:center;gap:4px;padding:6px 0 6px 6px;border-bottom:1px solid #2a2a2a;flex:0 0 auto;background:#141414;min-height:36px;overflow:hidden;min-width:0}
 .tp-tabs.is-visible{display:flex}
-.tp-tab{display:inline-flex;align-items:center;gap:8px;max-width:200px;padding:5px 10px;border-radius:8px;background:transparent;color:#9a9a9a;font-size:12.5px;border:0;cursor:pointer;min-width:0;flex:0 0 auto}
-.tp-tab.is-active{background:#2e2e2e;color:#f0f0f0}
+.tp-tabs-list{display:flex;align-items:center;gap:2px;flex:1 1 auto;min-width:0;overflow-x:hidden}
+.tp-tab{display:inline-flex;align-items:center;gap:4px;width:0;min-width:0;max-width:200px;padding:5px 6px;border-radius:8px;background:transparent;color:#9a9a9a;font-size:12.5px;border:0;cursor:pointer;flex:1 1 0;overflow:hidden}
+.tp-tab.is-active{background:#2e2e2e;color:#f0f0f0;box-shadow:inset 0 2px 0 #4c8dff}
 .tp-tab:hover{background:#252525;color:#d0d0d0}
 .tp-tab.is-active:hover{background:#323232;color:#f0f0f0}
-.tp-tab-ico{width:14px;height:14px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+.tp-tab-ico{width:14px;height:14px;flex:0 1 14px;min-width:0;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.85;overflow:hidden}
+.tp-tab-ico.is-git{stroke:#e8a04a}
+.tp-tab-ico.is-py{stroke:#4c8dff}
+.tp-tab-ico.is-md{stroke:#4c8dff}
 .tp-tab-label{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
-.tp-tab-close,.tp-tab-add{width:22px;height:22px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;color:#777;background:transparent;border:0;cursor:pointer;flex:0 0 auto}
-.tp-tab-close:hover,.tp-tab-add:hover{background:#333;color:#ddd}
-.tp-tab-close svg,.tp-tab-add svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.tp-tabs-spacer{flex:1;min-width:8px}
+.tp-tab-close,.tp-tab-add,.tp-tab-picker{width:22px;height:22px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;color:#777;background:transparent;border:0;cursor:pointer;flex:0 0 auto}
+.tp-tab .tp-tab-close{width:0;min-width:0;height:18px;padding:0;opacity:0;overflow:hidden;pointer-events:none;flex:0 1 0;margin:0}
+.tp-tab:hover .tp-tab-close,.tp-tab.is-active .tp-tab-close,.tp-tab:focus-within .tp-tab-close{width:18px;min-width:18px;opacity:1;pointer-events:auto;flex:0 0 18px}
+.tp-tab-close:hover,.tp-tab-add:hover,.tp-tab-picker:hover,.tp-tab-picker[aria-expanded="true"]{background:#333;color:#ddd}
+.tp-tab-close svg,.tp-tab-add svg,.tp-tab-picker svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* Reserve room for floating #layoutToolbar (全屏 + 底部 + 侧栏) */
+.tp-tabs-spacer{flex:0 0 110px;width:110px;min-width:110px;pointer-events:none}
 .tp-tab-menu{display:none;position:fixed;z-index:120;min-width:168px;padding:4px;background:#2c2c2c;border:1px solid #3a3a3a;border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.5)}
 .tp-tab-menu.open{display:block}
 .tp-tab-menu-item{display:block;width:100%;padding:8px 12px;border:0;border-radius:6px;background:transparent;color:#e8e8e8;font-size:13px;cursor:pointer;text-align:left;line-height:1.3}
 .tp-tab-menu-item:hover{background:#3a3a3a}
 .tp-tab-menu-item:disabled{color:#666;cursor:default}
 .tp-tab-menu-item:disabled:hover{background:transparent}
+/* Tab picker (open / recently closed) */
+.tp-picker-menu{display:none;position:fixed;z-index:130;width:min(320px,calc(100vw - 24px));max-height:min(420px,70vh);padding:0;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.55);overflow:hidden;flex-direction:column}
+.tp-picker-menu.open{display:flex}
+.tp-picker-search{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #353535;flex:0 0 auto}
+.tp-picker-search svg{width:14px;height:14px;flex:0 0 auto;color:#888;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tp-picker-search input{flex:1;min-width:0;border:0;outline:none;background:transparent;color:#e8e8e8;font:inherit;font-size:13px}
+.tp-picker-search input::placeholder{color:#777}
+.tp-picker-body{flex:1;min-height:0;overflow:auto;padding:6px 6px 8px;scrollbar-width:thin}
+.tp-picker-sec{margin-top:4px}
+.tp-picker-sec:first-child{margin-top:2px}
+.tp-picker-sec-title{padding:6px 10px 4px;font-size:11.5px;color:#8a8a8a;line-height:1.2}
+.tp-picker-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;border:0;border-radius:8px;background:transparent;color:#e0e0e0;font:inherit;font-size:13px;cursor:pointer;text-align:left;line-height:1.25;box-sizing:border-box}
+.tp-picker-item:hover,.tp-picker-item.is-active{background:#3a3a3a}
+.tp-picker-item svg.tp-tab-ico,.tp-picker-item > svg:first-child{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.tp-picker-item-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-picker-item-meta{flex:0 0 auto;font-size:11.5px;color:#888;font-variant-numeric:tabular-nums}
+.tp-picker-item-close{width:20px;height:20px;border:0;border-radius:5px;background:transparent;color:#777;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;flex:0 0 auto;opacity:.7}
+.tp-picker-item-close:hover{background:#4a4a4a;color:#ddd;opacity:1}
+.tp-picker-item-close svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.tp-picker-empty{padding:10px 12px;font-size:12.5px;color:#777}
+/* File viewer pane */
+.fv{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;background:#181818}
+.fv-crumb{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid #2a2a2a;flex:0 0 auto;background:#1a1a1a;min-width:0}
+.fv-crumb-proj{font-size:12.5px;color:#8a8a8a;white-space:nowrap}
+.fv-crumb-sep{color:#555;font-size:12px}
+.fv-crumb-file{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#d8d8d8;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fv-crumb-file svg{width:13px;height:13px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.fv-crumb-file svg.is-git{stroke:#e8a04a}
+.fv-crumb-file svg.is-py,.fv-crumb-file svg.is-md{stroke:#4c8dff}
+.fv-crumb-spacer{flex:1;min-width:8px}
+.fv-crumb-btn{width:26px;height:26px;border:0;border-radius:6px;background:transparent;color:#888;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.fv-crumb-btn:hover,.fv-crumb-btn[aria-expanded="true"]{background:#2a2a2a;color:#ddd}
+.fv-crumb-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.fv-more-wrap{position:relative;flex:0 0 auto}
+.fv-more-menu{display:none;position:fixed;z-index:130;min-width:220px;padding:6px;background:#2c2c2c;border:1px solid #3a3a3a;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.55)}
+.fv-more-menu.open{display:block}
+.fv-more-head{padding:6px 10px 8px;font-size:12px;color:#8a8a8a;line-height:1.2}
+.fv-more-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:8px;background:transparent;color:#e8e8e8;font-size:13px;cursor:pointer;text-align:left;font:inherit;line-height:1.25}
+.fv-more-item:hover{background:#3a3a3a}
+.fv-more-item svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.fv-more-item-label{flex:1;min-width:0}
+.fv-more-check{width:14px;height:14px;flex:0 0 auto;opacity:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fv-more-item.is-active .fv-more-check{opacity:1}
+.fv-more-sep{height:1px;margin:4px 6px;background:#3a3a3a}
+.fv-preview{flex:1;overflow:auto;min-height:0;padding:20px 22px 28px;color:#d8d8d8;font-size:14px;line-height:1.65}
+.fv-preview h1,.fv-preview h2,.fv-preview h3{margin:0 0 12px;color:#f0f0f0;font-weight:600;line-height:1.3}
+.fv-preview h1{font-size:22px}
+.fv-preview h2{font-size:18px;margin-top:18px}
+.fv-preview h3{font-size:15px;margin-top:14px}
+.fv-preview p{margin:0 0 12px}
+.fv-preview code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;background:#242424;padding:1px 5px;border-radius:4px}
+.fv-preview pre{margin:0 0 14px;padding:12px 14px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:8px;overflow:auto}
+.fv-preview pre code{background:transparent;padding:0}
+.fv-body.is-hidden{display:none}
+.fv-preview.is-hidden{display:none}
+.fv-body{flex:1;overflow:auto;min-height:0;padding:16px 18px 24px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.55;color:#d4d4d4}
+.fv-body pre{margin:0;white-space:pre-wrap;word-break:break-word}
+.fv-line{display:flex;min-width:0}
+.fv-ln{width:36px;flex:0 0 36px;text-align:right;padding-right:12px;color:#555;user-select:none}
+.fv-tx{flex:1;min-width:0}
 /* Keep review/browser/sidechat at hub width so chat is not squeezed */
 
 /* Side chat pane */
@@ -2863,8 +2930,18 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       <aside class="tools-panel" id="toolsPanel" aria-hidden="true" aria-label="工具面板">
         <div class="tools-panel-inner">
           <div class="tp-tabs" id="tpTabs" aria-label="工具标签">
-            <button type="button" class="tp-tab-add" id="tpTabAdd" title="添加" aria-label="添加" aria-haspopup="menu" aria-expanded="false" aria-controls="termAddMenu"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
-            <span class="tp-tabs-spacer"></span>
+            <button type="button" class="tp-tab-picker" id="tpTabPicker" title="标签页" aria-label="标签页" aria-haspopup="menu" aria-expanded="false" aria-controls="tpPickerMenu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+            <div class="tp-tabs-list" id="tpTabsList" role="tablist">
+              <button type="button" class="tp-tab-add" id="tpTabAdd" title="添加" aria-label="添加" aria-haspopup="menu" aria-expanded="false" aria-controls="termAddMenu"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+            </div>
+            <span class="tp-tabs-spacer" aria-hidden="true"></span>
+          </div>
+          <div class="tp-picker-menu" id="tpPickerMenu" role="dialog" aria-label="标签页" hidden>
+            <div class="tp-picker-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+              <input type="search" id="tpPickerSearch" placeholder="搜索标签页..." autocomplete="off" spellcheck="false">
+            </div>
+            <div class="tp-picker-body" id="tpPickerBody"></div>
           </div>
           <div class="tp-tab-menu" id="tpTabMenu" role="menu" hidden>
             <button type="button" class="tp-tab-menu-item" role="menuitem" data-action="close">关闭</button>
@@ -3032,6 +3109,49 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
                   <div class="send-btn" id="scSend" role="button" tabindex="0" title="发送" aria-label="发送" aria-disabled="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></div>
                 </div>
               </div>
+            </div>
+          </div>
+          <div class="tp-pane" id="tpPaneFile" data-pane="file">
+            <div class="fv" id="fileView">
+              <div class="fv-crumb">
+                <span class="fv-crumb-proj" id="fvProj">codex-pro</span>
+                <span class="fv-crumb-sep" aria-hidden="true">›</span>
+                <span class="fv-crumb-file" id="fvFileLabel">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                  <span id="fvFileName">.gitignore</span>
+                </span>
+                <span class="fv-crumb-spacer"></span>
+                <div class="fv-more-wrap">
+                  <button type="button" class="fv-crumb-btn" id="fvMoreBtn" title="更多" aria-label="更多" aria-haspopup="menu" aria-expanded="false" aria-controls="fvMoreMenu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg></button>
+                  <div class="fv-more-menu" id="fvMoreMenu" role="menu" hidden>
+                    <div class="fv-more-head" id="fvMoreHead">Markdown</div>
+                    <div class="fv-more-view" id="fvMoreViewOpts">
+                      <button type="button" class="fv-more-item is-active" role="menuitemradio" data-fv-action="preview" aria-checked="true">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+                        <span class="fv-more-item-label">预览</span>
+                        <svg class="fv-more-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7"/></svg>
+                      </button>
+                      <button type="button" class="fv-more-item" role="menuitemradio" data-fv-action="source" aria-checked="false">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9.2 13.2-2.2 2.3 2.2 2.3M14.8 13.2l2.2 2.3-2.2 2.3"/></svg>
+                        <span class="fv-more-item-label">源码</span>
+                        <svg class="fv-more-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7"/></svg>
+                      </button>
+                      <div class="fv-more-sep" role="separator"></div>
+                    </div>
+                    <button type="button" class="fv-more-item" role="menuitem" data-fv-action="copy-abs">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+                      <span class="fv-more-item-label">复制绝对路径</span>
+                    </button>
+                    <button type="button" class="fv-more-item" role="menuitem" data-fv-action="copy-rel">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+                      <span class="fv-more-item-label">复制相对路径</span>
+                    </button>
+                  </div>
+                </div>
+                <button type="button" class="fv-crumb-btn" id="fvOpenExtBtn" title="在外部打开" aria-label="在外部打开"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M18 13.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4.5"/></svg></button>
+              </div>
+              <div class="fv-body" id="fvBody" aria-label="文件内容"></div>
+              <div class="fv-preview is-hidden" id="fvPreview" aria-label="Markdown 预览"></div>
             </div>
           </div>
         </div>
@@ -6238,7 +6358,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     review: document.getElementById('tpPaneReview'),
     terminal: document.getElementById('tpPaneTerminal'),
     browser: document.getElementById('tpPaneBrowser'),
-    sidechat: document.getElementById('tpPaneSidechat')
+    sidechat: document.getElementById('tpPaneSidechat'),
+    file: document.getElementById('tpPaneFile')
   };
 
   function toolsPanelIsOpen() {
@@ -6247,15 +6368,24 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 
   /* ── Unified session tabs (review / terminal / browser / sidechat) ── */
   var tpTabsEl = document.getElementById('tpTabs');
+  var tpTabsListEl = document.getElementById('tpTabsList');
   var tpTabAdd = document.getElementById('tpTabAdd');
   var tpSessionTabs = [];
+  var tpRecentClosedTabs = [];
   var tpActiveTabId = null;
   var tpTabSeq = 0;
   var TP_TAB_ICONS = {
     review: '<svg class="tp-tab-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg>',
     terminal: '<svg class="tp-tab-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="m7.5 10 2.5 2-2.5 2M12 14h4.5"/></svg>',
     browser: '<svg class="tp-tab-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5a14 14 0 0 1 0 17M12 3.5a14 14 0 0 0 0 17"/></svg>',
-    sidechat: '<svg class="tp-tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 8v5M9.5 10.5h5"/></svg>'
+    sidechat: '<svg class="tp-tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 8v5M9.5 10.5h5"/></svg>',
+    file: '<svg class="tp-tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>'
+  };
+  var TP_FILE_ICONS = {
+    git: '<svg class="tp-tab-ico is-git" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.5 2.5 21.5 11.5a1.4 1.4 0 0 1 0 2l-8.5 8.5a1.4 1.4 0 0 1-2 0L2.5 13.5a1.4 1.4 0 0 1 0-2L11 2.5a1.4 1.4 0 0 1 1.5 0Z"/><circle cx="12" cy="12" r="2.2"/></svg>',
+    py: '<svg class="tp-tab-ico is-py" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c-3.2 0-3.5.1-4.2.4A3.4 3.4 0 0 0 5.5 6.2V8h6.7v1H4.8A3.8 3.8 0 0 0 1 12.8v2.4A3.8 3.8 0 0 0 4.8 19H7v-2.3a3.3 3.3 0 0 1 3.3-3.3h3.4A3.3 3.3 0 0 0 17 10.1V6.2A3.2 3.2 0 0 0 13.8 3H12Z"/><path d="M12 21c3.2 0 3.5-.1 4.2-.4a3.4 3.4 0 0 0 2.3-2.8V16h-6.7v-1h7.4A3.8 3.8 0 0 0 23 11.2V8.8A3.8 3.8 0 0 0 19.2 5H17v2.3A3.3 3.3 0 0 1 13.7 10.6H10.3A3.3 3.3 0 0 0 7 13.9v3.9A3.2 3.2 0 0 0 10.2 21H12Z"/></svg>',
+    md: '<svg class="tp-tab-ico is-md" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15V9l2.5 3L12 9v6M15 12h2.5M16.2 12v3"/></svg>',
+    html: '<svg class="tp-tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M13 6l-2 12"/></svg>'
   };
   var TP_TAB_LABELS = {
     review: '审查',
@@ -6283,26 +6413,34 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   }
   function renderSessionTabs() {
     if (!tpTabsEl) return;
+    var listEl = tpTabsListEl || tpTabsEl;
     var addBtn = tpTabAdd || document.getElementById('tpTabAdd');
-    var spacer = tpTabsEl.querySelector('.tp-tabs-spacer');
-    tpTabsEl.querySelectorAll('.tp-tab').forEach(function (el) { el.remove(); });
+    listEl.querySelectorAll('.tp-tab').forEach(function (el) { el.remove(); });
     tpSessionTabs.forEach(function (tab) {
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'tp-tab' + (tab.id === tpActiveTabId ? ' is-active' : '');
       btn.setAttribute('data-tp-id', String(tab.id));
       btn.setAttribute('data-tp-type', tab.type);
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', tab.id === tpActiveTabId ? 'true' : 'false');
       if (tab.id === tpActiveTabId) btn.setAttribute('aria-current', 'page');
       btn.title = tab.label;
-      btn.innerHTML = (TP_TAB_ICONS[tab.type] || '') +
+      var ico = tab.iconHtml || TP_TAB_ICONS[tab.type] || '';
+      btn.innerHTML = ico +
         '<span class="tp-tab-label"></span>' +
         '<span class="tp-tab-close" role="button" tabindex="0" title="关闭标签" aria-label="关闭标签"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></span>';
       btn.querySelector('.tp-tab-label').textContent = tab.label;
-      var before = addBtn || spacer;
-      if (before) tpTabsEl.insertBefore(btn, before);
-      else tpTabsEl.appendChild(btn);
+      if (addBtn && addBtn.parentNode === listEl) listEl.insertBefore(btn, addBtn);
+      else listEl.appendChild(btn);
     });
     syncTpTabsVisibility();
+    if (tpTabsListEl && tpActiveTabId != null) {
+      var activeEl = tpTabsListEl.querySelector('.tp-tab.is-active');
+      if (activeEl && typeof activeEl.scrollIntoView === 'function') {
+        try { activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { activeEl.scrollIntoView(false); }
+      }
+    }
   }
   function updateSessionTabLabel(tab) {
     if (!tab) return;
@@ -6310,7 +6448,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   }
   function clearPaneFlags() {
     if (!toolsPanel) return;
-    toolsPanel.classList.remove('review-open', 'browser-open', 'sidechat-open', 'terminal-open');
+    toolsPanel.classList.remove('review-open', 'browser-open', 'sidechat-open', 'terminal-open', 'file-open');
   }
   function showToolsHub() {
     if (tpHub) tpHub.style.display = '';
@@ -6326,6 +6464,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     if (tab.type === 'review') initReviewView();
     if (tab.type === 'sidechat') initSidechatView();
     if (tab.type === 'browser') paintBrowserTab(tab);
+    if (tab.type === 'file') paintFileTab(tab);
     if (tab.type === 'terminal') {
       openBottomPanel();
       if (tab.termId != null && typeof focusTerminalTab === 'function') focusTerminalTab(tab.termId);
@@ -6335,6 +6474,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     var tab = findSessionTab(id);
     if (!tab) return;
     tpActiveTabId = tab.id;
+    tab.lastActiveAt = Date.now();
     if (tab.type !== 'terminal' && !sideOpen) {
       sideOpen = true;
       if (toolsPanel) {
@@ -6359,6 +6499,31 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     renderSessionTabs();
     applySessionTabContent(tab);
   }
+  function pushRecentClosedTab(tab) {
+    if (!tab) return;
+    var snapshot = {
+      type: tab.type,
+      label: tab.label,
+      path: tab.path,
+      url: tab.url,
+      history: tab.history ? tab.history.slice() : undefined,
+      histIdx: tab.histIdx,
+      msgs: tab.msgs ? tab.msgs.slice() : undefined,
+      termId: tab.termId,
+      iconHtml: tab.iconHtml,
+      content: tab.content,
+      project: tab.project,
+      viewMode: tab.viewMode,
+      closedAt: Date.now()
+    };
+    tpRecentClosedTabs = tpRecentClosedTabs.filter(function (t) {
+      if (snapshot.type === 'file') return !(t.type === 'file' && t.path === snapshot.path);
+      if (snapshot.type === 'browser') return !(t.type === 'browser' && t.label === snapshot.label && t.url === snapshot.url);
+      return !(t.type === snapshot.type && t.label === snapshot.label);
+    });
+    tpRecentClosedTabs.unshift(snapshot);
+    if (tpRecentClosedTabs.length > 20) tpRecentClosedTabs.length = 20;
+  }
   function closeSessionTab(id) {
     id = Number(id);
     var idx = -1;
@@ -6367,12 +6532,14 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     }
     if (idx === -1) return;
     var removed = tpSessionTabs[idx];
+    pushRecentClosedTab(removed);
     tpSessionTabs.splice(idx, 1);
     if (removed.type === 'terminal' && removed.termId != null && typeof removeTerminalTab === 'function') {
       removeTerminalTab(removed.termId, true);
     }
     if (!tpSessionTabs.length) {
       showToolsHub();
+      if (typeof renderTpPickerMenu === 'function') renderTpPickerMenu();
       return;
     }
     if (tpActiveTabId === id) {
@@ -6381,11 +6548,19 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     } else {
       renderSessionTabs();
     }
+    if (typeof renderTpPickerMenu === 'function') renderTpPickerMenu();
   }
   function makeSessionTab(type, opts) {
     opts = opts || {};
     tpTabSeq += 1;
-    var tab = { id: tpTabSeq, type: type, label: opts.label || TP_TAB_LABELS[type] || type };
+    var now = Date.now();
+    var tab = {
+      id: tpTabSeq,
+      type: type,
+      label: opts.label || TP_TAB_LABELS[type] || type,
+      openedAt: now,
+      lastActiveAt: now
+    };
     if (type === 'browser') {
       tab.url = opts.url || '';
       tab.history = opts.history ? opts.history.slice() : [];
@@ -6396,9 +6571,320 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     } else if (type === 'terminal') {
       tab.termId = opts.termId != null ? opts.termId : null;
       tab.label = opts.label || TP_TAB_LABELS.terminal;
+    } else if (type === 'file') {
+      tab.path = opts.path || opts.label || 'untitled';
+      tab.label = opts.label || tab.path.split('/').pop() || tab.path;
+      tab.iconHtml = opts.iconHtml || fileIconForPath(tab.path);
+      tab.content = opts.content || fileSampleContent(tab.path);
+      tab.project = opts.project || 'codex-pro';
+      tab.viewMode = opts.viewMode || (isMarkdownPath(tab.path) ? 'preview' : 'source');
     }
     return tab;
   }
+  function isMarkdownPath(path) {
+    return /\.md$/i.test(path || '');
+  }
+  function fileTypeLabel(path) {
+    var name = ((path || '').split(/[/\\]/).pop() || '').toLowerCase();
+    if (name === '.gitignore') return 'Git Ignore';
+    if (/\.md$/.test(name)) return 'Markdown';
+    if (/\.py$/.test(name)) return 'Python';
+    if (/\.html?$/.test(name)) return 'HTML';
+    if (/\.json$/.test(name)) return 'JSON';
+    if (/\.ya?ml$/.test(name)) return 'YAML';
+    if (/\.ts$/.test(name)) return 'TypeScript';
+    if (/\.tsx$/.test(name)) return 'TSX';
+    if (/\.js$/.test(name)) return 'JavaScript';
+    if (/\.jsx$/.test(name)) return 'JSX';
+    if (/\.css$/.test(name)) return 'CSS';
+    if (/\.txt$/.test(name)) return 'Text';
+    return 'Text';
+  }
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function renderMarkdownPreview(text) {
+    var lines = String(text || '').split('\n');
+    var html = '';
+    var inCode = false;
+    var codeBuf = [];
+    function flushCode() {
+      if (!codeBuf.length) return;
+      html += '<pre><code>' + escapeHtml(codeBuf.join('\n')) + '</code></pre>';
+      codeBuf = [];
+    }
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (/^```/.test(line)) {
+        if (inCode) { flushCode(); inCode = false; }
+        else { inCode = true; }
+        continue;
+      }
+      if (inCode) { codeBuf.push(line); continue; }
+      if (!line.trim()) { html += ''; continue; }
+      var m = /^(#{1,3})\s+(.*)$/.exec(line);
+      if (m) {
+        var level = m[1].length;
+        html += '<h' + level + '>' + escapeHtml(m[2]) + '</h' + level + '>';
+        continue;
+      }
+      html += '<p>' + escapeHtml(line).replace(/`([^`]+)`/g, '<code>$1</code>') + '</p>';
+    }
+    if (inCode) flushCode();
+    return html || '<p></p>';
+  }
+  function fileAbsPath(tab) {
+    if (!tab) return '';
+    var rel = String(tab.path || '').replace(/\//g, '\\');
+    var root = 'E:\\workspace\\' + (tab.project || 'codex-pro');
+    if (!rel || rel === 'untitled') return root;
+    return root + '\\' + rel;
+  }
+  function fileRelPath(tab) {
+    if (!tab) return '';
+    return String(tab.path || '').replace(/\\/g, '/');
+  }
+  function copyProtoText(text, okMsg) {
+    text = String(text || '');
+    function done() {
+      if (typeof showProtoToast === 'function') showProtoToast(okMsg || '已复制');
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function () {
+        done();
+      });
+      return;
+    }
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) {}
+    done();
+  }
+  function syncFvMoreMenu(tab) {
+    var head = document.getElementById('fvMoreHead');
+    var viewOpts = document.getElementById('fvMoreViewOpts');
+    var menu = document.getElementById('fvMoreMenu');
+    if (!tab || tab.type !== 'file') return;
+    if (head) head.textContent = fileTypeLabel(tab.path);
+    var canPreview = isMarkdownPath(tab.path);
+    if (viewOpts) viewOpts.style.display = canPreview ? '' : 'none';
+    if (!menu) return;
+    var mode = tab.viewMode || (canPreview ? 'preview' : 'source');
+    menu.querySelectorAll('[data-fv-action="preview"], [data-fv-action="source"]').forEach(function (el) {
+      var action = el.getAttribute('data-fv-action');
+      var on = action === mode;
+      el.classList.toggle('is-active', on);
+      el.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+  function closeFvMoreMenu() {
+    var btn = document.getElementById('fvMoreBtn');
+    var menu = document.getElementById('fvMoreMenu');
+    if (menu) {
+      menu.classList.remove('open');
+      menu.hidden = true;
+      menu.style.top = '';
+      menu.style.left = '';
+    }
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+  function openFvMoreMenu() {
+    var btn = document.getElementById('fvMoreBtn');
+    var menu = document.getElementById('fvMoreMenu');
+    if (!menu || !btn) return;
+    var tab = getActiveSessionTab();
+    syncFvMoreMenu(tab);
+    if (menu.parentElement !== document.body) document.body.appendChild(menu);
+    menu.hidden = false;
+    menu.classList.add('open');
+    btn.setAttribute('aria-expanded', 'true');
+    requestAnimationFrame(function () {
+      var rect = btn.getBoundingClientRect();
+      var menuW = menu.offsetWidth || 220;
+      var menuH = menu.offsetHeight || 180;
+      var top = rect.bottom + 6;
+      if (top + menuH > window.innerHeight - 8) {
+        top = Math.max(8, rect.top - menuH - 6);
+      }
+      var left = rect.right - menuW;
+      if (left < 8) left = 8;
+      if (left + menuW > window.innerWidth - 8) left = Math.max(8, window.innerWidth - menuW - 8);
+      menu.style.top = Math.round(top) + 'px';
+      menu.style.left = Math.round(left) + 'px';
+    });
+  }
+  function fileIconForPath(path) {
+    var name = (path || '').split('/').pop() || '';
+    var lower = name.toLowerCase();
+    if (lower === '.gitignore' || lower.indexOf('git') === 0) return TP_FILE_ICONS.git;
+    if (/\.py$/.test(lower)) return TP_FILE_ICONS.py;
+    if (/\.md$/.test(lower)) return TP_FILE_ICONS.md;
+    if (/\.html?$/.test(lower)) return TP_FILE_ICONS.html;
+    return TP_TAB_ICONS.file;
+  }
+  function fileSampleContent(path) {
+    var name = (path || '').split('/').pop() || path;
+    if (name === '.gitignore') {
+      return [
+        '# Byte-compiled / optimized / DLL files',
+        '__pycache__/',
+        '*.py[cod]',
+        '*$py.class',
+        '',
+        '# Virtual environments',
+        '.venv/',
+        'venv/',
+        '',
+        '# Tooling caches',
+        '.pytest_cache/',
+        '.ruff_cache/',
+        '.mypy_cache/',
+        '',
+        '# IDE',
+        '.idea/',
+        '.vscode/',
+        '',
+        '# Local env',
+        '.env',
+        '.env.*'
+      ].join('\n');
+    }
+    if (/\.py$/.test(name)) {
+      return 'from __future__ import annotations\n\n\ndef main() -> None:\n    print("hello from ' + name + '")\n\n\nif __name__ == "__main__":\n    main()\n';
+    }
+    if (/\.md$/.test(name)) {
+      return '# ' + name + '\n\n这是原型中的示意 Markdown 内容。\n';
+    }
+    return '# ' + name + '\n# 原型文件预览\n';
+  }
+  function paintFileTab(tab) {
+    if (!tab || tab.type !== 'file') return;
+    var proj = document.getElementById('fvProj');
+    var nameEl = document.getElementById('fvFileName');
+    var label = document.getElementById('fvFileLabel');
+    var body = document.getElementById('fvBody');
+    var preview = document.getElementById('fvPreview');
+    if (proj) proj.textContent = tab.project || 'codex-pro';
+    if (nameEl) nameEl.textContent = tab.label || tab.path;
+    if (label) {
+      var svg = label.querySelector('svg');
+      if (svg && tab.iconHtml) {
+        var wrap = document.createElement('div');
+        wrap.innerHTML = tab.iconHtml;
+        var next = wrap.firstChild;
+        if (next) svg.replaceWith(next);
+      }
+    }
+    var canPreview = isMarkdownPath(tab.path);
+    var mode = tab.viewMode || (canPreview ? 'preview' : 'source');
+    if (!canPreview) mode = 'source';
+    tab.viewMode = mode;
+    var text = tab.content || fileSampleContent(tab.path);
+    if (body) {
+      var lines = String(text).split('\n');
+      var html = '';
+      for (var i = 0; i < lines.length; i++) {
+        html += '<div class="fv-line"><span class="fv-ln">' + (i + 1) + '</span><span class="fv-tx"></span></div>';
+      }
+      body.innerHTML = html || '<div class="fv-line"><span class="fv-ln">1</span><span class="fv-tx"></span></div>';
+      var txs = body.querySelectorAll('.fv-tx');
+      for (var j = 0; j < txs.length; j++) txs[j].textContent = lines[j] != null ? lines[j] : '';
+      body.classList.toggle('is-hidden', mode === 'preview');
+    }
+    if (preview) {
+      if (mode === 'preview' && canPreview) {
+        preview.innerHTML = renderMarkdownPreview(text);
+        preview.classList.remove('is-hidden');
+      } else {
+        preview.innerHTML = '';
+        preview.classList.add('is-hidden');
+      }
+    }
+    syncFvMoreMenu(tab);
+  }
+  function openFileTab(path, opts) {
+    opts = opts || {};
+    var filePath = path || opts.path || 'untitled';
+    for (var i = 0; i < tpSessionTabs.length; i++) {
+      if (tpSessionTabs[i].type === 'file' && tpSessionTabs[i].path === filePath) {
+        activateSessionTab(tpSessionTabs[i].id);
+        return tpSessionTabs[i];
+      }
+    }
+    var name = filePath.split('/').pop() || filePath;
+    var projEl = document.getElementById('sfProjLabel');
+    return addSessionTab('file', {
+      path: filePath,
+      label: name,
+      project: opts.project || ((projEl && projEl.textContent) || 'codex-pro'),
+      iconHtml: opts.iconHtml || fileIconForPath(filePath),
+      content: opts.content || fileSampleContent(filePath)
+    });
+  }
+  (function initFvMoreMenu() {
+    var btn = document.getElementById('fvMoreBtn');
+    var menu = document.getElementById('fvMoreMenu');
+    var openExt = document.getElementById('fvOpenExtBtn');
+    if (!btn || !menu) return;
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.classList.contains('open')) closeFvMoreMenu();
+      else openFvMoreMenu();
+    });
+    menu.addEventListener('click', function (e) {
+      var item = e.target.closest('[data-fv-action]');
+      if (!item || !menu.contains(item)) return;
+      e.preventDefault();
+      var action = item.getAttribute('data-fv-action');
+      var tab = getActiveSessionTab();
+      if (!tab || tab.type !== 'file') { closeFvMoreMenu(); return; }
+      if (action === 'preview' || action === 'source') {
+        if (!isMarkdownPath(tab.path) && action === 'preview') return;
+        tab.viewMode = action;
+        paintFileTab(tab);
+        closeFvMoreMenu();
+        return;
+      }
+      if (action === 'copy-abs') {
+        copyProtoText(fileAbsPath(tab), '已复制绝对路径');
+        closeFvMoreMenu();
+        return;
+      }
+      if (action === 'copy-rel') {
+        copyProtoText(fileRelPath(tab), '已复制相对路径');
+        closeFvMoreMenu();
+      }
+    });
+    document.addEventListener('click', function (e) {
+      if (!menu.classList.contains('open')) return;
+      if (e.target.closest('.fv-more-wrap') || e.target.closest('#fvMoreMenu')) return;
+      closeFvMoreMenu();
+    });
+    window.addEventListener('resize', closeFvMoreMenu);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeFvMoreMenu();
+    });
+    if (openExt) {
+      openExt.addEventListener('click', function () {
+        var tab = getActiveSessionTab();
+        if (typeof showProtoToast === 'function') {
+          showProtoToast(tab && tab.path ? ('在外部打开 ' + tab.path + '（原型）') : '在外部打开（原型）');
+        }
+      });
+    }
+  })();
   function addSessionTab(type, opts) {
     opts = opts || {};
     /* 审查：全局只保留一个标签，已存在则激活 */
@@ -6432,6 +6918,191 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       if (tabEl) activateSessionTab(tabEl.getAttribute('data-tp-id'));
     });
   }
+
+  /* ── Tab picker: open / recently closed ── */
+  function formatTpRelTime(ts) {
+    if (!ts) return '';
+    var diff = Math.max(0, Date.now() - ts);
+    var sec = Math.floor(diff / 1000);
+    if (sec < 60) return '刚刚';
+    var min = Math.floor(sec / 60);
+    if (min < 60) return min + '分';
+    var hr = Math.floor(min / 60);
+    if (hr < 48) return hr + '时';
+    return Math.floor(hr / 24) + '天';
+  }
+  function tabIconHtml(tab) {
+    if (!tab) return TP_TAB_ICONS.file || '';
+    if (tab.iconHtml) return tab.iconHtml;
+    if (tab.type === 'file') return fileIconForPath(tab.path);
+    return TP_TAB_ICONS[tab.type] || TP_TAB_ICONS.file || '';
+  }
+  function closeTpPickerMenu() {
+    var btn = document.getElementById('tpTabPicker');
+    var menu = document.getElementById('tpPickerMenu');
+    if (menu) {
+      menu.classList.remove('open');
+      menu.hidden = true;
+      menu.style.top = '';
+      menu.style.left = '';
+    }
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+  function renderTpPickerMenu() {
+    var body = document.getElementById('tpPickerBody');
+    var searchEl = document.getElementById('tpPickerSearch');
+    var menu = document.getElementById('tpPickerMenu');
+    if (!body || !menu || !menu.classList.contains('open')) return;
+    var q = ((searchEl && searchEl.value) || '').trim().toLowerCase();
+    function matchTab(tab) {
+      if (!q) return true;
+      var hay = ((tab.label || '') + ' ' + (tab.path || '') + ' ' + (tab.type || '')).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    }
+    var openTabs = tpSessionTabs.filter(matchTab);
+    var closedEntries = [];
+    for (var ci = 0; ci < tpRecentClosedTabs.length; ci++) {
+      if (matchTab(tpRecentClosedTabs[ci])) closedEntries.push({ tab: tpRecentClosedTabs[ci], idx: ci });
+    }
+    var html = '';
+    html += '<div class="tp-picker-sec"><div class="tp-picker-sec-title">打开的标签页</div>';
+    if (!openTabs.length) {
+      html += '<div class="tp-picker-empty">无打开的标签页</div>';
+    } else {
+      openTabs.forEach(function (tab) {
+        var active = tab.id === tpActiveTabId ? ' is-active' : '';
+        html += '<div class="tp-picker-item' + active + '" data-picker-action="activate" data-tp-id="' + tab.id + '" role="button" tabindex="0">' +
+          (tabIconHtml(tab) || '') +
+          '<span class="tp-picker-item-label"></span>' +
+          '<span class="tp-picker-item-meta">' + formatTpRelTime(tab.lastActiveAt || tab.openedAt) + '</span>' +
+          '<button type="button" class="tp-picker-item-close" title="关闭" aria-label="关闭" data-picker-action="close" data-tp-id="' + tab.id + '"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></button>' +
+          '</div>';
+      });
+    }
+    html += '</div>';
+    html += '<div class="tp-picker-sec"><div class="tp-picker-sec-title">最近关闭的标签页</div>';
+    if (!closedEntries.length) {
+      html += '<div class="tp-picker-empty">无最近关闭的标签页</div>';
+    } else {
+      closedEntries.forEach(function (entry) {
+        html += '<button type="button" class="tp-picker-item" data-picker-action="reopen" data-recent-idx="' + entry.idx + '">' +
+          (tabIconHtml(entry.tab) || '') +
+          '<span class="tp-picker-item-label"></span>' +
+          '<span class="tp-picker-item-meta">' + formatTpRelTime(entry.tab.closedAt) + '</span>' +
+          '</button>';
+      });
+    }
+    html += '</div>';
+    body.innerHTML = html;
+    var openLabelEls = body.querySelectorAll('[data-picker-action="activate"] .tp-picker-item-label');
+    for (var oi = 0; oi < openLabelEls.length; oi++) {
+      openLabelEls[oi].textContent = openTabs[oi] ? openTabs[oi].label : '';
+    }
+    var closedLabelEls = body.querySelectorAll('[data-picker-action="reopen"] .tp-picker-item-label');
+    for (var ri = 0; ri < closedLabelEls.length; ri++) {
+      closedLabelEls[ri].textContent = closedEntries[ri] ? closedEntries[ri].tab.label : '';
+    }
+  }
+  function openTpPickerMenu() {
+    var btn = document.getElementById('tpTabPicker');
+    var menu = document.getElementById('tpPickerMenu');
+    var searchEl = document.getElementById('tpPickerSearch');
+    if (!btn || !menu) return;
+    if (menu.parentElement !== document.body) document.body.appendChild(menu);
+    menu.hidden = false;
+    menu.classList.add('open');
+    btn.setAttribute('aria-expanded', 'true');
+    if (searchEl) searchEl.value = '';
+    renderTpPickerMenu();
+    requestAnimationFrame(function () {
+      var rect = btn.getBoundingClientRect();
+      var menuW = menu.offsetWidth || 320;
+      var menuH = menu.offsetHeight || 280;
+      var top = rect.bottom + 6;
+      if (top + menuH > window.innerHeight - 8) top = Math.max(8, rect.top - menuH - 6);
+      var left = rect.left;
+      if (left + menuW > window.innerWidth - 8) left = Math.max(8, window.innerWidth - menuW - 8);
+      if (left < 8) left = 8;
+      menu.style.top = Math.round(top) + 'px';
+      menu.style.left = Math.round(left) + 'px';
+      if (searchEl) searchEl.focus();
+    });
+  }
+  function reopenRecentTab(idx) {
+    idx = Number(idx);
+    var snap = tpRecentClosedTabs[idx];
+    if (!snap) return;
+    tpRecentClosedTabs.splice(idx, 1);
+    if (snap.type === 'file') {
+      openFileTab(snap.path, {
+        label: snap.label,
+        project: snap.project,
+        iconHtml: snap.iconHtml,
+        content: snap.content,
+        viewMode: snap.viewMode
+      });
+    } else {
+      addSessionTab(snap.type, {
+        label: snap.label,
+        url: snap.url,
+        history: snap.history,
+        histIdx: snap.histIdx,
+        msgs: snap.msgs,
+        termId: snap.type === 'terminal' ? null : snap.termId
+      });
+    }
+    closeTpPickerMenu();
+  }
+  (function initTpPickerMenu() {
+    var btn = document.getElementById('tpTabPicker');
+    var menu = document.getElementById('tpPickerMenu');
+    var searchEl = document.getElementById('tpPickerSearch');
+    var body = document.getElementById('tpPickerBody');
+    if (!btn || !menu) return;
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.classList.contains('open')) closeTpPickerMenu();
+      else openTpPickerMenu();
+    });
+    if (searchEl) {
+      searchEl.addEventListener('input', function () { renderTpPickerMenu(); });
+      searchEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeTpPickerMenu();
+        }
+      });
+    }
+    if (body) {
+      body.addEventListener('click', function (e) {
+        var closeEl = e.target.closest('[data-picker-action="close"]');
+        if (closeEl) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeSessionTab(closeEl.getAttribute('data-tp-id'));
+          return;
+        }
+        var item = e.target.closest('.tp-picker-item');
+        if (!item || !body.contains(item)) return;
+        var action = item.getAttribute('data-picker-action');
+        if (action === 'activate') {
+          activateSessionTab(item.getAttribute('data-tp-id'));
+          closeTpPickerMenu();
+        } else if (action === 'reopen') {
+          reopenRecentTab(item.getAttribute('data-recent-idx'));
+        }
+      });
+    }
+    document.addEventListener('click', function (e) {
+      if (!menu.classList.contains('open')) return;
+      if (e.target.closest('#tpPickerMenu') || e.target.closest('#tpTabPicker')) return;
+      closeTpPickerMenu();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeTpPickerMenu();
+    });
+    window.addEventListener('resize', closeTpPickerMenu);
+  })();
 
   /* ── Tab context menu: 关闭 / 关闭其他 / 关闭右侧 ── */
   var tpTabMenu = document.getElementById('tpTabMenu');
@@ -8214,10 +8885,12 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       }
       var file = e.target.closest('[data-sf-file]');
       if (file) {
+        var fpath = file.getAttribute('data-sf-file') || '';
         var fname = ((file.querySelector('.sf-name') || file).textContent || '').trim();
-        SF_ACTIVE = file.getAttribute('data-sf-file') || '';
+        SF_ACTIVE = fpath;
         renderSideFilesTree(sfSearch && sfSearch.value);
-        showProtoToast('打开 ' + fname + '（原型）');
+        if (typeof openFileTab === 'function') openFileTab(fpath, { label: fname });
+        else showProtoToast('打开 ' + fname + '（原型）');
       }
     });
   }

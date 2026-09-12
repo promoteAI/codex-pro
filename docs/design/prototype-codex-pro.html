@@ -49,9 +49,19 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .chat-row .chat-label svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:#909090;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .chat-row .chat-sub{font-size:12px;color:#6e6e6e;margin-top:1px;padding-left:22px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sidebar-foot{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-top:1px solid #262626}
+.account-wrap{position:relative;flex:0 0 auto}
 .account{display:flex;align-items:center;gap:8px;font-size:13px;color:#a8a8a8;cursor:pointer;padding:4px 6px;border-radius:5px}
-.account:hover{background:#262626}
+.account:hover,.account[aria-expanded="true"]{background:#262626}
 .account svg{width:18px;height:18px;fill:none;stroke:#888;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.account-menu{display:none;position:absolute;left:0;bottom:calc(100% + 8px);z-index:80;min-width:220px;padding:8px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.account-menu.open{display:block}
+.account-menu-title{padding:6px 10px 8px;font-size:13px;font-weight:500;color:#f0f0f0}
+.account-menu-sep{height:1px;margin:2px 4px 6px;background:#3a3a3a}
+.account-menu-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:8px;background:transparent;color:#d8d8d8;cursor:pointer;text-align:left;font:inherit;font-size:13px}
+.account-menu-item:hover{background:#353535;color:#f0f0f0}
+.account-menu-item svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.account-menu-item-label{flex:1;min-width:0}
+.account-menu-kbd{font-size:11.5px;color:#777;white-space:nowrap}
 .sidebar-foot-actions{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto}
 .mobile-btn-wrap{position:relative;flex:0 0 auto}
 .mobile-btn{width:30px;height:30px;border-radius:8px;border:0;background:transparent;color:#e8a04a;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
@@ -492,6 +502,49 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .tp-layout-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 #tpLayoutFull{display:none}
 .layout-toolbar.show-full #tpLayoutFull{display:inline-flex}
+.env-btn-wrap{position:relative;display:none}
+.layout-toolbar.is-chatting .env-btn-wrap{display:inline-flex}
+.env-menu{display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:90;width:280px;padding:10px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.env-menu.open{display:block}
+.env-menu-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 6px 10px}
+.env-menu-title{font-size:13.5px;font-weight:500;color:#f0f0f0}
+.env-menu-add{width:26px;height:26px;border:0;border-radius:7px;background:transparent;color:#aaa;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.env-menu-add:hover{background:#353535;color:#eee}
+.env-menu-add svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.env-menu-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;border-radius:9px;background:transparent;color:#d8d8d8;cursor:pointer;text-align:left;font:inherit;font-size:13px}
+.env-menu-item:hover{background:#353535;color:#f0f0f0}
+.env-menu-item svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.env-menu-item-label{flex:1;min-width:0}
+.env-menu-stats{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-variant-numeric:tabular-nums}
+.env-menu-additions{color:#3fb950}
+.env-menu-deletions{color:#f85149}
+.env-menu-chev{width:12px;height:12px;flex:0 0 auto;opacity:.65;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.commit-menu{display:none;position:fixed;z-index:95;width:300px;padding:12px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.commit-menu.open{display:block}
+.commit-menu-branch{display:inline-flex;align-items:center;gap:8px;width:100%;padding:6px 8px;margin-bottom:10px;border:0;border-radius:8px;background:transparent;color:#e0e0e0;font:inherit;font-size:13px;cursor:pointer;text-align:left}
+.commit-menu-branch:hover{background:#353535}
+.commit-menu-branch svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.commit-menu-branch-label{flex:1;min-width:0;text-align:left}
+.commit-menu-branch .env-menu-chev{margin-left:auto}
+.commit-menu-msg{width:100%;min-height:72px;max-height:120px;resize:vertical;box-sizing:border-box;padding:10px 12px;margin-bottom:10px;border:1px solid #3a3a3a;border-radius:10px;background:#1e1e1e;color:#e8e8e8;font:inherit;font-size:13px;line-height:1.45;outline:none}
+.commit-menu-msg::placeholder{color:#777}
+.commit-menu-msg:focus{border-color:#4a4a4a}
+.commit-menu-include{display:flex;align-items:center;gap:8px;width:100%;padding:4px 4px 10px;font-size:12.5px;color:#c8c8c8}
+.commit-menu-include input{width:14px;height:14px;accent-color:#4c8dff;flex:0 0 auto;margin:0}
+.commit-menu-include-label{flex:1;min-width:0;cursor:pointer}
+.commit-menu-include .env-menu-stats{margin-left:auto}
+.commit-menu-sep{height:1px;margin:2px 0 6px;background:#3a3a3a}
+.commit-menu-action{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;border-radius:9px;background:transparent;color:#d8d8d8;cursor:pointer;text-align:left;font:inherit;font-size:13px}
+.commit-menu-action:hover,.commit-menu-action.is-focus{background:#353535;color:#f0f0f0}
+.commit-menu-action svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.commit-menu-action-label{flex:1;min-width:0}
+.commit-menu-kbd{font-size:11.5px;color:#777;white-space:nowrap}
+.pr-menu-branches{display:flex;align-items:center;gap:8px;padding:4px 8px 10px;font-size:13px;color:#e0e0e0}
+.pr-menu-branches svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.pr-menu-arrow{color:#888;font-size:12px}
+.pr-menu-title{width:100%;box-sizing:border-box;padding:10px 12px;margin-bottom:8px;border:1px solid #3a3a3a;border-radius:10px;background:#1e1e1e;color:#e8e8e8;font:inherit;font-size:13px;outline:none}
+.pr-menu-title::placeholder{color:#777}
+.pr-menu-title:focus{border-color:#4a4a4a}
 
 .stage{flex:1;display:flex;flex-direction:row;min-height:0;min-width:0;position:relative}
 
@@ -1983,7 +2036,23 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         <div class="chat-row" role="button" tabindex="0" aria-label="最近：你好" data-chat="hello"><div class="chat-label">你好</div></div>
       </div>
       <div class="sidebar-foot">
-        <div class="account" role="button" tabindex="0" aria-label="设置" title="设置"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M19.2 12a7.2 7.2 0 0 0-.1-1.1l2-1.6-2-3.4-2.4 1a7.2 7.2 0 0 0-1.9-1.1L14.5 3h-5l-.3 2.8a7.2 7.2 0 0 0-1.9 1.1l-2.4-1 2 3.4-2 1.6a7.2 7.2 0 0 0 0 2.2l-2 1.6 2 3.4 2.4-1a7.2 7.2 0 0 0 1.9 1.1l.3 2.8h5l.3-2.8a7.2 7.2 0 0 0 1.9-1.1l2.4 1 2-3.4-2-1.6c.1-.4.1-.7.1-1.1Z"/></svg><span>custom</span></div>
+        <div class="account-wrap">
+          <div class="account" id="accountBtn" role="button" tabindex="0" aria-label="账户菜单" title="账户菜单" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M19.2 12a7.2 7.2 0 0 0-.1-1.1l2-1.6-2-3.4-2.4 1a7.2 7.2 0 0 0-1.9-1.1L14.5 3h-5l-.3 2.8a7.2 7.2 0 0 0-1.9 1.1l-2.4-1 2 3.4-2 1.6a7.2 7.2 0 0 0 0 2.2l-2 1.6 2 3.4 2.4-1a7.2 7.2 0 0 0 1.9 1.1l.3 2.8h5l.3-2.8a7.2 7.2 0 0 0 1.9-1.1l2.4 1 2-3.4-2-1.6c.1-.4.1-.7.1-1.1Z"/></svg><span>custom</span></div>
+          <div class="account-menu" id="accountMenu" role="menu" aria-label="账户菜单" hidden>
+            <div class="account-menu-title">custom</div>
+            <div class="account-menu-sep"></div>
+            <button type="button" class="account-menu-item" role="menuitem" data-account-action="analytics">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+              <span class="account-menu-item-label">使用统计</span>
+              <span class="account-menu-kbd">Alt+Win+P</span>
+            </button>
+            <button type="button" class="account-menu-item" role="menuitem" data-account-action="settings">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M19.2 12a7.2 7.2 0 0 0-.1-1.1l2-1.6-2-3.4-2.4 1a7.2 7.2 0 0 0-1.9-1.1L14.5 3h-5l-.3 2.8a7.2 7.2 0 0 0-1.9 1.1l-2.4-1 2 3.4-2 1.6a7.2 7.2 0 0 0 0 2.2l-2 1.6 2 3.4 2.4-1a7.2 7.2 0 0 0 1.9 1.1l.3 2.8h5l.3-2.8a7.2 7.2 0 0 0 1.9-1.1l2.4 1 2-3.4-2-1.6c.1-.4.1-.7.1-1.1Z"/></svg>
+              <span class="account-menu-item-label">设置</span>
+              <span class="account-menu-kbd">Ctrl+,</span>
+            </button>
+          </div>
+        </div>
         <div class="sidebar-foot-actions">
           <div class="mobile-btn-wrap" id="mobileBtnWrap">
             <button type="button" class="mobile-btn" id="mobileRemoteBtn" aria-label="移动端远程控制" aria-haspopup="dialog" aria-expanded="false" aria-controls="mobileRemoteModal">
@@ -2006,6 +2075,98 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         <button type="button" class="tp-layout-btn" id="tpLayoutFull" title="全屏" aria-label="全屏">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/><path d="m4 4 5 5M20 4l-5 5M4 20l5-5M20 20l-5-5"/></svg>
         </button>
+        <div class="env-btn-wrap" id="envBtnWrap">
+          <button type="button" class="tp-layout-btn" id="tpEnvBtn" title="环境信息" aria-label="环境信息" aria-haspopup="menu" aria-expanded="false" aria-controls="envMenu">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="8" r="2"/><path d="M12 8h7"/><circle cx="7" cy="16" r="2"/><path d="M12 16h7"/></svg>
+          </button>
+          <div class="env-menu" id="envMenu" role="menu" aria-label="环境信息" hidden>
+            <div class="env-menu-head">
+              <div class="env-menu-title">环境信息</div>
+              <button type="button" class="env-menu-add" id="envMenuAdd" title="添加" aria-label="添加">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+            </div>
+            <button type="button" class="env-menu-item" role="menuitem" data-env-action="changes">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg>
+              <span class="env-menu-item-label">变更</span>
+              <span class="env-menu-stats"><span class="env-menu-additions">+21,448</span><span class="env-menu-deletions">-13,428</span></span>
+            </button>
+            <button type="button" class="env-menu-item" role="menuitem" data-env-action="local" aria-haspopup="menu" aria-expanded="false" aria-controls="projectMenu">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              <span class="env-menu-item-label">本地</span>
+              <svg class="env-menu-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <button type="button" class="env-menu-item" role="menuitem" data-env-action="branch" aria-haspopup="menu" aria-expanded="false" aria-controls="branchMenu">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="18" r="2.2"/><circle cx="7" cy="6" r="2.2"/><circle cx="17" cy="12" r="2.2"/><path d="M7 8.2v7.6M9.2 6h3.3a4.5 4.5 0 0 1 4.5 4.5"/></svg>
+              <span class="env-menu-item-label branch-name" id="envBranchLabel">dev</span>
+              <svg class="env-menu-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <button type="button" class="env-menu-item" role="menuitem" data-env-action="commit" aria-haspopup="dialog" aria-expanded="false" aria-controls="commitMenu">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M6 8.2v7.6M8.2 6h5.3a4.5 4.5 0 0 1 4.5 4.5"/></svg>
+              <span class="env-menu-item-label">提交或推送</span>
+            </button>
+            <button type="button" class="env-menu-item" role="menuitem" data-env-action="pr" aria-haspopup="dialog" aria-expanded="false" aria-controls="prMenu">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3.5 7v10L12 22l8.5-5V7L12 2z"/><path d="M8.5 10.5h7M8.5 14h5"/></svg>
+              <span class="env-menu-item-label">创建 Pull Request</span>
+            </button>
+          </div>
+          <div class="commit-menu" id="commitMenu" role="dialog" aria-label="提交或推送" hidden>
+            <button type="button" class="commit-menu-branch" id="commitMenuBranch" aria-haspopup="menu" aria-expanded="false" aria-controls="branchMenu">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="18" r="2.2"/><circle cx="7" cy="6" r="2.2"/><circle cx="17" cy="12" r="2.2"/><path d="M7 8.2v7.6M9.2 6h3.3a4.5 4.5 0 0 1 4.5 4.5"/></svg>
+              <span class="commit-menu-branch-label branch-name">dev</span>
+              <svg class="env-menu-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <textarea class="commit-menu-msg" id="commitMenuMsg" placeholder="提交信息（留空将自动生成）..." aria-label="提交信息"></textarea>
+            <label class="commit-menu-include">
+              <input type="checkbox" id="commitIncludeUnstaged" checked>
+              <span class="commit-menu-include-label">包含未暂存的更改</span>
+              <span class="env-menu-stats"><span class="env-menu-additions">+374</span><span class="env-menu-deletions">-201</span></span>
+            </label>
+            <div class="commit-menu-sep" role="separator"></div>
+            <button type="button" class="commit-menu-action is-focus" data-commit-action="commit">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M6 8.2v7.6M8.2 6h5.3a4.5 4.5 0 0 1 4.5 4.5"/></svg>
+              <span class="commit-menu-action-label">提交</span>
+              <span class="commit-menu-kbd">Ctrl+⏎</span>
+            </button>
+            <button type="button" class="commit-menu-action" data-commit-action="commit-push">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V7M7 12l5-5 5 5"/><path d="M5 19h14"/></svg>
+              <span class="commit-menu-action-label">提交并推送</span>
+            </button>
+            <button type="button" class="commit-menu-action" data-commit-action="push">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V7M7 12l5-5 5 5"/><path d="M4 19h16"/></svg>
+              <span class="commit-menu-action-label">推送</span>
+            </button>
+          </div>
+          <div class="commit-menu" id="prMenu" role="dialog" aria-label="Create Pull Request" hidden>
+            <div class="pr-menu-branches">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="18" r="2.2"/><circle cx="7" cy="6" r="2.2"/><circle cx="17" cy="12" r="2.2"/><path d="M7 8.2v7.6M9.2 6h3.3a4.5 4.5 0 0 1 4.5 4.5"/></svg>
+              <span class="branch-name">dev</span>
+              <span class="pr-menu-arrow">→</span>
+              <span>master</span>
+            </div>
+            <input class="pr-menu-title" id="prMenuTitle" type="text" placeholder="标题" aria-label="PR 标题" autocomplete="off">
+            <textarea class="commit-menu-msg" id="prMenuDesc" placeholder="描述（留空将自动生成）" aria-label="PR 描述"></textarea>
+            <label class="commit-menu-include">
+              <input type="checkbox" id="prCommitPushLocal" checked>
+              <span class="commit-menu-include-label">提交并推送本地更改</span>
+              <span class="env-menu-stats"><span class="env-menu-additions">+374</span><span class="env-menu-deletions">-201</span></span>
+            </label>
+            <div class="commit-menu-sep" role="separator"></div>
+            <button type="button" class="commit-menu-action" data-pr-action="draft">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M6 8.2v7.6M8.2 6h5.3a4.5 4.5 0 0 1 4.5 4.5"/></svg>
+              <span class="commit-menu-action-label">创建草稿 PR</span>
+            </button>
+            <button type="button" class="commit-menu-action is-focus" data-pr-action="create">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3.5 7v10L12 22l8.5-5V7L12 2z"/><path d="M8.5 10.5h7M8.5 14h5"/></svg>
+              <span class="commit-menu-action-label">创建 Pull Request</span>
+              <span class="commit-menu-kbd">Ctrl+⏎</span>
+            </button>
+            <button type="button" class="commit-menu-action" data-pr-action="open">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4 11 13"/><path d="M10 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4"/></svg>
+              <span class="commit-menu-action-label">在浏览器中打开 PR</span>
+            </button>
+          </div>
+        </div>
         <button type="button" class="tp-layout-btn" id="tpLayoutBottom" title="底部面板" aria-label="底部面板" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 15h16"/></svg>
         </button>
@@ -2795,10 +2956,9 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
             <div class="settings-item" role="button" tabindex="0" data-section="Worktrees"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Worktrees</div>
             <div class="section-label">已归档</div>
             <div class="settings-item" role="button" tabindex="0" data-section="已归档的聊天"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>已归档的聊天</div>
-            <div class="section-label">管理</div>
+            <div class="section-label">数据与统计</div>
             <div class="settings-item" role="button" tabindex="0" data-section="记忆"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-4 12.7V18h8v-3.3A7 7 0 0 0 12 2z"/><path d="M10 22h4"/></svg>记忆</div>
             <div class="settings-item" role="button" tabindex="0" data-section="知识库"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>知识库</div>
-            <div class="settings-item" role="button" tabindex="0" data-section="通道"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49M7.76 16.24a6 6 0 0 1 0-8.49M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14"/></svg>通道</div>
             <div class="settings-item" role="button" tabindex="0" data-section="统计"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>统计</div>
           </div>
         </div>
@@ -5259,117 +5419,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
             </div>
           </div>
 
-          <div class="gen-page" id="adminChannelsPage">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-              <div>
-                <div class="gn-page-title" style="margin-bottom:2px">通道</div>
-                <p class="gn-page-sub" style="margin:0">外部消息通道与通知路由</p>
-              </div>
-              <button class="action-btn" type="button">添加通道</button>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-              <div class="gn-card" style="margin-bottom:0;padding:16px">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                  <div style="width:36px;height:36px;border-radius:10px;background:#1e3a5f;display:flex;align-items:center;justify-content:center">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#5b9dff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 3-2 5-2 8v2h16v-2c0-3-2-5-2-8z"/></svg>
-                  </div>
-                  <div style="flex:1">
-                    <div style="font-size:13.5px;font-weight:500;color:#e0e0e0">微信</div>
-                    <div style="font-size:12px;color:#6e6e6e">企业微信 / 个人微信</div>
-                  </div>
-                  <span style="background:#1a3d24;color:#3fb950;font-size:11px;padding:2px 8px;border-radius:999px">运行中</span>
-                </div>
-                <div style="font-size:12px;color:#888;margin-bottom:10px">接收微信消息，发送通知</div>
-                <div style="display:flex;gap:8px">
-                  <button class="action-btn" type="button">配置</button>
-                  <button class="action-btn" type="button">日志</button>
-                </div>
-              </div>
-              <div class="gn-card" style="margin-bottom:0;padding:16px">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                  <div style="width:36px;height:36px;border-radius:10px;background:#1e3a5f;display:flex;align-items:center;justify-content:center">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#5b9dff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                  </div>
-                  <div style="flex:1">
-                    <div style="font-size:13.5px;font-weight:500;color:#e0e0e0">钉钉</div>
-                    <div style="font-size:12px;color:#6e6e6e">机器人 webhook</div>
-                  </div>
-                  <span style="background:#1a3d24;color:#3fb950;font-size:11px;padding:2px 8px;border-radius:999px">运行中</span>
-                </div>
-                <div style="font-size:12px;color:#888;margin-bottom:10px">钉钉群消息接收与推送</div>
-                <div style="display:flex;gap:8px">
-                  <button class="action-btn" type="button">配置</button>
-                  <button class="action-btn" type="button">日志</button>
-                </div>
-              </div>
-              <div class="gn-card" style="margin-bottom:0;padding:16px">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                  <div style="width:36px;height:36px;border-radius:10px;background:#1e3a5f;display:flex;align-items:center;justify-content:center">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#5b9dff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                  </div>
-                  <div style="flex:1">
-                    <div style="font-size:13.5px;font-weight:500;color:#e0e0e0">飞书</div>
-                    <div style="font-size:12px;color:#6e6e6e">Lark 消息通道</div>
-                  </div>
-                  <span style="background:#1a3d24;color:#3fb950;font-size:11px;padding:2px 8px;border-radius:999px">运行中</span>
-                </div>
-                <div style="font-size:12px;color:#888;margin-bottom:10px">飞书群消息接收与推送</div>
-                <div style="display:flex;gap:8px">
-                  <button class="action-btn" type="button">配置</button>
-                  <button class="action-btn" type="button">日志</button>
-                </div>
-              </div>
-              <div class="gn-card" style="margin-bottom:0;padding:16px">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                  <div style="width:36px;height:36px;border-radius:10px;background:#252525;display:flex;align-items:center;justify-content:center">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#888" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                  </div>
-                  <div style="flex:1">
-                    <div style="font-size:13.5px;font-weight:500;color:#e0e0e0">Telegram</div>
-                    <div style="font-size:12px;color:#6e6e6e">Bot API</div>
-                  </div>
-                  <span style="background:#2a2a2a;color:#666;font-size:11px;padding:2px 8px;border-radius:999px">未配置</span>
-                </div>
-                <div style="font-size:12px;color:#888;margin-bottom:10px">Telegram Bot 消息通道</div>
-                <div style="display:flex;gap:8px">
-                  <button class="action-btn" type="button">配置</button>
-                </div>
-              </div>
-              <div class="gn-card" style="margin-bottom:0;padding:16px">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                  <div style="width:36px;height:36px;border-radius:10px;background:#252525;display:flex;align-items:center;justify-content:center">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#888" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                  </div>
-                  <div style="flex:1">
-                    <div style="font-size:13.5px;font-weight:500;color:#e0e0e0">Slack</div>
-                    <div style="font-size:12px;color:#6e6e6e">Bot + Events</div>
-                  </div>
-                  <span style="background:#2a2a2a;color:#666;font-size:11px;padding:2px 8px;border-radius:999px">未配置</span>
-                </div>
-                <div style="font-size:12px;color:#888;margin-bottom:10px">Slack 消息通道</div>
-                <div style="display:flex;gap:8px">
-                  <button class="action-btn" type="button">配置</button>
-                </div>
-              </div>
-              <div class="gn-card" style="margin-bottom:0;padding:16px">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                  <div style="width:36px;height:36px;border-radius:10px;background:#252525;display:flex;align-items:center;justify-content:center">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#888" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                  </div>
-                  <div style="flex:1">
-                    <div style="font-size:13.5px;font-weight:500;color:#e0e0e0">Webhook</div>
-                    <div style="font-size:12px;color:#6e6e6e">通用 HTTP 回调</div>
-                  </div>
-                  <span style="background:#2a2a2a;color:#666;font-size:11px;padding:2px 8px;border-radius:999px">未配置</span>
-                </div>
-                <div style="font-size:12px;color:#888;margin-bottom:10px">通用 Webhook 接收</div>
-                <div style="display:flex;gap:8px">
-                  <button class="action-btn" type="button">配置</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div class="gen-page" id="adminAnalyticsPage">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
               <div>
@@ -5929,7 +5978,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   armButtons(document);
 
   /* ── Settings panel open / close (+ Esc) ── */
-  var gear = document.querySelector('.account');
+  var gear = document.getElementById('accountBtn') || document.querySelector('.account');
+  var accountMenu = document.getElementById('accountMenu');
   var panel = document.getElementById('settingsPanel');
   var back = document.getElementById('backBtn');
   var lastFocus = null;
@@ -5943,12 +5993,59 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     panel.classList.remove('active');
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
+  function openAccountMenu() {
+    if (!accountMenu || !gear) return;
+    accountMenu.hidden = false;
+    accountMenu.classList.add('open');
+    gear.setAttribute('aria-expanded', 'true');
+  }
+  function closeAccountMenu() {
+    if (!accountMenu || !gear) return;
+    accountMenu.classList.remove('open');
+    accountMenu.hidden = true;
+    gear.setAttribute('aria-expanded', 'false');
+  }
+  function isAccountMenuOpen() {
+    return !!(accountMenu && accountMenu.classList.contains('open'));
+  }
+  function openSettingsSection(sectionName) {
+    if (!panel) return;
+    closeAccountMenu();
+    openPanel();
+    var item = Array.prototype.find.call(document.querySelectorAll('.settings-item'), function (el) {
+      return (el.getAttribute('data-section') || '') === sectionName;
+    });
+    if (item && typeof activateSettingsItem === 'function') activateSettingsItem(item);
+  }
   if (gear && panel) {
-    gear.addEventListener('click', function () {
-      panel.classList.contains('active') ? closePanel() : openPanel();
+    gear.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (isAccountMenuOpen()) closeAccountMenu();
+      else openAccountMenu();
+    });
+    if (accountMenu) {
+      accountMenu.addEventListener('click', function (e) {
+        var item = e.target.closest('[data-account-action]');
+        if (!item) return;
+        var action = item.getAttribute('data-account-action');
+        if (action === 'analytics') openSettingsSection('统计');
+        else if (action === 'settings') {
+          closeAccountMenu();
+          openPanel();
+        }
+      });
+    }
+    document.addEventListener('click', function (e) {
+      if (!isAccountMenuOpen()) return;
+      if (e.target.closest('.account-wrap')) return;
+      closeAccountMenu();
     });
     if (back) back.addEventListener('click', closePanel);
     document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && isAccountMenuOpen()) {
+        closeAccountMenu();
+        return;
+      }
       if (e.key === 'Escape' && spIsOpen()) return;
       if (e.key === 'Escape' && toolsPanelIsOpen()) return;
       if (e.key === 'Escape' && panel.classList.contains('active')) closePanel();
@@ -6896,6 +6993,275 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   if (termPanelClose) {
     termPanelClose.addEventListener('click', closeBottomPanel);
   }
+  (function initEnvMenu() {
+    var envBtn = document.getElementById('tpEnvBtn');
+    var envMenu = document.getElementById('envMenu');
+    var envAdd = document.getElementById('envMenuAdd');
+    var commitMenu = document.getElementById('commitMenu');
+    var commitMsg = document.getElementById('commitMenuMsg');
+    var commitBranchBtn = document.getElementById('commitMenuBranch');
+    var prMenu = document.getElementById('prMenu');
+    var prTitle = document.getElementById('prMenuTitle');
+    var prDesc = document.getElementById('prMenuDesc');
+    var commitAnchor = null;
+    var prAnchor = null;
+    if (!envBtn || !envMenu) return;
+    function openEnvMenu() {
+      envMenu.hidden = false;
+      envMenu.classList.add('open');
+      envBtn.classList.add('is-active');
+      envBtn.setAttribute('aria-expanded', 'true');
+    }
+    function positionFixedMenu(menu, anchor, focusEl) {
+      if (!menu || !anchor) return;
+      if (menu.parentElement !== document.body) document.body.appendChild(menu);
+      menu.hidden = false;
+      menu.classList.add('open');
+      anchor.setAttribute('aria-expanded', 'true');
+      requestAnimationFrame(function () {
+        var rect = anchor.getBoundingClientRect();
+        var menuH = menu.offsetHeight || 320;
+        var menuW = menu.offsetWidth || 300;
+        var top = rect.top;
+        if (top + menuH > window.innerHeight - 8) top = Math.max(8, window.innerHeight - menuH - 8);
+        var left = rect.left - menuW - 8;
+        if (left < 8) left = Math.min(rect.right + 8, window.innerWidth - menuW - 8);
+        if (left < 8) left = 8;
+        menu.style.top = Math.round(top) + 'px';
+        menu.style.left = Math.round(left) + 'px';
+        if (focusEl) focusEl.focus();
+      });
+    }
+    function closeCommitMenu() {
+      if (!commitMenu) return;
+      commitMenu.classList.remove('open');
+      commitMenu.hidden = true;
+      commitMenu.style.top = '';
+      commitMenu.style.left = '';
+      if (commitAnchor) {
+        commitAnchor.setAttribute('aria-expanded', 'false');
+        commitAnchor = null;
+      }
+      if (commitMsg) commitMsg.value = '';
+    }
+    function closePrMenu() {
+      if (!prMenu) return;
+      prMenu.classList.remove('open');
+      prMenu.hidden = true;
+      prMenu.style.top = '';
+      prMenu.style.left = '';
+      if (prAnchor) {
+        prAnchor.setAttribute('aria-expanded', 'false');
+        prAnchor = null;
+      }
+      if (prTitle) prTitle.value = '';
+      if (prDesc) prDesc.value = '';
+    }
+    function openCommitMenu(anchor) {
+      closePrMenu();
+      if (typeof window.closeProjectMenu === 'function') window.closeProjectMenu();
+      if (typeof window.closeBranchMenu === 'function') window.closeBranchMenu();
+      commitAnchor = anchor;
+      positionFixedMenu(commitMenu, anchor, commitMsg);
+    }
+    function openPrMenu(anchor) {
+      closeCommitMenu();
+      if (typeof window.closeProjectMenu === 'function') window.closeProjectMenu();
+      if (typeof window.closeBranchMenu === 'function') window.closeBranchMenu();
+      prAnchor = anchor;
+      positionFixedMenu(prMenu, anchor, prTitle);
+    }
+    function closeEnvMenu() {
+      envMenu.classList.remove('open');
+      envMenu.hidden = true;
+      envBtn.classList.remove('is-active');
+      envBtn.setAttribute('aria-expanded', 'false');
+      if (typeof window.closeProjectMenu === 'function') window.closeProjectMenu();
+      if (typeof window.closeBranchMenu === 'function') window.closeBranchMenu();
+      closeCommitMenu();
+      closePrMenu();
+    }
+    function isEnvMenuOpen() {
+      return envMenu.classList.contains('open');
+    }
+    function isCommitMenuOpen() {
+      return !!(commitMenu && commitMenu.classList.contains('open'));
+    }
+    function isPrMenuOpen() {
+      return !!(prMenu && prMenu.classList.contains('open'));
+    }
+    window.closeEnvMenu = closeEnvMenu;
+    window.closeCommitMenu = closeCommitMenu;
+    window.closePrMenu = closePrMenu;
+    envBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (isEnvMenuOpen()) closeEnvMenu();
+      else openEnvMenu();
+    });
+    if (envAdd) {
+      envAdd.addEventListener('click', function (e) {
+        e.stopPropagation();
+        showProtoToast('添加环境（原型）');
+      });
+    }
+    if (commitBranchBtn) {
+      commitBranchBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (typeof window.openBranchMenuFrom === 'function') {
+          window.openBranchMenuFrom(commitBranchBtn);
+        }
+      });
+    }
+    if (commitMenu) {
+      commitMenu.addEventListener('click', function (e) {
+        var actionBtn = e.target.closest('[data-commit-action]');
+        if (!actionBtn) return;
+        e.stopPropagation();
+        var kind = actionBtn.getAttribute('data-commit-action');
+        var msg = (commitMsg && commitMsg.value.trim()) || '（自动生成提交信息）';
+        var labels = {
+          commit: '已提交',
+          'commit-push': '已提交并推送',
+          push: '已推送'
+        };
+        showProtoToast((labels[kind] || kind) + '：' + msg);
+        closeEnvMenu();
+      });
+      if (commitMsg) {
+        commitMsg.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && e.ctrlKey) {
+            e.preventDefault();
+            var commitBtn = commitMenu.querySelector('[data-commit-action="commit"]');
+            if (commitBtn) commitBtn.click();
+          }
+        });
+      }
+    }
+    if (prMenu) {
+      prMenu.addEventListener('click', function (e) {
+        var actionBtn = e.target.closest('[data-pr-action]');
+        if (!actionBtn) return;
+        e.stopPropagation();
+        var kind = actionBtn.getAttribute('data-pr-action');
+        var title = (prTitle && prTitle.value.trim()) || '（自动生成标题）';
+        var labels = {
+          draft: '已创建草稿 PR',
+          create: '已创建 Pull Request',
+          open: '已在浏览器中打开 PR'
+        };
+        showProtoToast((labels[kind] || kind) + '：' + title);
+        closeEnvMenu();
+      });
+      function onPrCtrlEnter(e) {
+        if (e.key === 'Enter' && e.ctrlKey) {
+          e.preventDefault();
+          var createBtn = prMenu.querySelector('[data-pr-action="create"]');
+          if (createBtn) createBtn.click();
+        }
+      }
+      if (prTitle) prTitle.addEventListener('keydown', onPrCtrlEnter);
+      if (prDesc) prDesc.addEventListener('keydown', onPrCtrlEnter);
+    }
+    envMenu.addEventListener('click', function (e) {
+      var item = e.target.closest('[data-env-action]');
+      if (!item) return;
+      var action = item.getAttribute('data-env-action');
+      if (action === 'local') {
+        e.stopPropagation();
+        closeCommitMenu();
+        closePrMenu();
+        if (typeof window.closeBranchMenu === 'function') window.closeBranchMenu();
+        var projectMenu = document.getElementById('projectMenu');
+        if (projectMenu && projectMenu.classList.contains('open') && item.getAttribute('aria-expanded') === 'true') {
+          if (typeof window.closeProjectMenu === 'function') window.closeProjectMenu();
+          return;
+        }
+        if (typeof window.openProjectMenuFrom === 'function') {
+          window.openProjectMenuFrom(item);
+        }
+        return;
+      }
+      if (action === 'branch') {
+        e.stopPropagation();
+        closeCommitMenu();
+        closePrMenu();
+        if (typeof window.closeProjectMenu === 'function') window.closeProjectMenu();
+        var branchMenu = document.getElementById('branchMenu');
+        if (branchMenu && branchMenu.classList.contains('open') && item.getAttribute('aria-expanded') === 'true') {
+          if (typeof window.closeBranchMenu === 'function') window.closeBranchMenu();
+          return;
+        }
+        if (typeof window.openBranchMenuFrom === 'function') {
+          window.openBranchMenuFrom(item);
+        }
+        return;
+      }
+      if (action === 'commit') {
+        e.stopPropagation();
+        if (isCommitMenuOpen() && item.getAttribute('aria-expanded') === 'true') {
+          closeCommitMenu();
+          return;
+        }
+        openCommitMenu(item);
+        return;
+      }
+      if (action === 'pr') {
+        e.stopPropagation();
+        if (isPrMenuOpen() && item.getAttribute('aria-expanded') === 'true') {
+          closePrMenu();
+          return;
+        }
+        openPrMenu(item);
+        return;
+      }
+      if (action === 'changes') {
+        e.stopPropagation();
+        closeEnvMenu();
+        if (typeof openToolPane === 'function') openToolPane('review');
+        return;
+      }
+      closeEnvMenu();
+    });
+    document.addEventListener('click', function (e) {
+      if (isCommitMenuOpen()) {
+        if (e.target.closest('#commitMenu') || e.target.closest('#branchMenu')) return;
+        if (e.target.closest('[data-env-action="commit"]')) return;
+        closeCommitMenu();
+      }
+      if (isPrMenuOpen()) {
+        if (e.target.closest('#prMenu')) return;
+        if (e.target.closest('[data-env-action="pr"]')) return;
+        closePrMenu();
+      }
+      if (!isEnvMenuOpen()) return;
+      if (e.target.closest('#envBtnWrap')) return;
+      if (e.target.closest('#projectMenu')) return;
+      if (e.target.closest('#branchMenu')) return;
+      if (e.target.closest('#commitMenu')) return;
+      if (e.target.closest('#prMenu')) return;
+      closeEnvMenu();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (isCommitMenuOpen()) {
+        var branchMenu = document.getElementById('branchMenu');
+        if (branchMenu && branchMenu.classList.contains('open')) return;
+        closeCommitMenu();
+        return;
+      }
+      if (isPrMenuOpen()) {
+        closePrMenu();
+        return;
+      }
+      if (isEnvMenuOpen()) {
+        var projectMenu = document.getElementById('projectMenu');
+        var branchMenu2 = document.getElementById('branchMenu');
+        if (projectMenu && projectMenu.classList.contains('open')) return;
+        if (branchMenu2 && branchMenu2.classList.contains('open')) return;
+        closeEnvMenu();
+      }
+    });
+  })();
   if (tpLayoutFull) {
     tpLayoutFull.addEventListener('click', function () {
       if (!sideOpen) return;
@@ -7777,7 +8143,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     '账户': '账户、收据与重置',
     '记忆': '本机与项目级记忆条目',
     '知识库': '文档索引与检索源',
-    '通道': '外部消息通道与通知路由',
     '统计': '用量与性能摘要',
   };
 
@@ -7794,7 +8159,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       mcpCreate.classList.remove('is-active');
       mcpCreate.hidden = true;
     }
-    ['generalPage', 'modelsPage', 'genPage', 'appearancePage', 'importPage', 'voicePage', 'petsPage', 'personalizationPage', 'shortcutsPage', 'accountPage', 'computerControlPage', 'browserPage', 'hooksPage', 'gitPage', 'worktreesPage', 'archivedChatsPage', 'adminMemoryPage', 'adminKnowledgePage', 'adminChannelsPage', 'adminAnalyticsPage'].forEach(function (id) {
+    ['generalPage', 'modelsPage', 'genPage', 'appearancePage', 'importPage', 'voicePage', 'petsPage', 'personalizationPage', 'shortcutsPage', 'accountPage', 'computerControlPage', 'browserPage', 'hooksPage', 'gitPage', 'worktreesPage', 'archivedChatsPage', 'adminMemoryPage', 'adminKnowledgePage', 'adminAnalyticsPage'].forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) return;
       el.style.display = 'none';
@@ -7863,8 +8228,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       showSettingsPage('adminMemoryPage');
     } else if (txt === '知识库') {
       showSettingsPage('adminKnowledgePage');
-    } else if (txt === '通道') {
-      showSettingsPage('adminChannelsPage');
     } else if (txt === '统计') {
       showSettingsPage('adminAnalyticsPage');
     }
@@ -8706,28 +9069,53 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     var menu = document.getElementById('projectMenu');
     var search = document.getElementById('projSearch');
     var list = document.getElementById('projList');
-    if (!trigger || !menu) return;
+    if (!menu) return;
+    var activeAnchor = null;
     function closeMenu() {
       menu.classList.remove('open');
       menu.hidden = true;
       menu.style.top = '';
       menu.style.left = '';
-      trigger.classList.remove('is-open');
-      trigger.setAttribute('aria-expanded', 'false');
+      if (trigger) {
+        trigger.classList.remove('is-open');
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+      if (activeAnchor && activeAnchor !== trigger) {
+        activeAnchor.setAttribute('aria-expanded', 'false');
+      }
+      activeAnchor = null;
       if (search) search.value = '';
       filterList('');
     }
-    function openMenu() {
-      var branchMenu = document.getElementById('branchMenu');
-      var branchTrigger = document.getElementById('ctxBranch');
-      if (branchMenu && branchMenu.classList.contains('open')) {
-        branchMenu.classList.remove('open');
-        branchMenu.hidden = true;
-        branchMenu.style.top = '';
-        branchMenu.style.left = '';
-        if (branchTrigger) {
-          branchTrigger.classList.remove('is-open');
-          branchTrigger.setAttribute('aria-expanded', 'false');
+    function positionBeside(anchor) {
+      var rect = anchor.getBoundingClientRect();
+      var menuH = menu.offsetHeight || 280;
+      var menuW = menu.offsetWidth || 280;
+      var top = rect.top;
+      if (top + menuH > window.innerHeight - 8) top = Math.max(8, window.innerHeight - menuH - 8);
+      var left = rect.left - menuW - 8;
+      if (left < 8) left = Math.min(rect.right + 8, window.innerWidth - menuW - 8);
+      if (left < 8) left = 8;
+      menu.style.top = Math.round(top) + 'px';
+      menu.style.left = Math.round(left) + 'px';
+    }
+    function openMenu(anchor) {
+      anchor = anchor || trigger;
+      if (!anchor) return;
+      if (typeof window.closeBranchMenu === 'function') {
+        window.closeBranchMenu();
+      } else {
+        var branchMenu = document.getElementById('branchMenu');
+        var branchTrigger = document.getElementById('ctxBranch');
+        if (branchMenu && branchMenu.classList.contains('open')) {
+          branchMenu.classList.remove('open');
+          branchMenu.hidden = true;
+          branchMenu.style.top = '';
+          branchMenu.style.left = '';
+          if (branchTrigger) {
+            branchTrigger.classList.remove('is-open');
+            branchTrigger.setAttribute('aria-expanded', 'false');
+          }
         }
       }
       var addMenu = document.getElementById('addMenu');
@@ -8745,17 +9133,30 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       if (menu.parentElement !== document.body) document.body.appendChild(menu);
       menu.hidden = false;
       menu.classList.add('open');
-      trigger.classList.add('is-open');
-      trigger.setAttribute('aria-expanded', 'true');
+      activeAnchor = anchor;
+      if (anchor === trigger) {
+        trigger.classList.add('is-open');
+        trigger.setAttribute('aria-expanded', 'true');
+      } else {
+        if (trigger) {
+          trigger.classList.remove('is-open');
+          trigger.setAttribute('aria-expanded', 'false');
+        }
+        anchor.setAttribute('aria-expanded', 'true');
+      }
       requestAnimationFrame(function () {
-        var rect = trigger.getBoundingClientRect();
-        var menuH = menu.offsetHeight || 280;
-        var top = rect.top - menuH - 8;
-        if (top < 8) top = Math.min(rect.bottom + 8, window.innerHeight - menuH - 8);
-        var left = Math.min(rect.left, window.innerWidth - 296);
-        if (left < 8) left = 8;
-        menu.style.top = Math.round(top) + 'px';
-        menu.style.left = Math.round(left) + 'px';
+        if (anchor === trigger) {
+          var rect = trigger.getBoundingClientRect();
+          var menuH = menu.offsetHeight || 280;
+          var top = rect.top - menuH - 8;
+          if (top < 8) top = Math.min(rect.bottom + 8, window.innerHeight - menuH - 8);
+          var left = Math.min(rect.left, window.innerWidth - 296);
+          if (left < 8) left = 8;
+          menu.style.top = Math.round(top) + 'px';
+          menu.style.left = Math.round(left) + 'px';
+        } else {
+          positionBeside(anchor);
+        }
         if (search) {
           search.focus();
           search.select();
@@ -8767,8 +9168,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         e.preventDefault();
         e.stopPropagation();
       }
-      if (menu.classList.contains('open')) closeMenu();
-      else openMenu();
+      if (menu.classList.contains('open') && activeAnchor === trigger) closeMenu();
+      else openMenu(trigger);
     }
     function filterList(q) {
       if (!list) return;
@@ -8789,20 +9190,25 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         });
       }
     }
-    trigger.addEventListener('click', toggleMenu);
-    trigger.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        toggleMenu(e);
-      }
-    });
+    window.openProjectMenuFrom = openMenu;
+    window.closeProjectMenu = closeMenu;
+    if (trigger) {
+      trigger.addEventListener('click', toggleMenu);
+      trigger.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggleMenu(e);
+        }
+      });
+    }
     if (search) {
       search.addEventListener('input', function () { filterList(search.value); });
       search.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
           e.preventDefault();
           closeMenu();
-          trigger.focus();
+          if (activeAnchor && activeAnchor.focus) activeAnchor.focus();
+          else if (trigger) trigger.focus();
         }
       });
     }
@@ -8831,7 +9237,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     });
     document.addEventListener('click', function (e) {
       if (!menu.classList.contains('open')) return;
-      if (trigger === e.target || trigger.contains(e.target)) return;
+      if (activeAnchor && (activeAnchor === e.target || activeAnchor.contains(e.target))) return;
       if (menu.contains(e.target)) return;
       closeMenu();
     });
@@ -8963,8 +9369,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     var menu = document.getElementById('branchMenu');
     var search = document.getElementById('branchSearch');
     var list = document.getElementById('branchList');
-    var projectMenu = document.getElementById('projectMenu');
-    if (!trigger || !menu) return;
+    if (!menu) return;
+    var activeAnchor = null;
     var branchSvg = '<svg class="branch-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6.5" cy="6" r="2.3"/><circle cx="6.5" cy="18" r="2.3"/><circle cx="17.5" cy="6" r="2.3"/><path d="M6.5 8.3v7.4M15.2 6H13a3.5 3.5 0 0 0 0 7h2"/></svg>';
     var checkSvg = '<svg class="branch-menu-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
     function closeMenu() {
@@ -8972,24 +9378,19 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       menu.hidden = true;
       menu.style.top = '';
       menu.style.left = '';
-      trigger.classList.remove('is-open');
-      trigger.setAttribute('aria-expanded', 'false');
+      if (trigger) {
+        trigger.classList.remove('is-open');
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+      if (activeAnchor && activeAnchor !== trigger) {
+        activeAnchor.setAttribute('aria-expanded', 'false');
+      }
+      activeAnchor = null;
       if (search) search.value = '';
       filterList('');
     }
-    function closeProjectMenu() {
-      if (!projectMenu || !projectMenu.classList.contains('open')) return;
-      projectMenu.classList.remove('open');
-      projectMenu.hidden = true;
-      projectMenu.style.top = '';
-      projectMenu.style.left = '';
-      var projTrigger = document.getElementById('ctxProject');
-      if (projTrigger) {
-        projTrigger.classList.remove('is-open');
-        projTrigger.setAttribute('aria-expanded', 'false');
-      }
-    }
-    function closeAddMenu() {
+    function closeSiblingMenus() {
+      if (typeof window.closeProjectMenu === 'function') window.closeProjectMenu();
       var addMenu = document.getElementById('addMenu');
       var addTrigger = document.getElementById('composerAdd');
       if (!addMenu || !addMenu.classList.contains('open')) return;
@@ -9002,23 +9403,49 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         addTrigger.setAttribute('aria-expanded', 'false');
       }
     }
-    function openMenu() {
-      closeProjectMenu();
-      closeAddMenu();
+    function positionBeside(anchor) {
+      var rect = anchor.getBoundingClientRect();
+      var menuH = menu.offsetHeight || 280;
+      var menuW = menu.offsetWidth || 300;
+      var top = rect.top;
+      if (top + menuH > window.innerHeight - 8) top = Math.max(8, window.innerHeight - menuH - 8);
+      var left = rect.left - menuW - 8;
+      if (left < 8) left = Math.min(rect.right + 8, window.innerWidth - menuW - 8);
+      if (left < 8) left = 8;
+      menu.style.top = Math.round(top) + 'px';
+      menu.style.left = Math.round(left) + 'px';
+    }
+    function openMenu(anchor) {
+      anchor = anchor || trigger;
+      if (!anchor) return;
+      closeSiblingMenus();
       if (menu.parentElement !== document.body) document.body.appendChild(menu);
       menu.hidden = false;
       menu.classList.add('open');
-      trigger.classList.add('is-open');
-      trigger.setAttribute('aria-expanded', 'true');
+      activeAnchor = anchor;
+      if (anchor === trigger) {
+        trigger.classList.add('is-open');
+        trigger.setAttribute('aria-expanded', 'true');
+      } else {
+        if (trigger) {
+          trigger.classList.remove('is-open');
+          trigger.setAttribute('aria-expanded', 'false');
+        }
+        anchor.setAttribute('aria-expanded', 'true');
+      }
       requestAnimationFrame(function () {
-        var rect = trigger.getBoundingClientRect();
-        var menuH = menu.offsetHeight || 280;
-        var top = rect.top - menuH - 8;
-        if (top < 8) top = Math.min(rect.bottom + 8, window.innerHeight - menuH - 8);
-        var left = Math.min(rect.left, window.innerWidth - 316);
-        if (left < 8) left = 8;
-        menu.style.top = Math.round(top) + 'px';
-        menu.style.left = Math.round(left) + 'px';
+        if (anchor === trigger) {
+          var rect = trigger.getBoundingClientRect();
+          var menuH = menu.offsetHeight || 280;
+          var top = rect.top - menuH - 8;
+          if (top < 8) top = Math.min(rect.bottom + 8, window.innerHeight - menuH - 8);
+          var left = Math.min(rect.left, window.innerWidth - 316);
+          if (left < 8) left = 8;
+          menu.style.top = Math.round(top) + 'px';
+          menu.style.left = Math.round(left) + 'px';
+        } else {
+          positionBeside(anchor);
+        }
         if (search) {
           search.focus();
           search.select();
@@ -9030,8 +9457,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         e.preventDefault();
         e.stopPropagation();
       }
-      if (menu.classList.contains('open')) closeMenu();
-      else openMenu();
+      if (menu.classList.contains('open') && activeAnchor === trigger) closeMenu();
+      else openMenu(trigger);
     }
     function filterList(q) {
       if (!list) return;
@@ -9067,20 +9494,25 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         });
       }
     }
-    trigger.addEventListener('click', toggleMenu);
-    trigger.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        toggleMenu(e);
-      }
-    });
+    window.openBranchMenuFrom = openMenu;
+    window.closeBranchMenu = closeMenu;
+    if (trigger) {
+      trigger.addEventListener('click', toggleMenu);
+      trigger.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggleMenu(e);
+        }
+      });
+    }
     if (search) {
       search.addEventListener('input', function () { filterList(search.value); });
       search.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
           e.preventDefault();
           closeMenu();
-          trigger.focus();
+          if (activeAnchor && activeAnchor.focus) activeAnchor.focus();
+          else if (trigger) trigger.focus();
         }
       });
     }
@@ -9112,7 +9544,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     });
     document.addEventListener('click', function (e) {
       if (!menu.classList.contains('open')) return;
-      if (trigger === e.target || trigger.contains(e.target)) return;
+      if (activeAnchor && (activeAnchor === e.target || activeAnchor.contains(e.target))) return;
       if (menu.contains(e.target)) return;
       closeMenu();
     });
@@ -9836,6 +10268,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   async function enterChatMode(seedKey, userText) {
     showHomeView();
     if (homeView) homeView.classList.add('is-chatting');
+    if (layoutToolbar) layoutToolbar.classList.add('is-chatting');
     ['projectMenu', 'branchMenu'].forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) return;
@@ -9866,6 +10299,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     chatStreamToken += 1;
     chatBusy = false;
     if (homeView) homeView.classList.remove('is-chatting');
+    if (layoutToolbar) layoutToolbar.classList.remove('is-chatting');
+    if (typeof window.closeEnvMenu === 'function') window.closeEnvMenu();
     if (chatThread) chatThread.innerHTML = '';
   }
   var newChatNav = document.querySelector('.nav-item[aria-label="新对话"]');
@@ -10123,7 +10558,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     { name: '反馈', desc: '向 CodexPro 团队发送产品反馈', keys: [] },
     { name: '注销', desc: '退出登录 CodexPro', keys: [] },
     { name: '管理已安排任务', desc: '从当前页面创建或管理已安排任务', keys: [] },
-    { name: '显示或隐藏虚拟宠物', desc: '随时随地切换虚拟宠物的显示状态', keys: ['Alt+Win+P'] },
+    { name: '使用统计', desc: '打开用量与性能摘要', keys: ['Alt+Win+P'] },
     { name: '打开控制窗口', desc: '打开语音聊天控制窗口', keys: [] },
     { name: '重做上一步操作', desc: '重做最近撤销的应用操作', keys: ['Ctrl+Y', 'Ctrl+Shift+Z'] },
     { name: '设置', desc: '打开 CodexPro 设置', keys: ['Ctrl+,'] },

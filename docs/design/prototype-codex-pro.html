@@ -8,6 +8,13 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
 body{background:#181818;color:#e6e6e6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif;font-size:13px}
+/* Global thin scrollbar (match sidebar .side-scroll) */
+*{scrollbar-width:thin;scrollbar-color:#333 transparent}
+*::-webkit-scrollbar{width:6px;height:6px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+*::-webkit-scrollbar-thumb:hover{background:#3f3f3f}
+*::-webkit-scrollbar-corner{background:transparent}
 /* focus-visible rings live at these saturations to meet the "don't drop contrast on state change" rule while staying inset */
 :root{
   --accent:#3866f0;
@@ -33,8 +40,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .side-icons button:hover{background:#2a2a2a}
 .side-icons button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .side-scroll{flex:1;overflow-y:auto;padding:4px 0}
-.side-scroll::-webkit-scrollbar{width:6px}
-.side-scroll::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
 .nav-item{display:flex;align-items:center;gap:9px;height:32px;padding:0 12px;color:#b8b8b8;font-size:13.5px;border-radius:6px;margin:1px 4px;cursor:pointer}
 .nav-item:hover{background:#242424;color:#c8c8c8}
 .nav-item.active{background:#2a2a2a;color:#e8e8e8}
@@ -42,10 +47,18 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .nav-item > span:not(.green-dot){flex:1}
 .green-dot{display:inline-flex;align-items:center;justify-content:center;width:6px;height:6px;border-radius:50%;background:#3fb950;flex:0 0 6px;margin-left:4px}
 .sec{padding:10px 16px 4px;font-size:11px;color:#6f6f6f;font-weight:500;letter-spacing:.03em}
-.sec-projects{padding:10px 16px 4px}
+.sec-projects{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 8px 4px 16px}
 .sec-projects-label{display:inline-flex;align-items:center;gap:3px;padding:0;border:0;background:transparent;color:#6f6f6f;font:inherit;font-size:11px;font-weight:500;letter-spacing:.03em;cursor:pointer}
 .sec-projects-label:hover{color:#9a9a9a}
 .sec-projects-label svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sec-projects-actions{display:inline-flex;align-items:center;gap:1px;flex:0 0 auto}
+.sec-projects-btn{position:relative;width:24px;height:24px;border:0;border-radius:6px;background:transparent;color:#8a8a8a;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.sec-projects-btn:hover,.sec-projects-btn:focus-visible{background:#2a2a2a;color:#d0d0d0}
+.sec-projects-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sec-projects-btn svg.grip{width:12px;height:12px;fill:currentColor;stroke:none}
+.sec-projects-tip{display:none;position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);z-index:40;padding:5px 9px;border:1px solid #3a3a3a;border-radius:6px;background:#2a2a2a;color:#f0f0f0;font-size:12px;line-height:1.2;white-space:nowrap;pointer-events:none;box-shadow:0 6px 16px rgba(0,0,0,.35)}
+.sec-projects-tip::after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#2a2a2a}
+.sec-projects-btn:hover .sec-projects-tip,.sec-projects-btn:focus-visible .sec-projects-tip{display:block}
 .sec-recent{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 8px 4px 16px}
 .sec-recent-label{font-size:11px;color:#6f6f6f;font-weight:500;letter-spacing:.03em}
 .sec-recent-actions{display:inline-flex;align-items:center;gap:1px;flex:0 0 auto}
@@ -101,8 +114,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .sf-icon-btn:hover,.sf-icon-btn.is-active{background:#2a2a2a;color:#ddd}
 .sf-icon-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .sf-tree{flex:1;overflow:auto;padding:0 6px 12px;min-height:0}
-.sf-tree::-webkit-scrollbar{width:6px}
-.sf-tree::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
 .sf-item{display:flex;align-items:center;gap:7px;width:100%;padding:5px 8px;border:0;border-radius:6px;background:transparent;color:#c8c8c8;font:inherit;font-size:12.5px;cursor:pointer;text-align:left}
 .sf-item:hover{background:#262626}
 .sf-item.is-dim{color:#6a6a6a}
@@ -667,7 +678,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .tp-picker-search svg{width:14px;height:14px;flex:0 0 auto;color:#888;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tp-picker-search input{flex:1;min-width:0;border:0;outline:none;background:transparent;color:#e8e8e8;font:inherit;font-size:13px}
 .tp-picker-search input::placeholder{color:#777}
-.tp-picker-body{flex:1;min-height:0;overflow:auto;padding:6px 6px 8px;scrollbar-width:thin}
+.tp-picker-body{flex:1;min-height:0;overflow:auto;padding:6px 6px 8px}
 .tp-picker-sec{margin-top:4px}
 .tp-picker-sec:first-child{margin-top:2px}
 .tp-picker-sec-title{padding:6px 10px 4px;font-size:11.5px;color:#8a8a8a;line-height:1.2}
@@ -843,8 +854,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .rv-file-stats .add{color:#3fb950}
 .rv-file-stats .del{color:#f85149;margin-left:8px}
 .rv-code{flex:1;overflow:auto;min-height:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;background:#1e1e1e}
-.rv-code::-webkit-scrollbar{width:8px;height:8px}
-.rv-code::-webkit-scrollbar-thumb{background:#333;border-radius:4px}
 .rv-line{display:flex;min-width:max-content}
 .rv-line.is-add{background:rgba(46,160,67,.22)}
 .rv-line.is-del{background:rgba(248,81,73,.18)}
@@ -902,8 +911,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .term-add-item-label{flex:1;font-size:13px}
 .term-add-item-kbd{flex:0 0 auto;font-size:11px;color:#8a8a8a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .term-body{flex:1;min-height:0;overflow:auto;padding:10px 14px;background:#0e0e0e;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.55;color:#d8d8d8}
-.term-body::-webkit-scrollbar{width:8px;height:8px}
-.term-body::-webkit-scrollbar-thumb{background:#333;border-radius:4px}
 .term-line{white-space:pre-wrap;word-break:break-all}
 .term-prompt{color:#7dcea0}
 .term-cursor{display:inline-block;width:7px;height:14px;background:#e8e8e8;vertical-align:-2px;margin-left:1px;animation:termBlink 1s step-end infinite}
@@ -977,8 +984,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .add-btn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .add-menu{display:none;position:fixed;z-index:130;width:min(420px,calc(100vw - 24px));max-height:min(420px,55vh);padding:8px 6px 8px 8px;background:#1c1c1c;border:1px solid #333;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.55);overflow:auto}
 .add-menu.open{display:block}
-.add-menu::-webkit-scrollbar{width:8px}
-.add-menu::-webkit-scrollbar-thumb{background:#3a3a3a;border-radius:8px;border:2px solid #1c1c1c}
 .add-menu-sec{padding:6px 8px 4px;font-size:12px;color:#8a8a8a;font-weight:500}
 .add-menu-item{display:flex;align-items:flex-start;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:10px;background:transparent;color:#e4e4e4;cursor:pointer;text-align:left;font:inherit}
 .add-menu-item:hover,.add-menu-item.is-focus{background:#2e2e2e}
@@ -1002,8 +1007,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .add-menu-hint{padding:6px 10px 10px;font-size:12.5px;color:#777;line-height:1.4}
 .slash-menu{display:none;position:fixed;z-index:130;width:min(520px,calc(100vw - 24px));max-height:min(420px,55vh);padding:8px 6px 8px 8px;background:#1c1c1c;border:1px solid #333;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.55);overflow:auto}
 .slash-menu.open{display:block}
-.slash-menu::-webkit-scrollbar{width:8px}
-.slash-menu::-webkit-scrollbar-thumb{background:#3a3a3a;border-radius:8px;border:2px solid #1c1c1c}
 .slash-menu-sec{padding:8px 10px 4px;font-size:12px;color:#7dd3fc;font-weight:500}
 .slash-menu-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:10px;background:transparent;color:#e4e4e4;cursor:pointer;text-align:left;font:inherit}
 .slash-menu-item:hover,.slash-menu-item.is-focus{background:#2e2e2e}
@@ -2133,8 +2136,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .sp-input{width:100%;background:transparent;border:0;outline:none;font-size:15px;color:#ececec;padding:2px 0}
 .sp-input::placeholder{color:#6a6a6a}
 .sp-body{flex:1;min-height:0;overflow-y:auto;padding:8px 8px 12px}
-.sp-body::-webkit-scrollbar{width:6px}
-.sp-body::-webkit-scrollbar-thumb{background:#444;border-radius:3px}
 .sp-section{margin-top:6px}
 .sp-section:first-child{margin-top:2px}
 .sp-section-label{padding:8px 10px 6px;font-size:11.5px;color:#7a7a7a;font-weight:500}
@@ -2296,6 +2297,19 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
             项目
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
           </button>
+          <div class="sec-projects-actions">
+            <button type="button" class="sec-projects-btn" id="secProjectsReorderBtn" title="调整顺序" aria-label="调整顺序">
+              <svg class="grip" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="5" cy="3.5" r="1.15"/><circle cx="11" cy="3.5" r="1.15"/>
+                <circle cx="5" cy="8" r="1.15"/><circle cx="11" cy="8" r="1.15"/>
+                <circle cx="5" cy="12.5" r="1.15"/><circle cx="11" cy="12.5" r="1.15"/>
+              </svg>
+            </button>
+            <button type="button" class="sec-projects-btn" id="secProjectsAddBtn" aria-label="添加项目">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              <span class="sec-projects-tip">添加项目</span>
+            </button>
+          </div>
         </div>
         <div class="chat-row" role="button" tabindex="0" aria-label="项目 codex-pro" data-chat="codex-pro">
           <div class="chat-top">
@@ -9483,10 +9497,44 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       document.querySelectorAll('.nav-item').forEach(function (x) { x.classList.remove('active'); });
       var newNav = document.querySelector('.nav-item[aria-label="新对话"]');
       if (newNav) newNav.classList.add('active');
+      document.querySelectorAll('.chat-row').forEach(function (row) {
+        row.classList.remove('active');
+        row.removeAttribute('aria-current');
+      });
       showHomeView();
       if (typeof exitChatMode === 'function') exitChatMode();
+      if (typeof window.setComposerProject === 'function') {
+        window.setComposerProject('');
+      } else {
+        document.querySelectorAll('.project-name').forEach(function (el) {
+          el.textContent = '无项目';
+        });
+      }
       var hero = document.getElementById('homeHero');
       if (hero && hero.scrollIntoView) hero.scrollIntoView({ block: 'nearest' });
+      var ta = document.querySelector('#homeView .composer-body textarea');
+      if (ta) ta.focus();
+    });
+  }
+  var secProjectsReorderBtn = document.getElementById('secProjectsReorderBtn');
+  if (secProjectsReorderBtn) {
+    secProjectsReorderBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      showProtoToast('调整项目顺序（原型）');
+    });
+  }
+  var secProjectsAddBtn = document.getElementById('secProjectsAddBtn');
+  if (secProjectsAddBtn) {
+    secProjectsAddBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var proj = document.getElementById('ctxProject');
+      if (proj && typeof window.openProjectMenuFrom === 'function') {
+        window.openProjectMenuFrom(proj);
+      } else if (proj) {
+        proj.click();
+      } else {
+        showProtoToast('添加项目（原型）');
+      }
     });
   }
   /* ── Theme preview: toggle selection ── */
@@ -11700,6 +11748,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     }
     window.openProjectMenuFrom = openMenu;
     window.closeProjectMenu = closeMenu;
+    window.setComposerProject = setProject;
     if (trigger) {
       trigger.addEventListener('click', toggleMenu);
       trigger.addEventListener('keydown', function (e) {

@@ -1000,6 +1000,19 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .add-menu-row .add-menu-title{flex:1}
 .add-menu-suffix{flex:0 0 auto;font-size:12px;color:#8a8a8a}
 .add-menu-hint{padding:6px 10px 10px;font-size:12.5px;color:#777;line-height:1.4}
+.slash-menu{display:none;position:fixed;z-index:130;width:min(520px,calc(100vw - 24px));max-height:min(420px,55vh);padding:8px 6px 8px 8px;background:#1c1c1c;border:1px solid #333;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.55);overflow:auto}
+.slash-menu.open{display:block}
+.slash-menu::-webkit-scrollbar{width:8px}
+.slash-menu::-webkit-scrollbar-thumb{background:#3a3a3a;border-radius:8px;border:2px solid #1c1c1c}
+.slash-menu-sec{padding:8px 10px 4px;font-size:12px;color:#7dd3fc;font-weight:500}
+.slash-menu-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:10px;background:transparent;color:#e4e4e4;cursor:pointer;text-align:left;font:inherit}
+.slash-menu-item:hover,.slash-menu-item.is-focus{background:#2e2e2e}
+.slash-menu-item[hidden]{display:none !important}
+.slash-menu-ico{width:18px;height:18px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.95;color:#c8c8c8}
+.slash-menu-body{flex:1;min-width:0;display:flex;align-items:baseline;gap:10px}
+.slash-menu-title{flex:0 1 auto;font-size:13px;line-height:1.35;color:#e8e8e8;font-weight:500;white-space:nowrap}
+.slash-menu-desc{flex:1;min-width:0;font-size:12px;line-height:1.35;color:#8a8a8a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slash-menu-badge{flex:0 0 auto;font-size:12px;color:#8a8a8a}
 .perm-btn{display:flex;align-items:center;gap:6px;color:var(--warn);font-size:13px;cursor:pointer;padding:4px 8px;border-radius:6px}
 .perm-btn:hover,.perm-btn.is-open{background:var(--warn-hover);color:#ffb877}
 .perm-btn[data-perm="ask"],.perm-btn[data-perm="agent"]{color:#c8c8c8}
@@ -2760,6 +2773,88 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
             <div class="add-menu-hint">输入内容以搜索文件或聊天</div>
             <div class="add-menu-sec">随心输入</div>
         </div>
+          <div class="slash-menu" id="slashMenu" role="menu" aria-label="斜杠命令" hidden>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="mcp" data-label="MCP">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h4.5V13H4zM9.75 8.5H14.25V13H9.75zM15.5 8.5H20V13h-4.5zM6.5 14.5h4.5V19H6.5zM13 14.5h4.5V19H13z"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">MCP</span><span class="slash-menu-desc">显示 MCP 服务器状态</span></span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="review" data-label="代码审查">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M9.2 12.2c.4 1.6 1.5 2.6 2.8 2.6s2.4-1 2.8-2.6"/><circle cx="9.6" cy="10.2" r=".8" fill="currentColor"/><circle cx="14.4" cy="10.2" r=".8" fill="currentColor"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">代码审查</span><span class="slash-menu-desc">审查未提交的更改，或与某个分支进行比较</span></span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="init" data-label="初始化">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5h7.2L17.5 8v11.5H7z"/><path d="M14 4.5V8h3.5"/><path d="M9.5 12h5M9.5 15h5"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">初始化</span><span class="slash-menu-desc">创建包含 Codex 说明的 AGENTS.md 文件</span></span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="feedback" data-label="反馈">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14v9.2H9.2L5 19.5z"/><path d="M9 10.2h6M9 13h4"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">反馈</span><span class="slash-menu-desc">发送有关此聊天的反馈</span></span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="work" data-label="在项目中使用 Work">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8a2 2 0 0 1 2-2h4l2 2.3h7a2 2 0 0 1 2 2V16a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">在项目中使用 Work</span><span class="slash-menu-desc">为新聊天选择项目</span></span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="worktree" data-label="新的 codex-pro 工作树">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6.5" cy="6" r="2.2"/><circle cx="6.5" cy="18" r="2.2"/><circle cx="17" cy="12" r="2.2"/><path d="M6.5 8.2v7.6M8.8 6h4.2a4.2 4.2 0 0 1 4.2 4.2"/><path d="m15.2 9.8 2.2 2.2 2.2-2.2"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">新的 codex-pro 工作树</span><span class="slash-menu-desc">在新的工作树中运行此聊天</span></span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="status" data-label="状态">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/><path d="M12 8v4.4l2.8 1.7"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">状态</span><span class="slash-menu-desc">显示聊天 ID、上下文用量和速率限制</span></span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="goal" data-label="目标">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">目标</span><span class="slash-menu-desc">设置要持续追求的目标</span></span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="chat" data-label="聊天">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14v9.2H9.2L5 19.5z"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">聊天</span><span class="slash-menu-desc">不要在项目中工作</span></span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="plan" data-label="计划模式">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M8.5 14c-.8-1-1.3-2.1-1.3-3.4A4.8 4.8 0 0 1 12 5.8 4.8 4.8 0 0 1 16.8 10.6c0 1.3-.5 2.4-1.3 3.4-.6.7-1.2 1.2-1.5 2H10c-.3-.8-.9-1.3-1.5-2Z"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">计划模式</span><span class="slash-menu-desc">开启计划模式</span></span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="memory" data-label="记忆">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/><path d="M12 7.8v4.4l3 1.8"/><path d="M8.2 9.2a5.5 5.5 0 0 1 7.6 0"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">记忆</span><span class="slash-menu-desc"></span></span>
+            </button>
+            <div class="slash-menu-sec" data-slash-sec="skills">技能</div>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="skill-automate" data-label="Automate" data-skill="1">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 7.2v9.6L12 21l7.5-4.2V7.2Z"/><path d="M12 12 4.8 8M12 12l7.2-4M12 12v8.4"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">Automate</span><span class="slash-menu-desc">Use this skill to create Codex Automations.</span></span>
+              <span class="slash-menu-badge">个人</span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="skill-autopilot" data-label="Autopilot" data-skill="1">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 7.2v9.6L12 21l7.5-4.2V7.2Z"/><path d="M12 12 4.8 8M12 12l7.2-4M12 12v8.4"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">Autopilot</span><span class="slash-menu-desc">Keep a PR merge-ready by triaging comments, resolving clear conflicts, and fixing CI in a loop.</span></span>
+              <span class="slash-menu-badge">个人</span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="skill-baseline-ui" data-label="Baseline UI" data-skill="1">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 7.2v9.6L12 21l7.5-4.2V7.2Z"/><path d="M12 12 4.8 8M12 12l7.2-4M12 12v8.4"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">Baseline UI</span><span class="slash-menu-desc">Quickly deslop UI code by fixing spacing, hierarchy, typography, and small layout issues. Use wh...</span></span>
+              <span class="slash-menu-badge">个人</span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="skill-canvas" data-label="Canvas" data-skill="1">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 7.2v9.6L12 21l7.5-4.2V7.2Z"/><path d="M12 12 4.8 8M12 12l7.2-4M12 12v8.4"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">Canvas</span><span class="slash-menu-desc">A Codex Canvas is a live React app that the user can open beside the chat. You MUST use a canvas w...</span></span>
+              <span class="slash-menu-badge">个人</span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="skill-computer-use" data-label="Computer Use" data-skill="1">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 7.2v9.6L12 21l7.5-4.2V7.2Z"/><path d="M12 12 4.8 8M12 12l7.2-4M12 12v8.4"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">Computer Use</span><span class="slash-menu-desc">Computer Use Control Windows apps from ChatGPT</span></span>
+              <span class="slash-menu-badge">个人</span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="skill-create-hook" data-label="Create Hook" data-skill="1">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 7.2v9.6L12 21l7.5-4.2V7.2Z"/><path d="M12 12 4.8 8M12 12l7.2-4M12 12v8.4"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">Create Hook</span><span class="slash-menu-desc">Create Codex hooks. Use when you want to create a hook, write hooks.json, add hook scripts, ...</span></span>
+              <span class="slash-menu-badge">个人</span>
+            </button>
+            <button type="button" class="slash-menu-item" role="menuitem" data-slash="skill-create-rule" data-label="Create Rule" data-skill="1">
+              <svg class="slash-menu-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 7.2v9.6L12 21l7.5-4.2V7.2Z"/><path d="M12 12 4.8 8M12 12l7.2-4M12 12v8.4"/></svg>
+              <span class="slash-menu-body"><span class="slash-menu-title">Create Rule</span><span class="slash-menu-desc">Create Codex rules for persistent AI guidance. Use when you want to create a rule, add coding s...</span></span>
+              <span class="slash-menu-badge">个人</span>
+            </button>
+          </div>
         </div>
         </div><!-- /homeView -->
 
@@ -11687,6 +11782,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
           t.setAttribute('aria-expanded', 'false');
         }
       });
+      if (typeof window.closeComposerSlashMenu === 'function') window.closeComposerSlashMenu();
     }
     function closeMenu() {
       menu.classList.remove('open');
@@ -11696,7 +11792,42 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       trigger.classList.remove('is-open');
       trigger.setAttribute('aria-expanded', 'false');
     }
-    function openMenu() {
+    function positionMenu() {
+      var composer = trigger.closest('.composer');
+      var body = composer && composer.querySelector('.composer-body');
+      var ta = body && body.querySelector('textarea');
+      /* Sit above the textarea (composer-body), left-aligned with the composer card. */
+      var vRect = (body || composer || trigger).getBoundingClientRect();
+      var hRect = (composer || trigger).getBoundingClientRect();
+      var menuH = menu.offsetHeight || 360;
+      var menuW = menu.offsetWidth || Math.min(420, window.innerWidth - 24);
+      var gap = 8;
+      var top = vRect.top - menuH - gap;
+      if (top < 8) top = Math.min(vRect.bottom + gap, window.innerHeight - menuH - 8);
+      var left = hRect.left;
+      if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
+      if (left < 8) left = 8;
+      menu.style.top = Math.round(top) + 'px';
+      menu.style.left = Math.round(left) + 'px';
+      return ta;
+    }
+    function ensureAtInTextarea(ta) {
+      if (!ta) return;
+      var val = ta.value || '';
+      var start = typeof ta.selectionStart === 'number' ? ta.selectionStart : val.length;
+      var end = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : start;
+      if (start > 0 && val.charAt(start - 1) === '@') {
+        ta.focus();
+        return;
+      }
+      ta.value = val.slice(0, start) + '@' + val.slice(end);
+      var caret = start + 1;
+      try { ta.setSelectionRange(caret, caret); } catch (err) { /* ignore */ }
+      ta.focus();
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    function openMenu(opts) {
+      opts = opts || {};
       closeSiblingMenus();
       if (menu.parentElement !== document.body) document.body.appendChild(menu);
       menu.hidden = false;
@@ -11704,14 +11835,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       trigger.classList.add('is-open');
       trigger.setAttribute('aria-expanded', 'true');
       requestAnimationFrame(function () {
-        var rect = trigger.getBoundingClientRect();
-        var menuH = menu.offsetHeight || 360;
-        var top = rect.top - menuH - 10;
-        if (top < 8) top = Math.min(rect.bottom + 8, window.innerHeight - menuH - 8);
-        var left = Math.min(rect.left, window.innerWidth - Math.min(428, window.innerWidth - 16));
-        if (left < 8) left = 8;
-        menu.style.top = Math.round(top) + 'px';
-        menu.style.left = Math.round(left) + 'px';
+        var ta = positionMenu();
+        if (opts.insertAt !== false) ensureAtInTextarea(ta);
       });
     }
     function toggleMenu(e) {
@@ -11720,7 +11845,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         e.stopPropagation();
       }
       if (menu.classList.contains('open')) closeMenu();
-      else openMenu();
+      else openMenu({ insertAt: true });
     }
     trigger.addEventListener('click', toggleMenu);
     trigger.addEventListener('keydown', function (e) {
@@ -11774,6 +11899,214 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     window.addEventListener('resize', function () {
       if (menu.classList.contains('open')) closeMenu();
     });
+    /* Typing @ in the composer opens the same add menu above the textarea. */
+    var composerTa = document.querySelector('#homeView .composer-body textarea');
+    if (composerTa) {
+      composerTa.addEventListener('input', function () {
+        var val = composerTa.value || '';
+        var caret = typeof composerTa.selectionStart === 'number' ? composerTa.selectionStart : val.length;
+        var justAt = caret > 0 && val.charAt(caret - 1) === '@' &&
+          (caret === 1 || /\s/.test(val.charAt(caret - 2)));
+        if (justAt) {
+          if (!menu.classList.contains('open')) openMenu({ insertAt: false });
+          else positionMenu();
+        } else if (menu.classList.contains('open')) {
+          var atPos = val.lastIndexOf('@', Math.max(0, caret - 1));
+          if (atPos < 0) closeMenu();
+        }
+      });
+    }
+    window.openComposerAddMenu = openMenu;
+    window.closeComposerAddMenu = closeMenu;
+  })();
+
+  /* ── Composer slash menu (/) ── */
+  (function initComposerSlashMenu() {
+    var menu = document.getElementById('slashMenu');
+    var composer = document.querySelector('#homeView .composer');
+    var ta = document.querySelector('#homeView .composer-body textarea');
+    if (!menu || !ta) return;
+    var focusIdx = -1;
+    function items() {
+      return Array.prototype.slice.call(menu.querySelectorAll('.slash-menu-item')).filter(function (el) {
+        return !el.hidden;
+      });
+    }
+    function clearFocus() {
+      menu.querySelectorAll('.slash-menu-item.is-focus').forEach(function (el) {
+        el.classList.remove('is-focus');
+      });
+      focusIdx = -1;
+    }
+    function setFocus(idx) {
+      var list = items();
+      if (!list.length) { clearFocus(); return; }
+      focusIdx = ((idx % list.length) + list.length) % list.length;
+      list.forEach(function (el, i) {
+        el.classList.toggle('is-focus', i === focusIdx);
+      });
+      list[focusIdx].scrollIntoView({ block: 'nearest' });
+    }
+    function closeMenu() {
+      menu.classList.remove('open');
+      menu.hidden = true;
+      menu.style.top = '';
+      menu.style.left = '';
+      clearFocus();
+      filterItems('');
+    }
+    function positionMenu() {
+      var body = composer && composer.querySelector('.composer-body');
+      var vRect = (body || composer || ta).getBoundingClientRect();
+      var hRect = (composer || ta).getBoundingClientRect();
+      var menuH = menu.offsetHeight || 360;
+      var menuW = menu.offsetWidth || Math.min(520, window.innerWidth - 24);
+      var gap = 8;
+      var top = vRect.top - menuH - gap;
+      if (top < 8) top = Math.min(vRect.bottom + gap, window.innerHeight - menuH - 8);
+      var left = hRect.left;
+      if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
+      if (left < 8) left = 8;
+      menu.style.top = Math.round(top) + 'px';
+      menu.style.left = Math.round(left) + 'px';
+    }
+    function filterItems(query) {
+      var q = (query || '').trim().toLowerCase();
+      var visibleSkills = 0;
+      menu.querySelectorAll('.slash-menu-item').forEach(function (item) {
+        var label = (item.getAttribute('data-label') || item.textContent || '').toLowerCase();
+        var desc = ((item.querySelector('.slash-menu-desc') || {}).textContent || '').toLowerCase();
+        var hit = !q || label.indexOf(q) !== -1 || desc.indexOf(q) !== -1;
+        item.hidden = !hit;
+        if (hit && item.getAttribute('data-skill') === '1') visibleSkills += 1;
+      });
+      var sec = menu.querySelector('[data-slash-sec="skills"]');
+      if (sec) sec.hidden = visibleSkills === 0;
+    }
+    function slashQuery() {
+      var val = ta.value || '';
+      var caret = typeof ta.selectionStart === 'number' ? ta.selectionStart : val.length;
+      var before = val.slice(0, caret);
+      var m = before.match(/(?:^|[\s])\/([^\s]*)$/);
+      if (!m) return null;
+      return { start: before.lastIndexOf('/'), query: m[1] || '', caret: caret };
+    }
+    function openMenu(query) {
+      if (typeof window.closeComposerAddMenu === 'function') window.closeComposerAddMenu();
+      if (menu.parentElement !== document.body) document.body.appendChild(menu);
+      filterItems(query || '');
+      menu.hidden = false;
+      menu.classList.add('open');
+      requestAnimationFrame(function () {
+        positionMenu();
+        setFocus(0);
+      });
+    }
+    function replaceSlashToken(label) {
+      var info = slashQuery();
+      var val = ta.value || '';
+      if (!info) {
+        ta.value = '';
+      } else {
+        ta.value = val.slice(0, info.start) + (label || '') + val.slice(info.caret);
+        var caret = info.start + (label || '').length;
+        try { ta.setSelectionRange(caret, caret); } catch (err) { /* ignore */ }
+      }
+      ta.focus();
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    function activateItem(item) {
+      if (!item) return;
+      var kind = item.getAttribute('data-slash') || '';
+      var label = item.getAttribute('data-label') || '';
+      closeMenu();
+      if (kind === 'goal' || kind === 'plan') {
+        replaceSlashToken('');
+        if (typeof window.openComposerAddMenu === 'function') {
+          /* reuse goal/plan chip via add-menu semantics */
+        }
+        var goalBtn = document.getElementById('goalBtn');
+        if (goalBtn) {
+          var isPlan = kind === 'plan';
+          goalBtn.hidden = false;
+          goalBtn.classList.add('is-visible');
+          goalBtn.setAttribute('data-mode', kind);
+          goalBtn.setAttribute('aria-label', isPlan ? '计划' : '目标');
+          var text = goalBtn.querySelector('.goal-label');
+          if (text) text.textContent = isPlan ? '计划' : '目标';
+          if (typeof updatePlanBanner === 'function') updatePlanBanner();
+        }
+        if (typeof showProtoToast === 'function') showProtoToast('已开启' + label);
+        return;
+      }
+      if (kind === 'work') {
+        replaceSlashToken('');
+        setTimeout(function () {
+          var proj = document.getElementById('ctxProject');
+          if (proj) proj.click();
+        }, 0);
+        return;
+      }
+      if (kind.indexOf('skill-') === 0) {
+        replaceSlashToken('/' + label + ' ');
+        if (typeof showProtoToast === 'function') showProtoToast('已插入技能 ' + label);
+        return;
+      }
+      replaceSlashToken('/' + label + ' ');
+      if (typeof showProtoToast === 'function') showProtoToast(label + '（原型）');
+    }
+    menu.addEventListener('click', function (e) {
+      var item = e.target.closest('.slash-menu-item');
+      if (!item || item.hidden) return;
+      e.stopPropagation();
+      activateItem(item);
+    });
+    document.addEventListener('click', function (e) {
+      if (!menu.classList.contains('open')) return;
+      if (menu.contains(e.target) || ta === e.target) return;
+      closeMenu();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (!menu.classList.contains('open')) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeMenu();
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        e.stopPropagation();
+        setFocus(focusIdx + 1);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        e.stopPropagation();
+        setFocus(focusIdx <= 0 ? items().length - 1 : focusIdx - 1);
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey && focusIdx >= 0) {
+        var list = items();
+        if (list[focusIdx]) {
+          e.preventDefault();
+          e.stopPropagation();
+          activateItem(list[focusIdx]);
+        }
+      }
+    }, true);
+    window.addEventListener('resize', function () {
+      if (menu.classList.contains('open')) closeMenu();
+    });
+    ta.addEventListener('input', function () {
+      var info = slashQuery();
+      if (info) {
+        openMenu(info.query);
+      } else if (menu.classList.contains('open')) {
+        closeMenu();
+      }
+    });
+    window.openComposerSlashMenu = openMenu;
+    window.closeComposerSlashMenu = closeMenu;
   })();
 
   /* ── Branch picker (ctx-bar) ── */

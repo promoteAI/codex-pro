@@ -3575,32 +3575,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
           </div>
           </div>
 
-          <div class="pl-modal-overlay" id="plAddMarketModal" role="dialog" aria-modal="true" aria-labelledby="plAddMarketTitle" hidden>
-            <div class="pl-modal">
-              <div class="pl-modal-head">
-                <h3 class="pl-modal-title" id="plAddMarketTitle">添加插件市场</h3>
-                <button type="button" class="pl-modal-close" id="plAddMarketClose" aria-label="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
-              </div>
-              <p class="pl-modal-sub">从 GitHub 仓库、Git URL 或本地文件夹添加。<a href="#" id="plAddMarketLearn">了解更多</a></p>
-              <div class="pl-modal-field">
-                <label class="pl-modal-label" for="plMarketSource">来源</label>
-                <input class="pl-modal-input" id="plMarketSource" type="text" placeholder="openai/plugins 或 git@github.com:org/repo.git" spellcheck="false" autocomplete="off">
-              </div>
-              <div class="pl-modal-field">
-                <label class="pl-modal-label" for="plMarketRef">Git 引用</label>
-                <input class="pl-modal-input" id="plMarketRef" type="text" placeholder="主分支" spellcheck="false" autocomplete="off">
-              </div>
-              <div class="pl-modal-field">
-                <label class="pl-modal-label" for="plMarketSparse">稀疏路径</label>
-                <textarea class="pl-modal-textarea" id="plMarketSparse" placeholder="plugins/codex" spellcheck="false"></textarea>
-              </div>
-              <div class="pl-modal-foot">
-                <button type="button" class="pl-modal-cancel" id="plAddMarketCancel">取消</button>
-                <button type="button" class="pl-modal-submit" id="plAddMarketSubmit">添加市场</button>
-              </div>
-            </div>
-          </div>
-
           <div class="gen-page" id="generalPage">
             <div class="gn-section-title">权限</div>
             <div class="gn-card">
@@ -5879,6 +5853,32 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     </div>
   </div>
 </div>
+<div class="pl-modal-overlay" id="plAddMarketModal" role="dialog" aria-modal="true" aria-labelledby="plAddMarketTitle" hidden>
+            <div class="pl-modal">
+              <div class="pl-modal-head">
+                <h3 class="pl-modal-title" id="plAddMarketTitle">添加插件市场</h3>
+                <button type="button" class="pl-modal-close" id="plAddMarketClose" aria-label="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+              </div>
+              <p class="pl-modal-sub">从 GitHub 仓库、Git URL 或本地文件夹添加。<a href="#" id="plAddMarketLearn">了解更多</a></p>
+              <div class="pl-modal-field">
+                <label class="pl-modal-label" for="plMarketSource">来源</label>
+                <input class="pl-modal-input" id="plMarketSource" type="text" placeholder="openai/plugins 或 git@github.com:org/repo.git" spellcheck="false" autocomplete="off">
+              </div>
+              <div class="pl-modal-field">
+                <label class="pl-modal-label" for="plMarketRef">Git 引用</label>
+                <input class="pl-modal-input" id="plMarketRef" type="text" placeholder="主分支" spellcheck="false" autocomplete="off">
+              </div>
+              <div class="pl-modal-field">
+                <label class="pl-modal-label" for="plMarketSparse">稀疏路径</label>
+                <textarea class="pl-modal-textarea" id="plMarketSparse" placeholder="plugins/codex" spellcheck="false"></textarea>
+              </div>
+              <div class="pl-modal-foot">
+                <button type="button" class="pl-modal-cancel" id="plAddMarketCancel">取消</button>
+                <button type="button" class="pl-modal-submit" id="plAddMarketSubmit">添加市场</button>
+              </div>
+            </div>
+          </div>
+
 <div class="proto-toast" id="protoToast" role="status" aria-live="polite"></div>
 <div class="chat-more-menu" id="chatMoreMenu" role="menu" aria-label="项目操作" hidden>
   <button type="button" class="chat-more-item" role="menuitem" data-more-action="remove">
@@ -9243,8 +9243,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         closePlAddMenu();
         if (kind === 'create-plugin') showProtoToast('创建插件（原型）');
         else if (kind === 'add-market') {
-          if (typeof openAddMarketModal === 'function') openAddMarketModal();
-          else if (typeof window.openAddMarketModal === 'function') window.openAddMarketModal();
+          if (typeof window.openAddMarketModal === 'function') window.openAddMarketModal();
           else showProtoToast('添加插件市场（原型）');
         }
       });
@@ -9749,7 +9748,9 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       var kind = item.getAttribute('data-add');
       closeAddPluginMenu();
       if (kind === 'create-plugin') showProtoToast('创建插件（原型）');
-      else if (kind === 'add-market') openAddMarketModal();
+      else if (kind === 'add-market') {
+        if (typeof window.openAddMarketModal === 'function') window.openAddMarketModal();
+      }
       else if (kind === 'add-mcp') openMcpCreateView();
     });
   }
@@ -10005,6 +10006,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       if (source) source.value = '';
       if (ref) ref.value = '';
       if (sparse) sparse.value = '';
+      if (modal.parentElement !== document.body) document.body.appendChild(modal);
       modal.hidden = false;
       modal.classList.add('open');
       setTimeout(function () { if (source) source.focus(); }, 0);

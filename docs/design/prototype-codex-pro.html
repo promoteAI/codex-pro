@@ -1598,7 +1598,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 /* Scheduled tasks (main view) */
 .sch-view{display:none;flex:1;min-height:0;overflow-y:auto;padding:28px 40px 48px;position:relative}
 .sch-view.active{display:block}
-.sch-create-wrap{position:absolute;top:24px;right:40px;z-index:5}
+.sch-list-pane{min-height:0;position:relative}
+.sch-create-wrap{position:absolute;top:0;right:0;z-index:5}
 .sch-create-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;background:#2a2a2a;border:1px solid #3a3a3a;font-size:13px;color:#e0e0e0;cursor:pointer}
 .sch-create-btn:hover{background:#323232;border-color:#4a4a4a}
 .sch-create-btn svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
@@ -1620,13 +1621,27 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .sch-filter:hover{color:#c8c8c8;background:#242424}
 .sch-filter.active{background:#2e2e2e;color:#e8e8e8}
 .sch-task-list{display:flex;flex-direction:column;gap:6px;margin-bottom:28px}
-.sch-task{display:flex;align-items:flex-start;gap:12px;padding:12px 10px;border-radius:10px;cursor:pointer}
-.sch-task:hover{background:#222}
+.sch-task{display:flex;align-items:flex-start;gap:12px;padding:12px 10px;border-radius:10px;cursor:pointer;position:relative;border:1px solid transparent;outline:none}
+.sch-task:hover,.sch-task.is-more-open{background:#222}
+.sch-task.is-selected{background:#1a2336;border-color:#3b6aef;box-shadow:inset 0 0 0 1px rgba(59,106,239,.25)}
+.sch-task.is-selected .sch-task-icon{border-color:#5b87f5;color:#8eb6ff;background:rgba(59,106,239,.12)}
 .sch-task-icon{width:28px;height:28px;border-radius:50%;border:1px solid #3a3a3a;display:flex;align-items:center;justify-content:center;color:#9a9a9a;flex-shrink:0;margin-top:1px}
 .sch-task-icon svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .sch-task-info{flex:1;min-width:0}
 .sch-task-name{font-size:13.5px;font-weight:500;color:#e6e6e6;margin-bottom:3px}
 .sch-task-meta{font-size:12px;color:#6e6e6e}
+.sch-task-more{width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:#9a9a9a;display:none;align-items:center;justify-content:center;cursor:pointer;padding:0;flex:0 0 auto;margin-left:auto;margin-top:0;align-self:center}
+.sch-task:hover .sch-task-more,.sch-task:focus-within .sch-task-more,.sch-task.is-more-open .sch-task-more{display:inline-flex}
+.sch-task-more:hover,.sch-task-more.is-active,.sch-task-more[aria-expanded="true"]{background:#333;color:#e8e8e8}
+.sch-task-more svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sch-task-more svg circle{fill:currentColor;stroke:none}
+.sch-more-menu{display:none;position:fixed;z-index:130;min-width:132px;padding:4px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.5)}
+.sch-more-menu.open{display:block}
+.sch-more-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border:0;border-radius:7px;background:transparent;color:#d8d8d8;cursor:pointer;text-align:left;font:inherit;font-size:13px}
+.sch-more-item:hover{background:#353535;color:#f0f0f0}
+.sch-more-item svg{width:14px;height:14px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sch-more-item.danger{color:#e85d5d}
+.sch-more-item.danger:hover{background:#3a2a2a;color:#ff6b6b}
 .sch-suggest-title{font-size:13px;font-weight:500;color:#b8b8b8;margin:0 0 12px;padding-top:8px;border-top:1px solid #2a2a2a}
 .sch-suggest-list{display:flex;flex-direction:column;gap:4px}
 .sch-suggest{display:flex;align-items:flex-start;gap:12px;padding:12px 8px;border-radius:10px;cursor:pointer}
@@ -1699,7 +1714,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 @keyframes chatBlink{50%{opacity:0}}
 @media(max-width:720px){
   .sch-view{padding:20px 20px 36px}
-  .sch-create-wrap{right:20px;top:16px}
+  .sch-list-pane .sch-create-wrap,.sch-create-wrap{right:20px;top:16px}
   .act-summary-text{white-space:normal}
 }
 
@@ -1855,19 +1870,85 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .wt-refresh:hover{background:#2a2a2a;color:#d0d0d0}
 .wt-refresh svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .wt-empty{background:#222;border:1px solid #2e2e2e;border-radius:12px;padding:48px 24px;text-align:center;color:#6e6e6e;font-size:13px}
-.sch-detail{display:none;position:absolute;inset:16px 16px 16px auto;width:min(380px,92%);background:#1c1c1c;border:1px solid #333;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.5);padding:18px;z-index:6;overflow:auto}
-.sch-detail.open{display:block}
-.sch-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
-.sch-detail-title{font-size:16px;font-weight:600;color:#f0f0f0;margin:0}
-.sch-detail-close{width:28px;height:28px;border:0;border-radius:6px;background:transparent;color:#888;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
-.sch-detail-close:hover{background:#2a2a2a;color:#ddd}
-.sch-detail-close svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8}
-.sch-detail-meta{font-size:12.5px;color:#8a8a8a;margin:0 0 12px}
-.sch-detail-desc{font-size:13px;line-height:1.5;color:#c8c8c8;margin:0 0 16px}
-.sch-detail-actions{display:flex;gap:8px;flex-wrap:wrap}
-.sch-detail-actions button{border:1px solid #3a3a3a;background:#2a2a2a;color:#ddd;border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer}
-.sch-detail-actions button:hover{background:#333}
-.sch-detail-actions .primary{background:#3866f0;border-color:#3866f0;color:#fff}
+.sch-detail{display:none;position:absolute;top:16px;right:16px;bottom:16px;width:min(420px,calc(100% - 32px));max-width:420px;background:#161616;border:1px solid #2e2e2e;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.45);z-index:6;overflow:auto;flex-direction:column;min-height:0}
+.sch-detail.open{display:flex}
+.sch-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 20px 12px;position:sticky;top:0;background:#161616;z-index:1}
+.sch-detail-head-main{display:flex;align-items:flex-start;gap:10px;min-width:0;flex:1}
+.sch-detail-status{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:500;background:#2a2a2a;color:#b8b8b8;flex:0 0 auto;margin-top:3px}
+.sch-detail-status.is-on{background:#1a2e24;color:#6ecf9a}
+.sch-detail-status.is-paused{background:#2a2a2a;color:#b0b0b0}
+.sch-detail-status.is-done{background:#1e2a44;color:#8eb6ff}
+.sch-detail-title{font-size:16px;font-weight:600;color:#f0f0f0;margin:0;line-height:1.35;letter-spacing:-.01em}
+.sch-detail-head-actions{display:flex;align-items:center;gap:2px;flex:0 0 auto}
+.sch-detail-icon-btn{width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:#888;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.sch-detail-icon-btn:hover,.sch-detail-icon-btn.is-active,.sch-detail-icon-btn[aria-expanded="true"]{background:#2a2a2a;color:#ddd}
+.sch-detail-icon-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#schDetailMore svg circle{fill:currentColor;stroke:none}
+#schDetailRun svg path{fill:currentColor;stroke:none}
+.sch-detail-body{padding:0 20px 28px;display:flex;flex-direction:column;gap:22px}
+.sch-detail-prompt{width:100%;min-height:220px;max-height:340px;resize:vertical;box-sizing:border-box;padding:14px 14px;border-radius:12px;border:1px solid #2e2e2e;background:#1c1c1c;color:#d8d8d8;font:inherit;font-size:13px;line-height:1.55;outline:none}
+.sch-detail-prompt:focus{border-color:#3f3f3f}
+.sch-detail-section{display:flex;flex-direction:column;gap:10px}
+.sch-detail-section-title{font-size:13px;font-weight:600;color:#e8e8e8;margin:0}
+.sch-detail-section-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sch-detail-section-head .sch-detail-section-title{flex:1}
+.sch-freq-gear{width:26px;height:26px;border:0;border-radius:7px;background:transparent;color:#777;display:none;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.sch-freq-gear:hover{background:#2a2a2a;color:#ddd}
+.sch-freq-gear svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sch-detail-section.is-custom .sch-freq-gear{display:inline-flex}
+.sch-detail-field{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:34px}
+.sch-detail-label{font-size:13px;color:#8a8a8a;flex:0 0 auto}
+.sch-detail-select{appearance:none;-webkit-appearance:none;min-width:0;max-width:68%;padding:6px 28px 6px 10px;border-radius:8px;border:1px solid #333;background:#222 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") right 8px center/12px no-repeat;color:#e0e0e0;font:inherit;font-size:12.5px;cursor:pointer;outline:none}
+.sch-detail-select:hover,.sch-detail-select:focus{border-color:#444;background-color:#2a2a2a}
+.sch-freq-card{background:#1c1c1c;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden}
+.sch-freq-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:0 14px;border-bottom:1px solid #2a2a2a}
+.sch-freq-row:last-child{border-bottom:0}
+.sch-freq-row[hidden]{display:none!important}
+.sch-freq-row .sch-detail-label{color:#c8c8c8;font-size:13px}
+.sch-freq-ctrl{display:inline-flex;align-items:center;gap:4px;max-width:70%;min-width:0;border:0;background:transparent;color:#e8e8e8;font:inherit;font-size:13px;cursor:pointer;padding:4px 2px;border-radius:8px;text-align:right}
+.sch-freq-ctrl:hover{color:#fff}
+.sch-freq-ctrl.is-pill{padding:4px 10px 4px 12px;border:1px solid #3b6aef;border-radius:999px;color:#f0f0f0}
+.sch-freq-ctrl.is-pill:hover{background:rgba(59,106,239,.08)}
+.sch-freq-ctrl.is-open{background:#2a2a2a}
+.sch-freq-ctrl-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sch-freq-ctrl svg{width:12px;height:12px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
+.sch-freq-menu{display:none;position:fixed;z-index:140;min-width:148px;max-height:min(320px,50vh);overflow:auto;padding:4px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.5)}
+.sch-freq-menu.open{display:block}
+.sch-freq-menu-item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:7px;background:transparent;color:#d8d8d8;cursor:pointer;text-align:left;font:inherit;font-size:13px}
+.sch-freq-menu-item:hover{background:#353535;color:#f0f0f0}
+.sch-freq-menu-item.is-active{color:#f0f0f0}
+.sch-freq-menu-check{width:14px;height:14px;opacity:0;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sch-runin-panel{display:none;position:fixed;z-index:145;width:min(420px,calc(100vw - 24px));max-height:min(420px,70vh);background:#252525;border:1px solid #3a3a3a;border-radius:12px;box-shadow:0 16px 40px rgba(0,0,0,.55);overflow:hidden;flex-direction:column}
+.sch-runin-panel.open{display:flex}
+.sch-runin-search{display:flex;align-items:center;gap:8px;margin:10px 10px 6px;padding:8px 10px;border-radius:8px;background:#1c1c1c;border:1px solid #333}
+.sch-runin-search:focus-within{border-color:#3f3f3f}
+.sch-runin-search svg{width:14px;height:14px;fill:none;stroke:#777;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.sch-runin-search input{flex:1;min-width:0;border:0;outline:none;background:transparent;color:#e0e0e0;font:inherit;font-size:13px}
+.sch-runin-search input::placeholder{color:#666}
+.sch-runin-list{flex:1;min-height:0;overflow:auto;padding:4px 6px 10px}
+.sch-runin-new{display:flex;align-items:center;gap:8px;width:100%;padding:9px 10px;border:0;border-radius:8px;background:transparent;color:#e8e8e8;font:inherit;font-size:13px;cursor:pointer;text-align:left}
+.sch-runin-new:hover,.sch-runin-new.is-active{background:#333}
+.sch-runin-new-plus{color:#9a9a9a;flex:0 0 auto}
+.sch-runin-new-label{flex:1;min-width:0}
+.sch-runin-check{width:14px;height:14px;opacity:0;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sch-runin-new.is-active .sch-runin-check,.sch-runin-chat.is-active .sch-runin-check{opacity:1}
+.sch-runin-group{margin-top:8px}
+.sch-runin-group-title{font-size:11.5px;color:#777;padding:6px 10px 4px;font-weight:500}
+.sch-runin-chat{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border:0;border-radius:8px;background:transparent;color:#d4d4d4;font:inherit;font-size:12.5px;cursor:pointer;text-align:left}
+.sch-runin-chat:hover,.sch-runin-chat.is-active{background:#333;color:#f0f0f0}
+.sch-runin-chat-ico{width:14px;height:14px;flex:0 0 auto;color:#888;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sch-runin-chat-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sch-runin-chat-date{flex:0 0 auto;font-size:11.5px;color:#666;margin-left:6px}
+.sch-runin-chat .sch-runin-check{margin-left:2px}
+.sch-runin-empty{padding:16px 10px;text-align:center;color:#666;font-size:12.5px}
+.sch-detail-history{display:flex;flex-direction:column;gap:4px}
+.sch-run{display:flex;align-items:flex-start;gap:10px;padding:10px 8px;border-radius:10px;cursor:pointer}
+.sch-run:hover{background:#1f1f1f}
+.sch-run-icon{width:28px;height:28px;border-radius:50%;border:1px solid #3a3a3a;display:flex;align-items:center;justify-content:center;color:#8a8a8a;flex:0 0 auto}
+.sch-run-icon svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sch-run-info{flex:1;min-width:0}
+.sch-run-name{font-size:13px;font-weight:500;color:#e0e0e0;margin-bottom:2px}
+.sch-run-meta{font-size:12px;color:#6e6e6e}
 .tp-pane-cta{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px;text-align:center;color:#888}
 .tp-pane-cta p{margin:0;font-size:13px}
 .tp-pane-cta-btn{border:1px solid #3a3a3a;background:#2a2a2a;color:#e0e0e0;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer}
@@ -2172,7 +2253,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       <div class="side-scroll" role="navigation" aria-label="侧栏导航">
         <div class="nav-item" role="button" tabindex="0" aria-label="新对话"><svg viewBox="0 0 24 24"><path d="M12.9 5.4 18.6 11c.4.4.4 1 0 1.4l-7.2 7.2a1.4 1.4 0 0 1-2 0l-4-4a1.4 1.4 0 0 1 0-2l7.1-7.2c.5-.5 1.2-.5 1.6-.3Z"/><path d="m8.5 10 5.5 5.5"/></svg><span>新对话</span></div>
         <div class="nav-item" role="button" tabindex="0" aria-label="Pull Request"><svg viewBox="0 0 24 24"><circle cx="6.5" cy="6" r="2.3"/><circle cx="6.5" cy="18" r="2.3"/><circle cx="17.5" cy="6" r="2.3"/><path d="M6.5 8.3v7.4M15.2 6H13a3.5 3.5 0 0 0 0 7h2"/></svg><span>Pull Request</span></div>
-        <div class="nav-item" role="button" tabindex="0" aria-label="已安排"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>已安排</span></div>
+        <div class="nav-item" role="button" tabindex="0" aria-label="自动化"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>自动化</span></div>
         <div class="nav-item" role="button" tabindex="0" aria-label="插件"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 3.5v6.3M12 14.2v6.3M3.5 12h6.3M14.2 12h6.3"/></svg><span>插件</span></div>
         <div class="sec sec-projects">
           <button type="button" class="sec-projects-label" aria-label="项目" aria-expanded="true">
@@ -2660,6 +2741,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         </div><!-- /homeView -->
 
         <section class="sch-view" id="scheduledView" aria-label="已安排的任务">
+          <div class="sch-list-pane">
           <div class="sch-create-wrap" id="schCreateWrap">
             <button class="sch-create-btn" id="schCreateBtn" type="button" aria-haspopup="menu" aria-expanded="false">创建 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
             <div class="sch-create-menu" role="menu" aria-label="创建任务">
@@ -2670,23 +2752,26 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
           <div class="sch-inner">
             <h1 class="sch-title">已安排的任务</h1>
             <p class="sch-sub">让 CodexPro 安排任务、设置提醒或监测更新</p>
-            <div class="sch-search">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg>
-              <input type="search" id="schSearch" placeholder="搜索已安排任务" aria-label="搜索已安排任务">
-            </div>
             <div class="sch-filters" role="tablist" aria-label="任务状态筛选">
               <button class="sch-filter active" type="button" data-filter="all">全部</button>
               <button class="sch-filter" type="button" data-filter="on">已开启</button>
               <button class="sch-filter" type="button" data-filter="paused">已暂停</button>
               <button class="sch-filter" type="button" data-filter="done">已完成</button>
             </div>
+            <div class="sch-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg>
+              <input type="search" id="schSearch" placeholder="搜索已安排任务" aria-label="搜索已安排任务">
+            </div>
             <div class="sch-task-list" id="schTaskList">
-              <div class="sch-task" data-status="on" role="button" tabindex="0">
+              <div class="sch-task" data-status="paused" data-sch-id="competitor-research" role="button" tabindex="0">
                 <div class="sch-task-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg></div>
                 <div class="sch-task-info">
                   <div class="sch-task-name">Codex-Pro 竞品研究与迭代开发</div>
                   <div class="sch-task-meta">每小时</div>
                 </div>
+                <button type="button" class="sch-task-more" title="更多" aria-label="更多" aria-haspopup="menu" aria-expanded="false">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+                </button>
               </div>
             </div>
             <div class="sch-suggest-title">建议</div>
@@ -2717,16 +2802,116 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
               </div>
             </div>
           </div>
+          </div>
           <aside class="sch-detail" id="schDetail" aria-label="任务详情" hidden>
             <div class="sch-detail-head">
-              <h2 class="sch-detail-title" id="schDetailTitle">任务</h2>
-              <button type="button" class="sch-detail-close" id="schDetailClose" aria-label="关闭"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+              <div class="sch-detail-head-main">
+                <span class="sch-detail-status is-paused" id="schDetailStatus">已暂停</span>
+                <h2 class="sch-detail-title" id="schDetailTitle">任务</h2>
+              </div>
+              <div class="sch-detail-head-actions">
+                <button type="button" class="sch-detail-icon-btn" id="schDetailMore" title="更多" aria-label="更多" aria-haspopup="menu" aria-expanded="false">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+                </button>
+                <button type="button" class="sch-detail-icon-btn" id="schDetailRun" title="立即运行" aria-label="立即运行">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z"/></svg>
+                </button>
+                <button type="button" class="sch-detail-icon-btn" id="schDetailClose" title="关闭" aria-label="关闭">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>
+                </button>
+              </div>
             </div>
-            <p class="sch-detail-meta" id="schDetailMeta"></p>
-            <p class="sch-detail-desc" id="schDetailDesc"></p>
-            <div class="sch-detail-actions">
-              <button type="button" class="primary" id="schDetailConfirm">确认</button>
-              <button type="button" id="schDetailPause">暂停</button>
+            <div class="sch-detail-body">
+              <textarea class="sch-detail-prompt" id="schDetailPrompt" aria-label="任务提示词" spellcheck="false"></textarea>
+              <section class="sch-detail-section" aria-labelledby="schDetailSectionDetails">
+                <h3 class="sch-detail-section-title" id="schDetailSectionDetails">详情</h3>
+                <div class="sch-freq-card">
+                  <div class="sch-freq-row">
+                    <span class="sch-detail-label">运行于</span>
+                    <button type="button" class="sch-freq-ctrl is-pill" id="schRunInBtn" aria-label="运行于" aria-haspopup="dialog" aria-expanded="false">
+                      <span class="sch-freq-ctrl-label" id="schRunInLabel">每次运行时新建聊天</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                  </div>
+                  <div class="sch-freq-row">
+                    <span class="sch-detail-label">项目</span>
+                    <button type="button" class="sch-freq-ctrl" id="schDetailProjectBtn" data-freq-key="project" aria-haspopup="menu" aria-expanded="false">
+                      <span class="sch-freq-ctrl-label" id="schDetailProjectLabel">codex-pro</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                  </div>
+                  <div class="sch-freq-row">
+                    <span class="sch-detail-label">模型</span>
+                    <button type="button" class="sch-freq-ctrl" id="schDetailModelBtn" data-freq-key="model" aria-haspopup="menu" aria-expanded="false">
+                      <span class="sch-freq-ctrl-label" id="schDetailModelLabel">GPT-5.4</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                  </div>
+                  <div class="sch-freq-row">
+                    <span class="sch-detail-label">推理</span>
+                    <button type="button" class="sch-freq-ctrl" id="schDetailReasoningBtn" data-freq-key="reasoning" aria-haspopup="menu" aria-expanded="false">
+                      <span class="sch-freq-ctrl-label" id="schDetailReasoningLabel">轻度</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </section>
+              <section class="sch-detail-section" id="schFreqSection" aria-labelledby="schDetailSectionFreq">
+                <div class="sch-detail-section-head">
+                  <h3 class="sch-detail-section-title" id="schDetailSectionFreq">频率</h3>
+                  <button type="button" class="sch-freq-gear" id="schFreqGear" title="高级频率设置" aria-label="高级频率设置">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M4.9 6.5l1.6 1.6M17.5 15.9l1.6 1.6M3.5 12h2.2M18.3 12h2.2M4.9 17.5l1.6-1.6M17.5 8.1l1.6-1.6"/></svg>
+                  </button>
+                </div>
+                <div class="sch-freq-card">
+                  <div class="sch-freq-row" data-freq-row="repeat">
+                    <span class="sch-detail-label">重复</span>
+                    <button type="button" class="sch-freq-ctrl is-pill" id="schFreqRepeatBtn" data-freq-key="repeat" aria-haspopup="menu" aria-expanded="false">
+                      <span class="sch-freq-ctrl-label" id="schFreqRepeatLabel">每小时</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                  </div>
+                  <div class="sch-freq-row" data-freq-row="custom-unit" hidden>
+                    <span class="sch-detail-label">重复</span>
+                    <button type="button" class="sch-freq-ctrl" id="schFreqUnitBtn" data-freq-key="unit" aria-haspopup="menu" aria-expanded="false">
+                      <span class="sch-freq-ctrl-label" id="schFreqUnitLabel">每周</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                  </div>
+                  <div class="sch-freq-row" data-freq-row="interval" hidden>
+                    <span class="sch-detail-label">每隔</span>
+                    <button type="button" class="sch-freq-ctrl" id="schFreqIntervalBtn" data-freq-key="interval" aria-haspopup="menu" aria-expanded="false">
+                      <span class="sch-freq-ctrl-label" id="schFreqIntervalLabel">1 周</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                  </div>
+                  <div class="sch-freq-row" data-freq-row="weekday" hidden>
+                    <span class="sch-detail-label">开启</span>
+                    <button type="button" class="sch-freq-ctrl" id="schFreqWeekdayBtn" data-freq-key="weekday" aria-haspopup="menu" aria-expanded="false">
+                      <span class="sch-freq-ctrl-label" id="schFreqWeekdayLabel">星期一</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                  </div>
+                  <div class="sch-freq-row" data-freq-row="time" hidden>
+                    <span class="sch-detail-label">时间</span>
+                    <button type="button" class="sch-freq-ctrl" id="schFreqTimeBtn" data-freq-key="time" aria-haspopup="menu" aria-expanded="false">
+                      <span class="sch-freq-ctrl-label" id="schFreqTimeLabel">20:30</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                  </div>
+                  <div class="sch-freq-row" data-freq-row="notify">
+                    <span class="sch-detail-label">通知</span>
+                    <button type="button" class="sch-freq-ctrl" id="schFreqNotifyBtn" data-freq-key="notify" aria-haspopup="menu" aria-expanded="false">
+                      <span class="sch-freq-ctrl-label" id="schFreqNotifyLabel">所有运行</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </section>
+              <section class="sch-detail-section" aria-labelledby="schDetailSectionHistory">
+                <h3 class="sch-detail-section-title" id="schDetailSectionHistory">运行历史记录</h3>
+                <div class="sch-detail-history" id="schDetailHistory"></div>
+              </section>
             </div>
           </aside>
         </section>
@@ -5886,6 +6071,38 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     移除
   </button>
 </div>
+<div class="sch-more-menu" id="schMoreMenu" role="menu" aria-label="任务操作" hidden>
+  <button type="button" class="sch-more-item" role="menuitem" data-sch-action="run">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+    立即运行
+  </button>
+  <button type="button" class="sch-more-item" role="menuitem" data-sch-action="continue">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z"/></svg>
+    继续
+  </button>
+  <button type="button" class="sch-more-item danger" role="menuitem" data-sch-action="delete">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/><path d="M6.5 7l.8 12.2A1.5 1.5 0 0 0 8.8 20.5h6.4a1.5 1.5 0 0 0 1.5-1.3L17.5 7"/><path d="M10 11v6M14 11v6"/></svg>
+    删除
+  </button>
+</div>
+<div class="sch-more-menu" id="schDetailMoreMenu" role="menu" aria-label="任务详情操作" hidden>
+  <button type="button" class="sch-more-item" role="menuitem" data-sch-detail-action="run">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+    立即运行
+  </button>
+  <button type="button" class="sch-more-item danger" role="menuitem" data-sch-detail-action="delete">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/><path d="M6.5 7l.8 12.2A1.5 1.5 0 0 0 8.8 20.5h6.4a1.5 1.5 0 0 0 1.5-1.3L17.5 7"/><path d="M10 11v6M14 11v6"/></svg>
+    删除
+  </button>
+</div>
+<div class="sch-freq-menu" id="schFreqMenu" role="menu" aria-label="频率选项" hidden></div>
+<div class="sch-runin-panel" id="schRunInPanel" role="dialog" aria-label="选择运行聊天" hidden>
+  <div class="sch-runin-search">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg>
+    <input type="search" id="schRunInSearch" placeholder="搜索聊天" aria-label="搜索聊天" autocomplete="off">
+  </div>
+  <div class="sch-runin-list" id="schRunInList"></div>
+</div>
 <div class="plan-mode-banner" id="planModeBanner" role="status" aria-live="polite" hidden><span class="pm-label">计划模式</span><span>当前任务：探索并比较架构方案</span><button class="pm-close" type="button" aria-label="关闭计划模式"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
 <div class="notif-panel" id="notifPanel" role="dialog" aria-label="通知" hidden>
   <div class="notif-panel-title">通知</div>
@@ -8779,6 +8996,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     if (prView) prView.classList.remove('active');
     if (pluginsView) pluginsView.classList.remove('active');
     if (layoutToolbar) layoutToolbar.classList.remove('is-home');
+    if (typeof closeSchDetail === 'function') closeSchDetail();
   }
   function showHomeView() {
     hideAllMainViews();
@@ -8808,7 +9026,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       document.querySelectorAll('.nav-item').forEach(function (x) { x.classList.remove('active'); });
       n.classList.add('active');
       var label = n.getAttribute('aria-label') || '';
-      if (label === '已安排') showScheduledView();
+      if (label === '自动化') showScheduledView();
       else if (label === 'Pull Request') showPrView();
       else if (label === '插件') showPluginsView();
       else {
@@ -9389,35 +9607,506 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   /* ── Scheduled: create menu + filters + search ── */
   var schCreateWrap = document.getElementById('schCreateWrap');
   var schCreateBtn = document.getElementById('schCreateBtn');
-  function openSchDetail(title, meta, desc) {
+  var schSelectedTask = null;
+  var SCH_STATUS_LABEL = { on: '已开启', paused: '已暂停', done: '已完成' };
+  var SCH_TASK_PROMPTS = {
+    'competitor-research': [
+      '你是一个负责持续改进 codex-pro 的 AI 工程师。每次运行按以下流程执行：',
+      '',
+      '## 第一步：竞品调研',
+      '搜索并分析 AI agent 框架领域的最新动态，重点关注：',
+      '- LangChain / LangGraph',
+      '- CrewAI',
+      '- AutoGen / AG2',
+      '- OpenHands / OpenDevin',
+      '- Aider、Continue、Cline 等 coding agent',
+      '- 其他新兴开源 agent 项目',
+      '',
+      '关注它们在 memory、skills、plugins、multi-agent、tool use 等方面的创新。',
+      '',
+      '## 第二步：差距分析',
+      '对照当前 codex-pro 架构（4 层记忆、14 渠道、工具审批、模型路由等），找出可借鉴的能力缺口与优先改进项。',
+      '',
+      '## 第三步：落地迭代',
+      '挑选 1–2 个高价值改进点，给出可执行的设计/实现建议，并在仓库中推进最小可用改动。'
+    ].join('\n')
+  };
+  function schStatusLabel(status) {
+    return SCH_STATUS_LABEL[status] || '已开启';
+  }
+  function setSchDetailStatus(status) {
+    var el = document.getElementById('schDetailStatus');
+    if (!el) return;
+    var key = status || 'on';
+    el.textContent = schStatusLabel(key);
+    el.className = 'sch-detail-status is-' + (key === 'done' ? 'done' : key === 'paused' ? 'paused' : 'on');
+  }
+  function renderSchHistory(items) {
+    var host = document.getElementById('schDetailHistory');
+    if (!host) return;
+    host.innerHTML = '';
+    (items || []).forEach(function (item) {
+      var row = document.createElement('div');
+      row.className = 'sch-run';
+      row.setAttribute('role', 'button');
+      row.tabIndex = 0;
+      row.innerHTML = '<div class="sch-run-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg></div><div class="sch-run-info"><div class="sch-run-name"></div><div class="sch-run-meta"></div></div>';
+      row.querySelector('.sch-run-name').textContent = item.name || '运行';
+      row.querySelector('.sch-run-meta').textContent = item.meta || '';
+      row.addEventListener('click', function () {
+        if (typeof showProtoToast === 'function') showProtoToast('打开运行记录：' + (item.name || '运行'));
+      });
+      host.appendChild(row);
+    });
+    if (!items || !items.length) {
+      var empty = document.createElement('div');
+      empty.className = 'sch-run-meta';
+      empty.style.padding = '4px 2px';
+      empty.textContent = '暂无运行记录';
+      host.appendChild(empty);
+    }
+  }
+  var schFreqState = {
+    repeat: '每小时',
+    unit: '每周',
+    interval: '1 周',
+    weekday: '星期一',
+    time: '20:30',
+    notify: '所有运行',
+    project: 'codex-pro',
+    model: 'GPT-5.4',
+    reasoning: '轻度'
+  };
+  var SCH_FREQ_OPTIONS = {
+    repeat: ['每小时', '每天', '工作日', '每周', '自定义'],
+    unit: ['每天', '每周', '每月'],
+    interval: ['1 周', '2 周', '3 周', '4 周'],
+    weekday: ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'],
+    time: (function () {
+      var slots = [];
+      for (var h = 0; h < 24; h++) {
+        for (var m = 0; m < 60; m += 15) {
+          slots.push((h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m);
+        }
+      }
+      return slots;
+    })(),
+    notify: ['所有运行', '仅失败', '从不'],
+    project: ['codex-pro', '无项目'],
+    model: ['GPT-5.4', 'agnes-2.5-flash', 'claude-sonnet-4'],
+    reasoning: ['轻度', '中', '高', '极高']
+  };
+  var SCH_FREQ_LABEL_IDS = {
+    repeat: 'schFreqRepeatLabel',
+    unit: 'schFreqUnitLabel',
+    interval: 'schFreqIntervalLabel',
+    weekday: 'schFreqWeekdayLabel',
+    time: 'schFreqTimeLabel',
+    notify: 'schFreqNotifyLabel',
+    project: 'schDetailProjectLabel',
+    model: 'schDetailModelLabel',
+    reasoning: 'schDetailReasoningLabel'
+  };
+  var schFreqMenu = document.getElementById('schFreqMenu');
+  var schFreqMenuKey = null;
+  var schFreqMenuBtn = null;
+  function syncSchFreqRows() {
+    var section = document.getElementById('schFreqSection');
+    var repeat = schFreqState.repeat || '每小时';
+    var isCustom = repeat === '自定义';
+    var showTime = repeat === '每天' || repeat === '工作日' || repeat === '每周' || isCustom;
+    var showWeekday = repeat === '每周' || isCustom;
+    var showCustomExtra = isCustom;
+    if (section) section.classList.toggle('is-custom', isCustom);
+    document.querySelectorAll('#schFreqSection [data-freq-row]').forEach(function (row) {
+      var key = row.getAttribute('data-freq-row');
+      var show = true;
+      if (key === 'time') show = showTime;
+      else if (key === 'weekday') show = showWeekday;
+      else if (key === 'custom-unit' || key === 'interval') show = showCustomExtra;
+      row.hidden = !show;
+    });
+    Object.keys(SCH_FREQ_LABEL_IDS).forEach(function (key) {
+      var el = document.getElementById(SCH_FREQ_LABEL_IDS[key]);
+      if (el) el.textContent = schFreqState[key];
+    });
+    var repeatBtn = document.getElementById('schFreqRepeatBtn');
+    if (repeatBtn) repeatBtn.classList.add('is-pill');
+  }
+  function snapSchFreqTime(value) {
+    var m = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return '20:30';
+    var h = Math.min(23, Math.max(0, +m[1]));
+    var min = Math.min(59, Math.max(0, +m[2]));
+    min = Math.round(min / 15) * 15;
+    if (min === 60) { min = 0; h = (h + 1) % 24; }
+    return (h < 10 ? '0' : '') + h + ':' + (min < 10 ? '0' : '') + min;
+  }
+  function setSchFreq(partial) {
+    Object.keys(partial || {}).forEach(function (k) {
+      if (partial[k] != null) schFreqState[k] = partial[k];
+    });
+    if (partial && partial.time != null) schFreqState.time = snapSchFreqTime(partial.time);
+    if (partial && partial.repeat === '自定义' && !partial.unit) schFreqState.unit = '每周';
+    if (partial && partial.unit === '每周') schFreqState.interval = schFreqState.interval.indexOf('周') === -1 ? '1 周' : schFreqState.interval;
+    syncSchFreqRows();
+  }
+  function closeSchFreqMenu() {
+    if (!schFreqMenu) return;
+    schFreqMenu.classList.remove('open');
+    schFreqMenu.hidden = true;
+    schFreqMenu.innerHTML = '';
+    if (schFreqMenuBtn) {
+      schFreqMenuBtn.classList.remove('is-open');
+      schFreqMenuBtn.setAttribute('aria-expanded', 'false');
+    }
+    schFreqMenuKey = null;
+    schFreqMenuBtn = null;
+  }
+  function openSchFreqMenu(btn, key) {
+    if (!schFreqMenu || !btn || !key) return;
+    if (schFreqMenuKey === key && schFreqMenu.classList.contains('open')) {
+      closeSchFreqMenu();
+      return;
+    }
+    closeSchFreqMenu();
+    if (typeof closeSchDetailMoreMenu === 'function') closeSchDetailMoreMenu();
+    if (typeof closeSchMoreMenu === 'function') closeSchMoreMenu();
+    if (typeof closeSchRunInPanel === 'function') closeSchRunInPanel();
+    schFreqMenuKey = key;
+    schFreqMenuBtn = btn;
+    btn.classList.add('is-open');
+    btn.setAttribute('aria-expanded', 'true');
+    var options = SCH_FREQ_OPTIONS[key] || [];
+    var current = schFreqState[key];
+    options.forEach(function (opt) {
+      var item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'sch-freq-menu-item' + (opt === current ? ' is-active' : '');
+      item.setAttribute('role', 'menuitem');
+      item.setAttribute('data-freq-value', opt);
+      item.innerHTML = '<span></span><svg class="sch-freq-menu-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
+      item.querySelector('span').textContent = opt;
+      schFreqMenu.appendChild(item);
+    });
+    schFreqMenu.hidden = false;
+    schFreqMenu.classList.add('open');
+    var rect = btn.getBoundingClientRect();
+    var menuW = Math.max(schFreqMenu.offsetWidth || 148, 148);
+    var left = Math.min(window.innerWidth - menuW - 8, Math.max(8, rect.right - menuW));
+    var top = rect.bottom + 6;
+    if (top + schFreqMenu.offsetHeight > window.innerHeight - 8) {
+      top = Math.max(8, rect.top - schFreqMenu.offsetHeight - 6);
+    }
+    schFreqMenu.style.left = left + 'px';
+    schFreqMenu.style.top = top + 'px';
+    var active = schFreqMenu.querySelector('.sch-freq-menu-item.is-active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
+  }
+  if (schFreqMenu) {
+    schFreqMenu.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var item = e.target.closest('[data-freq-value]');
+      if (!item || !schFreqMenuKey) return;
+      var value = item.getAttribute('data-freq-value');
+      var patch = {};
+      patch[schFreqMenuKey] = value;
+      if (schFreqMenuKey === 'unit') {
+        if (value === '每天') patch.interval = '1 天';
+        else if (value === '每月') patch.interval = '1 月';
+        else patch.interval = '1 周';
+        SCH_FREQ_OPTIONS.interval = value === '每天'
+          ? ['1 天', '2 天', '3 天']
+          : value === '每月'
+            ? ['1 月', '2 月', '3 月']
+            : ['1 周', '2 周', '3 周', '4 周'];
+      }
+      closeSchFreqMenu();
+      setSchFreq(patch);
+    });
+  }
+  document.querySelectorAll('.sch-freq-ctrl[data-freq-key]').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      openSchFreqMenu(btn, btn.getAttribute('data-freq-key'));
+    });
+  });
+  var schFreqGear = document.getElementById('schFreqGear');
+  if (schFreqGear) {
+    schFreqGear.addEventListener('click', function () {
+      if (typeof showProtoToast === 'function') showProtoToast('高级频率设置（原型）');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!schFreqMenu || !schFreqMenu.classList.contains('open')) return;
+    if (e.target.closest('#schFreqMenu') || e.target.closest('.sch-freq-ctrl')) return;
+    closeSchFreqMenu();
+  });
+
+  var SCH_RUNIN_CHATS = [
+    { group: 'codex-pro', id: 'c1', title: '我们一起来设置一个已安排任务吧，看看怎么用 ChatGPT 的计划功能…', date: '2026年9月12日' },
+    { group: 'DeepTutor', id: 'd2', title: '如图，从托盘退出报错', date: '2026年9月11日' }
+  ];
+  var schRunInState = { id: 'new', label: '每次运行时新建聊天' };
+  var schRunInPanel = document.getElementById('schRunInPanel');
+  var schRunInBtn = document.getElementById('schRunInBtn');
+  var schRunInSearch = document.getElementById('schRunInSearch');
+  var schRunInList = document.getElementById('schRunInList');
+  function setSchRunIn(label, id) {
+    schRunInState.id = id || 'new';
+    schRunInState.label = label || '每次运行时新建聊天';
+    var el = document.getElementById('schRunInLabel');
+    if (el) el.textContent = schRunInState.label;
+  }
+  function closeSchRunInPanel() {
+    if (!schRunInPanel) return;
+    schRunInPanel.classList.remove('open');
+    schRunInPanel.hidden = true;
+    if (schRunInBtn) {
+      schRunInBtn.classList.remove('is-open');
+      schRunInBtn.setAttribute('aria-expanded', 'false');
+    }
+    if (schRunInSearch) schRunInSearch.value = '';
+  }
+  function renderSchRunInList(query) {
+    if (!schRunInList) return;
+    var q = (query || '').trim().toLowerCase();
+    schRunInList.innerHTML = '';
+    var newBtn = document.createElement('button');
+    newBtn.type = 'button';
+    newBtn.className = 'sch-runin-new' + (schRunInState.id === 'new' ? ' is-active' : '');
+    newBtn.setAttribute('data-runin-id', 'new');
+    newBtn.innerHTML = '<span class="sch-runin-new-plus">+</span><span class="sch-runin-new-label">每次运行时新建聊天</span><svg class="sch-runin-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
+    schRunInList.appendChild(newBtn);
+
+    var groups = {};
+    SCH_RUNIN_CHATS.forEach(function (chat) {
+      if (q && chat.title.toLowerCase().indexOf(q) === -1 && chat.group.toLowerCase().indexOf(q) === -1) return;
+      if (!groups[chat.group]) groups[chat.group] = [];
+      groups[chat.group].push(chat);
+    });
+    var groupNames = Object.keys(groups);
+    if (!groupNames.length && q) {
+      var empty = document.createElement('div');
+      empty.className = 'sch-runin-empty';
+      empty.textContent = '未找到匹配的聊天';
+      schRunInList.appendChild(empty);
+      return;
+    }
+    groupNames.forEach(function (name) {
+      var wrap = document.createElement('div');
+      wrap.className = 'sch-runin-group';
+      var title = document.createElement('div');
+      title.className = 'sch-runin-group-title';
+      title.textContent = name;
+      wrap.appendChild(title);
+      groups[name].forEach(function (chat) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sch-runin-chat' + (schRunInState.id === chat.id ? ' is-active' : '');
+        btn.setAttribute('data-runin-id', chat.id);
+        btn.setAttribute('data-runin-title', chat.title);
+        btn.innerHTML = '<svg class="sch-runin-chat-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="sch-runin-chat-text"></span><span class="sch-runin-chat-date"></span><svg class="sch-runin-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
+        btn.querySelector('.sch-runin-chat-text').textContent = chat.title;
+        btn.querySelector('.sch-runin-chat-date').textContent = chat.date;
+        wrap.appendChild(btn);
+      });
+      schRunInList.appendChild(wrap);
+    });
+  }
+  function openSchRunInPanel() {
+    if (!schRunInPanel || !schRunInBtn) return;
+    if (schRunInPanel.classList.contains('open')) {
+      closeSchRunInPanel();
+      return;
+    }
+    closeSchFreqMenu();
+    if (typeof closeSchDetailMoreMenu === 'function') closeSchDetailMoreMenu();
+    if (typeof closeSchMoreMenu === 'function') closeSchMoreMenu();
+    renderSchRunInList('');
+    schRunInBtn.classList.add('is-open');
+    schRunInBtn.setAttribute('aria-expanded', 'true');
+    schRunInPanel.hidden = false;
+    schRunInPanel.classList.add('open');
+    var rect = schRunInBtn.getBoundingClientRect();
+    var panelW = Math.min(420, window.innerWidth - 24);
+    var left = Math.min(window.innerWidth - panelW - 8, Math.max(8, rect.right - panelW));
+    var top = rect.bottom + 8;
+    schRunInPanel.style.width = panelW + 'px';
+    if (top + 360 > window.innerHeight - 8) {
+      top = Math.max(8, rect.top - 360 - 8);
+    }
+    schRunInPanel.style.left = left + 'px';
+    schRunInPanel.style.top = top + 'px';
+    if (schRunInSearch) {
+      schRunInSearch.value = '';
+      setTimeout(function () { schRunInSearch.focus(); }, 0);
+    }
+  }
+  if (schRunInBtn) {
+    schRunInBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      openSchRunInPanel();
+    });
+  }
+  if (schRunInSearch) {
+    schRunInSearch.addEventListener('input', function () {
+      renderSchRunInList(schRunInSearch.value);
+    });
+    schRunInSearch.addEventListener('click', function (e) { e.stopPropagation(); });
+  }
+  if (schRunInList) {
+    schRunInList.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var item = e.target.closest('[data-runin-id]');
+      if (!item) return;
+      var id = item.getAttribute('data-runin-id');
+      if (id === 'new') setSchRunIn('每次运行时新建聊天', 'new');
+      else {
+        var title = item.getAttribute('data-runin-title') || '指定聊天';
+        var short = title.length > 18 ? title.slice(0, 18) + '…' : title;
+        setSchRunIn(short, id);
+      }
+      closeSchRunInPanel();
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!schRunInPanel || !schRunInPanel.classList.contains('open')) return;
+    if (e.target.closest('#schRunInPanel') || e.target.closest('#schRunInBtn')) return;
+    closeSchRunInPanel();
+  });
+
+  function openSchDetail(opts) {
     var panel = document.getElementById('schDetail');
     if (!panel) return;
+    opts = opts || {};
     var tEl = document.getElementById('schDetailTitle');
-    var mEl = document.getElementById('schDetailMeta');
-    var dEl = document.getElementById('schDetailDesc');
-    if (tEl) tEl.textContent = title || '任务';
-    if (mEl) mEl.textContent = meta || '';
-    if (dEl) dEl.textContent = desc || '';
+    var pEl = document.getElementById('schDetailPrompt');
+    if (tEl) tEl.textContent = opts.title || '任务';
+    setSchDetailStatus(opts.status || 'on');
+    if (pEl) pEl.value = opts.prompt || opts.desc || '';
+    setSchRunIn(opts.runIn || '每次运行时新建聊天', opts.runInId || 'new');
+    var repeat = opts.repeat || '每小时';
+    if (repeat === '手动') repeat = '自定义';
+    setSchFreq({
+      repeat: repeat,
+      unit: opts.unit || '每周',
+      interval: opts.interval || '1 周',
+      weekday: opts.weekday || '星期一',
+      time: opts.time || '20:30',
+      notify: opts.notify || '所有运行',
+      project: opts.project || 'codex-pro',
+      model: opts.model || 'GPT-5.4',
+      reasoning: opts.reasoning || '轻度'
+    });
+    renderSchHistory(opts.history || [
+      { name: (opts.title || '任务') + ' · 运行', meta: '1 周 · ' + (opts.project || 'codex-pro') },
+      { name: (opts.title || '任务') + ' · 运行', meta: '1 周 · ' + (opts.project || 'codex-pro') }
+    ]);
+    document.querySelectorAll('.sch-task').forEach(function (t) { t.classList.remove('is-selected'); });
+    if (opts.taskEl) {
+      opts.taskEl.classList.add('is-selected');
+      schSelectedTask = opts.taskEl;
+    } else {
+      schSelectedTask = null;
+    }
     panel.hidden = false;
     panel.classList.add('open');
   }
   function closeSchDetail() {
     var panel = document.getElementById('schDetail');
     if (!panel) return;
+    if (typeof closeSchDetailMoreMenu === 'function') closeSchDetailMoreMenu();
+    if (typeof closeSchFreqMenu === 'function') closeSchFreqMenu();
+    if (typeof closeSchRunInPanel === 'function') closeSchRunInPanel();
     panel.classList.remove('open');
     panel.hidden = true;
+    document.querySelectorAll('.sch-task').forEach(function (t) { t.classList.remove('is-selected'); });
+    schSelectedTask = null;
   }
   var schDetailClose = document.getElementById('schDetailClose');
   if (schDetailClose) schDetailClose.addEventListener('click', closeSchDetail);
-  var schDetailConfirm = document.getElementById('schDetailConfirm');
-  if (schDetailConfirm) schDetailConfirm.addEventListener('click', function () {
-    showProtoToast('已确认任务');
+  var schDetailMoreMenu = document.getElementById('schDetailMoreMenu');
+  var schDetailMore = document.getElementById('schDetailMore');
+  function schDetailTaskName() {
+    var tEl = document.getElementById('schDetailTitle');
+    return (tEl && tEl.textContent) || '任务';
+  }
+  function runSchDetailTask() {
+    if (typeof showProtoToast === 'function') showProtoToast('已立即运行「' + schDetailTaskName() + '」');
+  }
+  function deleteSchDetailTask() {
+    var name = schDetailTaskName();
+    var row = schSelectedTask;
     closeSchDetail();
-  });
-  var schDetailPause = document.getElementById('schDetailPause');
-  if (schDetailPause) schDetailPause.addEventListener('click', function () {
-    showProtoToast('已暂停任务');
-    closeSchDetail();
+    if (row) row.remove();
+    if (typeof showProtoToast === 'function') showProtoToast('已删除「' + name + '」');
+  }
+  function closeSchDetailMoreMenu() {
+    if (!schDetailMoreMenu) return;
+    schDetailMoreMenu.classList.remove('open');
+    schDetailMoreMenu.hidden = true;
+    if (schDetailMore) {
+      schDetailMore.classList.remove('is-active');
+      schDetailMore.setAttribute('aria-expanded', 'false');
+    }
+  }
+  function openSchDetailMoreMenu() {
+    if (!schDetailMoreMenu || !schDetailMore) return;
+    if (schDetailMoreMenu.classList.contains('open')) {
+      closeSchDetailMoreMenu();
+      return;
+    }
+    if (typeof closeSchMoreMenu === 'function') closeSchMoreMenu();
+    if (typeof closeSchFreqMenu === 'function') closeSchFreqMenu();
+    if (typeof closeSchRunInPanel === 'function') closeSchRunInPanel();
+    schDetailMore.classList.add('is-active');
+    schDetailMore.setAttribute('aria-expanded', 'true');
+    schDetailMore.setAttribute('aria-controls', 'schDetailMoreMenu');
+    schDetailMoreMenu.hidden = false;
+    schDetailMoreMenu.classList.add('open');
+    var rect = schDetailMore.getBoundingClientRect();
+    var menuW = schDetailMoreMenu.offsetWidth || 132;
+    var left = Math.min(window.innerWidth - menuW - 8, Math.max(8, rect.right - menuW));
+    var top = rect.bottom + 6;
+    if (top + schDetailMoreMenu.offsetHeight > window.innerHeight - 8) {
+      top = Math.max(8, rect.top - schDetailMoreMenu.offsetHeight - 6);
+    }
+    schDetailMoreMenu.style.left = left + 'px';
+    schDetailMoreMenu.style.top = top + 'px';
+  }
+  if (schDetailMore) {
+    schDetailMore.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      openSchDetailMoreMenu();
+    });
+  }
+  if (schDetailMoreMenu) {
+    schDetailMoreMenu.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var item = e.target.closest('[data-sch-detail-action]');
+      if (!item) return;
+      var kind = item.getAttribute('data-sch-detail-action');
+      closeSchDetailMoreMenu();
+      if (kind === 'run') runSchDetailTask();
+      else if (kind === 'delete') deleteSchDetailTask();
+    });
+  }
+  var schDetailRun = document.getElementById('schDetailRun');
+  if (schDetailRun) {
+    schDetailRun.addEventListener('click', function (e) {
+      e.stopPropagation();
+      closeSchDetailMoreMenu();
+      runSchDetailTask();
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!schDetailMoreMenu || !schDetailMoreMenu.classList.contains('open')) return;
+    if (e.target.closest('#schDetailMoreMenu') || e.target.closest('#schDetailMore')) return;
+    closeSchDetailMoreMenu();
   });
   if (schCreateBtn && schCreateWrap) {
     schCreateBtn.addEventListener('click', function (e) {
@@ -9436,36 +10125,182 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
         schCreateBtn.setAttribute('aria-expanded', 'false');
         var label = (item.textContent || '').trim();
         var list = document.getElementById('schTaskList');
+        var row = null;
+        var taskName = label.indexOf('手动') !== -1 ? '手动安排的任务' : 'Codex 创建的任务';
         if (list) {
-          var row = document.createElement('div');
+          row = document.createElement('div');
           row.className = 'sch-task';
           row.setAttribute('data-status', 'on');
           row.setAttribute('role', 'button');
           row.tabIndex = 0;
-          row.innerHTML = '<div class="sch-task-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg></div><div class="sch-task-info"><div class="sch-task-name"></div><div class="sch-task-meta">刚刚创建</div></div>';
-          row.querySelector('.sch-task-name').textContent = label.indexOf('手动') !== -1 ? '手动安排的任务' : 'Codex 创建的任务';
+          row.innerHTML = '<div class="sch-task-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg></div><div class="sch-task-info"><div class="sch-task-name"></div><div class="sch-task-meta">刚刚创建</div></div><button type="button" class="sch-task-more" title="更多" aria-label="更多" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>';
+          row.querySelector('.sch-task-name').textContent = taskName;
           list.appendChild(row);
-          row.addEventListener('click', function () {
-            openSchDetail(row.querySelector('.sch-task-name').textContent, '刚刚创建 · 已开启', '由「' + label + '」创建的原型任务。');
-          });
+          bindSchTask(row, { prompt: '由「' + label + '」创建的原型任务。请补充目标、频率与验收标准。' });
         }
-        openSchDetail(label, '新建', '已根据「' + label + '」创建任务草稿，可确认或稍后编辑。');
+        openSchDetail({
+          title: taskName,
+          status: 'on',
+          prompt: '已根据「' + label + '」创建任务草稿，可确认或稍后编辑。',
+          repeat: '自定义',
+          history: [],
+          taskEl: row
+        });
       });
     });
   }
-  document.querySelectorAll('.sch-task').forEach(function (task) {
-    task.addEventListener('click', function () {
+  var schMoreMenu = document.getElementById('schMoreMenu');
+  var schMoreAnchor = null;
+  var schMoreRow = null;
+  var schMoreName = '';
+  function closeSchMoreMenu() {
+    if (!schMoreMenu) return;
+    schMoreMenu.classList.remove('open');
+    schMoreMenu.hidden = true;
+    if (schMoreAnchor) {
+      schMoreAnchor.classList.remove('is-active');
+      schMoreAnchor.setAttribute('aria-expanded', 'false');
+    }
+    if (schMoreRow) schMoreRow.classList.remove('is-more-open');
+    schMoreAnchor = null;
+    schMoreRow = null;
+    schMoreName = '';
+  }
+  function openSchMoreMenu(btn, row, name) {
+    if (!schMoreMenu || !btn) return;
+    if (schMoreAnchor === btn && schMoreMenu.classList.contains('open')) {
+      closeSchMoreMenu();
+      return;
+    }
+    closeSchMoreMenu();
+    if (typeof closeSchDetailMoreMenu === 'function') closeSchDetailMoreMenu();
+    schMoreAnchor = btn;
+    schMoreRow = row || null;
+    schMoreName = name || '';
+    if (schMoreRow) schMoreRow.classList.add('is-more-open');
+    btn.classList.add('is-active');
+    btn.setAttribute('aria-expanded', 'true');
+    btn.setAttribute('aria-controls', 'schMoreMenu');
+    schMoreMenu.hidden = false;
+    schMoreMenu.classList.add('open');
+    var rect = btn.getBoundingClientRect();
+    var menuW = schMoreMenu.offsetWidth || 132;
+    var left = Math.min(window.innerWidth - menuW - 8, Math.max(8, rect.right - menuW));
+    var top = rect.bottom + 6;
+    if (top + schMoreMenu.offsetHeight > window.innerHeight - 8) {
+      top = Math.max(8, rect.top - schMoreMenu.offsetHeight - 6);
+    }
+    schMoreMenu.style.left = left + 'px';
+    schMoreMenu.style.top = top + 'px';
+  }
+  if (schMoreMenu) {
+    schMoreMenu.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var item = e.target.closest('[data-sch-action]');
+      if (!item) return;
+      var kind = item.getAttribute('data-sch-action');
+      var row = schMoreRow;
+      var name = schMoreName || '任务';
+      closeSchMoreMenu();
+      if (kind === 'run') {
+        if (typeof showProtoToast === 'function') showProtoToast('已立即运行「' + name + '」');
+      } else if (kind === 'continue') {
+        if (typeof showProtoToast === 'function') showProtoToast('已继续「' + name + '」');
+      } else if (kind === 'delete' && row) {
+        if (schSelectedTask === row) closeSchDetail();
+        row.remove();
+        if (typeof showProtoToast === 'function') showProtoToast('已删除「' + name + '」');
+      }
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!schMoreMenu || !schMoreMenu.classList.contains('open')) return;
+    if (e.target.closest('#schMoreMenu') || e.target.closest('.sch-task-more')) return;
+    closeSchMoreMenu();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (schRunInPanel && schRunInPanel.classList.contains('open')) {
+      closeSchRunInPanel();
+      return;
+    }
+    if (schFreqMenu && schFreqMenu.classList.contains('open')) {
+      closeSchFreqMenu();
+      return;
+    }
+    if (schDetailMoreMenu && schDetailMoreMenu.classList.contains('open')) {
+      closeSchDetailMoreMenu();
+      return;
+    }
+    if (schMoreMenu && schMoreMenu.classList.contains('open')) {
+      closeSchMoreMenu();
+      return;
+    }
+    var panel = document.getElementById('schDetail');
+    if (panel && panel.classList.contains('open')) closeSchDetail();
+  });
+  window.addEventListener('resize', function () {
+    closeSchMoreMenu();
+    closeSchDetailMoreMenu();
+    closeSchFreqMenu();
+    closeSchRunInPanel();
+  });
+  function bindSchTask(task, detailOpts) {
+    if (!task || task.getAttribute('data-sch-bound') === '1') return;
+    task.setAttribute('data-sch-bound', '1');
+    task.addEventListener('click', function (e) {
+      if (e.target.closest('.sch-task-more')) return;
       var name = (task.querySelector('.sch-task-name') || {}).textContent || '任务';
       var meta = (task.querySelector('.sch-task-meta') || {}).textContent || '';
-      openSchDetail(name, meta + ' · 已开启', '查看或调整此已安排任务的运行计划。');
+      var status = task.getAttribute('data-status') || 'on';
+      var id = task.getAttribute('data-sch-id') || '';
+      var opts = Object.assign({
+        title: name,
+        status: status,
+        repeat: meta || '每小时',
+        prompt: SCH_TASK_PROMPTS[id] || (detailOpts && detailOpts.prompt) || '查看或调整此已安排任务的运行计划。',
+        project: 'codex-pro',
+        model: 'GPT-5.4',
+        reasoning: '轻度',
+        runIn: '每次运行时新建聊天',
+        notify: '所有运行',
+        history: [
+          { name: name, meta: '1 周 · codex-pro' },
+          { name: name, meta: '1 周 · codex-pro' }
+        ],
+        taskEl: task
+      }, detailOpts || {});
+      opts.taskEl = task;
+      openSchDetail(opts);
     });
+    var moreBtn = task.querySelector('.sch-task-more');
+    if (moreBtn) {
+      moreBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var name = (task.querySelector('.sch-task-name') || {}).textContent || '任务';
+        openSchMoreMenu(moreBtn, task, name);
+      });
+    }
+  }
+  document.querySelectorAll('.sch-task').forEach(function (task) {
+    bindSchTask(task);
   });
   document.querySelectorAll('.sch-suggest').forEach(function (sug) {
     sug.addEventListener('click', function () {
       var name = (sug.querySelector('.sch-suggest-name') || {}).textContent || '建议';
       var when = (sug.querySelector('.sch-suggest-when') || {}).textContent || '';
       var desc = (sug.querySelector('.sch-suggest-desc') || {}).textContent || '';
-      openSchDetail(name, when, desc);
+      openSchDetail({
+        title: name,
+        status: 'on',
+        repeat: when.indexOf('工作日') !== -1 ? '工作日' : when.indexOf('星期') !== -1 || when.indexOf('周五') !== -1 || when.indexOf('星期五') !== -1 ? '每周' : '每天',
+        time: (when.match(/\d{1,2}:\d{2}/) || ['20:30'])[0],
+        weekday: when.indexOf('五') !== -1 ? '星期五' : '星期一',
+        prompt: desc,
+        history: [],
+        taskEl: null
+      });
     });
   });
   document.querySelectorAll('.sch-filter').forEach(function (btn) {

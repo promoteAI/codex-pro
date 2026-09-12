@@ -724,21 +724,20 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 
 /* Side chat pane */
 .sc{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;background:#181818}
-.sc-body{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:24px 28px;overflow:auto}
+.sc-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:16px 16px 12px;overflow:auto;scrollbar-gutter:stable}
+.sc-body.is-empty{align-items:center;justify-content:center;padding:24px 28px}
 .sc-empty{text-align:center;max-width:280px;margin:auto}
 .sc-empty[hidden]{display:none!important}
 .sc-empty-icon{width:72px;height:72px;margin:0 auto 16px;border-radius:50%;border:1.5px solid #3a3a3a;display:flex;align-items:center;justify-content:center;color:#8a8a8a}
 .sc-empty-icon svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .sc-empty-title{font-size:18px;font-weight:600;color:#e8e8e8;margin:0 0 8px;letter-spacing:-.01em}
 .sc-empty-sub{font-size:12.5px;color:#6e6e6e;line-height:1.5;margin:0}
-.sc-thread{display:none;flex-direction:column;gap:12px;width:100%;padding:8px 4px 16px}
+.sc-thread{display:none;flex-direction:column;gap:6px;width:100%;max-width:100%;padding:4px 2px 20px;margin:0;flex:1 0 auto;position:relative}
 .sc-thread.is-visible{display:flex}
-.sc-msg{display:flex;flex-direction:column;gap:4px}
-.sc-msg.is-user{align-items:flex-end}
-.sc-msg.is-assistant{align-items:flex-start}
-.sc-msg-bubble{padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;color:#e0e0e0;max-width:92%;white-space:pre-wrap;word-break:break-word}
-.sc-msg.is-user .sc-msg-bubble{background:#2a2a2a;border-bottom-right-radius:4px}
-.sc-msg.is-assistant .sc-msg-bubble{background:#222;border:1px solid #2e2e2e;border-bottom-left-radius:4px}
+/* Sidechat reuses .chat-msg / .chat-turn / .chat-md / .act-* from main chat */
+.sc-thread .chat-msg{max-width:100%}
+.sc-thread .chat-msg.is-user .chat-msg-bubble{max-width:min(100%,92%)}
+.sc-thread .chat-md{font-size:14px;line-height:1.65}
 .sc-composer{margin:0 14px 14px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;flex:0 0 auto;max-height:160px}
 .sc-composer:focus-within{border-color:#3a3a3a}
 .sc-composer-body textarea{width:100%;min-height:52px;max-height:90px;background:transparent;border:0;resize:none;padding:12px 14px 4px;color:#d4d4d4;font-size:13px;outline:none;line-height:1.5;font:inherit}
@@ -1035,6 +1034,29 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .model-btn{font-size:13px;color:#a0a0a0;cursor:pointer;padding:4px 8px;border-radius:6px;display:flex;align-items:center;gap:4px}
 .model-btn:hover,.model-btn.is-open{background:#262626;color:#d8d8d8}
 .model-btn .seg{font-size:11px;color:#666;background:#252525;padding:1px 5px;border-radius:4px}
+.ctx-usage-wrap{position:relative;display:none;flex:0 0 auto;align-items:center}
+.home-view.is-chatting .ctx-usage-wrap.is-visible{display:inline-flex}
+.ctx-usage-btn{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:#9a9a9a;font:inherit;font-size:12.5px;cursor:pointer;font-variant-numeric:tabular-nums}
+.ctx-usage-btn:hover,.ctx-usage-btn[aria-expanded="true"]{background:#262626;color:#d8d8d8}
+.ctx-usage-mini{width:18px;height:18px;flex:0 0 auto;border-radius:50%;background:conic-gradient(#8b5cf6 0 4.7%,#22c55e 4.7% 7%,#f59e0b 7% 9.5%,#60a5fa 9.5% 10.1%,#9f1239 10.1% 69%,#2a2a2a 69% 100%);mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px));-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px))}
+.ctx-usage-pct{line-height:1}
+.ctx-usage-menu{display:none;position:fixed;z-index:130;width:300px;padding:14px 14px 12px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.55)}
+.ctx-usage-menu.open{display:block}
+.ctx-usage-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.ctx-usage-title{font-size:14px;font-weight:500;color:#e8e8e8}
+.ctx-usage-close{width:26px;height:26px;border:0;border-radius:7px;background:transparent;color:#888;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.ctx-usage-close:hover{background:#353535;color:#eee}
+.ctx-usage-close svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ctx-usage-summary{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+.ctx-usage-full{font-size:13.5px;color:#e0e0e0;font-weight:500}
+.ctx-usage-tokens{font-size:12.5px;color:#9a9a9a;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ctx-usage-bar{display:flex;height:8px;border-radius:999px;overflow:hidden;background:#1e1e1e;margin-bottom:14px}
+.ctx-usage-seg{height:100%;min-width:2px}
+.ctx-usage-list{display:flex;flex-direction:column;gap:2px}
+.ctx-usage-item{display:flex;align-items:center;gap:10px;padding:7px 4px;font-size:13px;color:#d8d8d8;line-height:1.3}
+.ctx-usage-dot{width:10px;height:10px;border-radius:2.5px;flex:0 0 auto}
+.ctx-usage-label{flex:1;min-width:0}
+.ctx-usage-val{flex:0 0 auto;color:#b0b0b0;font-variant-numeric:tabular-nums}
 .model-menu{display:none;position:fixed;z-index:120;width:240px;padding:14px 14px 16px;background:#252525;border:1px solid #353535;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.55)}
 .model-menu.open{display:block}
 .model-menu.is-picking{width:280px;padding:8px}
@@ -1741,8 +1763,9 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .pl-icon-btn:hover{background:#2a2a2a;color:#ddd}
 .pl-icon-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .pl-add-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;border:1px solid #333;background:#2a2a2a;color:#e0e0e0;font-size:13px;cursor:pointer}
-.pl-add-btn:hover{background:#333}
+.pl-add-btn:hover,.pl-add-btn.is-open{background:#333}
 .pl-add-btn svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8}
+.pl-add-wrap{position:relative;flex:0 0 auto}
 .pl-body{flex:1;min-height:0;overflow-y:auto;padding:20px 28px 48px}
 .pl-search{display:flex;align-items:center;gap:10px;max-width:720px;margin:0 auto 22px;padding:11px 14px;background:#1c1c1c;border:1px solid #2e2e2e;border-radius:12px}
 .pl-search:focus-within{border-color:#3f3f3f}
@@ -2466,6 +2489,38 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
             <div class="perm-btn" id="permBtn" role="button" tabindex="0" aria-label="完全访问" aria-haspopup="menu" aria-expanded="false" aria-controls="permMenu" data-perm="full"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5.5 5.8v5.4c0 4.2 2.7 7.9 6.5 9.3 3.8-1.4 6.5-5.1 6.5-9.3V5.8L12 3Z"/><path d="M12 8.2v4.2"/><circle cx="12" cy="15.2" r=".7" fill="currentColor"/></svg><span class="perm-label">完全访问</span></div>
             <div class="goal-btn" id="goalBtn" role="button" tabindex="0" aria-label="目标" data-mode="goal" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg><span class="goal-label">目标</span></div>
             <span class="spacer"></span>
+            <div class="ctx-usage-wrap" id="ctxUsageWrap">
+              <button type="button" class="ctx-usage-btn" id="ctxUsageBtn" title="Context Usage" aria-label="Context Usage" aria-haspopup="dialog" aria-expanded="false" aria-controls="ctxUsageMenu">
+                <span class="ctx-usage-mini" aria-hidden="true"></span>
+                <span class="ctx-usage-pct" id="ctxUsagePct">69%</span>
+              </button>
+              <div class="ctx-usage-menu" id="ctxUsageMenu" role="dialog" aria-label="Context Usage" hidden>
+                <div class="ctx-usage-head">
+                  <div class="ctx-usage-title">Context Usage</div>
+                  <button type="button" class="ctx-usage-close" id="ctxUsageClose" title="关闭" aria-label="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+                </div>
+                <div class="ctx-usage-summary">
+                  <span class="ctx-usage-full" id="ctxUsageFull">69% Full</span>
+                  <span class="ctx-usage-tokens" id="ctxUsageTokens">~175.7K / 256K Tokens</span>
+                </div>
+                <div class="ctx-usage-bar" id="ctxUsageBar" aria-hidden="true">
+                  <span class="ctx-usage-seg" style="width:.3%;background:#8a8a8a"></span>
+                  <span class="ctx-usage-seg" style="width:4.7%;background:#a78bfa"></span>
+                  <span class="ctx-usage-seg" style="width:2.3%;background:#4ade80"></span>
+                  <span class="ctx-usage-seg" style="width:2.5%;background:#fbbf24"></span>
+                  <span class="ctx-usage-seg" style="width:.6%;background:#7dd3fc"></span>
+                  <span class="ctx-usage-seg" style="width:58.1%;background:#9f1239"></span>
+                </div>
+                <div class="ctx-usage-list" id="ctxUsageList">
+                  <div class="ctx-usage-item"><span class="ctx-usage-dot" style="background:#8a8a8a"></span><span class="ctx-usage-label">System prompt</span><span class="ctx-usage-val">680</span></div>
+                  <div class="ctx-usage-item"><span class="ctx-usage-dot" style="background:#a78bfa"></span><span class="ctx-usage-label">Tool definitions</span><span class="ctx-usage-val">12.1K</span></div>
+                  <div class="ctx-usage-item"><span class="ctx-usage-dot" style="background:#4ade80"></span><span class="ctx-usage-label">Rules</span><span class="ctx-usage-val">6.0K</span></div>
+                  <div class="ctx-usage-item"><span class="ctx-usage-dot" style="background:#fbbf24"></span><span class="ctx-usage-label">Skills</span><span class="ctx-usage-val">6.5K</span></div>
+                  <div class="ctx-usage-item"><span class="ctx-usage-dot" style="background:#7dd3fc"></span><span class="ctx-usage-label">Subagent definitions</span><span class="ctx-usage-val">1.6K</span></div>
+                  <div class="ctx-usage-item"><span class="ctx-usage-dot" style="background:#9f1239"></span><span class="ctx-usage-label">Conversation</span><span class="ctx-usage-val">148.8K</span></div>
+                </div>
+              </div>
+            </div>
             <div class="model-btn" id="modelBtn" role="button" tabindex="0" aria-label="模型" aria-haspopup="dialog" aria-expanded="false" aria-controls="modelMenu" data-model="agnes-2.5-flash" data-effort="3"><span class="model-name">自定义</span> <span class="seg model-effort">最高</span></div>
             <div class="send-btn" role="button" tabindex="0" title="发送" aria-label="发送"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></div>
           </div>
@@ -2733,7 +2788,19 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
             <div class="pl-top-actions">
               <button type="button" class="pl-icon-btn" id="plRefresh" title="刷新" aria-label="刷新"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>
               <button type="button" class="pl-icon-btn" id="plSettings" title="插件设置" aria-label="插件设置"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
-              <button type="button" class="pl-add-btn" id="plAddBtn">添加 <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+              <div class="pl-add-wrap" id="plAddWrap">
+                <button type="button" class="pl-add-btn" id="plAddBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="plAddMenu">添加 <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+                <div class="add-plugin-menu" id="plAddMenu" role="menu" hidden>
+                  <button type="button" class="add-plugin-item" role="menuitem" data-pl-add="create-plugin">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 3.5v6.3M12 14.2v6.3M3.5 12h6.3M14.2 12h6.3"/></svg>
+                    创建插件
+                  </button>
+                  <button type="button" class="add-plugin-item" role="menuitem" data-pl-add="add-market">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                    添加插件市场
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
           <div class="pl-body">
@@ -3087,7 +3154,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
           </div>
           <div class="tp-pane" id="tpPaneSidechat" data-pane="sidechat">
             <div class="sc" id="sidechatView">
-              <div class="sc-body" id="scBody">
+              <div class="sc-body is-empty" id="scBody">
                 <div class="sc-empty" id="scEmpty">
                   <div class="sc-empty-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 8v5M9.5 10.5h5"/></svg>
@@ -7471,6 +7538,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 
   /* ── Side chat view ── */
   var scInited = false;
+  var scBusy = false;
+  var scStreamToken = 0;
   function getScActive() {
     var tab = getActiveSessionTab();
     if (tab && tab.type === 'sidechat') {
@@ -7478,6 +7547,58 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       return tab;
     }
     return { label: '侧边聊天', msgs: [] };
+  }
+  function scScrollBottom(force) {
+    var body = document.getElementById('scBody');
+    if (!body) return;
+    var near = body.scrollHeight - body.scrollTop - body.clientHeight < 120;
+    if (force || near) body.scrollTop = body.scrollHeight;
+  }
+  function scAppendUserMessage(text) {
+    var thread = document.getElementById('scThread');
+    if (!thread) return;
+    var row = document.createElement('div');
+    row.className = 'chat-msg is-user';
+    row.innerHTML = '<div class="chat-msg-bubble"></div>';
+    row.querySelector('.chat-msg-bubble').textContent = text;
+    thread.appendChild(row);
+    scScrollBottom(true);
+  }
+  function scCreateAssistantTurn() {
+    var thread = document.getElementById('scThread');
+    if (!thread) return null;
+    var wrap = document.createElement('div');
+    wrap.className = 'chat-msg is-assistant';
+    wrap.innerHTML =
+      '<div class="chat-turn">' +
+        '<div class="chat-activity" data-role="activity"></div>' +
+        '<div class="chat-md" data-role="md" hidden></div>' +
+      '</div>';
+    thread.appendChild(wrap);
+    scScrollBottom(true);
+    return {
+      root: wrap,
+      activity: wrap.querySelector('[data-role="activity"]'),
+      md: wrap.querySelector('[data-role="md"]')
+    };
+  }
+  function buildScDemoEvents(userText) {
+    var q = String(userText || '').trim();
+    return {
+      tools: [
+        {
+          id: 'sc-tc1', name: 'exec',
+          command: 'echo ' + JSON.stringify(q).slice(0, 80),
+          summary: '已运行 echo ' + (q.length > 28 ? q.slice(0, 28) + '…' : q),
+          output: q,
+          open: true, delay: 220, runMs: 360
+        }
+      ],
+      markdown:
+        '已收到。可以继续补充上下文，我会按主会话同样的方式处理：\n\n' +
+        '- 先跑相关检查\n' +
+        '- 再给出可执行的修复步骤'
+    };
   }
   function renderScThread() {
     var empty = document.getElementById('scEmpty');
@@ -7489,27 +7610,109 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     if (!data.msgs.length) {
       if (empty) empty.hidden = false;
       thread.classList.remove('is-visible');
+      if (body) body.classList.add('is-empty');
       return;
     }
     if (empty) empty.hidden = true;
+    if (body) body.classList.remove('is-empty');
     thread.classList.add('is-visible');
     data.msgs.forEach(function (m) {
-      var msg = document.createElement('div');
-      msg.className = 'sc-msg is-' + m.role;
-      msg.innerHTML = '<div class="sc-msg-bubble"></div>';
-      msg.querySelector('.sc-msg-bubble').textContent = m.text;
-      thread.appendChild(msg);
+      if (m.role === 'user') {
+        scAppendUserMessage(m.text);
+        return;
+      }
+      var turn = scCreateAssistantTurn();
+      if (!turn) return;
+      (m.tools || []).forEach(function (tool) {
+        if (typeof mountToolBlock !== 'function') return;
+        var block = mountToolBlock(turn.activity, tool);
+        if (typeof finishToolBlock === 'function') finishToolBlock(block, tool);
+        if (tool.open === false) {
+          block.classList.remove('is-open');
+          var sb = block.querySelector('.act-summary');
+          if (sb) sb.setAttribute('aria-expanded', 'false');
+        }
+      });
+      var mdText = m.markdown || m.text || '';
+      if (mdText) {
+        turn.md.hidden = false;
+        turn.md.innerHTML = typeof renderChatMarkdown === 'function'
+          ? renderChatMarkdown(mdText)
+          : escapeHtml(mdText);
+      }
     });
-    if (body) body.scrollTop = body.scrollHeight;
+    scScrollBottom(true);
   }
-  function appendScMsg(role, text) {
+  function appendScUser(text) {
     var data = getScActive();
-    data.msgs.push({ role: role, text: text });
-    if (role === 'user' && (data.label === '侧边聊天' || data.label === TP_TAB_LABELS.sidechat)) {
+    data.msgs.push({ role: 'user', text: text });
+    if (data.label === '侧边聊天' || data.label === TP_TAB_LABELS.sidechat) {
       data.label = text.slice(0, 18) || '侧边聊天';
       updateSessionTabLabel(data);
     }
-    renderScThread();
+    var empty = document.getElementById('scEmpty');
+    var thread = document.getElementById('scThread');
+    var body = document.getElementById('scBody');
+    if (empty) empty.hidden = true;
+    if (body) body.classList.remove('is-empty');
+    if (thread) thread.classList.add('is-visible');
+    scAppendUserMessage(text);
+  }
+  async function scStreamAssistantTurn(userText, token) {
+    var data = getScActive();
+    var demo = buildScDemoEvents(userText);
+    var turn = scCreateAssistantTurn();
+    if (!turn) return;
+    var openBlocks = [];
+    for (var ti = 0; ti < demo.tools.length; ti++) {
+      if (token !== scStreamToken) return;
+      var tool = demo.tools[ti];
+      await sleep(tool.delay || 220);
+      if (token !== scStreamToken) return;
+      openBlocks.forEach(function (b) { b.classList.remove('is-open', 'is-focus'); });
+      var block = mountToolBlock(turn.activity, tool);
+      block.classList.add('is-open', 'is-focus');
+      var summaryBtn = block.querySelector('.act-summary');
+      if (summaryBtn) summaryBtn.setAttribute('aria-expanded', 'true');
+      scScrollBottom(true);
+      await streamShellOutput(block, tool.output, token, tool.runMs || 360);
+      if (token !== scStreamToken) return;
+      finishToolBlock(block, tool);
+      if (tool.open === false) {
+        block.classList.remove('is-open');
+        if (summaryBtn) summaryBtn.setAttribute('aria-expanded', 'false');
+      }
+      openBlocks.push(block);
+      block.classList.remove('is-focus');
+      scScrollBottom(false);
+    }
+    if (token !== scStreamToken) return;
+    turn.md.hidden = false;
+    turn.md.innerHTML = '';
+    var full = demo.markdown || '';
+    var shown = '';
+    var cursor = document.createElement('span');
+    cursor.className = 'chat-cursor';
+    var i = 0;
+    while (i < full.length) {
+      if (token !== scStreamToken) return;
+      var step = full[i] === '\n' ? 1 : 3;
+      shown += full.slice(i, i + step);
+      i += step;
+      turn.md.innerHTML = renderChatMarkdown(shown);
+      turn.md.appendChild(cursor);
+      scScrollBottom(false);
+      await sleep(16);
+    }
+    if (token !== scStreamToken) return;
+    turn.md.innerHTML = renderChatMarkdown(full);
+    data.msgs.push({
+      role: 'assistant',
+      text: full,
+      markdown: full,
+      tools: demo.tools
+    });
+    scScrollBottom(true);
   }
   function initSidechatView() {
     var input = document.getElementById('scInput');
@@ -7521,19 +7724,25 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     function syncScSend() {
       if (!input || !send) return;
       var has = (input.value || '').trim().length > 0;
-      send.classList.toggle('is-active', has);
-      send.setAttribute('aria-disabled', has ? 'false' : 'true');
+      send.classList.toggle('is-active', has && !scBusy);
+      send.setAttribute('aria-disabled', has && !scBusy ? 'false' : 'true');
     }
-    function sendSc() {
-      if (!input) return;
+    async function sendSc() {
+      if (!input || scBusy) return;
       var text = (input.value || '').trim();
       if (!text) return;
-      appendScMsg('user', text);
+      appendScUser(text);
       input.value = '';
+      scBusy = true;
       syncScSend();
-      setTimeout(function () {
-        appendScMsg('assistant', '已收到（原型回复）：' + text);
-      }, 280);
+      scStreamToken += 1;
+      var token = scStreamToken;
+      try {
+        await scStreamAssistantTurn(text, token);
+      } finally {
+        if (token === scStreamToken) scBusy = false;
+        syncScSend();
+      }
     }
     if (input) {
       input.addEventListener('input', syncScSend);
@@ -8999,7 +9208,55 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       if (pluginsItem) activateSettingsItem(pluginsItem);
     });
     var plAddBtn = document.getElementById('plAddBtn');
-    if (plAddBtn) plAddBtn.addEventListener('click', function () { showProtoToast('添加插件（原型）'); });
+    var plAddMenu = document.getElementById('plAddMenu');
+    var plAddWrap = document.getElementById('plAddWrap');
+    function closePlAddMenu() {
+      if (!plAddMenu) return;
+      plAddMenu.classList.remove('open');
+      plAddMenu.hidden = true;
+      if (plAddBtn) {
+        plAddBtn.classList.remove('is-open');
+        plAddBtn.setAttribute('aria-expanded', 'false');
+      }
+    }
+    function openPlAddMenu() {
+      if (!plAddMenu || !plAddBtn) return;
+      plAddMenu.hidden = false;
+      plAddMenu.classList.add('open');
+      plAddBtn.classList.add('is-open');
+      plAddBtn.setAttribute('aria-expanded', 'true');
+    }
+    if (plAddBtn) {
+      plAddBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (plAddMenu && plAddMenu.classList.contains('open')) closePlAddMenu();
+        else openPlAddMenu();
+      });
+    }
+    if (plAddMenu) {
+      plAddMenu.addEventListener('click', function (e) {
+        var item = e.target.closest('[data-pl-add]');
+        if (!item) return;
+        e.stopPropagation();
+        var kind = item.getAttribute('data-pl-add');
+        closePlAddMenu();
+        if (kind === 'create-plugin') showProtoToast('创建插件（原型）');
+        else if (kind === 'add-market') {
+          if (typeof openAddMarketModal === 'function') openAddMarketModal();
+          else if (typeof window.openAddMarketModal === 'function') window.openAddMarketModal();
+          else showProtoToast('添加插件市场（原型）');
+        }
+      });
+    }
+    document.addEventListener('click', function (e) {
+      if (!plAddMenu || !plAddMenu.classList.contains('open')) return;
+      if (plAddWrap && plAddWrap.contains(e.target)) return;
+      closePlAddMenu();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closePlAddMenu();
+    });
     document.querySelectorAll('.pl-card').forEach(function (card) {
       card.addEventListener('click', function (e) {
         if (e.target.closest('.pl-card-more')) {
@@ -10826,6 +11083,72 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     });
   })();
 
+  /* ── Context usage popover (composer-foot, left of model) ── */
+  (function initCtxUsageMenu() {
+    var wrap = document.getElementById('ctxUsageWrap');
+    var btn = document.getElementById('ctxUsageBtn');
+    var menu = document.getElementById('ctxUsageMenu');
+    var closeBtn = document.getElementById('ctxUsageClose');
+    if (!wrap || !btn || !menu) return;
+
+    function closeCtxUsageMenu() {
+      menu.classList.remove('open');
+      menu.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+      menu.style.top = '';
+      menu.style.left = '';
+    }
+
+    function openCtxUsageMenu() {
+      if (menu.parentElement !== document.body) document.body.appendChild(menu);
+      menu.hidden = false;
+      menu.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      requestAnimationFrame(function () {
+        var rect = btn.getBoundingClientRect();
+        var mw = menu.offsetWidth || 300;
+        var mh = menu.offsetHeight || 280;
+        var top = rect.top - mh - 8;
+        if (top < 8) top = Math.min(rect.bottom + 8, window.innerHeight - mh - 8);
+        var left = rect.right - mw;
+        if (left < 8) left = 8;
+        if (left + mw > window.innerWidth - 8) left = Math.max(8, window.innerWidth - mw - 8);
+        menu.style.top = Math.round(top) + 'px';
+        menu.style.left = Math.round(left) + 'px';
+      });
+    }
+
+    function syncCtxUsageVisibility() {
+      var hasMsgs = !!(chatThread && chatThread.children.length > 0);
+      var chatting = !!(homeView && homeView.classList.contains('is-chatting'));
+      wrap.classList.toggle('is-visible', chatting && hasMsgs);
+      if (!wrap.classList.contains('is-visible')) closeCtxUsageMenu();
+    }
+
+    window.syncCtxUsageVisibility = syncCtxUsageVisibility;
+    window.closeCtxUsageMenu = closeCtxUsageMenu;
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.classList.contains('open')) closeCtxUsageMenu();
+      else openCtxUsageMenu();
+    });
+    if (closeBtn) closeBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      closeCtxUsageMenu();
+    });
+    document.addEventListener('click', function (e) {
+      if (!menu.classList.contains('open')) return;
+      if (e.target.closest('#ctxUsageMenu') || e.target.closest('#ctxUsageBtn')) return;
+      closeCtxUsageMenu();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeCtxUsageMenu();
+    });
+    window.addEventListener('resize', closeCtxUsageMenu);
+    syncCtxUsageVisibility();
+  })();
+
   /* ── Model / effort picker (composer-foot) ── */
   (function initModelMenu() {
     var trigger = document.getElementById('modelBtn');
@@ -11173,6 +11496,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     row.querySelector('.chat-msg-bubble').textContent = text;
     chatThread.appendChild(row);
     scrollChatBottom(true);
+    if (typeof syncCtxUsageVisibility === 'function') syncCtxUsageVisibility();
   }
 
   function createAssistantTurn() {
@@ -11253,6 +11577,9 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   async function streamShellOutput(item, output, token, durationMs) {
     var outEl = item && item.querySelector('.out');
     var text = String(output || '');
+    function cancelled() {
+      return token !== chatStreamToken && token !== scStreamToken;
+    }
     if (!outEl || !text) {
       await sleep(durationMs || 400);
       return;
@@ -11261,12 +11588,13 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     var i = 0;
     var started = Date.now();
     while (i < text.length) {
-      if (token !== chatStreamToken) return;
+      if (cancelled()) return;
       var step = text[i] === '\n' ? 1 : Math.min(4, text.length - i);
       shown += text.slice(i, i + step);
       i += step;
       outEl.textContent = shown;
       scrollChatBottom(false);
+      scScrollBottom(false);
       await sleep(28);
     }
     var remain = (durationMs || 400) - (Date.now() - started);
@@ -11434,11 +11762,13 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     chatStreamToken += 1;
     var token = chatStreamToken;
     if (chatThread) chatThread.innerHTML = '';
+    if (typeof syncCtxUsageVisibility === 'function') syncCtxUsageVisibility();
     if (userText) {
       appendUserMessage(userText);
       chatBusy = true;
       try { await streamAssistantTurn(userText, token); }
       finally { if (token === chatStreamToken) chatBusy = false; }
+      if (typeof syncCtxUsageVisibility === 'function') syncCtxUsageVisibility();
       return;
     }
     var msgs = (CHAT_SEEDS[seedKey] || []).slice();
@@ -11446,6 +11776,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       msgs.push({ role: 'assistant', text: '发送一条消息开始这个线程。' });
     }
     renderStaticSeed(msgs);
+    if (typeof syncCtxUsageVisibility === 'function') syncCtxUsageVisibility();
   }
   function exitChatMode() {
     chatStreamToken += 1;
@@ -11453,7 +11784,9 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     if (homeView) homeView.classList.remove('is-chatting');
     if (layoutToolbar) layoutToolbar.classList.remove('is-chatting');
     if (typeof window.closeEnvMenu === 'function') window.closeEnvMenu();
+    if (typeof closeCtxUsageMenu === 'function') closeCtxUsageMenu();
     if (chatThread) chatThread.innerHTML = '';
+    if (typeof syncCtxUsageVisibility === 'function') syncCtxUsageVisibility();
   }
   var newChatNav = document.querySelector('.nav-item[aria-label="新对话"]');
   if (newChatNav) newChatNav.addEventListener('click', exitChatMode);

@@ -1598,6 +1598,12 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 /* Scheduled tasks (main view) */
 .sch-view{display:none;flex:1;min-height:0;overflow-y:auto;padding:28px 40px 48px;position:relative}
 .sch-view.active{display:block}
+.sch-view.has-detail{display:flex;overflow:hidden;padding:0}
+.sch-view.has-detail .sch-list-pane{flex:0 0 clamp(280px,38%,420px);width:clamp(280px,38%,420px);max-width:100%;overflow-y:auto;padding:16px 16px 32px 20px;border-right:1px solid #2a2a2a;position:relative}
+.sch-view.has-detail .sch-inner{max-width:none;margin:0}
+.sch-view.has-detail .sch-title,.sch-view.has-detail .sch-sub{display:none}
+.sch-view.has-detail .sch-create-wrap{top:14px;right:16px}
+.sch-view.has-detail .sch-filters{padding-right:88px;margin-bottom:12px}
 .sch-list-pane{min-height:0;position:relative}
 .sch-create-wrap{position:absolute;top:0;right:0;z-index:5}
 .sch-create-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;background:#2a2a2a;border:1px solid #3a3a3a;font-size:13px;color:#e0e0e0;cursor:pointer}
@@ -1642,6 +1648,20 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .sch-more-item svg{width:14px;height:14px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .sch-more-item.danger{color:#e85d5d}
 .sch-more-item.danger:hover{background:#3a2a2a;color:#ff6b6b}
+.sch-del-overlay{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.55)}
+.sch-del-overlay.open{display:flex}
+.sch-del-modal{width:min(420px,100%);background:#2c2c2c;border:1px solid #3a3a3a;border-radius:14px;box-shadow:0 20px 48px rgba(0,0,0,.55);padding:20px 22px 18px}
+.sch-del-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+.sch-del-title{font-size:16px;font-weight:600;color:#f0f0f0;margin:0;line-height:1.35;padding-right:4px}
+.sch-del-close{width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:#888;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;margin:-4px -4px 0 0}
+.sch-del-close:hover{background:#363636;color:#ddd}
+.sch-del-close svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sch-del-body{font-size:13.5px;color:#a8a8a8;line-height:1.5;margin:0 0 22px}
+.sch-del-foot{display:flex;justify-content:flex-end;gap:10px}
+.sch-del-cancel{padding:8px 14px;border:1px solid #4a4a4a;border-radius:8px;background:#2a2a2a;color:#e8e8e8;font:inherit;font-size:13px;cursor:pointer}
+.sch-del-cancel:hover{background:#333;border-color:#5a5a5a;color:#fff}
+.sch-del-confirm{padding:8px 14px;border:0;border-radius:8px;background:#3a1f1f;color:#ff5c5c;font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.sch-del-confirm:hover{background:#4a2626;color:#ff7070}
 .sch-suggest-title{font-size:13px;font-weight:500;color:#b8b8b8;margin:0 0 12px;padding-top:8px;border-top:1px solid #2a2a2a}
 .sch-suggest-list{display:flex;flex-direction:column;gap:4px}
 .sch-suggest{display:flex;align-items:flex-start;gap:12px;padding:12px 8px;border-radius:10px;cursor:pointer}
@@ -1715,6 +1735,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 @media(max-width:720px){
   .sch-view{padding:20px 20px 36px}
   .sch-list-pane .sch-create-wrap,.sch-create-wrap{right:20px;top:16px}
+  .sch-view.has-detail .sch-list-pane{flex:0 0 min(240px,42%);width:min(240px,42%);padding:12px 10px 24px 12px}
+  .sch-view.has-detail .sch-create-wrap{top:10px;right:10px}
   .act-summary-text{white-space:normal}
 }
 
@@ -1870,9 +1892,10 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .wt-refresh:hover{background:#2a2a2a;color:#d0d0d0}
 .wt-refresh svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .wt-empty{background:#222;border:1px solid #2e2e2e;border-radius:12px;padding:48px 24px;text-align:center;color:#6e6e6e;font-size:13px}
-.sch-detail{display:none;position:absolute;top:16px;right:16px;bottom:16px;width:min(420px,calc(100% - 32px));max-width:420px;background:#161616;border:1px solid #2e2e2e;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.45);z-index:6;overflow:auto;flex-direction:column;min-height:0}
+.sch-detail{display:none;flex:1 1 auto;min-width:0;min-height:0;background:#141414;border:0;border-radius:0;box-shadow:none;z-index:6;overflow:auto;flex-direction:column}
 .sch-detail.open{display:flex}
-.sch-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 20px 12px;position:sticky;top:0;background:#161616;z-index:1}
+.sch-view.has-detail .sch-detail{display:flex}
+.sch-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 24px 12px;position:sticky;top:0;background:#141414;z-index:1}
 .sch-detail-head-main{display:flex;align-items:flex-start;gap:10px;min-width:0;flex:1}
 .sch-detail-status{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:500;background:#2a2a2a;color:#b8b8b8;flex:0 0 auto;margin-top:3px}
 .sch-detail-status.is-on{background:#1a2e24;color:#6ecf9a}
@@ -1885,7 +1908,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 .sch-detail-icon-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #schDetailMore svg circle{fill:currentColor;stroke:none}
 #schDetailRun svg path{fill:currentColor;stroke:none}
-.sch-detail-body{padding:0 20px 28px;display:flex;flex-direction:column;gap:22px}
+.sch-detail-body{padding:0 24px 32px;display:flex;flex-direction:column;gap:22px}
 .sch-detail-prompt{width:100%;min-height:220px;max-height:340px;resize:vertical;box-sizing:border-box;padding:14px 14px;border-radius:12px;border:1px solid #2e2e2e;background:#1c1c1c;color:#d8d8d8;font:inherit;font-size:13px;line-height:1.55;outline:none}
 .sch-detail-prompt:focus{border-color:#3f3f3f}
 .sch-detail-section{display:flex;flex-direction:column;gap:10px}
@@ -6095,6 +6118,21 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     删除
   </button>
 </div>
+<div class="sch-del-overlay" id="schDeleteModal" role="dialog" aria-modal="true" aria-labelledby="schDeleteTitle" hidden>
+  <div class="sch-del-modal">
+    <div class="sch-del-head">
+      <h3 class="sch-del-title" id="schDeleteTitle">删除任务?</h3>
+      <button type="button" class="sch-del-close" id="schDeleteClose" aria-label="关闭">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <p class="sch-del-body">这将永久删除已安排的任务，并停止今后的运行</p>
+    <div class="sch-del-foot">
+      <button type="button" class="sch-del-cancel" id="schDeleteCancel">取消</button>
+      <button type="button" class="sch-del-confirm" id="schDeleteConfirm">删除已安排任务</button>
+    </div>
+  </div>
+</div>
 <div class="sch-freq-menu" id="schFreqMenu" role="menu" aria-label="频率选项" hidden></div>
 <div class="sch-runin-panel" id="schRunInPanel" role="dialog" aria-label="选择运行聊天" hidden>
   <div class="sch-runin-search">
@@ -10014,6 +10052,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     }
     panel.hidden = false;
     panel.classList.add('open');
+    var view = document.getElementById('scheduledView');
+    if (view) view.classList.add('has-detail');
   }
   function closeSchDetail() {
     var panel = document.getElementById('schDetail');
@@ -10023,6 +10063,8 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     if (typeof closeSchRunInPanel === 'function') closeSchRunInPanel();
     panel.classList.remove('open');
     panel.hidden = true;
+    var view = document.getElementById('scheduledView');
+    if (view) view.classList.remove('has-detail');
     document.querySelectorAll('.sch-task').forEach(function (t) { t.classList.remove('is-selected'); });
     schSelectedTask = null;
   }
@@ -10037,13 +10079,62 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   function runSchDetailTask() {
     if (typeof showProtoToast === 'function') showProtoToast('已立即运行「' + schDetailTaskName() + '」');
   }
-  function deleteSchDetailTask() {
-    var name = schDetailTaskName();
-    var row = schSelectedTask;
-    closeSchDetail();
+  var schDeleteModal = document.getElementById('schDeleteModal');
+  var schDeleteTitle = document.getElementById('schDeleteTitle');
+  var schDeletePending = null;
+  function closeSchDeleteModal() {
+    if (!schDeleteModal) return;
+    schDeleteModal.classList.remove('open');
+    schDeleteModal.hidden = true;
+    schDeletePending = null;
+  }
+  function openSchDeleteModal(opts) {
+    if (!schDeleteModal) return;
+    var name = (opts && opts.name) || '任务';
+    schDeletePending = {
+      name: name,
+      row: (opts && opts.row) || null,
+      fromDetail: !!(opts && opts.fromDetail)
+    };
+    if (schDeleteTitle) schDeleteTitle.textContent = '删除 ' + name + '?';
+    schDeleteModal.hidden = false;
+    schDeleteModal.classList.add('open');
+    var confirmBtn = document.getElementById('schDeleteConfirm');
+    if (confirmBtn) confirmBtn.focus();
+  }
+  function confirmSchDelete() {
+    if (!schDeletePending) {
+      closeSchDeleteModal();
+      return;
+    }
+    var name = schDeletePending.name || '任务';
+    var row = schDeletePending.row;
+    var fromDetail = schDeletePending.fromDetail;
+    closeSchDeleteModal();
+    if (fromDetail) closeSchDetail();
+    else if (row && schSelectedTask === row) closeSchDetail();
     if (row) row.remove();
     if (typeof showProtoToast === 'function') showProtoToast('已删除「' + name + '」');
   }
+  function deleteSchDetailTask() {
+    openSchDeleteModal({
+      name: schDetailTaskName(),
+      row: schSelectedTask,
+      fromDetail: true
+    });
+  }
+  (function bindSchDeleteModal() {
+    if (!schDeleteModal) return;
+    var closeBtn = document.getElementById('schDeleteClose');
+    var cancelBtn = document.getElementById('schDeleteCancel');
+    var confirmBtn = document.getElementById('schDeleteConfirm');
+    if (closeBtn) closeBtn.addEventListener('click', closeSchDeleteModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeSchDeleteModal);
+    if (confirmBtn) confirmBtn.addEventListener('click', confirmSchDelete);
+    schDeleteModal.addEventListener('click', function (e) {
+      if (e.target === schDeleteModal) closeSchDeleteModal();
+    });
+  })();
   function closeSchDetailMoreMenu() {
     if (!schDetailMoreMenu) return;
     schDetailMoreMenu.classList.remove('open');
@@ -10207,9 +10298,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       } else if (kind === 'continue') {
         if (typeof showProtoToast === 'function') showProtoToast('已继续「' + name + '」');
       } else if (kind === 'delete' && row) {
-        if (schSelectedTask === row) closeSchDetail();
-        row.remove();
-        if (typeof showProtoToast === 'function') showProtoToast('已删除「' + name + '」');
+        openSchDeleteModal({ name: name, row: row, fromDetail: false });
       }
     });
   }
@@ -10220,6 +10309,10 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
   });
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    if (schDeleteModal && schDeleteModal.classList.contains('open')) {
+      closeSchDeleteModal();
+      return;
+    }
     if (schRunInPanel && schRunInPanel.classList.contains('open')) {
       closeSchRunInPanel();
       return;
@@ -10245,6 +10338,70 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
     closeSchFreqMenu();
     closeSchRunInPanel();
   });
+  function parseSchSchedule(when) {
+    var text = when || '';
+    var timeMatch = text.match(/(\d{1,2}):(\d{2})/);
+    var time = timeMatch ? snapSchFreqTime(timeMatch[0]) : '08:00';
+    var weekday = text.indexOf('五') !== -1 ? '星期五'
+      : text.indexOf('一') !== -1 ? '星期一'
+      : text.indexOf('二') !== -1 ? '星期二'
+      : text.indexOf('三') !== -1 ? '星期三'
+      : text.indexOf('四') !== -1 ? '星期四'
+      : text.indexOf('六') !== -1 ? '星期六'
+      : text.indexOf('日') !== -1 ? '星期日'
+      : '星期一';
+    var repeat = '每天';
+    if (text.indexOf('工作日') !== -1) repeat = '工作日';
+    else if (text.indexOf('星期') !== -1 || text.indexOf('周') !== -1 || /星期[一二三四五六日]/.test(text) || text.indexOf('五') !== -1) repeat = '每周';
+    else if (text.indexOf('每小时') !== -1) repeat = '每小时';
+    return { repeat: repeat, time: time, weekday: weekday };
+  }
+  function syncSchSuggestSection() {
+    var list = document.querySelector('.sch-suggest-list');
+    var title = document.querySelector('.sch-suggest-title');
+    if (!list) return;
+    var any = list.querySelector('.sch-suggest');
+    list.hidden = !any;
+    if (title) title.hidden = !any;
+  }
+  function addSchTaskFromSuggest(name, when, desc) {
+    var list = document.getElementById('schTaskList');
+    if (!list) return null;
+    var exists = Array.prototype.some.call(list.querySelectorAll('.sch-task-name'), function (el) {
+      return (el.textContent || '').trim() === name;
+    });
+    if (exists) {
+      var existing = null;
+      list.querySelectorAll('.sch-task').forEach(function (row) {
+        var n = (row.querySelector('.sch-task-name') || {}).textContent || '';
+        if (n.trim() === name) existing = row;
+      });
+      if (existing && typeof showProtoToast === 'function') showProtoToast('「' + name + '」已在任务列表中');
+      return existing;
+    }
+    var schedule = parseSchSchedule(when);
+    var meta = when || schedule.repeat;
+    var row = document.createElement('div');
+    row.className = 'sch-task';
+    row.setAttribute('data-status', 'on');
+    row.setAttribute('role', 'button');
+    row.tabIndex = 0;
+    row.setAttribute('data-sch-repeat', schedule.repeat);
+    row.setAttribute('data-sch-time', schedule.time);
+    row.setAttribute('data-sch-weekday', schedule.weekday);
+    row.innerHTML = '<div class="sch-task-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg></div><div class="sch-task-info"><div class="sch-task-name"></div><div class="sch-task-meta"></div></div><button type="button" class="sch-task-more" title="更多" aria-label="更多" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>';
+    row.querySelector('.sch-task-name').textContent = name;
+    row.querySelector('.sch-task-meta').textContent = meta;
+    list.appendChild(row);
+    bindSchTask(row, {
+      prompt: desc || ('根据建议模板「' + name + '」创建的任务。'),
+      repeat: schedule.repeat,
+      time: schedule.time,
+      weekday: schedule.weekday,
+      history: []
+    });
+    return row;
+  }
   function bindSchTask(task, detailOpts) {
     if (!task || task.getAttribute('data-sch-bound') === '1') return;
     task.setAttribute('data-sch-bound', '1');
@@ -10254,10 +10411,13 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       var meta = (task.querySelector('.sch-task-meta') || {}).textContent || '';
       var status = task.getAttribute('data-status') || 'on';
       var id = task.getAttribute('data-sch-id') || '';
+      var schedule = parseSchSchedule(meta);
       var opts = Object.assign({
         title: name,
         status: status,
-        repeat: meta || '每小时',
+        repeat: task.getAttribute('data-sch-repeat') || schedule.repeat || meta || '每小时',
+        time: task.getAttribute('data-sch-time') || schedule.time || '20:30',
+        weekday: task.getAttribute('data-sch-weekday') || schedule.weekday || '星期一',
         prompt: SCH_TASK_PROMPTS[id] || (detailOpts && detailOpts.prompt) || '查看或调整此已安排任务的运行计划。',
         project: 'codex-pro',
         model: 'GPT-5.4',
@@ -10291,16 +10451,23 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
       var name = (sug.querySelector('.sch-suggest-name') || {}).textContent || '建议';
       var when = (sug.querySelector('.sch-suggest-when') || {}).textContent || '';
       var desc = (sug.querySelector('.sch-suggest-desc') || {}).textContent || '';
-      openSchDetail({
-        title: name,
-        status: 'on',
-        repeat: when.indexOf('工作日') !== -1 ? '工作日' : when.indexOf('星期') !== -1 || when.indexOf('周五') !== -1 || when.indexOf('星期五') !== -1 ? '每周' : '每天',
-        time: (when.match(/\d{1,2}:\d{2}/) || ['20:30'])[0],
-        weekday: when.indexOf('五') !== -1 ? '星期五' : '星期一',
-        prompt: desc,
-        history: [],
-        taskEl: null
-      });
+      var row = addSchTaskFromSuggest(name, when, desc);
+      sug.remove();
+      syncSchSuggestSection();
+      if (row) {
+        var schedule = parseSchSchedule(when);
+        openSchDetail({
+          title: name,
+          status: 'on',
+          repeat: schedule.repeat,
+          time: schedule.time,
+          weekday: schedule.weekday,
+          prompt: desc,
+          history: [],
+          taskEl: row
+        });
+        if (typeof showProtoToast === 'function') showProtoToast('已加入「' + name + '」');
+      }
     });
   });
   document.querySelectorAll('.sch-filter').forEach(function (btn) {

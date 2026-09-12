@@ -7,8 +7,6 @@ Orchestrates pipeline stages: context building, inference, and response finaliza
 from __future__ import annotations
 
 import asyncio
-import time
-import uuid
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any
@@ -22,15 +20,11 @@ from codex_pro.permissions.allowlist import ApprovalAllowlist
 from codex_pro.agent.compression import ConversationCompressor
 from codex_pro.agent.pipeline.context_stage import ContextStage
 from codex_pro.agent.pipeline.inference_stage import InferenceStage
-from codex_pro.agent.pipeline.response_stage import ResponseStage, _is_ephemeral_session
+from codex_pro.agent.pipeline.response_stage import ResponseStage
 from codex_pro.agent.tools.circuit_breaker import ToolCircuitBreaker
 from codex_pro.agent.tools.registry import ToolRegistry
-from codex_pro.agent.turn_run_store import DuplicateTurnClaim
 from codex_pro.bus.events import (
-    EventType,
     InboundEvent,
-    OutboundEvent,
-    stamp_turn_outcome,
 )
 from codex_pro.bus.queue import MessageBus
 from codex_pro.config.schema import Config
@@ -43,20 +37,21 @@ from codex_pro.models.provider import LLMProvider
 from codex_pro.models.model_windows import compression_window, resolve_context_window
 from codex_pro.models.router import ModelRouter
 from codex_pro.observability.monitor import TraceLogger
-from codex_pro.permissions.manager import ApprovalManager, ApprovalStatus, CredentialManager
+from codex_pro.permissions.manager import ApprovalManager, CredentialManager
 from codex_pro.session.manager import Session, SessionManager
 from codex_pro.skills.store import SkillStore
 from codex_pro.agent.streaming import (
     ProcessResult as _ProcessResult,
-    TokenStreamPublisher as _TokenStreamPublisher,
-    channel_matches as _channel_matches,
 )
-from codex_pro.agent.progress_heartbeat import ProgressHeartbeat, SharedActivityState
-from codex_pro.agent.degraded_notice import GENERIC_FALLBACK_TEXT
 from codex_pro.agent.commands.approval import ApprovalCommands
 from codex_pro.agent.commands.clarify import ClarifyCommands
 from codex_pro.agent.commands.interrupt import InterruptCommands
 from codex_pro.agent.commands.stream_params import StreamParams
+from codex_pro.agent.embedding_bootstrap import EmbeddingBootstrap
+from codex_pro.agent.lifecycle import AgentLifecycle
+from codex_pro.agent.inbound import InboundHandler
+from codex_pro.agent.memory_cache import MemoryCache
+from codex_pro.agent.bootstrap import LoopBootstrap
 
 
 
@@ -69,6 +64,7 @@ from codex_pro.agent.embedding_helpers import (
     probe_embed_provider,
     resolve_embed_fallback,
 )
+
 
 
 class AgentLoop:
@@ -528,129 +524,13 @@ class AgentLoop:
         )
 
     def _register_tools(self, scheduler: Any = None, task_manager: Any = None, workflow_engine: Any = None) -> None:
-        from codex_pro.agent.tools import discover_tools
-
-        all_tools = discover_tools(
-            config=self.config,
-            workspace=self.workspace,
-            bus=self.bus,
-            provider=self.provider,
-            scheduler=scheduler,
-            session_manager=self.sessions,
-            skill_store=self.skill_store,
-            # memory.enabled 是总开关：关闭时连 memory_store 都不传，
-            # discover_tools 的 `if memory_store:` 门控即不注册 memory 工具；
-            # 配套的矛盾检测/失效回调在关闭时一并传 None，避免半开状态。
-            memory_store=self.memory if self.config.memory.enabled else None,
-            contradiction_detector=(
-                getattr(self, "_contradiction_detector", None) if self.config.memory.enabled else None
-            ),
-            task_manager=task_manager,
-            workflow_engine=workflow_engine,
-            knowledge_index=self.knowledge,
-            approval=self.approval,
-            clarify_manager=self.clarify,
-            memory_invalidate_fn=(self._invalidate_memory_caches if self.config.memory.enabled else None),
-            # R1 Task8:MemoryTool 注入 loop 单例 service,不再就近 new。
-            memory_service=(self._memory_service if self.config.memory.enabled else None),
-        )
-        for tool in all_tools:
-            self.tools.register(tool)
-
-        report = self.tools.get_readiness_report()
-        not_ready = [(name, reason) for name, ready, reason in report if not ready]
-        if not_ready:
-            logger.warning("Tools not ready: {}", ", ".join(f"{n} ({r})" for n, r in not_ready))
-        else:
-            logger.info("All {} registered tools are ready", len(report))
+        LoopBootstrap.register_tools(self, scheduler, task_manager, workflow_engine)
 
     def _init_advanced_memory(self, config: Config, storage: Any) -> None:
-        """初始化高级记忆子系统：分层记忆、向量索引、混合检索、矛盾检测。"""
-        from codex_pro.memory.tiers import EpisodicManager, SemanticManager, ArchivalManager
-
-        forgetting = self.memory.forgetting_curve
-
-        episodic = EpisodicManager(storage) if storage else None
-        # R1 Task8:晋升(SemanticManager)与归档/遗忘删除(ArchivalManager)均注入
-        # loop 的 _memory_service 单例,失效/flush/审计统一收敛。
-        semantic = SemanticManager(self._memory_service)
-        archival = ArchivalManager(storage, service=self._memory_service) if storage else None
-
-        self._episodic = episodic
-        self.consolidator.set_episodic_manager(episodic)
-        self.consolidator.set_semantic_manager(semantic)
-        self.consolidator.set_forgetting_curve(forgetting)
-        self.consolidator.set_archival_manager(archival)
-
-        # 阶段 A：只挑候选 provider（不发网络、不构造索引、不构造依赖向量的消费者）。
-        # 最终 backend 由 start() 内的探针在 _resolve_embed_and_index 定案，
-        # VectorIndex / embed_fn / 矛盾检测 / HybridRetriever / reflection 一并在那时构造。
-        # 阶段 A 后至 start() 前，_vector_index / _embed_fn 保持 None 是安全的
-        # （下游消费者与 retrieval.py 均有 None 判断），生产环境处理事件必经 start()。
-        vector_index = None
-        embed_fn = None
-        self._local_embedder = None
-        self._embed_model_id = ""
-        self._embed_backend = config.memory.embedding_backend
-        self._embed_candidate = (None, None)
-        # 依赖向量的消费者推迟到阶段 B 构造；阶段 A 先把属性初始化好，
-        # 使 __init__ 后续（_register_tools / _context_stage / prefetcher）拿到确定的初值。
-        self._contradiction_detector = None
-        self._hybrid_retriever = None
-        if config.memory.vector_enabled and storage:
-            emb_model = config.memory.embedding_model or None
-            self._embed_candidate = pick_embed_candidate(
-                self._embed_backend,
-                self.provider,
-                self.router,
-                emb_model,
-            )
-        self._vector_index = vector_index
-        self._embed_fn = embed_fn
+        LoopBootstrap.init_advanced_memory(self, config, storage)
 
     def _setup_delegation(self) -> None:
-        if not self.config.multi_agent.enabled:
-            return
-        from codex_pro.agent.multi_agent.registry import WorkerRegistry
-        from codex_pro.agent.tools.delegate import DelegateTool
-
-        worker_registry = WorkerRegistry.from_config(self.config.multi_agent)
-        audit_path = Path(self.config.multi_agent.audit_path).expanduser()
-        if not audit_path.is_absolute():
-            audit_path = self.workspace / audit_path
-
-        delegate_tool = DelegateTool(
-            provider=self.provider,
-            model_router=self.router,
-            tool_registry=self.tools,
-            worker_registry=worker_registry,
-            approval_gate=self.approval_gate,
-            credentials=self.credentials,
-            audit_path=audit_path,
-            max_depth=self.config.multi_agent.max_depth,
-            max_parallel_workers=self.config.multi_agent.max_parallel_workers,
-            max_worker_iterations=self.config.multi_agent.max_iterations,
-            default_model=self._default_model,
-        )
-        self.tools.register(delegate_tool)
-
-        # spawn_task shares delegate's execution engine so its background worker
-        # runs real tool calls (exec/write_file/cronjob) through the approval
-        # flow, instead of being a tool-less completion that only "plans".
-        from codex_pro.agent.tools.delegate import SpawnTool
-
-        spawn_tool = SpawnTool(
-            provider=self.provider,
-            bus=self.bus,
-            tool_registry=self.tools,
-            approval_gate=self.approval_gate,
-            credentials=self.credentials,
-            model_router=self.router,
-            default_model=self._default_model,
-            max_iterations=self.config.multi_agent.max_iterations,
-        )
-        self.tools.register(spawn_tool)
-        logger.info("Delegation enabled with {} worker templates", len(worker_registry.list()))
+        LoopBootstrap.setup_delegation(self)
 
     def set_plugin_manager(self, manager: Any) -> None:
         """Attach the plugin manager after bootstrap. Passes hook_registry to InferenceStage."""
@@ -726,23 +606,10 @@ class AgentLoop:
         trace_id: str,
         metadata: dict[str, Any] | None = None,
     ) -> bool:
-        turn_runs = getattr(self, "_turn_runs", None)
-        if turn_runs is None:
-            return True
-        try:
-            return await turn_runs.mark_running(
-                event_id,
-                session_key,
-                context_key=context_key,
-                trace_id=trace_id,
-                metadata=metadata,
-            )
-        except Exception as e:
-            logger.warning("Turn running ledger write failed for {}: {}", event_id, e)
-            # Preserve the ledger's best-effort availability contract. Built-in
-            # SQLite returns an authoritative bool; a storage outage must not
-            # silently drop every otherwise valid inbound message.
-            return True
+        return await InboundHandler._mark_turn_running(
+            self, event_id, session_key,
+            context_key=context_key, trace_id=trace_id, metadata=metadata,
+        )
 
     async def _mark_turn_terminal(
         self,
@@ -752,67 +619,15 @@ class AgentLoop:
         response_text: str = "",
         error: str = "",
     ) -> None:
-        """Best-effort observability write; never turn it into a task failure."""
-        turn_runs = getattr(self, "_turn_runs", None)
-        if turn_runs is None:
-            return
-        try:
-            await turn_runs.mark_terminal(
-                event_id,
-                status,
-                response_text=response_text,
-                error=error,
-            )
-        except Exception as e:
-            logger.warning("Turn terminal ledger write failed for {}: {}", event_id, e)
+        await InboundHandler._mark_turn_terminal(
+            self, event_id, status, response_text=response_text, error=error
+        )
 
     async def _on_inbound_rejected(self, event: InboundEvent, reason: str) -> None:
-        """Converge ledger/task state when the bus refuses an accepted event."""
-        if event.is_control:
-            return
-        interrupt = getattr(self, "interrupt", None)
-        discard = getattr(interrupt, "discard", None)
-        if callable(discard):
-            discard(event.session_key, event.event_id)
-        status = "interrupted" if reason == "shutdown" else "failed"
-        await self._record_cron_outcome(event, "error", reason)
-        await self._record_task_outcome(event, "error", reason)
-        await self._mark_turn_terminal(event.event_id, status, error=reason)
+        await InboundHandler._on_inbound_rejected(self, event, reason)
 
     async def reset_session_state(self, session_key: str) -> None:
-        """Clear every reset-bounded, prompt-bearing process-local state.
-
-        Durable user/environment memories intentionally survive. Persisted
-        episodes and plans are isolated by the incremented conversation epoch,
-        so no destructive database purge is needed here.
-        """
-        from codex_pro.session.context_epoch import belongs_to_session
-
-        async with self._state_lock:
-            for cache in (
-                self._working_memories,
-                self._memory_snapshots,
-                self._memory_snapshot_ids,
-                self._retrieval_cache,
-            ):
-                for key in list(cache):
-                    if belongs_to_session(key, session_key):
-                        cache.pop(key, None)
-            for key in list(self._memory_snapshot_meta):
-                if belongs_to_session(key, session_key):
-                    self._memory_snapshot_meta.pop(key, None)
-        self.compressor.on_session_reset(session_key)
-        self._response_stage.on_session_reset(session_key)
-        # Reset happens under the session lock in GatewayServer, so no normal
-        # turn can be executing here. These are defensive cleanup for abandoned
-        # prompts/control state from a disconnected client.
-        self.unblock_session_for_reset(session_key)
-        self.interrupt.clear(session_key)
-        # Tool approvals are scoped to the durable session identity rather than
-        # the conversation epoch.  Explicitly clear the session map here so a
-        # reset cannot inherit SESSION / SESSION_ALL grants.  ALWAYS grants stay
-        # effective because ApprovalAllowlist retains them in its permanent set.
-        self.approval_gate.clear_session(session_key)
+        await InboundHandler.reset_session_state(self, session_key)
 
     @property
     def log_buffer(self) -> Any:
@@ -826,569 +641,37 @@ class AgentLoop:
         return get_log_buffer()
 
     def _resolved_vector_dimensions(self) -> int:
-        """Dimension for knowledge attach: explicit config wins, then the live
-        index, then the local model's known dim, then the legacy default."""
-        if self.config.memory.vector_dimensions:
-            return self.config.memory.vector_dimensions
-        if self._vector_index is not None and self._vector_index.dimensions:
-            return self._vector_index.dimensions
-        if self._local_embedder is not None and self._local_embedder.dimensions:
-            return self._local_embedder.dimensions
-        return 1536
+        return EmbeddingBootstrap._resolved_vector_dimensions(self)
 
     async def _resolve_embed_and_index(self, storage: Any) -> None:
-        """阶段 B：探针定案 backend，构造 VectorIndex 与依赖它的消费者。
-
-        由 start() 在向量初始化前调用。provider 模式探针失败抛 RuntimeError（不回退），
-        auto 模式探针失败静默回退 fastembed，local 模式（候选恒为 None）直接走本地兜底。
-        """
-        config = self.config
-        # memory.enabled 关闭时,阶段 A 的 _init_advanced_memory 整段被跳过,
-        # 原实现下不存在任何向量索引/消费者,这里同样短路以保持行为一致。
-        if not config.memory.enabled:
-            return
-        # vector_enabled=False 或无 storage 时,探针+建索引整段跳过,但消费者仍需
-        # 按原语义接线(关键词模式):改造前 HybridRetriever/矛盾检测/reflection/预取
-        # 的构造在向量块之外,只受各自开关+storage 控制。此处以 vector_index=None、
-        # embed_fn=None 调用 _wire_vector_consumers,HybridRetriever 退化为 BM25。
-        if not (config.memory.vector_enabled and storage):
-            self._wire_vector_consumers(None, None)
-            return
-        candidate, emb_model = self._embed_candidate
-        embed_fn = None
-        self._embed_model_id = ""
-        self._local_embedder = None
-        probe_dim = 0
-
-        use_provider = False
-        if candidate is not None:
-            dim = await probe_embed_provider(
-                candidate,
-                emb_model,
-                config.memory.embed_timeout_seconds,
-            )
-            if dim > 0:
-                use_provider = True
-                probe_dim = dim
-            elif self._embed_backend == "provider":
-                raise RuntimeError(
-                    "memory.embedding_backend=provider but the embedding probe "
-                    "failed; fix the endpoint or switch to auto/local."
-                )
-            else:
-                use_provider = False  # auto：静默回退 fastembed
-        elif self._embed_backend == "provider":
-            # provider 模式却没挑到任何 embed 候选（主 provider 无 embed 能力且无路由）：
-            # 契约要求强制 provider、不回退，这里同样报错而非静默降级。
-            raise RuntimeError(
-                "memory.embedding_backend=provider but no embed-capable provider "
-                "is available; register one or switch to auto/local."
-            )
-
-        if use_provider:
-            # _ProviderEmbedFn 失败返回 []（非 None），且连续失败熔断，止损后靠重启重决策。
-            embed_fn = _ProviderEmbedFn(candidate, emb_model)
-            self._embed_model_id = _embed_model_identity(candidate, emb_model)
-        else:
-            embed_fn, self._embed_model_id, self._local_embedder = resolve_embed_fallback(
-                None,
-                emb_model,
-                config.memory.local_embedding_model,
-                local_load_timeout=config.memory.embed_load_timeout_seconds,
-                hf_endpoint=config.memory.hf_embedding_endpoint,
-                cache_dir=config.memory.local_embedding_cache_dir,
-                max_load_attempts=config.memory.local_embedding_max_load_attempts,
-                retry_backoff=config.memory.local_embedding_retry_backoff_seconds,
-            )
-
-        from codex_pro.memory.vectors import VectorIndex
-
-        # 维度优先用探针实测值（config.vector_dimensions 默认 0=自动跟随），
-        # 让索引在首个向量入库前就知道正确维度。
-        vector_index = VectorIndex(
-            storage,
-            dimensions=probe_dim or config.memory.vector_dimensions,
-            model_id=self._embed_model_id,
-        )
-        self._vector_index = vector_index
-        self._embed_fn = embed_fn
-        self.memory.set_vector_index(vector_index)
-        self.memory.set_embed_fn(embed_fn)
-        self.consolidator.set_embed_fn(embed_fn)
-        if self._episodic is not None and embed_fn is not None:
-            # Same vector floor as the hybrid retriever: a low-cosine episode
-            # must not enter the candidate pool (it would only be filtered later
-            # at the retrieve() admission gate — cheaper to drop it at source).
-            self._episodic.attach_embedding(
-                embed_fn,
-                vector_index,
-                min_similarity=config.memory.rrf_min_similarity,
-            )
-        self._wire_vector_consumers(vector_index, embed_fn)
+        await EmbeddingBootstrap._resolve_embed_and_index(self, storage)
 
     def _wire_vector_consumers(self, vector_index: Any, embed_fn: Any) -> None:
-        """构造依赖最终 vector_index/embed_fn 的消费者（矛盾检测/reflection/混合检索），
-        并把 __init__ 阶段以 None 占位的持有者（context_stage / memory 工具 / prefetcher）
-        重新指向最终对象——这些持有者在 __init__ 里按值捕获引用，不重指会永久停在 None。"""
-        config = self.config
-        storage = self._storage
-        forgetting = self.memory.forgetting_curve
-
-        if config.memory.contradiction_detection and storage:
-            from codex_pro.memory.contradiction import ContradictionDetector
-
-            # R1 Task8:裁决 mark_superseded 走 loop 单例 service 的 maintenance
-            # 通道(统一失效+审计)。矛盾镜像跟踪(unresolved 标记/清除)仍直接落 store。
-            detector = ContradictionDetector(
-                storage,
-                vector_index,
-                store=self.memory,
-                service=self._memory_service,
-            )
-            self._contradiction_detector = detector
-            self.consolidator.set_contradiction_detector(detector)
-            self.consolidator.set_auto_resolve_contradictions(config.memory.auto_resolve_contradictions)
-            # memory 工具在 _register_tools 时以 None 建成，这里补上检测器引用。
-            mem_tool = self.tools.get("memory")
-            if mem_tool is not None and hasattr(mem_tool, "_contradiction_detector"):
-                mem_tool._contradiction_detector = detector
-
-        if config.memory.reflection_enabled:
-            from codex_pro.memory.reflection import ReflectionEngine
-
-            # R1 Task8:reflection 的写(蒸馏 add/清 tag/裁决 mark_superseded)注入
-            # loop 单例 service,统一走 maintenance 通道失效+审计。收口前就近 new 的
-            # reflection service 无 audit_path,审计 no-op——收敛后一并落统一审计。
-            self.consolidator.set_reflection(
-                ReflectionEngine(
-                    self._memory_service,
-                    llm_call=self.provider.chat_with_retry,
-                    contradiction_detector=self._contradiction_detector,
-                )
-            )
-
-        from codex_pro.memory.retrieval import HybridRetriever
-
-        def entries_fn() -> list:
-            return list(self.memory._entries.values())
-
-        # Episode candidates by relevance (semantic + LIKE), assembled inside
-        # retrieve() so they ride the same call the prefetcher warms — this is
-        # what keeps episodic recall alive on the CLI degrade-on-miss path (a
-        # cache hit now carries episodes). None-safe: no episodic manager ⇒ no
-        # episode candidates, retrieval stays memory-only.
-        episodic_mgr = self._episodic
-
-        async def _episode_search(query: str, session_key: str, limit: int) -> list:
-            if episodic_mgr is None:
-                return []
-            return await episodic_mgr.search_episodes(query, session_key=session_key or None, limit=limit)
-
-        # Optional cross-encoder reranker. Built once here; the rerank_fn closure
-        # bounds each call with the INFERENCE budget so a slow/still-loading model
-        # degrades THIS turn to the un-reranked RRF order instead of stalling the
-        # reply. The model load gets its own, far larger budget: a ~1GB ONNX load
-        # can never finish inside a per-turn budget, and sharing one value meant
-        # every wait timed out (silent permanent degrade). start() warms the model
-        # in the background so the first real turn likely finds it hot.
-        rerank_fn = None
-        rerank_min_score = None
-        if config.memory.rerank_enabled:
-            from codex_pro.memory.local_rerank import LocalReranker
-
-            self._reranker = LocalReranker(
-                model_name=config.memory.rerank_model,
-                load_timeout_seconds=config.memory.rerank_load_timeout_seconds,
-                hf_endpoint=config.memory.hf_embedding_endpoint,
-                cache_dir=config.memory.local_embedding_cache_dir,
-                max_load_attempts=config.memory.local_embedding_max_load_attempts,
-                retry_backoff_seconds=config.memory.local_embedding_retry_backoff_seconds,
-            )
-            _reranker = self._reranker
-            _rerank_budget = max(0.1, float(config.memory.rerank_timeout_seconds))
-
-            async def rerank_fn(query: str, docs: list) -> "list[float] | None":
-                try:
-                    return await asyncio.wait_for(_reranker.rerank(query, docs), timeout=_rerank_budget)
-                except (asyncio.TimeoutError, TimeoutError):
-                    logger.debug("Rerank exceeded {}s budget; keeping RRF order", _rerank_budget)
-                    return None
-
-            _floor = float(config.memory.rerank_min_score)
-            rerank_min_score = _floor if _floor > 0 else None
-
-        self._hybrid_retriever = HybridRetriever(
-            entries_fn=entries_fn,
-            vector_index=vector_index,
-            forgetting=forgetting,
-            embed_fn=embed_fn,
-            embed_timeout=config.memory.embed_timeout_seconds,
-            visibility_fn=self.memory.is_visible_in_session,
-            episode_search_fn=_episode_search if episodic_mgr is not None else None,
-            is_unresolved_fn=self.memory.is_unresolved,
-            min_similarity=config.memory.rrf_min_similarity,
-            rerank_fn=rerank_fn,
-            rerank_top_k=config.memory.rerank_top_k,
-            rerank_min_score=rerank_min_score,
-        )
-        self.memory.set_retriever(self._hybrid_retriever)
-        # context_stage 在 __init__ 里按值持有了 None，这里重指最终检索器。
-        self._context_stage._hybrid_retriever = self._hybrid_retriever
-        # prefetcher 只在存在检索器时才有意义；__init__ 时检索器为 None 故未建，
-        # 这里补建并重指 response_stage，使回复后预取重新生效。
-        from codex_pro.memory.prefetch import RetrievalPrefetcher
-
-        async def _knowledge_fetch(query: str, user_id: str, channel: str = "") -> str:
-            # search_async (keyword + vector), not the keyword-only sync search —
-            # see the identical closure in __init__.
-            results = await self.knowledge.search_async(
-                query, limit=config.knowledge.max_results, user_id=user_id, channel=channel
-            )
-            return self.knowledge.format_results(results)
-
-        self._prefetcher = RetrievalPrefetcher(
-            # limit=8 matches the inline sync path (5 memory + 3 episode) now
-            # that episodes ride the same retrieve() call.
-            self._hybrid_retriever,
-            self._put_retrieval_cache,
-            limit=8,
-            knowledge_fetch=_knowledge_fetch if self.knowledge else None,
-        )
-        self._response_stage._prefetcher = self._prefetcher
+        EmbeddingBootstrap._wire_vector_consumers(self, vector_index, embed_fn)
 
     async def _warmup_embedding(self) -> None:
-        """Prime the embedding backend once at startup.
-
-        The inline retrieval budget (memory.retrieval_miss_timeout_seconds,
-        default 0.8s) is spent almost entirely on the FIRST embedding call —
-        a local fastembed model lazy-loads/JITs on first use, then serves
-        subsequent queries in ~10-50ms. Without a warmup the first real turn
-        (and every topic-switch cache miss until the model is hot) times out
-        and degrades to keyword-only — dropping the one signal that carries
-        absolute relevance. A throwaway embed here moves that cost off the
-        user-facing path. Best-effort: failure just leaves the old lazy
-        behavior intact.
-        """
-        if self._embed_fn is None:
-            return
-        try:
-            await asyncio.wait_for(
-                self._embed_fn("warmup"),
-                timeout=self.config.memory.embed_load_timeout_seconds,
-            )
-            logger.info("Embedding backend warmed up")
-        except Exception as e:
-            logger.debug("Embedding warmup skipped ({}); first query will lazy-load", e)
+        await EmbeddingBootstrap._warmup_embedding(self)
 
     async def _warmup_reranker(self) -> None:
-        """Prime the cross-encoder reranker once at startup.
-
-        Same reasoning as _warmup_embedding, only more so: the reranker model is
-        an order of magnitude larger (~1GB ONNX), so its first-use lazy load can
-        never fit inside a per-turn budget. Without a warmup the reranker is
-        effectively dead weight — every turn waits out the inference budget, gets
-        None, and silently keeps the RRF order, while the model file sits unused
-        on disk. Warming it here moves that one-time cost off the user-facing path.
-
-        The wait uses the LOAD budget (not the per-turn inference budget) because
-        that is what is actually happening here. Outcome is logged at INFO/WARNING
-        rather than DEBUG: "is the reranker actually serving?" is otherwise
-        unanswerable from the logs, which is exactly how a permanently degraded
-        reranker went unnoticed.
-        """
-        if self._reranker is None:
-            return
-        budget = self.config.memory.rerank_load_timeout_seconds
-        # LocalReranker.rerank already bounds its own load wait by the load
-        # budget, and only THEN runs inference. So this outer guard gets the load
-        # budget plus one inference budget — sized at exactly the load budget it
-        # could abort a load that had just succeeded and report a misleading
-        # failure. This is only a backstop against a wedged call; the inner waits
-        # are what normally decide the outcome.
-        guard = budget + max(0.1, float(self.config.memory.rerank_timeout_seconds))
-        try:
-            scores = await asyncio.wait_for(
-                self._reranker.rerank("warmup", ["warmup document"]),
-                timeout=guard,
-            )
-        except Exception as e:
-            logger.warning(
-                "Reranker warmup failed ({}); retrieval keeps the RRF order until the model loads on a later turn",
-                e,
-            )
-            return
-        if scores:
-            logger.info("Reranker warmed up: {}", self.config.memory.rerank_model)
-        else:
-            # rerank() swallows its own failures and returns None, so an empty
-            # result here means "not ready" — the load is still running, hit its
-            # own budget, or failed. Either way retrieval degrades to RRF order,
-            # and that must be visible.
-            logger.warning(
-                "Reranker '{}' not ready after {}s; retrieval keeps the un-reranked "
-                "RRF order until the background load completes",
-                self.config.memory.rerank_model,
-                budget,
-            )
+        await EmbeddingBootstrap._warmup_reranker(self)
 
     async def start(self) -> None:
-        # Rejections happen outside the normal inbound handler (session limiter,
-        # shutdown deadline), so subscribe a dedicated lifecycle sink before the
-        # bus can leave any already-accepted event without a terminal record.
-        self.bus.subscribe_inbound_rejected(self._on_inbound_rejected)
-        # Reconcile before any expensive initialization and, critically, before
-        # subscribing to inbound traffic.  Every non-terminal row at this point
-        # belongs to a process instance that can no longer finish it.
-        if self._turn_runs is not None:
-            try:
-                reconciled = await self._turn_runs.reconcile_orphaned()
-                if reconciled:
-                    logger.info("Reconciled {} orphaned agent turn(s) at startup", reconciled)
-            except Exception as e:
-                # The ledger is observability/reconnect state.  A storage failure
-                # here must be visible but must not make the whole agent unavailable.
-                logger.warning("Turn-run startup reconciliation failed: {}", e)
-        await self._resolve_embed_and_index(self._storage)
-        if self._embed_fn is not None:
-            # Off the critical path: warm the model in the background so startup
-            # isn't blocked, but the first retrieval likely finds it hot.
-            self._spawn_background(self._warmup_embedding())
-        if self._reranker is not None:
-            # Same deal for the reranker, and it matters more here: its model is
-            # ~20x larger, so without this the first turns are guaranteed to
-            # degrade to the RRF order.
-            self._spawn_background(self._warmup_reranker())
-        if self._vector_index is not None:
-            # Order matters: purge orphan rows BEFORE the index loads (so they
-            # never enter the matrix), then queue re-embeds for entries whose
-            # vector is missing or was produced by a different model.
-            try:
-                await self.memory.scan_orphan_vectors()
-            except Exception as e:
-                logger.warning("Orphan vector scan failed: {}", e)
-            await self._vector_index.initialize()
-            queued = self.memory.queue_missing_embeds(self._vector_index.stale_source_ids)
-            if queued:
-                self._spawn_background(self.memory.flush_pending_embeds())
-            if self._episodic is not None:
-                try:
-                    await self._episodic.requeue_stale(self._vector_index.stale_source_ids)
-                except Exception as e:
-                    logger.warning("Episodic stale re-embed failed: {}", e)
-        # Knowledge vectors reuse the same embed_fn but stay in their own sidecar
-        # store. Inject here in start() — both self.knowledge and self._embed_fn
-        # are assigned during __init__, but _init_advanced_memory runs before
-        # knowledge is constructed, so injection cannot live there.
-        if self.knowledge is not None and self._embed_fn is not None:
-            self.knowledge.attach_embedding(
-                self._embed_fn,
-                self._resolved_vector_dimensions(),
-                embed_timeout=self.config.memory.embed_timeout_seconds,
-            )
-        if self.knowledge is not None and self.knowledge.needs_vector_backfill():
-            self._spawn_background(self.knowledge.rebuild_async())
-        await self._cost_tracker.load()
-        if self._contradiction_detector is not None:
-            try:
-                self.memory.reset_unresolved()
-                # unresolved 镜像本身是全局索引,启动重建必须扫全库——这是
-                # get_unresolved 唯一合法的不带 memory_scope(全库)调用方。
-                for c in await self._contradiction_detector.get_unresolved(limit=10000):
-                    self.memory.mark_contradiction_unresolved(c.id, c.memory_id_a, c.memory_id_b)
-            except Exception as e:
-                logger.warning("Unresolved-contradiction rebuild failed: {}", e)
-        # DURABLE, not DISCARDABLE: MCP startup is the only thing that ever
-        # registers these tools, so if the background pool happens to be
-        # saturated at boot a DISCARDABLE task is dropped and the agent runs
-        # for its whole lifetime with no MCP tools and no error anyone sees.
-        from codex_pro.agent.background import Tier
-
-        self._spawn_background(self._start_mcp_background(), tier=Tier.DURABLE)
-        self._start_spill_sweeper()
-        self._start_artifact_sweeper()
-        # Skill admission candidate store: ensure schema exists before the first
-        # background skill review can stage a candidate. Must run BEFORE
-        # subscribe_inbound to close the startup race where an inbound event
-        # triggers a review against a not-yet-created table. Independent of evolution.
-        if self._skill_candidate_store is not None:
-            try:
-                await self._skill_candidate_store.init_schema()
-            except Exception as e:
-                logger.warning("Skill candidate store schema init failed: {}", e)
-        self.bus.subscribe_inbound(self._on_inbound)
-        # 置位必须在 subscribe_inbound 之后、且在所有可抛异常的初始化完成之后:
-        # 之前 _running=True 在 start() 首行,embedding 探针/索引初始化中途抛错时
-        # 健康检查(app.py 以 is_running 为 HEALTHY 判据)会对一个收不了消息的
-        # 半启动实例误报健康。
-        self._running = True
-        if self._plugin_manager:
-            await self._plugin_manager.hooks.dispatch("on_agent_start")
-        if self.evolution is not None:
-            try:
-                await self.evolution.start()
-            except Exception as e:
-                logger.warning("Evolution engine failed to start: {}", e)
-        logger.info("Agent loop started")
+        await AgentLifecycle.start(self)
 
     async def stop(self) -> None:
-        self._running = False
-        self.bus.unsubscribe_inbound(self._on_inbound)
-        self.bus.unsubscribe_inbound_rejected(self._on_inbound_rejected)
-        if self.evolution is not None:
-            try:
-                await self.evolution.stop()
-            except Exception as e:
-                logger.debug("Evolution engine stop raised: {}", e)
-        plugin_owns_tool = None
-        if self._plugin_manager:
-            # The stop hook is the plugin's last notification while every tool
-            # and shared dependency is still alive. Plugin-registered tools are
-            # owned and closed by PluginManager (whether or not the plugin has a
-            # deactivate hook), so exclude them from the registry-wide close
-            # below to avoid double-closing non-idempotent third-party resources.
-            await self._plugin_manager.hooks.dispatch("on_agent_stop")
-            plugin_owns_tool = getattr(self._plugin_manager, "owns_tool", None)
-        # Tools may own work that depends on plugins, MCP clients, credentials,
-        # or other tools. Close every duck-typed lifecycle owner in reverse
-        # registration order (LIFO) before dismantling those dependencies. This
-        # covers SpawnTool as well as ProcessTool and future host-owned tools
-        # without another hard-coded shutdown branch.
-        for name in reversed(self.tools.tool_names):
-            tool = self.tools.get(name)
-            if tool is not None and callable(plugin_owns_tool) and plugin_owns_tool(tool) is True:
-                continue
-            close = getattr(tool, "aclose", None)
-            if not callable(close):
-                continue
-            try:
-                await close()
-            except Exception as e:
-                logger.debug("{} aclose raised (ignored): {}", name, e)
-        if self._plugin_manager:
-            await self._plugin_manager.shutdown()
-        if self.mcp_manager:
-            await self.mcp_manager.stop_all()
-        try:
-            from codex_pro.agent.browser.session import manager as _browser_manager
-
-            await _browser_manager.close_all()
-        except Exception as e:
-            logger.debug("browser manager close_all raised (ignored): {}", e)
-        # spill 清扫循环不属于调度器,自己收。它绝大多数时间停在 sleep 上,
-        # cancel 即刻生效;正在 to_thread 里扫的那一轮会跑完(线程不可中断),
-        # 故这里等它,不 fire-and-forget。
-        if self._spill_sweep_task is not None:
-            self._spill_sweep_task.cancel()
-            try:
-                await self._spill_sweep_task
-            except (asyncio.CancelledError, Exception) as e:  # noqa: BLE001
-                if not isinstance(e, asyncio.CancelledError):
-                    logger.debug("spill 清扫任务收尾异常(忽略): {}", e)
-            self._spill_sweep_task = None
-        if self._artifact_sweep_task is not None:
-            self._artifact_sweep_task.cancel()
-            try:
-                await self._artifact_sweep_task
-            except (asyncio.CancelledError, Exception) as e:  # noqa: BLE001
-                if not isinstance(e, asyncio.CancelledError):
-                    logger.debug("artifact cleanup shutdown failed (ignored): {}", e)
-            self._artifact_sweep_task = None
-        # All background work is spawned via ``_spawn_background`` and owned by
-        # the scheduler; ``aclose`` cancels discardable tasks and flushes durable
-        # ones. This is the single shutdown path for background work.
-        await self._bg_scheduler.aclose(timeout=10.0)
-        # 调度器 aclose 后再排空 store 的在途镜像任务:DURABLE 任务可能刚产生镜像写,
-        # 顺序不能反。消除关闭时 aiosqlite 向已关闭事件循环回调的资源警告。
-        if getattr(self, "memory", None) is not None:
-            try:
-                await self.memory.aclose()
-            except Exception as e:
-                logger.debug("Memory store aclose raised (ignored): {}", e)
-        # Release the local embedder's dedicated thread pool, if one was built.
-        if self._local_embedder is not None:
-            try:
-                self._local_embedder.close()
-            except Exception as e:
-                logger.debug("Local embedder close raised (ignored): {}", e)
-        # Same for the reranker's dedicated pool.
-        if self._reranker is not None:
-            try:
-                self._reranker.close()
-            except Exception as e:
-                logger.debug("Local reranker close raised (ignored): {}", e)
-        # Export the final telemetry batch only after every task/tool that can
-        # create spans has stopped. TelemetryManager.shutdown is synchronous and
-        # idempotent, but keep this boundary best-effort for embedded/custom
-        # managers so it cannot prevent the rest of process shutdown.
-        if self._telemetry is not None:
-            try:
-                self._telemetry.shutdown()
-            except Exception as e:
-                logger.debug("Telemetry shutdown raised (ignored): {}", e)
-        logger.info("Agent loop stopped")
+        await AgentLifecycle.stop(self)
 
     def _spawn_background(self, coro: Any, *, tier: Any = None) -> None:
-        from codex_pro.agent.background import Tier
-
-        self._bg_scheduler.spawn(coro, tier=tier or Tier.DISCARDABLE)
+        AgentLifecycle._spawn_background(self, coro, tier=tier)
 
     def _start_spill_sweeper(self) -> None:
-        """启动 spill 清扫循环,持有独立生命周期,不进 BackgroundScheduler。
-
-        调度器是为"有界的一次性工作"设计的,而这是个永不返回的循环,放进去有两个
-        后果:启动时若池已饱和,DISCARDABLE 会被永久丢弃(不是漏一轮,是这辈子
-        不再清扫);启动成功则永久占住一个信号量槽,max_background_tasks=1 时后续
-        DURABLE 全部排队等它——而它永远不结束。
-
-        不以 spill.enabled 为条件:关掉开关只是不再产生新产物,已有的敏感内容
-        仍须继续受 retentionDays/maxTotalMb 约束。目录不存在时循环自身是 no-op,
-        所以无条件启动是安全的。
-        """
-        from codex_pro.spill.sweeper import sweep_forever
-
-        # 挂在 start() 而非 __init__:AgentLoop 在 app.py 里于事件循环之外构造,
-        # 那里 create_task 会抛 "no running event loop"。
-        self._spill_sweep_task = asyncio.create_task(
-            sweep_forever(
-                self._spill_store.root,
-                self.config.spill.retention_days,
-                self.config.spill.max_total_mb,
-                self.config.spill.sweep_interval_hours,
-            )
-        )
+        AgentLifecycle._start_spill_sweeper(self)
 
     def _start_artifact_sweeper(self) -> None:
-        """Own the perpetual user-artifact retention loop outside the worker pool."""
-        if not self.config.artifacts.enabled:
-            return
-        from codex_pro.artifacts.sweeper import sweep_forever
-
-        workspace_root = self.workspace.resolve()
-        configured_root = workspace_root / self.config.artifacts.root_dir
-        root = configured_root.resolve()
-        try:
-            root.relative_to(workspace_root)
-        except ValueError:
-            logger.error("Artifact cleanup disabled: configured root escapes the workspace")
-            return
-        if configured_root.is_symlink():
-            logger.error("Artifact cleanup disabled: configured root is a symbolic link")
-            return
-        self._artifact_sweep_task = asyncio.create_task(
-            sweep_forever(
-                root,
-                self.config.artifacts.retention_days,
-                self.config.artifacts.max_total_mb,
-                self.config.artifacts.sweep_interval_hours,
-            )
-        )
+        AgentLifecycle._start_artifact_sweeper(self)
 
     async def _lru_put(self, cache: OrderedDict, key: str, value: Any) -> None:  # type: ignore[type-arg]
-        async with self._state_lock:
-            cache[key] = value
-            cache.move_to_end(key)
-            while len(cache) > self._max_cached_sessions:
-                cache.popitem(last=False)
+        await MemoryCache.lru_put(self, cache, key, value)
 
     async def put_memory_snapshot(
         self,
@@ -1398,534 +681,49 @@ class AgentLoop:
         scope: str = "",
         version: int = 0,
     ) -> None:
-        """快照缓存的唯一写入入口:经统一 LRU 管控。同时写入进入快照的 entry.id 集,
-        供动态召回去重。并记录构建时的 (scope, version),读侧据此按 scope 版本校验:
-        某 scope 被写后 bump 版本,挂在任意 session_key 上的旧快照都因版本不符失效。"""
-        await self._lru_put(self._memory_snapshots, key, value)
-        await self._lru_put(self._memory_snapshot_ids, key, ids or frozenset())
-        async with self._state_lock:
-            self._memory_snapshot_meta[key] = (scope, version)
-            # meta 不走 _lru_put,快照被 LRU 逐出后其 meta 会残留。按当前快照键集
-            # 剪除孤儿 meta,保证 meta 不超出快照上限、不无界增长(读侧已先 gate
-            # session_key in _memory_snapshots,孤儿 meta 不会误命中,但须防泄漏)。
-            if len(self._memory_snapshot_meta) > len(self._memory_snapshots):
-                live = set(self._memory_snapshots)
-                for k in [mk for mk in self._memory_snapshot_meta if mk not in live]:
-                    del self._memory_snapshot_meta[k]
+        await MemoryCache.put_memory_snapshot(self, key, value, ids, scope, version)
 
     def _scope_version(self, scope: str) -> int:
-        return self._scope_versions.get(scope, 0)
+        return MemoryCache.scope_version(self, scope)
 
     async def _clear_memory_snapshot(self, session_key: str) -> None:
-        async with self._state_lock:
-            self._memory_snapshots.pop(session_key, None)
-            self._memory_snapshot_ids.pop(session_key, None)
-            self._memory_snapshot_meta.pop(session_key, None)
+        await MemoryCache.clear_memory_snapshot(self, session_key)
 
     async def _invalidate_memory_caches(self, scope: str, global_scope: bool = False) -> None:
-        """记忆写操作后的缓存失效。per-scope 用版本号:bump 该 scope 的版本,
-        使所有在旧版本下构建、共享该 memory_scope 的快照/检索缓存(可能挂在
-        不同 session_key 上)读取时因版本不符而失效——根治按单 session_key
-        pop 清不掉跨通道共享 scope 的问题。environment/矛盾裁决影响所有会话,
-        仍全局 clear。"""
-        async with self._state_lock:
-            if global_scope:
-                self._memory_snapshots.clear()
-                self._memory_snapshot_ids.clear()
-                self._memory_snapshot_meta.clear()
-                self._retrieval_cache.clear()
-            else:
-                self._scope_versions[scope] = self._scope_versions.get(scope, 0) + 1
+        await MemoryCache.invalidate_memory_caches(self, scope, global_scope)
 
     async def _put_retrieval_cache(self, session_key: str, entry: Any) -> None:
-        """检索预取缓存的唯一写入入口:复用统一 LRU(锁 + 上限),
-        与 snapshot 缓存共用上限策略,避免无界增长。"""
-        await self._lru_put(self._retrieval_cache, session_key, entry)
+        await MemoryCache.put_retrieval_cache(self, session_key, entry)
 
     def _get_retrieval_cache(self, session_key: str) -> Any:
-        return self._retrieval_cache.get(session_key)
+        return MemoryCache.get_retrieval_cache(self, session_key)
 
     async def _start_mcp_background(self) -> None:
-        try:
-            await self._start_mcp()
-        except Exception as e:
-            logger.error("MCP initialization failed (agent continues without MCP tools): {}", e)
+        await AgentLifecycle._start_mcp_background(self)
 
     async def _start_mcp(self) -> None:
-        # tools.mcp.enabled 是 setup 向导写入的总开关,而这里过去只读 mcp_servers,
-        # 全代码库没有任何位置读它 —— 用户在向导里取消勾选 MCP、配置写入
-        # enabled: false,重启后所有 server 照旧连接。这就是那段注释声称要修掉的
-        # fake toggle 换个地方复现。显式关闭必须压过"还有 server 配置"。
-        if not self.config.tools.mcp.enabled:
-            if self.config.tools.mcp_servers:
-                logger.info(
-                    "MCP is disabled (tools.mcp.enabled=false) — skipping {} configured server(s)",
-                    len(self.config.tools.mcp_servers),
-                )
-            return
-
-        mcp_servers = self._filter_mcp_servers(self.config.tools.mcp_servers)
-        if not mcp_servers:
-            return
-        from codex_pro.mcp.manager import MCPManager
-
-        self.mcp_manager = MCPManager(
-            workspace=self.workspace,
-            security_policy=self.config.tools.mcp_security_policy,
-        )
-        await self.mcp_manager.start_all(mcp_servers)
-        await self.mcp_manager.discover_tools(self.tools)
-        self._apply_runtime_tool_policy()
+        await AgentLifecycle._start_mcp(self)
 
     def _apply_runtime_tool_policy(self) -> None:
-        from codex_pro.security.tool_policy import is_tool_allowed
-
-        for name in list(self.tools.tool_names):
-            if name.startswith("mcp_") and not is_tool_allowed(self.config, name):
-                self.tools.unregister(name)
-                logger.info("Tool policy skipped MCP tool '{}'", name)
+        AgentLifecycle._apply_runtime_tool_policy(self)
 
     def _filter_mcp_servers(self, servers: dict[str, Any]) -> dict[str, Any]:
-        filtered: dict[str, Any] = {}
-        for name, cfg in servers.items():
-            if cfg.url and self.config.execution.network_policy == "deny":
-                logger.warning("Skipping MCP server '{}' because networkPolicy is deny", name)
-                continue
-            if (
-                cfg.command
-                and self.config.security.profile == "public_gateway"
-                and not self.config.permissions.elevated.enabled
-            ):
-                logger.warning(
-                    "Skipping stdio MCP server '{}' under public_gateway profile without elevated access", name
-                )
-                continue
-            filtered[name] = cfg
-        return filtered
+        return AgentLifecycle._filter_mcp_servers(self, servers)
 
     async def _record_cron_outcome(self, event: InboundEvent, status: str, error: str = "") -> None:
-        """For a fired CRON job, write the turn's terminal outcome back to the
-        scheduler so last_status reflects reality instead of staying "queued".
-
-        "completed" means the agent turn finished and its reply was published to
-        the bus — NOT a confirmed channel delivery receipt (that would need the
-        SendResult to propagate back from the channel, which is out of scope
-        here). This is still strictly more truthful than the enqueue-time
-        "queued". No-op for non-cron events or when no scheduler is wired."""
-        # getattr guard: some code paths (and tests) build AgentLoop via
-        # __new__, bypassing __init__ where _scheduler is set.
-        scheduler = getattr(self, "_scheduler", None)
-        if scheduler is None or event.event_type != EventType.CRON:
-            return
-        job_id = str(event.metadata.get("job_id") or "")
-        if not job_id:
-            return
-        try:
-            await scheduler.record_run_outcome(job_id, status, error)
-        except Exception as e:
-            logger.debug("Cron outcome writeback failed for job {}: {}", job_id, e)
+        await InboundHandler._record_cron_outcome(self, event, status, error)
 
     async def _record_task_outcome(self, event: InboundEvent, status: str, error: str = "") -> None:
-        """For a dispatched board task, drive it to a terminal state after its turn
-        finishes — the safety net that keeps a task from being stuck at RUNNING if
-        the agent didn't close it out via the task tool itself. `status` is one of
-        "completed" (clean finish → SUCCESS), "incomplete" (turn produced a reply
-        but did not finish the task: provider error / budget / iteration ceiling /
-        forced convergence / interrupt → FAILED) or "error" (the turn raised →
-        FAILED). Idempotent: if the agent already completed/failed it (terminal),
-        mark_terminal no-ops, and a task cancelled mid-run is already terminal so a
-        later writeback can't resurrect it. No-op for non-task events or when no
-        task_manager is wired."""
-        manager = getattr(self, "_task_manager", None)
-        task_id = str(event.metadata.get("task_id") or "")
-        if manager is None or not task_id:
-            return
-        from codex_pro.tasks.models import TERMINAL_TASK_STATUSES, TaskStatus
-
-        target = TaskStatus.SUCCESS if status == "completed" else TaskStatus.FAILED
-        if status == "incomplete" and not error:
-            error = "任务未完成即结束(模型报错/预算或轮次耗尽/被中断),已按失败处理"
-        try:
-            # Snapshot the pre-writeback status: if the agent already closed the
-            # task via the task tool, it's already terminal AND the tool already
-            # advanced the workflow — mark_terminal no-ops and we must NOT advance
-            # again. We only advance the workflow when THIS writeback is what
-            # drove the task terminal (the agent didn't call complete/fail).
-            before = await manager.get(task_id)
-            was_open = before is not None and before.status not in TERMINAL_TASK_STATUSES
-            after = await manager.mark_terminal(task_id, target, error=error)
-        except Exception as e:
-            logger.debug("Task outcome writeback failed for task {}: {}", task_id, e)
-            return
-        # Safety-net terminal transition on a workflow step: advance the owning
-        # workflow so its next eligible steps get queued (same hook TaskTool runs
-        # when the agent closes a step itself). Best-effort — the writeback
-        # already persisted; a failed advance is recoverable via explicit advance.
-        engine = getattr(self, "_workflow_engine", None)
-        if (
-            engine is not None
-            and was_open
-            and after is not None
-            and getattr(after, "workflow_id", "")
-            and after.status in TERMINAL_TASK_STATUSES
-        ):
-            try:
-                await engine.on_task_complete(after.id)
-            except Exception as e:
-                logger.debug("Workflow advance after task writeback failed for {}: {}", task_id, e)
+        await InboundHandler._record_task_outcome(self, event, status, error)
 
     async def _on_inbound(self, event: InboundEvent) -> None:
-        """入站事件处理入口，负责追踪、错误处理和响应发布。"""
-        if not self._running:
-            return
-        # 群聊会话作用域解析：把按策略解析出的隔离键固化到 override，
-        # 使下游全部 session_key 读取(锁/working memory/快照/可见性/source_session)统一按此键隔离。
-        scope = self.config.session.group_session_scope
-        if not event.session_key_override:
-            event.session_key_override = event.scoped_session_key(scope)
-        # 记忆作用域(memory_scope)的冻结统一下沉到 _process_event,使 _on_inbound
-        # 与 process_direct(A2A/CLI)两条入站路径共享同一处逻辑,避免新增入口漏设。
-        # Approval decisions (/approve, /deny, /approvals) are handled BEFORE
-        # acquiring the session lock — by design. A turn that is blocked waiting
-        # for approval holds the session lock while parked in wait_for_decision;
-        # routing the decision through a separate lock-free path (not _process_event)
-        # is what lets it wake the waiter without deadlocking on that same lock.
-        # Do not move this below sessions.acquire().
-        if ApprovalCommands.is_approval_command(self, event.text):
-            response_text = await ApprovalCommands.handle_approval_command(self, event)
-            if response_text is not None:
-                out = OutboundEvent.from_text_with_media(
-                    channel=event.channel,
-                    chat_id=event.chat_id,
-                    text=response_text,
-                    reply_to_id=event.reply_to_id,
-                )
-                out.metadata = dict(event.metadata)
-                out.metadata["_inbound_event_id"] = event.event_id
-                await self.bus.publish_outbound(out)
-                await self._mark_turn_terminal(
-                    event.event_id,
-                    "completed",
-                    response_text=response_text,
-                )
-                return
-        # Clarify answers, like approval decisions, are handled BEFORE acquiring
-        # the session lock — the blocked agent holds that lock while parked in
-        # wait_for_answer, so resolving must run on a lock-free path. Do not move
-        # this below sessions.acquire().
-        if ClarifyCommands.is_clarify_command(event.text):
-            response_text = await ClarifyCommands.handle_clarify_command(self, event)
-            if response_text is not None:
-                out = OutboundEvent.from_text_with_media(
-                    channel=event.channel,
-                    chat_id=event.chat_id,
-                    text=response_text,
-                    reply_to_id=event.reply_to_id,
-                )
-                out.metadata = dict(event.metadata)
-                out.metadata["_inbound_event_id"] = event.event_id
-                await self.bus.publish_outbound(out)
-                await self._mark_turn_terminal(
-                    event.event_id,
-                    "completed",
-                    response_text=response_text,
-                )
-                return
-        # Session-interrupt escape valve, handled BEFORE the session lock for the
-        # same reason as clarify answers: the agent blocked in wait_for_answer
-        # holds the lock, so the wake must run on a lock-free path. Synthesized by
-        # the gateway on ws disconnect; internal control command, no reply.
-        if ClarifyCommands.is_clarify_cancel_command(event.text):
-            await ClarifyCommands.handle_clarify_cancel(self, event)
-            return
-        # Turn-interrupt escape valve. Handled BEFORE the session lock for the
-        # same reason as clarify-cancel: the running turn holds the lock, so the
-        # cooperative-stop signal must be delivered on a lock-free path — the
-        # inference loop polls the flag at its next checkpoint and stops cleanly.
-        # Synthesized by the gateway from a Ctrl+C interrupt frame; internal
-        # control command, no reply.
-        if InterruptCommands.is_interrupt_command(event.text):
-            await InterruptCommands.handle_interrupt(self, event)
-            return
-        # IM follow-up continuation. On IM channels a clarify tool call cannot
-        # block the turn, so the agent's question was remembered per session
-        # (InferenceStage._prepare_clarify → register_im_pending). If this
-        # session has an unanswered, unexpired follow-up, bind this message to it
-        # so the model sees WHAT is being answered — otherwise a bare "A" reads
-        # as an isolated, ambiguous message. This runs on IM channels only; CLI
-        # uses the blocking /clarify path and never registers an IM pending.
-        ClarifyCommands.maybe_bind_im_clarify_answer(self, event)
-        session_lock = await self.sessions.acquire(event.session_key)
-        async with session_lock:
-            trace_id = uuid.uuid4().hex[:12]
-            span = self.tracer.start_span(trace_id, f"s_{trace_id}", "process_message", "input")
-            heartbeat = ProgressHeartbeat(
-                self.bus,
-                event,
-                self.config.agent.heartbeat,
-                cognitive_emitter=self.cognitive_emitter,
-            )
-            activity = SharedActivityState(started_at=time.monotonic())
-            # Register this turn so a lock-free /__interrupt__ can flag it for a
-            # cooperative stop. request() always starts un-interrupted, so a
-            # stale flag from a prior turn cannot leak into this one.
-            self.interrupt.request(event.session_key, event.event_id)
-            try:
-                await heartbeat.start(activity)
-                result = await self._process_event(event, trace_id, publish_response=True, activity=activity)
-                response_text = result.response_text
-
-                # Delivery point. Text convergence (degraded notices, English
-                # filler → Chinese fallback) already happened in
-                # ResponseStage.finalize BEFORE the session was persisted, so
-                # history, stream, and this publish all carry the same text.
-                # Here we only decide whether an outbound message is still
-                # needed: streamed turns already delivered it.
-                final_text = "" if result.outbound_sent else response_text
-
-                # Terminal state must reflect the REAL delivery fate, not merely
-                # that we called publish. Only a non-streaming publish here can
-                # fail: a streamed turn only sets outbound_sent when its finalize
-                # receipt was ok, and a FAILED stream falls back to republishing
-                # response_text (final_text non-empty) which is judged below.
-                # Default True so a turn with nothing to publish (e.g. silenced
-                # inspection, or an already-delivered stream) is not falsely faulted.
-                delivered = True
-                if final_text and _should_publish_reply(event, final_text):
-                    out = OutboundEvent.from_text_with_media(
-                        channel=event.channel,
-                        chat_id=event.chat_id,
-                        text=final_text,
-                        reply_to_id=event.reply_to_id,
-                    )
-                    out.metadata = dict(event.metadata)
-                    out.metadata["_inbound_event_id"] = event.event_id
-                    if getattr(result, "task_incomplete", False):
-                        outcome = "interrupted" if result.termination_reason == "interrupted" else "incomplete"
-                        stamp_turn_outcome(
-                            out.metadata,
-                            outcome,
-                            error=result.termination_reason,
-                        )
-                    else:
-                        stamp_turn_outcome(out.metadata, "completed")
-                    delivery = await self.bus.publish_outbound(out)
-                    delivered = delivery.ok
-                self.tracer.end_span(span, metadata={"response_len": len(response_text or "")})
-                # A turn that returned without raising still may not have FINISHED
-                # the task: a failed delivery, or a provider error / budget /
-                # iteration ceiling / forced convergence / interrupt that produced
-                # a reply but left the task incomplete. Fault the terminal state so
-                # neither cron history nor the board shows an undelivered or
-                # half-done turn as done.
-                if not delivered:
-                    await self._record_cron_outcome(event, "error", "delivery failed")
-                    await self._record_task_outcome(event, "error", "delivery failed")
-                    await self._mark_turn_terminal(
-                        event.event_id,
-                        "failed",
-                        response_text=response_text,
-                        error="delivery failed",
-                    )
-                elif getattr(result, "task_incomplete", False):
-                    await self._record_cron_outcome(event, "completed")
-                    await self._record_task_outcome(event, "incomplete")
-                    terminal = "interrupted" if result.termination_reason == "interrupted" else "incomplete"
-                    await self._mark_turn_terminal(
-                        event.event_id,
-                        terminal,
-                        response_text=response_text,
-                        error=result.termination_reason,
-                    )
-                else:
-                    await self._record_cron_outcome(event, "completed")
-                    await self._record_task_outcome(event, "completed")
-                    await self._mark_turn_terminal(
-                        event.event_id,
-                        "completed",
-                        response_text=response_text,
-                    )
-            except DuplicateTurnClaim:
-                # The first claimant owns execution, response delivery and the
-                # terminal ledger transition. A duplicate must touch none of
-                # those or it could contradict the authoritative run.
-                logger.info("Duplicate inbound event {} skipped", event.event_id)
-                self.tracer.end_span(span, metadata={"duplicate": True})
-            except asyncio.CancelledError:
-                # A bus hard-stop or outer task cancellation is still a terminal
-                # lifecycle event.  CancelledError is a BaseException, so the
-                # generic handler cannot persist it and the ledger would otherwise
-                # remain accepted/running forever.
-                self.tracer.end_span(span, error="cancelled")
-                await self._record_cron_outcome(event, "error", "cancelled")
-                await self._record_task_outcome(event, "error", "cancelled")
-                await self._mark_turn_terminal(
-                    event.event_id,
-                    "interrupted",
-                    error="cancelled",
-                )
-                raise
-            except Exception as e:
-                logger.error("Processing failed for event {}: {}", event.event_id, e)
-                self.tracer.end_span(span, error=str(e))
-                error_out = OutboundEvent.text_reply(
-                    channel=event.channel,
-                    chat_id=event.chat_id,
-                    text=GENERIC_FALLBACK_TEXT,
-                    reply_to_id=event.reply_to_id,
-                )
-                error_out.metadata = dict(event.metadata)
-                error_out.metadata["_inbound_event_id"] = event.event_id
-                stamp_turn_outcome(
-                    error_out.metadata,
-                    "failed",
-                    error="agent processing failed",
-                )
-                await self.bus.publish_outbound(error_out)
-                await self._record_cron_outcome(event, "error", str(e))
-                await self._record_task_outcome(event, "error", str(e))
-                await self._mark_turn_terminal(
-                    event.event_id,
-                    "failed",
-                    error=str(e),
-                )
-            finally:
-                # Deregister the turn so a finished turn leaves no residue for
-                # the next one to trip over (mirrors request() above).
-                self.interrupt.clear(event.session_key)
-                await heartbeat.stop()
-                self.tracer.flush_trace(trace_id)
+        await InboundHandler._on_inbound(self, event)
 
     async def _process_event(
         self, event: InboundEvent, trace_id: str, *, publish_response: bool = False, activity: Any = None
     ) -> _ProcessResult:
-        """处理单个入站事件 — 委托给 pipeline stages。"""
-        # 记忆作用域键:与 session_key 解耦(后者承载会话锁/历史/投递路由,不能按人
-        # 归一)。此处是所有入站路径(_on_inbound、A2A/CLI 的 process_direct)的唯一
-        # 咽喉点,统一冻结可确保任何入口都拿到正确作用域。单主体下 1:1 私聊(任意通道,
-        # 含 A2A/CLI)归一到 owner 键实现跨通道记忆互通,群聊保持 per_user 隔离;
-        # 开关关闭时退回按会话键(旧行为)。
-        if not event.memory_scope:
-            if self.config.memory.cross_channel_owner:
-                scope = self.config.session.group_session_scope
-                event.memory_scope = event.memory_scope_key(
-                    scope,
-                    self.config.memory.owner_key,
-                    frozenset(self.config.memory.principal_bindings),
-                )
-            else:
-                event.memory_scope = event.session_key
-        session = await self.sessions.get_or_create(event.session_key)
-        from codex_pro.session.context_epoch import conversation_context_key
-
-        context_key = conversation_context_key(event.session_key, session)
-        if context_key not in self._working_memories:
-            from codex_pro.memory.tiers import WorkingMemory
-
-            await self._lru_put(
-                self._working_memories, context_key, WorkingMemory(max_entries=self.config.memory.max_working_memory)
-            )
-        if not event.is_control:
-            from codex_pro.bus.idempotency import idempotency_ledger_metadata
-
-            claimed = await self._mark_turn_running(
-                event.event_id,
-                event.session_key,
-                context_key=context_key,
-                trace_id=trace_id,
-                metadata=idempotency_ledger_metadata(event.metadata),
-            )
-            if not claimed:
-                raise DuplicateTurnClaim(event.event_id)
-        command_response = await ApprovalCommands.handle_approval_command(self, event)
-        if command_response is not None:
-            session.add_message("user", event.text)
-            session.add_message("assistant", command_response)
-            await self.sessions.save(session)
-            return _ProcessResult(response_text=command_response)
-
-        recorder = self.evolution.recorder if self.evolution is not None else None
-        if recorder is not None and not _is_ephemeral_session(event.session_key, event.channel):
-            try:
-                await recorder.begin_turn(
-                    session_key=event.session_key,
-                    chat_id=event.chat_id,
-                    channel=event.channel,
-                    task_input=event.text or "",
-                    model_used=self._default_model,
-                )
-            except Exception as e:
-                logger.debug("Recorder begin_turn failed: {}", e)
-
-        should_introduce = StreamParams.should_introduce(self, session)
-        intro_text = StreamParams.build_introduction(self, event) if should_introduce else ""
-        _flush_chars, _flush_interval_ms, _paragraph_mode = StreamParams.stream_flush_params(self, event.channel)
-        stream_publisher = _TokenStreamPublisher(
-            self.bus,
-            event,
-            enabled=publish_response and StreamParams.should_stream_channel(self, event.channel),
-            flush_chars=_flush_chars,
-            flush_interval_ms=_flush_interval_ms,
-            paragraph_mode=_paragraph_mode,
-            intro_text=intro_text,
-        )
-        if publish_response:
-            await stream_publisher.start()
-
-        ctx = None
-        inference_result = None
-        result = None
-        process_error: Exception | None = None
-        try:
-            # Stage 1: Context building
-            ctx = await self._context_stage.build(
-                event,
-                session,
-                publish_response=publish_response,
-                trace_id=trace_id,
-                stream_publisher=stream_publisher,
-                intro_text=intro_text,
-            )
-            if activity is not None:
-                ctx.activity = activity
-
-            # Stage 2: Inference (LLM + tool execution loop)
-            inference_result = await self._inference_stage.run(ctx)
-
-            # Stage 3: Response finalization
-            result = await self._response_stage.finalize(ctx, inference_result)
-        except Exception as e:
-            process_error = e
-            raise
-        finally:
-            if recorder is not None:
-                try:
-                    if process_error is not None:
-                        await recorder.end_turn(
-                            session_key=event.session_key,
-                            error=f"{type(process_error).__name__}: {process_error}",
-                            outcome="failure",
-                            task_type=getattr(ctx, "task_type", "") if ctx is not None else "",
-                            spawn_fn=self._spawn_background,
-                        )
-                    else:
-                        await recorder.end_turn(
-                            session_key=event.session_key,
-                            response_text=result.response_text if result else "",
-                            iteration_count=getattr(inference_result, "total_tool_calls", 0) or 0,
-                            task_type=getattr(ctx, "task_type", "") if ctx is not None else "",
-                            spawn_fn=self._spawn_background,
-                        )
-                except Exception as e:
-                    logger.debug("Recorder end_turn failed: {}", e)
-
-        return _ProcessResult(
-            response_text=result.response_text,
-            outbound_sent=result.outbound_sent,
-            degraded_notices=result.degraded_notices,
-            task_incomplete=result.task_incomplete,
-            output_truncated=result.output_truncated,
-            termination_reason=result.termination_reason,
+        return await InboundHandler._process_event(
+            self, event, trace_id, publish_response=publish_response, activity=activity,
         )
 
     # ── Command handler wrappers for test compatibility ─────────────────────
@@ -1986,39 +784,4 @@ class AgentLoop:
         ClarifyCommands.maybe_bind_im_clarify_answer(self, event)
 
     async def process_direct(self, content: str, session_key: str = "cli:direct", channel: str = "cli") -> str:
-        """Process a message directly (for CLI or testing)."""
-        event = InboundEvent.text_message(
-            channel=channel,
-            sender_id="user",
-            chat_id="direct",
-            text=content,
-            session_key_override=session_key,
-        )
-        # Hold the same per-session lock the inbound dispatcher uses so two
-        # concurrent CLI calls on the same session_key serialize their writes
-        # to the message history.
-        session_lock = await self.sessions.acquire(event.session_key)
-        async with session_lock:
-            try:
-                result = await self._process_event(
-                    event,
-                    uuid.uuid4().hex[:12],
-                    publish_response=False,
-                )
-                status = "incomplete" if result.task_incomplete else "completed"
-                if result.termination_reason == "interrupted":
-                    status = "interrupted"
-                await self._mark_turn_terminal(
-                    event.event_id,
-                    status,
-                    response_text=result.response_text,
-                    error=result.termination_reason,
-                )
-            except Exception as e:
-                await self._mark_turn_terminal(
-                    event.event_id,
-                    "failed",
-                    error=str(e),
-                )
-                raise
-        return result.response_text or ""
+        return await InboundHandler.process_direct(self, content, session_key, channel)

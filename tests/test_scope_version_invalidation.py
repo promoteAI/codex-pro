@@ -11,8 +11,8 @@ def test_loop_has_scope_versions():
 
 
 def test_invalidate_bumps_version_not_pop():
-    from codex_pro.agent import loop
-    src = inspect.getsource(loop.AgentLoop._invalidate_memory_caches)
+    from codex_pro.agent.memory_cache import MemoryCache
+    src = inspect.getsource(MemoryCache.invalidate_memory_caches)
     # per-scope 分支改为 bump 版本,不再 pop 单个 session key
     assert "_scope_versions" in src
 

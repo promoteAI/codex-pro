@@ -4,8 +4,8 @@ import inspect
 
 
 def test_bounded_retrieve_passes_both_keys():
-    from codex_pro.agent.pipeline import context_stage
-    src = inspect.getsource(context_stage.ContextStage._bounded_retrieve)
+    from codex_pro.agent.pipeline.context import retrieval
+    src = inspect.getsource(retrieval.bounded_retrieve)
     assert "memory_scope=event.memory_scope" in src
     # Episodes are conversation-reset-bounded. The stable delivery/session key
     # would leak pre-reset episodes into the new conversation epoch.

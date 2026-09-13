@@ -31,6 +31,8 @@ export function CodexSidebar() {
   const location = useLocation();
   const [accountOpen, setAccountOpen] = useState(false);
   const openSearch = useShellStore((s) => s.openSearch);
+  const openMobileRemote = useShellStore((s) => s.openMobileRemote);
+  const openRemoteConnect = useShellStore((s) => s.openRemoteConnect);
   const openSettings = useShellStore((s) => s.openSettings);
   const clearChat = useChatStore((s) => s.clearChat);
   const loadSessionHistory = useChatStore((s) => s.loadSessionHistory);
@@ -299,6 +301,20 @@ export function CodexSidebar() {
                 role="menuitem"
                 onClick={() => {
                   setAccountOpen(false);
+                  openRemoteConnect();
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#d8d8d8] hover:bg-[#353535] hover:text-[#f0f0f0]"
+              >
+                <span className="w-[15px] h-[15px] inline-flex items-center justify-center text-[#4c8dff]">
+                  <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>
+                </span>
+                <span className="flex-1">{t("remoteConnect")}</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setAccountOpen(false);
                   openSettings();
                 }}
                 className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#d8d8d8] hover:bg-[#353535] hover:text-[#f0f0f0]"
@@ -316,6 +332,7 @@ export function CodexSidebar() {
             type="button"
             title={t("mobileRemote")}
             aria-label={t("mobileRemote")}
+            onClick={openMobileRemote}
             className="w-[30px] h-[30px] inline-flex items-center justify-center rounded-lg text-[#e8a04a] hover:bg-[#2a2a2a]"
           >
             <Smartphone size={16} />

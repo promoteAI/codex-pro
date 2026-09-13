@@ -4,6 +4,8 @@ import { RouteErrorBoundary } from "./ErrorBoundary";
 import { CodexSidebar } from "./shell/CodexSidebar";
 import { LayoutToolbar } from "./shell/LayoutToolbar";
 import { SearchPalette } from "./shell/SearchPalette";
+import { MobileRemoteModal } from "./MobileRemoteModal";
+import { RemoteConnectModal } from "./RemoteConnectModal";
 import { ToolsPanel } from "./tools/ToolsPanel";
 import { TermPanel } from "./tools/TermPanel";
 import { useShellStore } from "../stores/shell";
@@ -72,6 +74,8 @@ export function Layout() {
         </Suspense>
       </div>
       <SearchPalette />
+      <MobileRemoteModal />
+      <RemoteConnectModal />
     </div>
   );
 }

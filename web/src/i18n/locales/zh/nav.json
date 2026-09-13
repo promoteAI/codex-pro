@@ -18,5 +18,6 @@
   "usageStats": "使用统计",
   "mobileRemote": "手机遥控",
   "update": "检查更新",
-  "updateShort": "更新"
+  "updateShort": "更新",
+  "remoteConnect": "远程连接"
 }

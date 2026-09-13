@@ -18,5 +18,6 @@
   "usageStats": "Usage stats",
   "mobileRemote": "Mobile remote",
   "update": "Check for updates",
-  "updateShort": "Update"
+  "updateShort": "Update",
+  "remoteConnect": "Remote connect"
 }

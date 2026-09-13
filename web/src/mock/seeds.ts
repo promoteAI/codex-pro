@@ -1,7 +1,27 @@
-export const MOCK_PROJECTS = [
-  { id: "codex-pro", label: "codex-pro", subtitle: "暂无聊天" },
-  { id: "eko-pro", label: "eko-pro", subtitle: "探索并比较架构方案" },
+export interface MockThread {
+  id: string;
+  title: string;
+  time?: string;
+  pinned?: boolean;
+}
+
+export interface MockProject {
+  id: string;
+  label: string;
+  threads: MockThread[];
+}
+
+export const MOCK_PROJECTS: MockProject[] = [
+  { id: "codex-pro", label: "codex-pro", threads: [] },
+  {
+    id: "eko-pro",
+    label: "eko-pro",
+    threads: [{ id: "arch", title: "探索并比较架构方案", time: "4天", pinned: false }],
+  },
 ];
+
+/** Fallback recent chats when API sessions are empty (matches Codex empty-home mock). */
+export const MOCK_RECENTS: MockThread[] = [{ id: "hello", title: "你好", pinned: false }];
 
 export const MOCK_BRANCHES = [
   { id: "master", label: "master" },
@@ -17,7 +37,7 @@ export const MOCK_MODELS = [
   "o4-mini",
 ];
 
-export const EFFORT_LABELS = ["低", "中", "高", "极高"] as const;
+export const EFFORT_LABELS = ["低", "中", "高", "最高"] as const;
 
 export interface PrItem {
   id: string;

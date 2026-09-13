@@ -1,12 +1,65 @@
 import { useTranslation } from "react-i18next";
-import { Search, Wrench, RefreshCw, Bug } from "lucide-react";
 import { useChatStore } from "../../stores/chat";
 
 const CARDS = [
-  { key: "promptExplore" as const, full: "promptExploreFull" as const, icon: Search },
-  { key: "promptBuild" as const, full: "promptBuildFull" as const, icon: Wrench },
-  { key: "promptReview" as const, full: "promptReviewFull" as const, icon: RefreshCw },
-  { key: "promptFix" as const, full: "promptFixFull" as const, icon: Bug },
+  {
+    key: "promptExplore" as const,
+    full: "promptExploreFull" as const,
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="m16.5 16.5 4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M3.5 21C7 14 14 7.5 20.5 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path
+          d="M9 3.5 3.5 21l3 .5 4-14 2 .7-.5 2z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    key: "promptBuild" as const,
+    full: "promptBuildFull" as const,
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" aria-hidden="true">
+        <path d="m10.5 12 6-6 3.5 3.5-6 6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="m15 7-2.5-2.5L8 9.5l3.5 3.5L15 10Z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="m9 11-5 5 3.5 3.5 5-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    key: "promptReview" as const,
+    full: "promptReviewFull" as const,
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" aria-hidden="true">
+        <path d="M19 8A8 8 0 0 0 5.5 6.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M5 16a8 8 0 0 0 13.5 1.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M19 3.5V8h-4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M5 20.5V16h4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    key: "promptFix" as const,
+    full: "promptFixFull" as const,
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" aria-hidden="true">
+        <circle cx="12" cy="4.5" r="1.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <ellipse cx="12" cy="12.5" rx="5" ry="6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          d="M12 6.5v12M7 10.5 4.5 9M7 14H4M7.5 17.5 5 19.5M17 10.5 19.5 9M17 14h3M16.5 17.5 19 19.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
 ];
 
 export function HomeHero() {
@@ -48,14 +101,14 @@ export function HomeHero() {
         )}
       </h1>
       <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-[clamp(8px,1.2vw,16px)] w-full max-w-[680px]">
-        {CARDS.map(({ key, full, icon: Icon }) => (
+        {CARDS.map(({ key, full, icon }) => (
           <button
             key={key}
             type="button"
             onClick={() => setDraft(t(full))}
             className="flex items-start gap-3 p-3 border border-codex-border rounded-[12px] text-left hover:border-[#3a3a3a] hover:bg-[#1e1e1e]"
           >
-            <Icon size={18} className="text-[#8a8a8a] shrink-0 mt-0.5" />
+            <span className="text-[#8a8a8a] shrink-0 mt-0.5">{icon}</span>
             <p className="text-[13px] text-[#d4d4d4] leading-snug line-clamp-2 overflow-hidden">{t(key)}</p>
           </button>
         ))}

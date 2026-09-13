@@ -102,11 +102,14 @@ export function Composer() {
   }, [draft]);
 
   const permLabel =
-    perm === "ask" ? t("permAskShort") : perm === "agent" ? t("permAgentShort") : t("permFullShort");
+    perm === "ask" ? t("permAsk") : perm === "agent" ? t("permAgent") : t("permFull");
   const effortLabels = [t("effortLow"), t("effortMed"), t("effortHigh"), t("effortMax")];
   const effortLabel = effortLabels[effort] ?? effortLabels[0];
+  const modelLabel =
+    model === "agnes-2.5-flash" || model === "自定义" ? t("modelCustom") : model;
   const canSend = draft.trim().length > 0 && !typing;
   const showGoalBtn = goalMode || planMode;
+  const showCtxUsage = chatting;
 
   const filteredRepos = useMemo(
     () => repos.filter((r) => r.name.toLowerCase().includes(projectQuery.toLowerCase())),
@@ -346,12 +349,26 @@ export function Composer() {
           <button
             type="button"
             onClick={() => toggle("perm")}
-            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[12px] ${
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] ${
               perm === "full" ? "text-codex-warn" : "text-[#c0c0c0]"
             } hover:bg-[#2a2a2a]`}
             aria-label={permLabel}
           >
-            <ShieldAlert size={14} />
+            {perm === "full" ? (
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 shrink-0" aria-hidden="true">
+                <path
+                  d="M12 3 5.5 5.8v5.4c0 4.2 2.7 7.9 6.5 9.3 3.8-1.4 6.5-5.1 6.5-9.3V5.8L12 3Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinejoin="round"
+                />
+                <path d="M12 8.2v4.2" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                <circle cx="12" cy="15.2" r=".7" fill="currentColor" />
+              </svg>
+            ) : (
+              <ShieldAlert size={14} />
+            )}
             <span>{permLabel}</span>
           </button>
           {showGoalBtn && (
@@ -372,77 +389,90 @@ export function Composer() {
           )}
           <span className="flex-1" />
 
-          {/* Context usage indicator (donut ring + dialog) */}
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              onClick={() => toggle("ctx")}
-              aria-haspopup="dialog"
-              aria-expanded={menu === "ctx"}
-              className="h-[26px] px-2 inline-flex items-center gap-1.5 rounded-md text-[12.5px] text-[#9a9a9a] hover:bg-[#262626] hover:text-[#d8d8d8]"
-              title="Context Usage"
-              aria-label="Context Usage"
-            >
-              <span
-                className="w-[18px] h-[18px] rounded-full flex-none"
-                style={{
-                  background: `conic-gradient(${MOCK_CTX_USAGE.segments
-                    .map((s) => `${s.color} 0 ${s.direct}%`)
-                    .join(",")}, #2a2a2a ${ctxUsage.pct}% 100%)`,
-                  WebkitMask:
-                    "radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px))",
-                  mask: "radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px))",
-                }}
-                aria-hidden
-              />
-              <span className="tabular-nums leading-none">{ctxUsage.pct}%</span>
-            </button>
-            {menu === "ctx" && (
-              <div className="absolute right-0 bottom-[calc(100%+6px)] w-[300px] p-3.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30" role="dialog" aria-label="Context Usage">
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="text-[14px] font-medium text-[#e8e8e8]">{t("ctxTitle")}</span>
-                  <button
-                    type="button"
-                    onClick={() => setMenu(null)}
-                    className="w-6 h-6 inline-flex items-center justify-center rounded-md text-[#888] hover:bg-[#353535] hover:text-[#eee]"
-                    aria-label={t("ctxClose")}
-                  >
-                    <X size={14} />
-                  </button>
+          {/* Context usage — only while chatting (empty home matches Codex screenshot) */}
+          {showCtxUsage && (
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => toggle("ctx")}
+                aria-haspopup="dialog"
+                aria-expanded={menu === "ctx"}
+                className="h-[26px] px-2 inline-flex items-center gap-1.5 rounded-md text-[12.5px] text-[#9a9a9a] hover:bg-[#262626] hover:text-[#d8d8d8]"
+                title="Context Usage"
+                aria-label="Context Usage"
+              >
+                <span
+                  className="w-[18px] h-[18px] rounded-full flex-none"
+                  style={{
+                    background: `conic-gradient(${MOCK_CTX_USAGE.segments
+                      .map((s) => `${s.color} 0 ${s.direct}%`)
+                      .join(",")}, #2a2a2a ${ctxUsage.pct}% 100%)`,
+                    WebkitMask:
+                      "radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px))",
+                    mask: "radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px))",
+                  }}
+                  aria-hidden
+                />
+                <span className="tabular-nums leading-none">{ctxUsage.pct}%</span>
+              </button>
+              {menu === "ctx" && (
+                <div
+                  className="absolute right-0 bottom-[calc(100%+6px)] w-[300px] p-3.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30"
+                  role="dialog"
+                  aria-label="Context Usage"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="text-[14px] font-medium text-[#e8e8e8]">{t("ctxTitle")}</span>
+                    <button
+                      type="button"
+                      onClick={() => setMenu(null)}
+                      className="w-6 h-6 inline-flex items-center justify-center rounded-md text-[#888] hover:bg-[#353535] hover:text-[#eee]"
+                      aria-label={t("ctxClose")}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3 mb-2.5">
+                    <span className="text-[13.5px] text-[#e0e0e0] font-medium">
+                      {t("ctxFull", { pct: ctxUsage.pct })}
+                    </span>
+                    <span className="text-[12.5px] text-[#9a9a9a] tabular-nums whitespace-nowrap">
+                      ~{formatTokens(ctxUsage.used)} / {formatTokens(MOCK_CTX_USAGE.max)} Tokens
+                    </span>
+                  </div>
+                  <div className="flex h-2 rounded-full overflow-hidden bg-[#1e1e1e] mb-3.5">
+                    {MOCK_CTX_USAGE.segments.map((s) => (
+                      <span
+                        key={s.key}
+                        style={{ width: `${s.direct}%`, background: s.color }}
+                        className="h-full min-w-[2px]"
+                      />
+                    ))}
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    {MOCK_CTX_USAGE.segments.map((s) => (
+                      <div
+                        key={s.key}
+                        className="flex items-center gap-2.5 py-[7px] text-[13px] text-[#d8d8d8] leading-tight"
+                      >
+                        <span className="w-2.5 h-2.5 rounded-[2.5px] flex-none" style={{ background: s.color }} />
+                        <span className="flex-1 min-w-0">{s.label}</span>
+                        <span className="flex-none text-[#b0b0b0] tabular-nums">{formatTokens(s.tokens)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-baseline justify-between gap-3 mb-2.5">
-                  <span className="text-[13.5px] text-[#e0e0e0] font-medium">
-                    {t("ctxFull", { pct: ctxUsage.pct })}
-                  </span>
-                  <span className="text-[12.5px] text-[#9a9a9a] tabular-nums whitespace-nowrap">
-                    ~{formatTokens(ctxUsage.used)} / {formatTokens(MOCK_CTX_USAGE.max)} Tokens
-                  </span>
-                </div>
-                <div className="flex h-2 rounded-full overflow-hidden bg-[#1e1e1e] mb-3.5">
-                  {MOCK_CTX_USAGE.segments.map((s) => (
-                    <span key={s.key} style={{ width: `${s.direct}%`, background: s.color }} className="h-full min-w-[2px]" />
-                  ))}
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  {MOCK_CTX_USAGE.segments.map((s) => (
-                    <div key={s.key} className="flex items-center gap-2.5 py-[7px] text-[13px] text-[#d8d8d8] leading-tight">
-                      <span className="w-2.5 h-2.5 rounded-[2.5px] flex-none" style={{ background: s.color }} />
-                      <span className="flex-1 min-w-0">{s.label}</span>
-                      <span className="flex-none text-[#b0b0b0] tabular-nums">{formatTokens(s.tokens)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           <button
             type="button"
             onClick={() => toggle("model")}
-            className="inline-flex items-center gap-1.5 text-[12px] text-[#c0c0c0] px-2 py-1 rounded-md hover:bg-[#2a2a2a]"
+            className="inline-flex items-center gap-1.5 text-[12.5px] text-[#a0a0a0] px-2 py-1 rounded-md hover:bg-[#2a2a2a] hover:text-[#d8d8d8]"
             aria-label={t("model")}
           >
-            <span>{model}</span>
+            <span>{modelLabel}</span>
             <span className="text-[11px] text-[#666] bg-[#252525] px-1.5 py-0.5 rounded">{effortLabel}</span>
           </button>
           <button
@@ -491,7 +521,7 @@ export function Composer() {
               <div className="flex items-start justify-between gap-2 px-2 py-1">
                 <div>
                   <div className="text-[12px] text-codex-muted">{effortLabel}</div>
-                  <div className="text-[13px] text-[#e0e0e0] font-medium">{model}</div>
+                  <div className="text-[13px] text-[#e0e0e0] font-medium">{modelLabel}</div>
                 </div>
                 <button
                   type="button"

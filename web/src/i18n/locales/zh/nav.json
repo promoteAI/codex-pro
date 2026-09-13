@@ -1,8 +1,8 @@
 {
-  "appName": "Codex Pro",
+  "appName": "Codex",
   "newChat": "新对话",
   "pullRequests": "Pull Request",
-  "scheduled": "已安排",
+  "scheduled": "自动化",
   "plugins": "插件",
   "projects": "项目",
   "recents": "最近",
@@ -15,9 +15,12 @@
   "addProject": "添加项目",
   "viewFiles": "查看文件",
   "archive": "归档",
+  "pin": "置顶",
+  "unpin": "取消置顶",
   "usageStats": "使用统计",
   "mobileRemote": "手机遥控",
   "update": "检查更新",
   "updateShort": "更新",
-  "remoteConnect": "远程连接"
+  "remoteConnect": "远程连接",
+  "more": "更多"
 }

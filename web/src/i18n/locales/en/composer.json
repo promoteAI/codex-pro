@@ -1,5 +1,5 @@
 {
-  "placeholder": "Describe your goal and define measurable outcomes for best results",
+  "placeholder": "Ask anything",
   "send": "Send",
   "project": "Project",
   "branch": "Branch",
@@ -12,9 +12,10 @@
   "permFull": "Full access",
   "permFullLong": "Full access",
   "permFullDesc": "Unrestricted access to the internet and files on this machine",
-  "permFullShort": "Full",
+  "permFullShort": "Full access",
   "permTitle": "How should actions be approved?",
   "model": "Model",
+  "modelCustom": "Custom",
   "effortLow": "Low",
   "effortMed": "Medium",
   "effortHigh": "High",

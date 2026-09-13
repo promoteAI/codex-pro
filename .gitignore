@@ -65,3 +65,6 @@ docs/assets/generated/
 
 # pnpm content-addressable store (local package cache, never versioned)
 /.pnpm-store/
+
+.vite/
+web/.vite/

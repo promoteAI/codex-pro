@@ -25,16 +25,15 @@ if [ -z "$PYTHON" ]; then
   else PYTHON="python3"; fi
 fi
 
-# 前端包管理器:优先 pnpm,回退到 npx。
-if command -v pnpm >/dev/null 2>&1; then
-  PKG="pnpm"
-elif command -v npm >/dev/null 2>&1; then
-  PKG="npm"
-elif command -v npx >/dev/null 2>&1; then
-  PKG="npx"
-else
-  echo "[dev] 未找到 pnpm/npm/npx,无法启动前端。" >&2
-  exit 1
+# 前端:优先项目内的 vite bin(不依赖 pnpm/npx 的依赖自检),否则回退 npx。
+VITE_BIN="$PROJECT_DIR/web/node_modules/vite/bin/vite.js"
+if [ ! -f "$VITE_BIN" ]; then
+  if command -v npx >/dev/null 2>&1; then VITE_BIN="npx vite";
+  elif command -v pnpm >/dev/null 2>&1; then VITE_BIN="pnpm dev";
+  else
+    echo "[dev] 未找到本地 vite,也无法用 npx/pnpm,无法启动前端。" >&2
+    exit 1
+  fi
 fi
 
 PORT="${PORT:-5173}"
@@ -58,4 +57,8 @@ sleep 2
 
 echo "[dev] 启动前端 dev server(http://localhost:$PORT)..."
 echo "[dev] Ctrl+C 退出并同时停止后端。"
-( cd "$PROJECT_DIR/web" && "$PKG" dev --port "$PORT" )
+if [ -f "$PROJECT_DIR/web/node_modules/vite/bin/vite.js" ]; then
+  ( cd "$PROJECT_DIR/web" && node node_modules/vite/bin/vite.js --port "$PORT" )
+else
+  ( cd "$PROJECT_DIR/web" && $VITE_BIN --port "$PORT" )
+fi

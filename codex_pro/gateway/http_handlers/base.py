@@ -141,13 +141,18 @@ def require_admin_token(
     *,
     action: str,
 ) -> web.Response | None:
-    """Guard for high-risk admin endpoints. Enforces CSRF + admin token."""
+    """Guard for high-risk admin endpoints. Enforces CSRF + admin token.
+
+    The ``?token=`` query backdoor is NOT honoured here — admin tokens must
+    travel in a header so they cannot leak via referrer/logs or be triggered
+    by a cross-site GET.
+    """
     csrf = check_csrf(request, auth, action=action)
     if csrf is not None:
         return csrf
     if not admin_tokens:
         return None  # unauthenticated deployment (loopback, no tokens)
-    token = request_token(request)
+    token = auth.token_from_headers(request.headers)
     if auth.authenticate_admin_token(token):
         auth.audit(action, ok=True)
         return None

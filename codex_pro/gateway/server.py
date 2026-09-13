@@ -635,14 +635,24 @@ class GatewayServer:
     async def broadcast_to_ws(self, session_key: str, data: dict[str, Any]) -> bool:
         return await self._ws_handler.broadcast_to_ws(session_key, data)
 
-    # ── Wrapper methods for test compatibility ─────────────────────────────
+    # ── Wrapper methods for API modules / test compatibility ───────────────
 
     def _check_csrf(self, request: web.Request, *, action: str) -> web.Response | None:
         from codex_pro.gateway.http_handlers.base import check_csrf
         return check_csrf(request, self.auth, action=action)
 
-    def _tokens_configured(self) -> bool:
-        return bool(self._config.auth.api_tokens or self._config.auth.admin_tokens)
+    def _require_api_token(self, request: web.Request, *, action: str) -> web.Response | None:
+        """Guard for read/chat-level endpoints used by management API modules."""
+        from codex_pro.gateway.http_handlers.base import require_api_token
+        return require_api_token(
+            request, self.auth, self._tokens_configured(), action=action,
+        )
+
+    def _require_admin_token(self, request: web.Request, *, action: str) -> web.Response | None:
+        """Guard for high-risk admin endpoints used by management API modules."""
+        from codex_pro.gateway.http_handlers.base import require_admin_token
+        admin = self._config.auth.admin_tokens or self._config.auth.api_tokens
+        return require_admin_token(request, self.auth, admin, action=action)
 
     async def _handle_message(self, request: web.Request) -> web.Response:
         return await self._msg_handler.handle_message(request)

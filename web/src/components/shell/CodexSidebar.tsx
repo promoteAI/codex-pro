@@ -299,10 +299,10 @@ export function CodexSidebar() {
                       aria-label={isPinned(thread.id, thread.pinned) ? t("unpin") : t("pin")}
                       aria-pressed={isPinned(thread.id, thread.pinned)}
                       onClick={() => togglePin(thread.id)}
-                      className={`w-4 h-4 shrink-0 inline-flex items-center justify-center rounded ${
+                      className={`w-4 h-4 shrink-0 items-center justify-center rounded ${
                         isPinned(thread.id, thread.pinned)
-                          ? "text-[#c8c8c8]"
-                          : "text-[#6a6a6a] hover:text-[#b0b0b0]"
+                          ? "inline-flex text-[#c8c8c8]"
+                          : "hidden group-hover/thread:inline-flex text-[#6a6a6a] hover:text-[#b0b0b0]"
                       }`}
                     >
                       <PinIcon className="w-3 h-3" />
@@ -397,8 +397,10 @@ export function CodexSidebar() {
                 aria-label={isPinned(s.id) ? t("unpin") : t("pin")}
                 aria-pressed={isPinned(s.id)}
                 onClick={() => togglePin(s.id)}
-                className={`w-4 h-4 shrink-0 inline-flex items-center justify-center rounded ${
-                  isPinned(s.id) ? "text-[#c8c8c8]" : "text-[#6a6a6a] hover:text-[#b0b0b0]"
+                className={`w-4 h-4 shrink-0 items-center justify-center rounded ${
+                  isPinned(s.id)
+                    ? "inline-flex text-[#c8c8c8]"
+                    : "hidden group-hover/row:inline-flex text-[#6a6a6a] hover:text-[#b0b0b0]"
                 }`}
               >
                 <PinIcon className="w-3 h-3" />

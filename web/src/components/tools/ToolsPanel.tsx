@@ -1,12 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Copy,
+  ExternalLink,
   FileCode2,
-  Folder,
   FolderTree,
   Globe,
   MessageSquare,
@@ -15,13 +14,20 @@ import {
   Terminal,
   X,
 } from "lucide-react";
-import { useShellStore, type ToolPane } from "../../stores/shell";
-import { useApi } from "../../hooks/use-api";
+import { useShellStore, type ToolPane, type SessionTab } from "../../stores/shell";
 import {
   MOCK_DIFF,
   MOCK_FILE_PREVIEW,
   MOCK_REVIEW_FILES,
 } from "../../mock/seeds";
+
+const TAB_ICONS: Record<SessionTab["type"], typeof Terminal> = {
+  review: FileCode2,
+  terminal: Terminal,
+  browser: Globe,
+  files: FolderTree,
+  sidechat: MessageSquare,
+};
 
 function Hub() {
   const { t } = useTranslation("tools");
@@ -30,7 +36,6 @@ function Hub() {
     { type: "review", label: t("review"), kbd: "Ctrl+Shift+G", icon: FileCode2 },
     { type: "terminal", label: t("terminal"), kbd: "Ctrl+`", icon: Terminal },
     { type: "browser", label: t("browser"), kbd: "Ctrl+T", icon: Globe },
-    { type: "files", label: t("files"), kbd: "Ctrl+P", icon: FolderTree },
     { type: "sidechat", label: t("sidechat"), kbd: "Ctrl+Alt+S", icon: MessageSquare },
   ];
   return (
@@ -153,147 +158,103 @@ function ReviewPane() {
   );
 }
 
-interface FileEntry {
-  path: string;
-  kind: "file" | "dir";
-  icon?: string;
-  ext?: string;
-}
-
+/** Single-file viewer matching the prototype's `fv` pane: breadcrumb + preview/source
+ *  toggle + copy path + open-external. Shows one file's content (mock), not a file tree. */
 function FilesPane() {
   const { t } = useTranslation("tools");
-  const [currentPath, setCurrentPath] = useState("");
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [filter, setFilter] = useState("");
-
-  const { data, loading, error } = useApi<{ entries: FileEntry[]; path: string }>(
-    currentPath ? `/files?path=${encodeURIComponent(currentPath)}` : "/files",
-  );
-
-  const entries = (data?.entries ?? []).filter((e) =>
-    e.path.toLowerCase().includes(filter.toLowerCase()),
-  );
-  const crumbs = currentPath ? currentPath.split(/[/\\]/).filter(Boolean) : [];
-  const previewLines = (selectedFile ? MOCK_FILE_PREVIEW : "").split("\n");
+  const [view, setView] = useState<"preview" | "source">("source");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const filePath = MOCK_REVIEW_FILES[0]?.path ?? "web/src/App.tsx";
+  const fileName = filePath.split("/").pop() ?? filePath;
+  const previewLines = MOCK_FILE_PREVIEW.split("\n");
 
   return (
-    <div className="flex-1 flex min-h-0">
-      <div className="flex-1 min-w-0 flex flex-col border-r border-codex-border">
-        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#262626]">
-          <div className="flex-1 min-w-0 flex items-center gap-1 flex-wrap text-[12.5px] text-[#8a8a8a]">
-            <button
-              type="button"
-              onClick={() => {
-                setCurrentPath("");
-                setSelectedFile(null);
-              }}
-              className="hover:text-[#e0e0e0] px-1 rounded hover:bg-[#262626]"
-            >
-              root
-            </button>
-            {crumbs.map((c, i) => {
-              const path = crumbs.slice(0, i + 1).join("/");
-              const isLast = i === crumbs.length - 1 && !selectedFile;
-              return (
-                <span key={path} className="inline-flex items-center gap-1">
-                  <span className="text-[#555]">›</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCurrentPath(path);
-                      setSelectedFile(null);
-                    }}
-                    className={`px-1 rounded hover:bg-[#262626] ${isLast ? "text-[#e0e0e0] font-medium" : "hover:text-[#e0e0e0]"}`}
-                  >
-                    {c}
-                  </button>
-                </span>
-              );
-            })}
-            {selectedFile && (
-              <span className="inline-flex items-center gap-1">
-                <span className="text-[#555]">›</span>
-                <span className="text-[#e0e0e0] font-medium truncate max-w-[120px]">
-                  {selectedFile.split(/[/\\]/).pop()}
-                </span>
-              </span>
-            )}
-          </div>
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* Breadcrumb bar: project / file + more (⋯) menu + open external */}
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#262626] bg-codex-panel">
+        <span className="text-[12.5px] text-[#8a8a8a]">{t("filesProject")}</span>
+        <span className="text-[#555]" aria-hidden>›</span>
+        <span className="inline-flex items-center gap-1.5 text-[12.5px] text-[#e0e0e0] font-medium min-w-0">
+          <FileCode2 size={13} className="shrink-0 opacity-80" />
+          <span className="truncate">{fileName}</span>
+        </span>
+        <span className="flex-1" />
+        <div className="relative">
           <button
             type="button"
-            className="w-7 h-7 inline-flex items-center justify-center text-[#888] hover:bg-[#2a2a2a] rounded"
-            title={t("filesCopy")}
-            aria-label={t("filesCopy")}
-            onClick={() => {
-              if (selectedFile) void navigator.clipboard?.writeText(MOCK_FILE_PREVIEW);
-            }}
+            onClick={() => setMoreOpen((v) => !v)}
+            aria-expanded={moreOpen}
+            aria-label={t("filesMore")}
+            title={t("filesMore")}
+            className="w-7 h-7 inline-flex items-center justify-center rounded text-[#888] hover:bg-[#2a2a2a] hover:text-[#ddd]"
           >
-            <Copy size={14} />
+            <span className="flex items-center gap-0.5">
+              <span className="w-1 h-1 rounded-full bg-current" />
+              <span className="w-1 h-1 rounded-full bg-current" />
+              <span className="w-1 h-1 rounded-full bg-current" />
+            </span>
           </button>
-        </div>
-        <div className="flex-1 overflow-auto min-h-0 font-mono text-[12.5px] leading-[1.6] bg-[#121212]">
-          {!selectedFile ? (
-            <div className="h-full flex items-center justify-center text-codex-muted text-sm px-4 text-center">
-              {t("emptyFiles")}
+          {moreOpen && (
+            <div
+              className="fixed z-[120] w-[180px] p-1 bg-[#2c2c2c] border border-[#3a3a3a] rounded-lg shadow-[0_10px_28px_rgba(0,0,0,.5)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-2.5 py-1.5 text-[11px] text-codex-muted">{view === "preview" ? "Markdown" : "Source"}</div>
+              <button
+                type="button"
+                onClick={() => { setView("preview"); setMoreOpen(false); }}
+                className={`block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] ${view === "preview" ? "bg-[#3a3a3a] text-[#f0f0f0]" : "text-[#e8e8e8] hover:bg-[#3a3a3a]"}`}
+              >
+                {t("filesPreview")}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setView("source"); setMoreOpen(false); }}
+                className={`block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] ${view === "source" ? "bg-[#3a3a3a] text-[#f0f0f0]" : "text-[#e8e8e8] hover:bg-[#3a3a3a]"}`}
+              >
+                {t("filesSource")}
+              </button>
+              <div className="h-px bg-[#3a3a3a] my-1" />
+              <button
+                type="button"
+                onClick={() => { void navigator.clipboard?.writeText(filePath); setMoreOpen(false); }}
+                className="block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
+              >
+                {t("filesCopyAbs")}
+              </button>
+              <button
+                type="button"
+                onClick={() => { void navigator.clipboard?.writeText(fileName); setMoreOpen(false); }}
+                className="block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
+              >
+                {t("filesCopyRel")}
+              </button>
             </div>
-          ) : (
-            previewLines.map((line, i) => (
-              <div key={i} className="flex min-w-max">
-                <span className="w-11 shrink-0 text-right pr-3 pl-2 text-[#555] select-none">{i + 1}</span>
-                <span className="pr-5 text-[#d4d4d4] whitespace-pre">{line || " "}</span>
-              </div>
-            ))
           )}
         </div>
+        <button
+          type="button"
+          className="w-7 h-7 inline-flex items-center justify-center rounded text-[#888] hover:bg-[#2a2a2a] hover:text-[#ddd]"
+          title={t("filesOpen")}
+          aria-label={t("filesOpen")}
+        >
+          <ExternalLink size={14} />
+        </button>
       </div>
-      <aside className="w-[min(210px,40%)] flex flex-col min-h-0 bg-[#1a1a1a]">
-        <div className="m-2.5 mb-2 flex items-center gap-2 px-2.5 py-1.5 bg-[#222] border border-[#2e2e2e] rounded-lg">
-          <input
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder={t("filesFilter")}
-            className="w-full bg-transparent outline-none text-[12px]"
-            aria-label={t("filesFilter")}
-          />
+      {view === "preview" ? (
+        <div className="flex-1 overflow-auto min-h-0 px-4 py-3 text-[13.5px] leading-relaxed text-[#d8d8d8]">
+          <pre className="whitespace-pre-wrap font-sans">{MOCK_FILE_PREVIEW}</pre>
         </div>
-        <div className="flex-1 overflow-auto px-1.5 pb-2">
-          {loading && <p className="px-2 py-3 text-[12px] text-codex-muted">{t("loading")}</p>}
-          {error && <p className="px-2 py-3 text-[12px] text-codex-danger">{error}</p>}
-          {!loading && !error && entries.length === 0 && (
-            <p className="px-2 py-3 text-[12px] text-codex-muted">{t("filesEmptyDir")}</p>
-          )}
-          {entries.map((f) =>
-            f.kind === "dir" ? (
-              <button
-                key={f.path}
-                type="button"
-                onClick={() => {
-                  setCurrentPath(f.path);
-                  setSelectedFile(null);
-                }}
-                className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12.5px] text-[#c4c4c4] hover:bg-[#252525] text-left"
-              >
-                <Folder size={13} className="shrink-0 opacity-80" />
-                <span className="truncate">{f.path.split(/[/\\]/).pop() || f.path}</span>
-              </button>
-            ) : (
-              <button
-                key={f.path}
-                type="button"
-                onClick={() => setSelectedFile(f.path)}
-                className={`w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12.5px] text-left ${
-                  selectedFile === f.path
-                    ? "bg-[#2e2e2e] text-[#f0f0f0]"
-                    : "text-[#c4c4c4] hover:bg-[#252525]"
-                }`}
-              >
-                <FileCode2 size={13} className="shrink-0 opacity-80" />
-                <span className="truncate">{f.path.split(/[/\\]/).pop() || f.path}</span>
-              </button>
-            ),
-          )}
+      ) : (
+        <div className="flex-1 overflow-auto min-h-0 font-mono text-[12.5px] leading-[1.6] bg-[#121212]">
+          {previewLines.map((line, i) => (
+            <div key={i} className="flex min-w-max">
+              <span className="w-11 shrink-0 text-right pr-3 pl-2 text-[#555] select-none">{i + 1}</span>
+              <span className="pr-5 text-[#d4d4d4] whitespace-pre">{line || " "}</span>
+            </div>
+          ))}
         </div>
-      </aside>
+      )}
     </div>
   );
 }
@@ -478,6 +439,62 @@ function SidechatPane() {
   );
 }
 
+/** Tab picker popover: lists open tabs with icons + close, plus a quick "new tool" hint. */
+function TabPicker({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation("tools");
+  const sessionTabs = useShellStore((s) => s.sessionTabs);
+  const activeTabId = useShellStore((s) => s.activeTabId);
+  const activateTab = useShellStore((s) => s.activateTab);
+  const closeTab = useShellStore((s) => s.closeTab);
+
+  return (
+    <div
+      className="fixed z-[130] w-[min(320px,calc(100vw-24px))] max-h-[min(420px,70vh)] flex flex-col bg-[#2a2a2a] border border-[#3a3a3a] rounded-xl shadow-[0_14px_36px_rgba(0,0,0,.55)] overflow-hidden"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="px-3 py-2 border-b border-[#353535] text-[12px] text-[#8a8a8a]">
+        {t("picker")}
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto p-1.5">
+        {sessionTabs.length === 0 && (
+          <div className="px-3 py-4 text-center text-[12.5px] text-[#777]">{t("emptyTabs")}</div>
+        )}
+        {sessionTabs.map((tab) => {
+          const Icon = TAB_ICONS[tab.type];
+          return (
+            <div
+              key={tab.id}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-[13px] ${
+                activeTabId === tab.id ? "bg-[#3a3a3a] text-[#f0f0f0]" : "text-[#e0e0e0] hover:bg-[#3a3a3a]"
+              }`}
+            >
+              <Icon size={15} className="shrink-0 opacity-90" />
+              <button
+                type="button"
+                onClick={() => {
+                  activateTab(tab.id);
+                  onClose();
+                }}
+                className="flex-1 min-w-0 truncate text-left"
+              >
+                {tab.label}
+              </button>
+              <button
+                type="button"
+                onClick={() => closeTab(tab.id)}
+                className="w-5 h-5 inline-flex items-center justify-center rounded text-[#777] hover:bg-[#4a4a4a] hover:text-[#ddd] shrink-0"
+                aria-label={t("close")}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function ToolsPanel() {
   const { t } = useTranslation("tools");
   const toolsOpen = useShellStore((s) => s.toolsOpen);
@@ -487,11 +504,30 @@ export function ToolsPanel() {
   const activeTabId = useShellStore((s) => s.activeTabId);
   const activateTab = useShellStore((s) => s.activateTab);
   const closeTab = useShellStore((s) => s.closeTab);
-  const closeTools = useShellStore((s) => s.closeTools);
+  const closeOtherTabs = useShellStore((s) => s.closeOtherTabs);
+  const closeRightTabs = useShellStore((s) => s.closeRightTabs);
   const showHub = useShellStore((s) => s.showHub);
   const openTerm = useShellStore((s) => s.openTerm);
+  const openTool = useShellStore((s) => s.openTool);
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [hubMenuOpen, setHubMenuOpen] = useState(false);
+  const [menuTabId, setMenuTabId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  useEffect(() => {
+    const onDoc = () => setPickerOpen(false);
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
 
   const width = layoutMode === "full" ? "min(720px,72vw)" : "min(420px,46vw)";
+
+  const openTabMenu = (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    setMenuPos({ top: e.clientY, left: e.clientX });
+    setMenuTabId(id);
+  };
 
   return (
     <aside
@@ -502,57 +538,147 @@ export function ToolsPanel() {
       aria-hidden={!toolsOpen}
     >
       <div className="h-full flex flex-col min-h-0 min-w-0" style={{ width }}>
-        <div className="flex items-center gap-1 px-2.5 py-1.5 border-b border-codex-border bg-codex-panel min-h-9 overflow-x-auto">
-          <button
-            type="button"
-            onClick={showHub}
-            className={`px-2.5 py-1 rounded-lg text-[12.5px] ${
-              activeToolPane === "hub" ? "bg-[#2e2e2e] text-[#f0f0f0]" : "text-[#9a9a9a] hover:bg-[#252525]"
-            }`}
-          >
-            {t("hubTitle")}
-          </button>
-          {sessionTabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => activateTab(tab.id)}
-              className={`inline-flex items-center gap-1.5 max-w-[200px] px-2.5 py-1 rounded-lg text-[12.5px] ${
-                activeTabId === tab.id
-                  ? "bg-[#2e2e2e] text-[#f0f0f0]"
-                  : "text-[#9a9a9a] hover:bg-[#252525]"
-              }`}
-            >
-              <span className="truncate">{tab.label}</span>
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeTab(tab.id);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.stopPropagation();
-                    closeTab(tab.id);
-                  }
-                }}
-                className="opacity-60 hover:opacity-100"
-                aria-label={t("close")}
+        {/* Unified session-tab bar: picker chevron + tabs (+ icon each) + close, with
+            reserved spacer so the floating layout toolbar doesn't overlap. */}
+        <div className="flex items-stretch border-b border-codex-border bg-codex-panel">
+          {sessionTabs.length > 0 && (
+            <div className="relative inline-flex shrink-0">
+              <button
+                type="button"
+                onClick={() => setPickerOpen((v) => !v)}
+                aria-expanded={pickerOpen}
+                aria-label={t("picker")}
+                title={t("picker")}
+                className="w-6 h-6 m-1.5 inline-flex items-center justify-center rounded text-[#777] hover:bg-[#333] hover:text-[#ddd]"
               >
-                <X size={12} />
-              </span>
+                <ChevronDown size={14} />
+              </button>
+              {pickerOpen && <TabPicker onClose={() => setPickerOpen(false)} />}
+            </div>
+          )}
+          <div className="flex-1 flex items-center gap-0.5 min-w-0 overflow-x-hidden">
+            {sessionTabs.length === 0 && (
+              <button
+                type="button"
+                onClick={showHub}
+                className="px-2.5 py-1.5 text-[12.5px] text-[#8a8a8a] hover:text-[#dedede] shrink-0"
+              >
+                {t("hubTitle")}
+              </button>
+            )}
+            {sessionTabs.map((tab) => {
+              const Icon = TAB_ICONS[tab.type];
+              const isActive = activeTabId === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => activateTab(tab.id)}
+                  onContextMenu={(e) => openTabMenu(tab.id, e)}
+                  className={`inline-flex items-center gap-1 max-w-[200px] min-w-0 px-2 py-1.5 text-[12.5px] border-t-2 ${
+                    isActive
+                      ? "bg-[#2e2e2e] text-[#f0f0f0] border-t-[#4c8dff]"
+                      : "border-t-transparent text-[#9a9a9a] hover:bg-[#252525] hover:text-[#d0d0d0]"
+                  }`}
+                >
+                  <Icon size={14} className="shrink-0" />
+                  <span className="truncate">{tab.label}</span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeTab(tab.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.stopPropagation();
+                        closeTab(tab.id);
+                      }
+                    }}
+                    className="opacity-60 hover:opacity-100 shrink-0"
+                    aria-label={t("close")}
+                  >
+                    <X size={12} />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+            <button
+              type="button"
+              onClick={() => setHubMenuOpen((v) => !v)}
+              aria-expanded={hubMenuOpen}
+              title={t("newTool")}
+              aria-label={t("newTool")}
+              className="w-7 h-7 m-1.5 inline-flex items-center justify-center rounded text-[#777] hover:bg-[#333] hover:text-[#ddd] shrink-0"
+            >
+              <Plus size={14} />
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={closeTools}
-            className="ml-auto text-codex-muted hover:text-codex-text p-1"
-            aria-label={t("close")}
-          >
-            <X size={14} />
-          </button>
-        </div>
+            {hubMenuOpen && (
+              <div
+                className="fixed z-[120] min-w-[168px] p-1 bg-[#2c2c2c] border border-[#3a3a3a] rounded-lg shadow-[0_10px_28px_rgba(0,0,0,.5)]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {(["review", "terminal", "browser", "sidechat"] as const).map((type) => {
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        openTool(type);
+                        setHubMenuOpen(false);
+                      }}
+                      className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
+                    >
+                      {t(type)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          {/* Reserved room for the floating layout toolbar (全屏 / 底部 / 侧栏) */}
+          <div className="w-[110px] min-w-[110px] shrink-0 pointer-events-none" aria-hidden />
+
+          {menuTabId && sessionTabs.length > 0 && (
+            <div
+              className="fixed z-[120] min-w-[168px] p-1 bg-[#2c2c2c] border border-[#3a3a3a] rounded-lg shadow-[0_10px_28px_rgba(0,0,0,.5)]"
+              style={menuPos}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  closeOtherTabs(menuTabId);
+                  setMenuTabId(null);
+                }}
+                className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
+              >
+                {t("closeOthers")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  closeRightTabs(menuTabId);
+                  setMenuTabId(null);
+                }}
+                className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
+              >
+                {t("closeRight")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  closeTab(menuTabId);
+                  setMenuTabId(null);
+                }}
+                className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
+              >
+                {t("close")}
+              </button>
+            </div>
+          )}
 
         {activeToolPane === "hub" && <Hub />}
         {activeToolPane === "review" && <ReviewPane />}

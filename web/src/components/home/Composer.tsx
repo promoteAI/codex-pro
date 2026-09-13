@@ -2,23 +2,33 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Folder,
-  Monitor,
   GitBranch,
   Plus,
   ShieldAlert,
   ArrowUp,
   Loader2,
-  ExternalLink,
   RotateCcw,
   Target,
   Lightbulb,
   Paperclip,
+  X,
 } from "lucide-react";
 import { useChatStore, type GitRepo, type GitBranch as GitBranchType } from "../../stores/chat";
-import { toast } from "../../stores/toast";
-import { MOCK_AGENT, MOCK_BROWSER_TABS, MOCK_MARKETPLACE, MOCK_MODELS } from "../../mock/seeds";
+import {
+  MOCK_AGENT,
+  MOCK_BROWSER_TABS,
+  MOCK_CTX_USAGE,
+  MOCK_MARKETPLACE,
+  MOCK_MODELS,
+  SLASH_COMMANDS,
+} from "../../mock/seeds";
 
-type Menu = "project" | "env" | "branch" | "model" | "perm" | "add" | null;
+type Menu = "project" | "branch" | "model" | "perm" | "add" | "ctx" | null;
+
+function formatTokens(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return String(n);
+}
 
 export function Composer() {
   const { t } = useTranslation("composer");
@@ -27,7 +37,6 @@ export function Composer() {
   const sendMessage = useChatStore((s) => s.sendMessage);
   const typing = useChatStore((s) => s.typing);
   const project = useChatStore((s) => s.project);
-  const env = useChatStore((s) => s.env);
   const branch = useChatStore((s) => s.branch);
   const model = useChatStore((s) => s.model);
   const effort = useChatStore((s) => s.effort);
@@ -35,7 +44,6 @@ export function Composer() {
   const planMode = useChatStore((s) => s.planMode);
   const goalMode = useChatStore((s) => s.goalMode);
   const setProject = useChatStore((s) => s.setProject);
-  const setEnv = useChatStore((s) => s.setEnv);
   const setBranch = useChatStore((s) => s.setBranch);
   const setModel = useChatStore((s) => s.setModel);
   const setEffort = useChatStore((s) => s.setEffort);
@@ -47,6 +55,7 @@ export function Composer() {
   const loadRepos = useChatStore((s) => s.loadRepos);
   const loadBranches = useChatStore((s) => s.loadBranches);
   const loadingBranches = useChatStore((s) => s.loadingBranches);
+  const chatting = useChatStore((s) => s.chatting);
 
   const [menu, setMenu] = useState<Menu>(null);
   const [modelQuery, setModelQuery] = useState("");
@@ -56,6 +65,12 @@ export function Composer() {
   const [newBranchName, setNewBranchName] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  const ctxUsage = useMemo(() => {
+    const used = MOCK_CTX_USAGE.segments.reduce((s, x) => s + x.tokens, 0);
+    const pct = Math.round((used / MOCK_CTX_USAGE.max) * 100);
+    return { used, pct };
+  }, []);
 
   useEffect(() => {
     void loadRepos();
@@ -86,14 +101,6 @@ export function Composer() {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [draft]);
 
-  const envLabel =
-    env === "local"
-      ? t("envLocal")
-      : env === "worktree"
-        ? t("envWorktree")
-        : env === "codex-web"
-          ? t("envWeb")
-          : t("envCloud");
   const permLabel =
     perm === "ask" ? t("permAskShort") : perm === "agent" ? t("permAgentShort") : t("permFullShort");
   const effortLabels = [t("effortLow"), t("effortMed"), t("effortHigh"), t("effortMax")];
@@ -120,13 +127,6 @@ export function Composer() {
   const menuBox =
     "absolute z-30 left-0 bottom-[calc(100%+6px)] min-w-[260px] max-h-80 overflow-auto p-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[10px] shadow-xl";
 
-  const envOptions = [
-    ["local", "envLocal", false],
-    ["worktree", "envWorktree", false],
-    ["codex-web", "envWeb", true],
-    ["cloud", "envCloud", false],
-  ] as const;
-
   const permOptions = [
     ["ask", "permAsk", "permAskDesc"],
     ["agent", "permAgent", "permAgentDesc"],
@@ -145,7 +145,8 @@ export function Composer() {
   return (
     <div ref={rootRef} className="shrink-0 px-[clamp(16px,4vw,32px)] pb-[clamp(14px,2vw,22px)]">
       <div className="max-w-[720px] mx-auto bg-codex-surface border border-codex-border rounded-[14px] relative">
-        <div className="flex flex-wrap items-center gap-1 px-3 pt-2.5">
+        {/* ctx-bar: separate top row (project / branch), hidden while chatting */}
+        <div className={`flex flex-wrap items-center gap-1 px-3 pt-2.5 pb-1 border-b border-[#262626] ${chatting ? "hidden" : ""}`}>
           <button
             type="button"
             onClick={() => toggle("project")}
@@ -154,15 +155,7 @@ export function Composer() {
           >
             <Folder size={14} />
             <span>{project || t("noProjectLabel")}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => toggle("env")}
-            className="inline-flex items-center gap-1.5 text-[12.5px] text-[#c0c0c0] px-2 py-1 rounded-md hover:bg-[#2a2a2a]"
-            aria-label={t("env")}
-          >
-            <Monitor size={14} />
-            <span>{envLabel}</span>
+            <svg className="w-2.5 h-2.5 opacity-65" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
           <button
             type="button"
@@ -172,6 +165,7 @@ export function Composer() {
           >
             <GitBranch size={14} />
             <span>{branch}</span>
+            <svg className="w-2.5 h-2.5 opacity-65" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </div>
 
@@ -214,48 +208,12 @@ export function Composer() {
               role="menuitem"
               className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-left text-[13px] hover:bg-[#353535]"
               onClick={() => {
-                toast.info(t("newProjectToast"));
-                setMenu(null);
-              }}
-            >
-              <Plus size={14} />
-              {t("newProject")}
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-left text-[13px] hover:bg-[#353535]"
-              onClick={() => {
                 setProject("");
                 setMenu(null);
               }}
             >
               {t("noProject")}
             </button>
-          </div>
-        )}
-
-        {menu === "env" && (
-          <div className={`${menuBox} w-[260px]`} role="menu">
-            <div className="px-2.5 py-1.5 text-[11.5px] text-codex-muted">{t("envWorkLocation")}</div>
-            {envOptions.map(([id, labelKey, external]) => (
-              <button
-                key={id}
-                type="button"
-                disabled={id === "cloud"}
-                className={`w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-md text-[13px] ${
-                  env === id ? "bg-[#353535]" : "hover:bg-[#353535]"
-                } disabled:opacity-40`}
-                onClick={() => {
-                  setEnv(id);
-                  setMenu(null);
-                }}
-              >
-                {id === "local" || id === "cloud" ? <Monitor size={14} /> : <GitBranch size={14} />}
-                <span className="flex-1">{t(labelKey)}</span>
-                {external && <ExternalLink size={12} className="text-codex-muted" />}
-              </button>
-            ))}
           </div>
         )}
 
@@ -335,7 +293,7 @@ export function Composer() {
           </div>
         )}
 
-        <div className="px-3 py-2">
+        <div className="px-3 py-2 relative">
           <textarea
             ref={taRef}
             value={draft}
@@ -351,6 +309,28 @@ export function Composer() {
             rows={2}
             className="w-full resize-none bg-transparent outline-none text-[13.5px] text-codex-text placeholder:text-codex-muted leading-relaxed"
           />
+          {/* / slash-command menu */}
+          {draft.startsWith("/") && !draft.includes(" ") && (
+            <div className="absolute left-3 bottom-[calc(100%-6px)] w-[min(520px,calc(100vw-24px))] max-h-[min(420px,55vh)] overflow-auto p-2 pl-2.5 bg-[#1c1c1c] border border-[#333] rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30">
+              <div className="px-2.5 py-1.5 text-[12px] text-[#7dd3fc] font-medium">{t("slashCommands")}</div>
+              {SLASH_COMMANDS.filter((c) => c.label.startsWith(draft.slice(1))).map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    if (c.id === "plan") setPlanMode(true);
+                    else if (c.id === "goal") setGoalMode(true);
+                    setDraft(`/${c.label} `);
+                    taRef.current?.focus();
+                  }}
+                  className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-[#2e2e2e]"
+                >
+                  <span className="text-[13px] text-[#e8e8e8] font-medium whitespace-nowrap">/{c.label}</span>
+                  <span className="flex-1 min-w-0 text-[12px] text-[#8a8a8a] truncate">{c.hint}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 px-2.5 pb-2.5 relative">
@@ -391,6 +371,71 @@ export function Composer() {
             </button>
           )}
           <span className="flex-1" />
+
+          {/* Context usage indicator (donut ring + dialog) */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => toggle("ctx")}
+              aria-haspopup="dialog"
+              aria-expanded={menu === "ctx"}
+              className="h-[26px] px-2 inline-flex items-center gap-1.5 rounded-md text-[12.5px] text-[#9a9a9a] hover:bg-[#262626] hover:text-[#d8d8d8]"
+              title="Context Usage"
+              aria-label="Context Usage"
+            >
+              <span
+                className="w-[18px] h-[18px] rounded-full flex-none"
+                style={{
+                  background: `conic-gradient(${MOCK_CTX_USAGE.segments
+                    .map((s) => `${s.color} 0 ${s.direct}%`)
+                    .join(",")}, #2a2a2a ${ctxUsage.pct}% 100%)`,
+                  WebkitMask:
+                    "radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px))",
+                  mask: "radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px))",
+                }}
+                aria-hidden
+              />
+              <span className="tabular-nums leading-none">{ctxUsage.pct}%</span>
+            </button>
+            {menu === "ctx" && (
+              <div className="absolute right-0 bottom-[calc(100%+6px)] w-[300px] p-3.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30" role="dialog" aria-label="Context Usage">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="text-[14px] font-medium text-[#e8e8e8]">{t("ctxTitle")}</span>
+                  <button
+                    type="button"
+                    onClick={() => setMenu(null)}
+                    className="w-6 h-6 inline-flex items-center justify-center rounded-md text-[#888] hover:bg-[#353535] hover:text-[#eee]"
+                    aria-label={t("ctxClose")}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="flex items-baseline justify-between gap-3 mb-2.5">
+                  <span className="text-[13.5px] text-[#e0e0e0] font-medium">
+                    {t("ctxFull", { pct: ctxUsage.pct })}
+                  </span>
+                  <span className="text-[12.5px] text-[#9a9a9a] tabular-nums whitespace-nowrap">
+                    ~{formatTokens(ctxUsage.used)} / {formatTokens(MOCK_CTX_USAGE.max)} Tokens
+                  </span>
+                </div>
+                <div className="flex h-2 rounded-full overflow-hidden bg-[#1e1e1e] mb-3.5">
+                  {MOCK_CTX_USAGE.segments.map((s) => (
+                    <span key={s.key} style={{ width: `${s.direct}%`, background: s.color }} className="h-full min-w-[2px]" />
+                  ))}
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  {MOCK_CTX_USAGE.segments.map((s) => (
+                    <div key={s.key} className="flex items-center gap-2.5 py-[7px] text-[13px] text-[#d8d8d8] leading-tight">
+                      <span className="w-2.5 h-2.5 rounded-[2.5px] flex-none" style={{ background: s.color }} />
+                      <span className="flex-1 min-w-0">{s.label}</span>
+                      <span className="flex-none text-[#b0b0b0] tabular-nums">{formatTokens(s.tokens)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={() => toggle("model")}

@@ -35,28 +35,28 @@ export function HomeHero() {
           <rect fill="#5a5a5a" x="48" y="66" width="14" height="5" rx="1.5" />
         </svg>
       </div>
-      <h1 className="text-[clamp(16px,2.2vw,22px)] font-semibold text-[#f0f0f0] text-center mb-6 max-w-[640px]">
+      <h1 className="text-[clamp(16px,2.2vw,22px)] font-medium text-[#d4d4d4] text-center mb-6 max-w-[480px]">
         {t("heroTitle", { project }).split(project).map((part, i, arr) =>
           i < arr.length - 1 ? (
             <span key={i}>
               {part}
-              <em className="not-italic text-codex-accent">{project}</em>
+              <em className="not-italic text-[#a8a8a8]">{project}</em>
             </span>
           ) : (
             <span key={i}>{part}</span>
           ),
         )}
       </h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-[560px]">
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-[clamp(8px,1.2vw,16px)] w-full max-w-[680px]">
         {CARDS.map(({ key, full, icon: Icon }) => (
           <button
             key={key}
             type="button"
             onClick={() => setDraft(t(full))}
-            className="flex items-start gap-3 p-4 bg-codex-surface border border-codex-border rounded-[12px] text-left hover:border-[#3a3a3a] hover:bg-[#222]"
+            className="flex items-start gap-3 p-3 border border-codex-border rounded-[12px] text-left hover:border-[#3a3a3a] hover:bg-[#1e1e1e]"
           >
-            <Icon size={18} className="text-[#888] shrink-0 mt-0.5" />
-            <p className="text-[13.5px] text-[#d4d4d4] leading-snug">{t(key)}</p>
+            <Icon size={18} className="text-[#8a8a8a] shrink-0 mt-0.5" />
+            <p className="text-[13px] text-[#d4d4d4] leading-snug line-clamp-2 overflow-hidden">{t(key)}</p>
           </button>
         ))}
       </div>

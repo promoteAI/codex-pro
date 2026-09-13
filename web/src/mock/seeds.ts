@@ -145,3 +145,33 @@ export const MOCK_AGENT = {
   name: "Agnes 2.0 Flash",
   desc: "CCSwitchMulti managed worker pinned to 'agnes-2.0-flash'.",
 };
+
+export interface CtxUsageSegment {
+  key: string;
+  label: string;
+  color: string;
+  tokens: number;
+  direct: number;
+}
+
+/** Context-window usage breakdown shown in the composer's context-usage dialog. */
+export const MOCK_CTX_USAGE: { max: number; segments: CtxUsageSegment[] } = {
+  max: 256_000,
+  segments: [
+    { key: "system", label: "System prompt", color: "#8a8a8a", tokens: 680, direct: 0.3 },
+    { key: "tools", label: "Tool definitions", color: "#a78bfa", tokens: 12_100, direct: 4.7 },
+    { key: "rules", label: "Rules", color: "#4ade80", tokens: 6_000, direct: 2.3 },
+    { key: "skills", label: "Skills", color: "#fbbf24", tokens: 6_500, direct: 2.5 },
+    { key: "subagents", label: "Subagent definitions", color: "#7dd3fc", tokens: 1_600, direct: 0.6 },
+    { key: "conversation", label: "Conversation", color: "#9f1239", tokens: 148_800, direct: 58.1 },
+  ],
+};
+
+export const SLASH_COMMANDS = [
+  { id: "new", label: "new", hint: "新建对话" },
+  { id: "permissions", label: "permissions", hint: "批准模式" },
+  { id: "model", label: "model", hint: "选择模型与推理强度" },
+  { id: "effort", label: "effort", hint: "调整推理强度" },
+  { id: "plan", label: "plan", hint: "开启计划模式" },
+  { id: "goal", label: "goal", hint: "设置持续追求的目标" },
+];

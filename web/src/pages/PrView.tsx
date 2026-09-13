@@ -7,118 +7,102 @@ interface PrItem {
   meta: string;
   tabs: string[];
   body: string;
-  status: "open" | "merged" | "draft";
+  status: string;
   url?: string;
+  branch?: string;
+  default_branch?: string;
 }
 
+const badgeClass = (s: string) =>
+  s === "open" || s === "MERGED" || s === "merged"
+    ? "pr-item-badge open"
+    : s === "review" || s === "Review"
+      ? "pr-item-badge review"
+      : "pr-item-badge";
+
 export function PrView() {
-  const [tab, setTab] = useState<"all" | "mine">("all");
-  const [activeId, setActiveId] = useState("");
+  const [tab, setTab] = useState<"all" | "review" | "mine">("all");
+  const [activeId, setActiveId] = useState<string>("");
+  const [query, setQuery] = useState("");
 
   const { data, loading, error } = useApi<{ prs: PrItem[] }>("/prs");
-
   const prs = useMemo(() => data?.prs ?? [], [data]);
 
-  const list = useMemo(
-    () => prs.filter((p) => (tab === "mine" ? p.tabs.includes("mine") : true)),
-    [prs, tab],
-  );
-
-  // Set default active PR when data loads
-  useMemo(() => {
-    if (list.length > 0 && !activeId) {
-      setActiveId(list[0].id);
+  const list = useMemo(() => {
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      return prs.filter((p) => p.title.toLowerCase().includes(q) || p.meta.toLowerCase().includes(q) || p.tabs.includes(tab));
     }
-  }, [list, activeId]);
+    return prs;
+  }, [prs, query, tab]);
 
-  const active = list.find((p) => p.id === activeId) ?? list[0];
+  const filtered = useMemo(() => {
+    if (tab === "review") return list.filter((p) => p.tabs.includes("review") || p.status === "review");
+    if (tab === "mine") return list.filter((p) => p.tabs.includes("mine"));
+    return list;
+  }, [list, tab]);
 
-  if (loading) {
-    return (
-      <div className="flex-1 min-h-0 flex items-center justify-center text-codex-muted text-sm">
-        Loading Pull Requests...
-      </div>
-    );
-  }
+  const active = filtered.find((p) => p.id === activeId) ?? filtered[0];
 
-  if (error) {
-    return (
-      <div className="flex-1 min-h-0 flex items-center justify-center text-codex-danger text-sm">
-        Failed to load PRs: {error}
-      </div>
-    );
-  }
+  const badges: Record<string, string> = {
+    open: "Open",
+    merged: "Merged",
+    review: "Review",
+    draft: "Draft",
+    closed: "Closed",
+  };
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-codex-bg overflow-hidden">
-      <div className="px-8 pt-7 pb-3">
-        <h1 className="text-[22px] font-semibold text-[#e8e8e8]">Pull Requests</h1>
-        <div className="flex gap-4 mt-4 border-b border-codex-border">
-          {(
-            [
-              ["all", "All"],
-              ["mine", "Mine"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`pb-2 text-[13px] border-b-2 -mb-px ${
-                tab === id
-                  ? "text-[#e0e0e0] border-[#e0e0e0]"
-                  : "text-codex-muted border-transparent hover:text-[#a0a0a0]"
-              }`}
-            >
-              {label}
-            </button>
+    <section className="pr-view" aria-label="Pull Request">
+      <div className="pr-list-pane">
+        <div className="pr-tabs" role="tablist" aria-label="Pull Request 筛选">
+          {([["all", "全部"], ["review", "正在审查"], ["mine", "由我创建"]] as const).map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={tab === id}
+              className={`pr-tab ${tab === id ? "active" : ""}`}
+              onClick={() => setTab(id)}>{label}</button>
           ))}
         </div>
-      </div>
-      <div className="flex-1 min-h-0 flex">
-        <div className="w-[min(340px,40%)] border-r border-codex-border overflow-y-auto">
-          {list.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setActiveId(p.id)}
-              className={`w-full text-left px-5 py-3 border-b border-codex-border ${
-                active?.id === p.id ? "bg-[#1e1e1e]" : "hover:bg-codex-hover"
-              }`}
-            >
-              <div className="text-[13.5px] text-[#e0e0e0] font-medium truncate">{p.title}</div>
-              <div className="text-[12px] text-codex-muted mt-1 truncate">{p.meta}</div>
-              <span
-                className={`inline-block mt-1.5 text-[11px] px-1.5 py-0.5 rounded ${
-                  p.status === "merged"
-                    ? "bg-[#1a2f1a] text-codex-success"
-                    : p.status === "draft"
-                      ? "bg-[#2a2a2a] text-codex-muted"
-                      : "bg-[#1a2744] text-[#7aa2ff]"
-                }`}
-              >
-                {p.status}
+        <div className="pr-search-row">
+          <div className="pr-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg>
+            <input type="search" placeholder="搜索 Pull Request" aria-label="搜索 Pull Request" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </div>
+          <button type="button" className="pr-filter-btn" title="筛选" aria-label="筛选">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 2v-8.5L4 5z"/></svg>
+          </button>
+        </div>
+        <div className="pr-list-body" id="prListBody">
+          {loading && <div className="pr-list-empty">加载中…</div>}
+          {!loading && error && <div className="pr-list-empty">加载失败：{error}</div>}
+          {!loading && !error && filtered.length === 0 && <div className="pr-list-empty" id="prListEmpty">未找到 Pull Request</div>}
+          {!loading && filtered.map((p) => (
+            <button key={p.id} type="button" className={`pr-item ${active?.id === p.id ? "is-active" : ""}`} onClick={() => setActiveId(p.id)}>
+              <span className="pr-item-title">{p.title}</span>
+              <span className="pr-item-meta">
+                <span className={badgeClass(p.status)}>{badges[p.status] ?? p.status}</span>
+                <span>{p.meta}</span>
               </span>
             </button>
           ))}
-          {list.length === 0 && (
-            <div className="p-6 text-sm text-codex-muted">No Pull Requests found</div>
-          )}
-        </div>
-        <div className="flex-1 overflow-y-auto p-6 bg-codex-panel">
-          {active ? (
-            <>
-              <h2 className="text-lg font-semibold text-[#e8e8e8] mb-2">{active.title}</h2>
-              <p className="text-[12.5px] text-codex-muted mb-4">{active.meta}</p>
-              <p className="text-[13.5px] text-[#d4d4d4] leading-relaxed whitespace-pre-wrap">
-                {active.body}
-              </p>
-            </>
-          ) : (
-            <p className="text-codex-muted text-sm">Select a PR</p>
-          )}
         </div>
       </div>
-    </div>
+      <div className="pr-detail-pane">
+        {active ? (
+          <div className="pr-detail is-visible" id="prDetail">
+            <div className="pr-detail-kicker" id="prDetailKicker">{active.meta}</div>
+            <h2 className="pr-detail-title" id="prDetailTitle">{active.title}</h2>
+            <div className="pr-detail-meta" id="prDetailMeta"><span>{badges[active.status] ?? active.status}</span></div>
+            <div className="pr-detail-body" id="prDetailBody"><p>{active.body}</p></div>
+            {active.url && (
+              <div className="pr-detail-actions">
+                <a href={active.url} target="_blank" rel="noreferrer" style={{ color: "#8b9cff", fontSize: 13 }}>在 GitHub 查看→</a>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="pr-detail-empty" id="prDetailEmpty">选择要查看的 Pull Request</div>
+        )}
+      </div>
+    </section>
   );
 }

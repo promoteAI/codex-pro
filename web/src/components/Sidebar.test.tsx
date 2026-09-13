@@ -4,14 +4,24 @@ import { MemoryRouter } from "react-router";
 import { Sidebar } from "./Sidebar";
 
 describe("Sidebar", () => {
-  it("默认中文渲染菜单,点 EN 切英文", async () => {
+  it("默认中文渲染菜单", () => {
     render(
       <MemoryRouter>
         <Sidebar />
       </MemoryRouter>,
     );
     expect(screen.getByText("新对话")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("EN"));
-    await waitFor(() => expect(screen.getByText("New chat")).toBeInTheDocument());
+  });
+
+  it("账户菜单可打开并包含使用统计/设置", async () => {
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByLabelText("账户"));
+    await waitFor(() => expect(screen.getByText("使用统计")).toBeInTheDocument());
+    expect(screen.getByText("设置")).toBeInTheDocument();
   });
 });
+

@@ -62,6 +62,8 @@ interface ShellState {
   showHub: () => void;
   openTool: (type: Exclude<ToolPane, "hub">) => void;
   activateTab: (id: string) => void;
+  closeOtherTabs: (id: string) => void;
+  closeRightTabs: (id: string) => void;
   closeTab: (id: string) => void;
 }
 
@@ -149,6 +151,29 @@ export const useShellStore = create<ShellState>((set, get) => ({
     const tab = get().sessionTabs.find((t) => t.id === id);
     if (!tab) return;
     set({ activeTabId: id, activeToolPane: tab.type, toolsOpen: true });
+  },
+
+  closeOtherTabs: (id) => {
+    const { sessionTabs, activeTabId } = get();
+    const next = sessionTabs.filter((t) => t.id === id);
+    set({
+      sessionTabs: next,
+      activeTabId: activeTabId === id ? id : null,
+      activeToolPane: next.length ? next[0].type : "hub",
+    });
+  },
+
+  closeRightTabs: (id) => {
+    const { sessionTabs, activeTabId } = get();
+    const idx = sessionTabs.findIndex((t) => t.id === id);
+    if (idx === -1) return;
+    const next = sessionTabs.filter((_, i) => i <= idx);
+    if (activeTabId && !next.some((t) => t.id === activeTabId)) {
+      const last = next[next.length - 1];
+      set({ sessionTabs: next, activeTabId: last.id, activeToolPane: last.type });
+    } else {
+      set({ sessionTabs: next });
+    }
   },
 
   closeTab: (id) => {

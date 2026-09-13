@@ -2,13 +2,7 @@
   "placeholder": "Describe your goal and define measurable outcomes for best results",
   "send": "Send",
   "project": "Project",
-  "env": "Environment",
   "branch": "Branch",
-  "envLocal": "Local",
-  "envWorktree": "New local worktree",
-  "envWeb": "Link Codex Web",
-  "envCloud": "Cloud",
-  "envWorkLocation": "Work location",
   "permAsk": "Ask for approval",
   "permAskDesc": "Always ask when editing external files or using the internet",
   "permAskShort": "Ask",
@@ -53,8 +47,10 @@
   "branchRemote": "remote",
   "createBranch": "Create & checkout branch…",
   "createBranchPrompt": "New branch name",
-  "newProject": "New project",
-  "newProjectToast": "New project requires local setup (preview)",
   "noProject": "Not working in a project",
-  "noProjectLabel": "No project"
+  "noProjectLabel": "No project",
+  "ctxTitle": "Context Usage",
+  "ctxClose": "Close",
+  "ctxFull": "{{pct}}% Full",
+  "slashCommands": "Commands"
 }

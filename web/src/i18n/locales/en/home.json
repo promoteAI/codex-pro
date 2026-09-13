@@ -21,5 +21,6 @@
   "toolOutput": "Output",
   "toolRunning": "Running {{name}}…",
   "unknownTool": "unknown tool",
-  "emptyContent": "(empty)"
+  "emptyContent": "(empty)",
+  "actDone": "done"
 }

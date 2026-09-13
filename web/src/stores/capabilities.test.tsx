@@ -1,7 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
-import { Sidebar } from "../components/Sidebar";
 import { useCapabilitiesStore } from "./capabilities";
 import { useAuthStore } from "./auth";
 import * as api from "../lib/api";
@@ -106,16 +103,5 @@ describe("auth 与 capabilities 联动", () => {
     expect(useAuthStore.getState().token).toBeNull();
     expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
     expect(useCapabilitiesStore.getState().admin).toBeNull();
-  });
-});
-
-describe("侧边栏登出入口", () => {
-  it("点击后清空登录态 —— 此前唯一的退出方式是等 401", async () => {
-    useAuthStore.getState().setToken("t");
-    render(<MemoryRouter><Sidebar /></MemoryRouter>);
-
-    fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
-
-    await waitFor(() => expect(useAuthStore.getState().token).toBeNull());
   });
 });

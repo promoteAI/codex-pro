@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -344,9 +344,21 @@ export function SettingsPluginsPage() {
   const { t } = useTranslation("settings");
   const [tab, setTab] = useState<"plugins" | "mcp" | "skills">("plugins");
   const [q, setQ] = useState("");
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [enabled, setEnabled] = useState<Record<string, boolean>>(
     Object.fromEntries(PLUGIN_ITEMS.map((p) => [p.id, p.on])),
   );
+
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!addMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!addMenuRef.current?.contains(e.target as Node)) setAddMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [addMenuOpen]);
 
   const filtered = PLUGIN_ITEMS.filter((p) => {
     if (tab === "mcp" && p.tag !== "MCP") return false;
@@ -365,14 +377,59 @@ export function SettingsPluginsPage() {
           <PageTitle>{t("plugins")}</PageTitle>
           <PageSub>{t("pluginsDesc")}</PageSub>
         </div>
-        <div className="flex gap-2.5 shrink-0">
+        <div className="flex gap-2.5 shrink-0 items-start">
           <ActionBtn>{t("browseCatalog")}</ActionBtn>
-          <button
-            type="button"
-            className="px-3.5 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[13px] font-medium hover:bg-[#f2f2f2]"
-          >
-            {t("add")} ▾
-          </button>
+          <div className="relative" ref={addMenuRef}>
+            <button
+              type="button"
+              onClick={() => setAddMenuOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={addMenuOpen}
+              className="px-3.5 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[13px] font-medium hover:bg-[#f2f2f2]"
+            >
+              {t("add")} ▾
+            </button>
+            {addMenuOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[200px] p-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[10px] shadow-[0_12px_32px_rgba(0,0,0,.45)]"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => setAddMenuOpen(false)}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#e0e0e0] hover:bg-[#353535]"
+                >
+                  <span className="w-4 h-4 inline-flex items-center justify-center text-[#888]">
+                    <Plus size={14} />
+                  </span>
+                  {t("createPlugin")}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => setAddMenuOpen(false)}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#e0e0e0] hover:bg-[#353535]"
+                >
+                  <span className="w-4 h-4 inline-flex items-center justify-center text-[#888]">
+                    <Plus size={14} />
+                  </span>
+                  {t("addMarketplace")}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => setAddMenuOpen(false)}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#e0e0e0] hover:bg-[#353535]"
+                >
+                  <span className="w-4 h-4 inline-flex items-center justify-center text-[#888]">
+                    <Plus size={14} />
+                  </span>
+                  {t("addMcp")}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

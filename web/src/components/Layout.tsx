@@ -38,10 +38,6 @@ export function Layout() {
           openTool("browser");
         }
       }
-      if (meta && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        openTool("files");
-      }
       if (meta && e.altKey && e.key.toLowerCase() === "s") {
         e.preventDefault();
         openTool("sidechat");

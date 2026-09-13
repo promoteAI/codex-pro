@@ -43,15 +43,6 @@ function NotFound() {
   );
 }
 
-/** Opens settings overlay when landing on legacy admin URLs. */
-function SettingsRedirect({ section }: { section: string }) {
-  const openSettings = useShellStore((s) => s.openSettings);
-  useEffect(() => {
-    openSettings(section as never);
-  }, [openSettings, section]);
-  return <Navigate to={`/?settings=${section}`} replace />;
-}
-
 function SettingsQuerySync() {
   const [params] = useSearchParams();
   const openSettings = useShellStore((s) => s.openSettings);
@@ -111,19 +102,6 @@ export function App() {
                 </LazyRoute>
               }
             />
-
-            {/* Legacy redirects */}
-            <Route path="cron" element={<Navigate to="/scheduled" replace />} />
-            <Route path="skills" element={<Navigate to="/plugins" replace />} />
-            <Route path="sessions" element={<SettingsRedirect section="sessions" />} />
-            <Route path="memory" element={<SettingsRedirect section="memory" />} />
-            <Route path="knowledge" element={<SettingsRedirect section="knowledge" />} />
-            <Route path="channels" element={<SettingsRedirect section="channels" />} />
-            <Route path="kanban" element={<SettingsRedirect section="kanban" />} />
-            <Route path="logs" element={<SettingsRedirect section="logs" />} />
-            <Route path="config" element={<SettingsRedirect section="config" />} />
-            <Route path="analytics" element={<SettingsRedirect section="analytics" />} />
-            <Route path="overview" element={<SettingsRedirect section="overview" />} />
 
             <Route path="*" element={<NotFound />} />
           </Route>

@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { Skills } from "./Skills";
 import { useApi } from "../hooks/use-api";
+import { Skills } from "./Skills";
 
 interface MarketplaceItem {
   name: string;
@@ -11,126 +10,91 @@ interface MarketplaceItem {
   author?: string;
 }
 
+// deterministic tint from name for the plugin chip
+const chipColor = (name: string) => {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  const palette = ["#24292f", "#0f9d58", "#4285f4", "#f4b400", "#ea4335", "#7c4dff", "#00c853", "#ff6d00", "#0091ea", "#c2185b", "#455a64", "#6a1b9a"];
+  return palette[h % palette.length];
+};
+
 export function PluginsView() {
-  const { t } = useTranslation("nav");
-  const [tab, setTab] = useState<"skills" | "market">("skills");
-  const [scope, setScope] = useState<"all" | "installed" | "public">("all");
+  const [tab, setTab] = useState<"plugins" | "skills">("plugins");
+  const [scope, setScope] = useState<"plugin-all" | "plugin-installed" | "plugin-public">("plugin-all");
   const [q, setQ] = useState("");
 
-  // Fetch live marketplace data from skills API
   const { data: skillsData, loading: skillsLoading, error: skillsError } = useApi<{ skills: MarketplaceItem[] }>("/skills");
 
   const market = useMemo(() => {
     const items = skillsData?.skills ?? [];
     return items.filter((p) => {
-      if (scope === "installed" && p.scope !== "installed") return false;
-      if (scope === "public" && p.scope !== "public") return false;
-      if (q && !p.name.toLowerCase().includes(q.toLowerCase()) && !p.desc.toLowerCase().includes(q.toLowerCase())) {
-        return false;
-      }
+      if (scope === "plugin-installed" && p.scope !== "installed") return false;
+      if (scope === "plugin-public" && p.scope !== "public") return false;
+      if (q && !p.name.toLowerCase().includes(q.toLowerCase()) && !p.desc.toLowerCase().includes(q.toLowerCase())) return false;
       return true;
     });
   }, [scope, q, skillsData]);
 
   return (
-    <div className="flex-1 min-h-0 overflow-auto bg-codex-bg">
-      <div className="px-8 pt-7 pb-2">
-        <h1 className="text-[22px] font-semibold text-[#e8e8e8]">{t("plugins")}</h1>
-        <div className="flex gap-4 mt-4 border-b border-codex-border">
-          {(
-            [
-              ["skills", "Skills"],
-              ["market", "Marketplace"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`pb-2 text-[13px] border-b-2 -mb-px ${
-                tab === id
-                  ? "text-[#e0e0e0] border-[#e0e0e0]"
-                  : "text-codex-muted border-transparent hover:text-[#a0a0a0]"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+    <section className="pl-view" aria-label="插件市场">
+      <div className="pl-top">
+        <div className="pl-tabs" role="tablist" aria-label="插件与技能">
+          <button type="button" role="tab" aria-selected={tab === "plugins"}
+            className={`pl-tab ${tab === "plugins" ? "active" : ""}`}
+            onClick={() => setTab("plugins")}>插件</button>
+          <button type="button" role="tab" aria-selected={tab === "skills"}
+            className={`pl-tab ${tab === "skills" ? "active" : ""}`}
+            onClick={() => setTab("skills")}>技能</button>
+        </div>
+        <div className="pl-top-actions">
+          <button type="button" className="pl-icon-btn" title="刷新" aria-label="刷新">
+            <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg>
+          </button>
         </div>
       </div>
-
-      {tab === "skills" && (
-        <div className="codex-admin-pane px-8 pb-10">
-          <Skills />
-        </div>
-      )}
-
-      {tab === "market" && (
-        <div className="px-8 pb-10">
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            {(
-              [
-                ["all", "All"],
-                ["installed", "Installed"],
-                ["public", "Public"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setScope(id)}
-                className={`px-3 py-1 rounded-full text-[12.5px] border ${
-                  scope === id
-                    ? "bg-[#2e2e2e] border-[#3a3a3a] text-[#e0e0e0]"
-                    : "border-codex-border text-codex-muted hover:bg-codex-hover"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search plugins..."
-              className="ml-auto bg-codex-surface border border-codex-border rounded-lg px-3 py-1.5 text-[12.5px] outline-none w-[200px]"
-            />
-          </div>
-
-          {skillsLoading && (
-            <div className="text-codex-muted text-sm py-8 text-center">Loading marketplace...</div>
-          )}
-          {skillsError && (
-            <div className="text-codex-danger text-sm py-8 text-center">Failed to load: {skillsError}</div>
-          )}
-          {!skillsLoading && !skillsError && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {market.map((p) => (
-                <div
-                  key={p.name}
-                  className="text-left p-4 bg-codex-surface border border-codex-border rounded-[12px] hover:border-[#3a3a3a]"
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="w-9 h-9 rounded-lg bg-[#252525] inline-flex items-center justify-center text-sm text-[#888]">
-                      {p.name[0]}
-                    </span>
-                    <div>
-                      <div className="text-[13.5px] text-[#d4d4d4] font-medium">{p.name}</div>
-                      <div className="text-[11px] text-codex-muted">{p.scope}</div>
-                    </div>
-                  </div>
-                  <p className="text-xs text-codex-muted leading-relaxed line-clamp-2">{p.desc}</p>
-                </div>
-              ))}
-              {market.length === 0 && (
-                <div className="col-span-full text-codex-muted text-sm py-8 text-center">
-                  No plugins found
-                </div>
-              )}
+      <div className="pl-body">
+        {tab === "plugins" && (
+          <div className="pl-plugins-panel" id="plPluginsPanel" style={{ display: "block" }}>
+            <div className="pl-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg>
+              <input type="search" placeholder="搜索插件" aria-label="搜索插件" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
-          )}
-        </div>
-      )}
-    </div>
+            <div className="pl-filters" role="tablist" aria-label="插件来源">
+              {([["plugin-all", "全部"], ["plugin-installed", "已安装"], ["plugin-public", "公开"]] as const).map(([id, label]) => (
+                <button key={id} type="button" className={`pl-filter ${scope === id ? "active" : ""}`} onClick={() => setScope(id)}>{label}</button>
+              ))}
+            </div>
+            {skillsLoading && <div style={{ color: "#888", fontSize: 13, textAlign: "center", padding: 40 }}>加载中…</div>}
+            {!skillsLoading && skillsError && <div style={{ color: "#e85d5d", fontSize: 13, textAlign: "center", padding: 40 }}>加载失败：{skillsError}</div>}
+            {!skillsLoading && !skillsError && (
+              <div className="pl-section">
+                <h3 className="pl-section-title">已安装 / 公开</h3>
+                <div className="pl-grid">
+                  {market.map((p) => (
+                    <div key={p.name} className="pl-card" role="button" tabIndex={0}>
+                      <span className="pl-card-ico" style={{ background: chipColor(p.name) }}>
+                        {p.name.charAt(0).toUpperCase()}
+                      </span>
+                      <div className="pl-card-info">
+                        <p className="pl-card-name">{p.name}</p>
+                        <p className="pl-card-desc">{p.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {market.length === 0 && (
+                    <div style={{ color: "#6e6e6e", fontSize: 13, textAlign: "center", padding: 32 }}>未找到插件</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {tab === "skills" && (
+          <div className="pl-skills-panel" id="plSkillsPanel" style={{ display: "block" }}>
+            <Skills />
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
-

@@ -32,6 +32,7 @@ const Config = lazy(() => import("../../pages/Config").then((m) => ({ default: m
 
 type NavGroup = "personal" | "integrations" | "coding" | "archived" | "admin";
 
+/** Prototype settings-nav only (19 items). Extra admin pages stay reachable via deep link. */
 const SECTIONS: Array<{ id: SettingsSection; group: NavGroup }> = [
   { id: "general", group: "personal" },
   { id: "models", group: "personal" },
@@ -47,17 +48,10 @@ const SECTIONS: Array<{ id: SettingsSection; group: NavGroup }> = [
   { id: "browser", group: "integrations" },
   { id: "hooks", group: "coding" },
   { id: "git", group: "coding" },
-  { id: "environment", group: "coding" },
   { id: "worktrees", group: "coding" },
   { id: "archived", group: "archived" },
-  { id: "config", group: "admin" },
-  { id: "overview", group: "admin" },
-  { id: "sessions", group: "admin" },
   { id: "memory", group: "admin" },
   { id: "knowledge", group: "admin" },
-  { id: "channels", group: "admin" },
-  { id: "kanban", group: "admin" },
-  { id: "logs", group: "admin" },
   { id: "analytics", group: "admin" },
 ];
 
@@ -78,36 +72,48 @@ const PROTO_PAGES: Partial<Record<SettingsSection, ComponentType>> = {
   browser: BrowserSettingsPage,
   hooks: HooksPage,
   git: GitPage,
-  environment: EnvironmentPage,
   worktrees: WorktreesPage,
   archived: ArchivedPage,
+  environment: EnvironmentPage,
 };
 
 const ADMIN_PAGES: Partial<Record<SettingsSection, ComponentType>> = {
+  memory: Memory,
+  knowledge: Knowledge,
+  analytics: Analytics,
+  // Deep-link only (not in prototype settings-nav)
   config: Config,
   overview: Overview,
-  memory: Memory,
+  sessions: Sessions,
   channels: Channels,
   kanban: KanbanPage,
   logs: Logs,
-  analytics: Analytics,
-  knowledge: Knowledge,
-  sessions: Sessions,
 };
 
 const ADMIN_SUB: Partial<Record<SettingsSection, string>> = {
+  memory: "adminMemoryDesc",
+  knowledge: "adminKnowledgeDesc",
+  analytics: "adminAnalyticsDesc",
   config: "adminConfigDesc",
   overview: "adminOverviewDesc",
   sessions: "adminSessionsDesc",
-  memory: "adminMemoryDesc",
-  knowledge: "adminKnowledgeDesc",
   channels: "adminChannelsDesc",
   kanban: "adminKanbanDesc",
   logs: "adminLogsDesc",
-  analytics: "adminAnalyticsDesc",
 };
 
-const SECTION_IDS = new Set(SECTIONS.map((s) => s.id));
+const NAV_IDS = new Set(SECTIONS.map((s) => s.id));
+const SECTION_IDS = new Set<SettingsSection>([
+  ...SECTIONS.map((s) => s.id),
+  "config",
+  "overview",
+  "sessions",
+  "channels",
+  "kanban",
+  "logs",
+  "environment",
+  "connections",
+]);
 
 export function SettingsOverlay() {
   const { t } = useTranslation("settings");
@@ -133,6 +139,21 @@ export function SettingsOverlay() {
     setSearchParams(next, { replace: true });
   }, [open, section, searchParams, setSearchParams]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      closeSettings();
+      if (searchParams.has("settings")) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("settings");
+        setSearchParams(next, { replace: true });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, closeSettings, searchParams, setSearchParams]);
+
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return SECTIONS;
@@ -153,15 +174,17 @@ export function SettingsOverlay() {
   const ProtoPage = PROTO_PAGES[section];
   const AdminPage = ADMIN_PAGES[section];
   const adminSubKey = ADMIN_SUB[section];
+  const showAdminChrome = NAV_IDS.has(section) && !!AdminPage;
 
   return (
     <div
+      id="settingsPanel"
       className="absolute inset-0 z-20 flex bg-codex-bg"
       role="dialog"
       aria-modal="true"
       aria-label={t("title")}
     >
-      <aside className="w-[220px] shrink-0 border-r border-codex-border flex flex-col bg-[#1a1a1a]">
+      <aside className="settings-sidebar w-[220px] shrink-0 border-r border-codex-border flex flex-col bg-[#1a1a1a]">
         <button
           type="button"
           onClick={close}
@@ -180,7 +203,7 @@ export function SettingsOverlay() {
             className="bg-transparent outline-none text-[12.5px] text-[#c0c0c0] placeholder:text-[#6a6a6a] w-full py-0.5"
           />
         </div>
-        <nav className="flex-1 overflow-y-auto py-2">
+        <nav className="settings-nav flex-1 overflow-y-auto py-2">
           {GROUPS.map((group) => {
             const items = filtered.filter((s) => s.group === group);
             if (items.length === 0) return null;
@@ -209,7 +232,7 @@ export function SettingsOverlay() {
           })}
         </nav>
       </aside>
-      <div className="flex-1 min-w-0 min-h-0 overflow-auto flex flex-col">
+      <div className="settings-content flex-1 min-w-0 min-h-0 overflow-auto flex flex-col">
         {ProtoPage && (
           <div className="flex-1 min-h-0 overflow-auto p-7 px-[clamp(16px,4vw,40px)] pb-12">
             <ProtoPage />
@@ -217,10 +240,14 @@ export function SettingsOverlay() {
         )}
         {AdminPage && (
           <div className="flex-1 min-h-0 overflow-auto p-7 px-[clamp(16px,4vw,40px)] pb-12">
-            <h2 className="text-[22px] font-semibold text-[#f0f0f0] tracking-tight m-0 mb-1.5">{t(section)}</h2>
-            {adminSubKey && (
-              <p className="text-[12.5px] text-codex-muted leading-relaxed m-0 mb-5 max-w-[560px]">{t(adminSubKey)}</p>
-            )}
+            {showAdminChrome || !NAV_IDS.has(section) ? (
+              <>
+                <h2 className="text-[22px] font-semibold text-[#f0f0f0] tracking-tight m-0 mb-1.5">{t(section)}</h2>
+                {adminSubKey && (
+                  <p className="text-[12.5px] text-codex-muted leading-relaxed m-0 mb-5 max-w-[560px]">{t(adminSubKey)}</p>
+                )}
+              </>
+            ) : null}
             <div className="codex-admin-pane min-h-[50vh]">
               <Suspense fallback={<div className="text-codex-muted text-sm p-2">{t("loading")}</div>}>
                 <AdminPage />

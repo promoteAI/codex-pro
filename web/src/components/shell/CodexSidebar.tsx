@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -6,7 +6,6 @@ import {
   Bell,
   Settings,
   Folder,
-  TrendingUp,
   Smartphone,
   ArrowUp,
 } from "lucide-react";
@@ -19,6 +18,11 @@ interface SessionItem {
   key: string;
   message_count: number;
   updated_at: string;
+}
+
+function isMacPlatform(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
 }
 
 function PinIcon({ className }: { className?: string }) {
@@ -67,12 +71,33 @@ export function CodexSidebar() {
   const [pinned, setPinned] = useState<Record<string, boolean>>({});
   const openSearch = useShellStore((s) => s.openSearch);
   const openMobileRemote = useShellStore((s) => s.openMobileRemote);
-  const openRemoteConnect = useShellStore((s) => s.openRemoteConnect);
+  const mobileRemoteOpen = useShellStore((s) => s.mobileRemoteOpen);
   const openSettings = useShellStore((s) => s.openSettings);
+  const accountWrapRef = useRef<HTMLDivElement>(null);
   const clearChat = useChatStore((s) => s.clearChat);
   const loadSessionHistory = useChatStore((s) => s.loadSessionHistory);
   const sessionId = useChatStore((s) => s.sessionId);
   const project = useChatStore((s) => s.project);
+  const kbdAnalytics = isMacPlatform() ? "⌥⌘P" : "Alt+Win+P";
+  const kbdSettings = isMacPlatform() ? "⌘," : "Ctrl+,";
+
+  useEffect(() => {
+    if (!accountOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!accountWrapRef.current?.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAccountOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [accountOpen]);
 
   const { data } = useApi<{ sessions: SessionItem[] }>("/sessions?limit=20&offset=0");
   const apiRecents = data?.sessions ?? [];
@@ -83,6 +108,15 @@ export function CodexSidebar() {
     }
     return MOCK_RECENTS;
   }, [apiRecents]);
+
+  const goAnalytics = () => {
+    setAccountOpen(false);
+    openSettings("analytics");
+  };
+  const goSettings = () => {
+    setAccountOpen(false);
+    openSettings();
+  };
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-2.5 h-8 px-3 mx-1 rounded-md text-[13.5px] cursor-pointer ${
@@ -434,91 +468,76 @@ export function CodexSidebar() {
       </nav>
 
       <div className="shrink-0 flex items-center justify-between px-2.5 py-2 border-t border-[#262626]">
-        <div className="relative">
+        <div className="account-wrap relative" ref={accountWrapRef}>
           <button
             type="button"
+            id="accountBtn"
             onClick={() => setAccountOpen((v) => !v)}
             aria-expanded={accountOpen}
             aria-haspopup="menu"
+            aria-controls="accountMenu"
             title={t("account")}
             aria-label={t("account")}
-            className="flex items-center gap-2 text-[13px] text-[#a8a8a8] px-1.5 py-1 rounded hover:bg-[#262626]"
+            className="account flex items-center gap-2 text-[13px] text-[#a8a8a8] px-1.5 py-1 rounded hover:bg-[#262626]"
           >
             <Settings size={18} className="text-[#888]" />
             <span>custom</span>
           </button>
           {accountOpen && (
             <div
+              id="accountMenu"
               role="menu"
-              className="absolute left-0 bottom-[calc(100%+8px)] z-20 min-w-[220px] p-2 bg-[#2a2a2a] border border-[#3a3a3a] rounded-xl shadow-[0_12px_32px_rgba(0,0,0,.5)]"
+              aria-label={t("account")}
+              className="account-menu open"
             >
-              <div className="px-2.5 py-1.5 pb-2 text-[13px] font-medium text-[#f0f0f0]">custom</div>
-              <div className="h-px bg-[#3a3a3a] mb-1.5" />
+              <div className="account-menu-title">custom</div>
+              <div className="account-menu-sep" />
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => openSettings("analytics")}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#d8d8d8] hover:bg-[#353535] hover:text-[#f0f0f0]"
+                className="account-menu-item"
+                onClick={goAnalytics}
               >
-                <span className="w-[15px] h-[15px] inline-flex items-center justify-center text-[#3fb950]">
-                  <TrendingUp size={15} />
-                </span>
-                <span className="flex-1">{t("usageStats")}</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M18 20V10M12 20V4M6 20v-6" />
+                </svg>
+                <span className="account-menu-item-label">{t("usageStats")}</span>
+                <span className="account-menu-kbd">{kbdAnalytics}</span>
               </button>
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => {
-                  setAccountOpen(false);
-                  openRemoteConnect();
-                }}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#d8d8d8] hover:bg-[#353535] hover:text-[#f0f0f0]"
+                className="account-menu-item"
+                onClick={goSettings}
               >
-                <span className="w-[15px] h-[15px] inline-flex items-center justify-center text-[#4c8dff]">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="w-[15px] h-[15px]"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <rect x="4" y="4" width="16" height="6" rx="1.5" />
-                    <rect x="4" y="14" width="16" height="6" rx="1.5" />
-                    <path d="M7 7h.01M7 17h.01" />
-                  </svg>
-                </span>
-                <span className="flex-1">{t("remoteConnect")}</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setAccountOpen(false);
-                  openSettings();
-                }}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#d8d8d8] hover:bg-[#353535] hover:text-[#f0f0f0]"
-              >
-                <span className="w-[15px] h-[15px] inline-flex items-center justify-center text-[#888]">
-                  <Settings size={15} />
-                </span>
-                <span className="flex-1">{t("settings")}</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3.5" />
+                  <path d="M19.2 12a7.2 7.2 0 0 0-.1-1.1l2-1.6-2-3.4-2.4 1a7.2 7.2 0 0 0-1.9-1.1L14.5 3h-5l-.3 2.8a7.2 7.2 0 0 0-1.9 1.1l-2.4-1 2 3.4-2 1.6a7.2 7.2 0 0 0 0 2.2l-2 1.6 2 3.4 2.4-1a7.2 7.2 0 0 0 1.9 1.1l.3 2.8h5l.3-2.8a7.2 7.2 0 0 0 1.9-1.1l2.4 1 2-3.4-2-1.6c.1-.4.1-.7.1-1.1Z" />
+                </svg>
+                <span className="account-menu-item-label">{t("settings")}</span>
+                <span className="account-menu-kbd">{kbdSettings}</span>
               </button>
             </div>
           )}
         </div>
         <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            title={t("mobileRemote")}
-            aria-label={t("mobileRemote")}
-            onClick={openMobileRemote}
-            className="w-[30px] h-[30px] inline-flex items-center justify-center rounded-lg text-[#e8a04a] hover:bg-[#2a2a2a]"
-          >
-            <Smartphone size={16} />
-          </button>
+          <div className="mobile-btn-wrap relative">
+            <button
+              type="button"
+              title={t("mobileRemote")}
+              aria-label={t("mobileRemote")}
+              aria-haspopup="dialog"
+              aria-expanded={mobileRemoteOpen}
+              onClick={openMobileRemote}
+              className={`mobile-btn w-[30px] h-[30px] inline-flex items-center justify-center rounded-lg text-[#e8a04a] hover:bg-[#2a2a2a]${mobileRemoteOpen ? " is-active" : ""}`}
+            >
+              <Smartphone size={16} />
+            </button>
+            <div className="mobile-tip" hidden={mobileRemoteOpen} aria-hidden="true">
+              <p className="mobile-tip-title">{t("mobileRemoteTipTitle")}</p>
+              <p className="mobile-tip-sub">{t("mobileRemoteTipSub")}</p>
+            </div>
+          </div>
           <button
             type="button"
             title={t("update")}

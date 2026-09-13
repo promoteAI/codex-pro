@@ -44,6 +44,8 @@ interface ShellState {
   searchOpen: boolean;
   mobileRemoteOpen: boolean;
   remoteConnectOpen: boolean;
+  botsOpen: boolean;
+  botsPreferredChannel: string | null;
   layoutMode: LayoutMode;
   activeToolPane: ToolPane;
   sessionTabs: SessionTab[];
@@ -64,6 +66,8 @@ interface ShellState {
   closeMobileRemote: () => void;
   openRemoteConnect: () => void;
   closeRemoteConnect: () => void;
+  openBots: (channel?: string) => void;
+  closeBots: () => void;
   setLayoutMode: (mode: LayoutMode) => void;
   showHub: () => void;
   openTool: (type: Exclude<ToolPane, "hub">) => void;
@@ -88,6 +92,8 @@ export const useShellStore = create<ShellState>((set, get) => ({
   searchOpen: false,
   mobileRemoteOpen: false,
   remoteConnectOpen: false,
+  botsOpen: false,
+  botsPreferredChannel: null,
   layoutMode: "side",
   activeToolPane: "hub",
   sessionTabs: [],
@@ -121,6 +127,13 @@ export const useShellStore = create<ShellState>((set, get) => ({
   closeMobileRemote: () => set({ mobileRemoteOpen: false }),
   openRemoteConnect: () => set({ remoteConnectOpen: true }),
   closeRemoteConnect: () => set({ remoteConnectOpen: false }),
+  openBots: (channel) =>
+    set({
+      botsOpen: true,
+      botsPreferredChannel: channel ?? null,
+      mobileRemoteOpen: false,
+    }),
+  closeBots: () => set({ botsOpen: false, botsPreferredChannel: null }),
 
   setLayoutMode: (mode) => {
     if (mode === "bottom") {

@@ -22,6 +22,18 @@ describe("Sidebar", () => {
     fireEvent.click(screen.getByLabelText("账户"));
     await waitFor(() => expect(screen.getByText("使用统计")).toBeInTheDocument());
     expect(screen.getByText("设置")).toBeInTheDocument();
+    expect(screen.queryByText("远程连接")).not.toBeInTheDocument();
+  });
+
+  it("使用统计与设置带快捷键标注", async () => {
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByLabelText("账户"));
+    await waitFor(() => expect(screen.getByText("使用统计")).toBeInTheDocument());
+    expect(screen.getByText(/Alt\+Win\+P|⌥⌘P/)).toBeInTheDocument();
+    expect(screen.getByText(/Ctrl\+,|⌘,/)).toBeInTheDocument();
   });
 });
-

@@ -5,6 +5,7 @@ import { CodexSidebar } from "./shell/CodexSidebar";
 import { LayoutToolbar } from "./shell/LayoutToolbar";
 import { SearchPalette } from "./shell/SearchPalette";
 import { MobileRemoteModal } from "./MobileRemoteModal";
+import { BotsModal } from "./BotsModal";
 import { RemoteConnectModal } from "./RemoteConnectModal";
 import { ToolsPanel } from "./tools/ToolsPanel";
 import { TermPanel } from "./tools/TermPanel";
@@ -19,6 +20,7 @@ export function Layout() {
   const openTool = useShellStore((s) => s.openTool);
   const openTerm = useShellStore((s) => s.openTerm);
   const openSearch = useShellStore((s) => s.openSearch);
+  const openSettings = useShellStore((s) => s.openSettings);
 
   const isHome =
     location.pathname === "/" || location.pathname.startsWith("/chat/");
@@ -26,6 +28,33 @@ export function Layout() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
+      const target = e.target as HTMLElement | null;
+      const typing =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
+
+      // Ctrl+, / ⌘, → 设置
+      if (meta && !e.altKey && !e.shiftKey && e.key === ",") {
+        e.preventDefault();
+        openSettings();
+        return;
+      }
+      // Alt+Win+P / ⌥⌘P → 使用统计
+      if (e.altKey && e.metaKey && !e.shiftKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        openSettings("analytics");
+        return;
+      }
+      // Windows: Alt+Ctrl+P as fallback when Win key isn't exposed to the page
+      if (e.altKey && e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === "p" && !typing) {
+        e.preventDefault();
+        openSettings("analytics");
+        return;
+      }
+
       if (meta && e.shiftKey && e.key.toLowerCase() === "g") {
         e.preventDefault();
         openTool("review");
@@ -35,7 +64,7 @@ export function Layout() {
         openTerm();
       }
       if (meta && e.key.toLowerCase() === "t" && !e.shiftKey) {
-        if ((e.target as HTMLElement)?.tagName === "BODY" || (e.target as HTMLElement)?.closest?.(".app-shell")) {
+        if (target?.tagName === "BODY" || target?.closest?.(".app-shell")) {
           e.preventDefault();
           openTool("browser");
         }
@@ -51,7 +80,7 @@ export function Layout() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openTool, openTerm, openSearch]);
+  }, [openTool, openTerm, openSearch, openSettings]);
 
   return (
     <div className="app-shell h-screen flex flex-col bg-codex-bg text-codex-text overflow-hidden">
@@ -75,6 +104,7 @@ export function Layout() {
       </div>
       <SearchPalette />
       <MobileRemoteModal />
+      <BotsModal />
       <RemoteConnectModal />
     </div>
   );

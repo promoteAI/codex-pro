@@ -19,6 +19,8 @@
   "unpin": "取消置顶",
   "usageStats": "使用统计",
   "mobileRemote": "手机遥控",
+  "mobileRemoteTipTitle": "移动端远程控制",
+  "mobileRemoteTipSub": "扫码控制当前工作区",
   "update": "检查更新",
   "updateShort": "更新",
   "remoteConnect": "远程连接",

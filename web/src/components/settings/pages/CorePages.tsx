@@ -414,6 +414,73 @@ export function AppearancePage() {
 
       <SettingsCard>
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
+          <SectionTitle className="mb-0">{t("lightTheme")}</SectionTitle>
+          <div className="flex gap-2 items-center">
+            <ActionBtn>{t("importTheme")}</ActionBtn>
+            <ActionBtn>{t("copyTheme")}</ActionBtn>
+            <span className="text-[11px] text-[#666] bg-[#2a2a2a] border border-[#3a3a3a] rounded px-2 py-0.5">
+              Codex
+            </span>
+          </div>
+        </div>
+        <SettingsRow label={t("accentColor")}>
+          <div className="w-9 h-6 rounded bg-codex-accent border border-[#3a3a3a]" />
+          <ActionBtn>{t("default")}</ActionBtn>
+        </SettingsRow>
+        <SettingsRow label={t("bgColor")}>
+          <input
+            defaultValue="#ffffff"
+            className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1 text-[12.5px] text-[#e0e0e0] w-28 outline-none font-mono"
+          />
+        </SettingsRow>
+        <SettingsRow label={t("fgColor")}>
+          <input
+            defaultValue="#1a1a1a"
+            className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1 text-[12.5px] text-[#e0e0e0] w-28 outline-none font-mono"
+          />
+        </SettingsRow>
+        <SettingsRow label={t("uiFont")}>
+          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#c0c0c0]">
+            <option>{t("systemDefault")}</option>
+          </select>
+          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#c0c0c0] min-w-[60px]">
+            <option>{t("fontRegular")}</option>
+          </select>
+        </SettingsRow>
+        <SettingsRow label={t("contentFont")}>
+          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#c0c0c0]">
+            <option>{t("sameAsUiFont")}</option>
+          </select>
+          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#c0c0c0] min-w-[60px]">
+            <option>{t("fontRegular")}</option>
+          </select>
+        </SettingsRow>
+        <SettingsRow label={t("codeFont")}>
+          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#c0c0c0]">
+            <option>{t("systemDefault")}</option>
+          </select>
+          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#c0c0c0] min-w-[60px]">
+            <option>{t("fontRegular")}</option>
+          </select>
+        </SettingsRow>
+        <SettingsRow label={t("translucentSidebar")}>
+          <Toggle checked={translucent} onChange={setTranslucent} label={t("translucentSidebar")} />
+        </SettingsRow>
+        <SettingsRow label={t("contrast")}>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={contrast}
+            onChange={(e) => setContrast(Number(e.target.value))}
+            className="w-32 accent-codex-accent"
+          />
+          <span className="text-[12.5px] text-[#999] w-6 text-right">{contrast}</span>
+        </SettingsRow>
+      </SettingsCard>
+
+      <SettingsCard>
+        <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <SectionTitle className="mb-0">{t("darkTheme")}</SectionTitle>
           <div className="flex gap-2 items-center">
             <ActionBtn>{t("importTheme")}</ActionBtn>

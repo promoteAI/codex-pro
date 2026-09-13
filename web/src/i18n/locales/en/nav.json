@@ -19,6 +19,8 @@
   "unpin": "Unpin",
   "usageStats": "Usage stats",
   "mobileRemote": "Mobile remote",
+  "mobileRemoteTipTitle": "Mobile remote control",
+  "mobileRemoteTipSub": "Scan to control this workspace",
   "update": "Check for updates",
   "updateShort": "Update",
   "remoteConnect": "Remote connect",

@@ -5,6 +5,7 @@
   "tokenTrend": "Token usage trend",
   "costTrend": "Cost trend",
   "channelAttribution": "Cost by channel",
+  "channelShare": "Channel mix",
   "inputTokens": "Input",
   "outputTokens": "Output",
   "costUsd": "Cost (USD)",
@@ -16,5 +17,13 @@
   "successes": "Successes",
   "failures": "Failures",
   "successRate": "Success rate",
-  "clearChannelFilter": "Clear channel filter"
+  "clearChannelFilter": "Clear channel filter",
+  "kpiTokens": "Tokens in range",
+  "kpiChannels": "Active channels",
+  "kpiChannelsHint": "Channels with cost",
+  "kpiSkillCalls": "Skill calls",
+  "kpiSkillCallsHint": "{{n}} skills",
+  "kpiErrorRate": "Failure rate",
+  "kpiErrorOk": "Within range",
+  "kpiErrorWatch": "Elevated — investigate"
 }

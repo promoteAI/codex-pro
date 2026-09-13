@@ -169,12 +169,26 @@ export function PetsPage() {
 }
 
 const SHORTCUTS = [
-  { id: "search", action: "打开搜索", keys: ["Ctrl", "K"] },
-  { id: "settings", action: "打开设置", keys: ["Ctrl", ","] },
-  { id: "new", action: "新建对话", keys: ["Ctrl", "N"] },
-  { id: "term", action: "切换终端", keys: ["Ctrl", "`"] },
-  { id: "tools", action: "切换工具面板", keys: ["Ctrl", "\\"] },
+  { id: "search", action: "打开命令菜单", keys: ["Ctrl+K"] },
+  { id: "settings", action: "设置", keys: ["Ctrl+,"] },
+  { id: "analytics", action: "使用统计", keys: ["Alt+Win+P"] },
+  { id: "new", action: "新建对话", keys: ["Ctrl+N"] },
+  { id: "term", action: "打开终端", keys: ["Ctrl+`"] },
+  { id: "sidebar", action: "切换侧边栏", keys: ["Ctrl+B"] },
+  { id: "bottom", action: "切换底部面板", keys: ["Ctrl+J"] },
+  { id: "review", action: "切换审阅", keys: ["Ctrl+Shift+G"] },
+  { id: "browser", action: "打开浏览器", keys: ["Ctrl+T"] },
+  { id: "sidechat", action: "切换侧边聊天", keys: ["Ctrl+Alt+S"] },
+  { id: "model", action: "打开模型选择器", keys: ["Ctrl+Shift+M"] },
+  { id: "folder", action: "打开文件夹", keys: ["Ctrl+O"] },
   { id: "send", action: "发送消息", keys: ["Enter"] },
+  { id: "queue", action: "在后台发送消息", keys: ["Ctrl+Enter"] },
+  { id: "copy-md", action: "复制为 Markdown", keys: [] },
+  { id: "rename", action: "重命名聊天", keys: ["Ctrl+Alt+R"] },
+  { id: "show-keys", action: "显示键盘快捷键", keys: ["Ctrl+/"] },
+  { id: "env1", action: "环境操作 1", keys: ["Shift+Win+D"] },
+  { id: "env2", action: "环境操作 2", keys: [] },
+  { id: "env3", action: "环境操作 3", keys: [] },
 ];
 
 export function ShortcutsPage() {
@@ -204,19 +218,23 @@ export function ShortcutsPage() {
         {list.map((s) => (
           <div
             key={s.id}
-            className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-[#222]"
+            className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-[#222]"
             role="listitem"
           >
             <span className="text-[13.5px] text-[#d4d4d4]">{s.action}</span>
-            <div className="flex gap-1">
-              {s.keys.map((k) => (
-                <kbd
-                  key={k}
-                  className="text-[11.5px] text-[#999] bg-[#2a2a2a] border border-[#3a3a3a] rounded px-1.5 py-0.5"
-                >
-                  {k}
-                </kbd>
-              ))}
+            <div className="flex gap-1 shrink-0">
+              {s.keys.length === 0 ? (
+                <span className="text-[11.5px] text-[#666]">{t("shortcutUnset")}</span>
+              ) : (
+                s.keys.map((k) => (
+                  <kbd
+                    key={k}
+                    className="text-[11.5px] text-[#999] bg-[#2a2a2a] border border-[#3a3a3a] rounded px-1.5 py-0.5"
+                  >
+                    {k}
+                  </kbd>
+                ))
+              )}
             </div>
           </div>
         ))}
@@ -279,6 +297,7 @@ export function ComputerPage() {
   const { t } = useTranslation("settings");
   const [anyScreen, setAnyScreen] = useState(true);
   const [chrome, setChrome] = useState(true);
+  const [excel, setExcel] = useState(true);
 
   return (
     <div className="max-w-[720px]">
@@ -305,7 +324,7 @@ export function ComputerPage() {
           <ActionBtn>{t("manage")}</ActionBtn>
           <Toggle checked={chrome} onChange={setChrome} label="Chrome" />
         </div>
-        <div className="flex items-center gap-3.5 px-4 py-3.5">
+        <div className="flex items-center gap-3.5 px-4 py-3.5 border-b border-codex-border">
           <div className="w-9 h-9 rounded-lg bg-[#0a2a4a] shrink-0 grid place-items-center text-[#36c5f0] text-xs font-bold">
             E
           </div>
@@ -315,7 +334,21 @@ export function ComputerPage() {
           </div>
           <ActionBtn>{t("install")}</ActionBtn>
         </div>
+        <div className="flex items-center gap-3.5 px-4 py-3.5">
+          <div className="w-9 h-9 rounded-lg bg-[#107c41] shrink-0 grid place-items-center text-white text-xs font-bold">
+            X
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13.5px] font-medium text-[#e0e0e0]">Microsoft Excel</div>
+            <div className="text-xs text-codex-muted">{t("excelDesc")}</div>
+          </div>
+          <Toggle checked={excel} onChange={setExcel} label="Excel" />
+        </div>
       </SettingsCard>
+      <SectionTitle>{t("alwaysAllowApps")}</SectionTitle>
+      <div className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-xl px-4 py-6 text-center text-[13px] text-[#6e6e6e]">
+        {t("alwaysAllowEmpty")}
+      </div>
     </div>
   );
 }
@@ -497,19 +530,28 @@ export function SettingsPluginsPage() {
 export function BrowserSettingsPage() {
   const { t } = useTranslation("settings");
   const [enabled, setEnabled] = useState(true);
+  const [ignoreCert, setIgnoreCert] = useState(true);
   return (
     <div className="max-w-[720px]">
       <PageTitle>{t("browser")}</PageTitle>
-      <PageSub>{t("browserDesc")}</PageSub>
       <SettingsCard>
         <SettingsRow label={t("embeddedBrowser")} desc={t("embeddedBrowserDesc")}>
           <Toggle checked={enabled} onChange={setEnabled} label={t("embeddedBrowser")} />
         </SettingsRow>
-        <SettingsRow label={t("defaultBrowser")} desc={t("defaultBrowserDesc")}>
-          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]">
-            <option>Chromium</option>
-            <option>System</option>
-          </select>
+      </SettingsCard>
+      <SectionTitle>{t("browserSecurity")}</SectionTitle>
+      <SettingsCard>
+        <SettingsRow label={t("ignoreCert")} desc={t("ignoreCertDesc")}>
+          <Toggle checked={ignoreCert} onChange={setIgnoreCert} label={t("ignoreCert")} />
+        </SettingsRow>
+      </SettingsCard>
+      <SectionTitle>{t("browserData")}</SectionTitle>
+      <SettingsCard>
+        <SettingsRow label={t("clearBrowserCache")} desc={t("clearBrowserCacheDesc")}>
+          <ActionBtn>{t("clearCache")}</ActionBtn>
+        </SettingsRow>
+        <SettingsRow label={t("clearAllBrowserData")} desc={t("clearAllBrowserDataDesc")}>
+          <ActionBtn danger>{t("clearAll")}</ActionBtn>
         </SettingsRow>
       </SettingsCard>
     </div>
@@ -517,14 +559,106 @@ export function BrowserSettingsPage() {
 }
 
 export function HooksPage() {
-  const { t } = useTranslation("settings");
+  const { t } = useTranslation(["settings", "common"]);
   const [q, setQ] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [scope, setScope] = useState("用户");
+  const [event, setEvent] = useState("PreToolUse");
+  const [runMode, setRunMode] = useState("process");
+  const [command, setCommand] = useState("");
+
+  if (creating) {
+    return (
+      <div className="max-w-[720px]">
+        <PageTitle>{t("newHook")}</PageTitle>
+        <PageSub>{t("newHookDesc")}</PageSub>
+        <SettingsCard>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-4 py-3.5 border-b border-codex-border">
+            <label className="block text-[12px] text-[#8a8a8a]">
+              {t("hookEvent")}
+              <select
+                value={event}
+                onChange={(e) => setEvent(e.target.value)}
+                className="mt-1.5 w-full bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]"
+              >
+                {["PreToolUse", "PostToolUse", "UserPromptSubmit", "PermissionRequest", "Stop", "SessionStart", "SessionEnd"].map(
+                  (v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+            <label className="block text-[12px] text-[#8a8a8a]">
+              {t("hookRunMode")}
+              <select
+                value={runMode}
+                onChange={(e) => setRunMode(e.target.value)}
+                className="mt-1.5 w-full bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]"
+              >
+                <option value="process">{t("hookRunProcess")}</option>
+                <option value="prompt">{t("hookRunPrompt")}</option>
+              </select>
+            </label>
+            <label className="block text-[12px] text-[#8a8a8a]">
+              {t("hookScope")}
+              <select
+                value={scope}
+                onChange={(e) => setScope(e.target.value)}
+                className="mt-1.5 w-full bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]"
+              >
+                <option value="用户">{t("scopeUser")}</option>
+                <option value="codex-pro">codex-pro</option>
+                <option value="default">default</option>
+              </select>
+            </label>
+          </div>
+          <div className="px-4 py-3.5">
+            <label className="block text-[12px] text-[#8a8a8a] mb-1.5">{t("hookCommand")}</label>
+            <textarea
+              value={command}
+              onChange={(e) => setCommand(e.target.value)}
+              rows={4}
+              placeholder={t("hookCommandPlaceholder")}
+              className="w-full bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-[#e0e0e0] outline-none resize-y font-mono"
+            />
+          </div>
+        </SettingsCard>
+        <div className="flex justify-end gap-2 mt-4">
+          <ActionBtn onClick={() => setCreating(false)}>{t("common:cancel")}</ActionBtn>
+          <button
+            type="button"
+            onClick={() => setCreating(false)}
+            className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium"
+          >
+            {t("save")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-[720px]">
       <PageTitle>{t("hooks")}</PageTitle>
-      <PageSub>{t("hooksDesc")}</PageSub>
-      <div className="flex items-center gap-2 mb-3">
-        <ActionBtn>{t("scopeUser")} ▾</ActionBtn>
+      <PageSub>
+        {t("hooksDesc")}{" "}
+        <a href="#" className="text-[#4c8dff] hover:underline">
+          {t("learnMore")}
+        </a>
+      </PageSub>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <select
+          value={scope}
+          onChange={(e) => setScope(e.target.value)}
+          className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]"
+          aria-label={t("hookScope")}
+        >
+          <option value="用户">{t("scopeUser")}</option>
+          <option value="codex-pro">codex-pro</option>
+          <option value="default">default</option>
+        </select>
         <span className="text-[12.5px] text-codex-muted">{t("hooksCount", { n: 0 })}</span>
         <div className="ml-auto flex items-center gap-1.5 bg-[#1e1e1e] border border-codex-border rounded-lg px-2.5 py-1 w-[200px]">
           <Search size={14} className="text-[#555]" />
@@ -538,18 +672,36 @@ export function HooksPage() {
       </div>
       <div className="flex items-center justify-between mb-6">
         <span className="text-[12.5px] text-codex-muted">{t("installedN", { n: 0 })}</span>
-        <button
-          type="button"
-          className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium"
-        >
-          + {t("new")}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            title={t("refresh")}
+            aria-label={t("refresh")}
+            className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-[#c0c0c0] hover:bg-[#333]"
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
+              <path d="M21 12a9 9 0 1 1-2.6-6.3" />
+              <path d="M21 3v6h-6" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium"
+          >
+            + {t("new")}
+          </button>
+        </div>
       </div>
       <EmptyState
         title={t("noHooks")}
         desc={t("noHooksDesc")}
         action={
-          <button type="button" className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium">
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium"
+          >
             + {t("newHook")}
           </button>
         }
@@ -578,6 +730,12 @@ export function GitPage() {
   const [prefix, setPrefix] = useState("codex_pro");
   const [merge, setMerge] = useState("merge");
   const [force, setForce] = useState(false);
+  const [draftPr, setDraftPr] = useState(true);
+  const [review, setReview] = useState("separate");
+  const [autoMerge, setAutoMerge] = useState(false);
+  const [monitorInstr, setMonitorInstr] = useState("");
+  const [commitInstr, setCommitInstr] = useState("");
+  const [prInstr, setPrInstr] = useState("");
 
   return (
     <div className="max-w-[720px]">
@@ -603,6 +761,68 @@ export function GitPage() {
         <SettingsRow label={t("forcePush")} desc={t("forcePushDesc")}>
           <Toggle checked={force} onChange={setForce} label={t("forcePush")} />
         </SettingsRow>
+        <SettingsRow label={t("draftPr")} desc={t("draftPrDesc")}>
+          <Toggle checked={draftPr} onChange={setDraftPr} label={t("draftPr")} />
+        </SettingsRow>
+        <SettingsRow label={t("reviewPresentation")} desc={t("reviewPresentationDesc")}>
+          <SegGroup
+            value={review}
+            onChange={setReview}
+            options={[
+              { id: "inline", label: t("reviewInline") },
+              { id: "separate", label: t("reviewSeparate") },
+            ]}
+          />
+        </SettingsRow>
+      </SettingsCard>
+
+      <SectionTitle>{t("monitorPr")}</SectionTitle>
+      <SettingsCard>
+        <div className="px-4 py-3.5 space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-[13.5px] font-medium text-[#e4e4e4]">{t("autoMergeWhenReady")}</div>
+              <div className="text-[12px] text-[#6e6e6e] mt-1">{t("autoMergeWhenReadyDesc")}</div>
+            </div>
+            <Toggle checked={autoMerge} onChange={setAutoMerge} label={t("autoMergeWhenReady")} />
+          </div>
+          <textarea
+            value={monitorInstr}
+            onChange={(e) => setMonitorInstr(e.target.value)}
+            rows={3}
+            placeholder={t("monitorInstrPlaceholder")}
+            className="w-full bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-[#e0e0e0] outline-none resize-y"
+            aria-label={t("monitorInstrPlaceholder")}
+          />
+        </div>
+      </SettingsCard>
+
+      <SectionTitle>{t("commitInstr")}</SectionTitle>
+      <SettingsCard>
+        <div className="px-4 py-3.5 space-y-2">
+          <div className="text-[12px] text-[#6e6e6e]">{t("commitInstrDesc")}</div>
+          <textarea
+            value={commitInstr}
+            onChange={(e) => setCommitInstr(e.target.value)}
+            rows={3}
+            placeholder={t("commitInstrPlaceholder")}
+            className="w-full bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-[#e0e0e0] outline-none resize-y"
+          />
+        </div>
+      </SettingsCard>
+
+      <SectionTitle>{t("prInstr")}</SectionTitle>
+      <SettingsCard>
+        <div className="px-4 py-3.5 space-y-2">
+          <div className="text-[12px] text-[#6e6e6e]">{t("prInstrDesc")}</div>
+          <textarea
+            value={prInstr}
+            onChange={(e) => setPrInstr(e.target.value)}
+            rows={3}
+            placeholder={t("prInstrPlaceholder")}
+            className="w-full bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-[#e0e0e0] outline-none resize-y"
+          />
+        </div>
       </SettingsCard>
     </div>
   );
@@ -659,6 +879,10 @@ export function EnvironmentPage() {
 export function WorktreesPage() {
   const { t } = useTranslation("settings");
   const [root, setRoot] = useState("C:/Users/cheris/.codex/worktrees");
+  const [pullUpstream, setPullUpstream] = useState(false);
+  const [autoDelete, setAutoDelete] = useState(true);
+  const [deleteLimit, setDeleteLimit] = useState(15);
+
   return (
     <div className="max-w-[720px]">
       <PageTitle>{t("worktrees")}</PageTitle>
@@ -670,18 +894,252 @@ export function WorktreesPage() {
             className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#e0e0e0] w-[280px] max-w-[40vw] outline-none"
           />
         </SettingsRow>
+        <SettingsRow label={t("pullUpstream")} desc={t("pullUpstreamDesc")}>
+          <Toggle checked={pullUpstream} onChange={setPullUpstream} label={t("pullUpstream")} />
+        </SettingsRow>
+        <SettingsRow label={t("autoDeleteWorktrees")} desc={t("autoDeleteWorktreesDesc")}>
+          <Toggle checked={autoDelete} onChange={setAutoDelete} label={t("autoDeleteWorktrees")} />
+        </SettingsRow>
+        <SettingsRow label={t("autoDeleteLimit")} desc={t("autoDeleteLimitDesc")}>
+          <input
+            type="number"
+            min={1}
+            max={999}
+            value={deleteLimit}
+            onChange={(e) => setDeleteLimit(Number(e.target.value) || 1)}
+            className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#e0e0e0] w-20 outline-none"
+            aria-label={t("autoDeleteLimit")}
+          />
+        </SettingsRow>
       </SettingsCard>
+      <div className="flex items-center justify-between mt-5 mb-2">
+        <span className="text-[12.5px] text-[#b8b8b8]">{t("noWorktreesYet")}</span>
+        <button
+          type="button"
+          title={t("refresh")}
+          aria-label={t("refresh")}
+          className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-[#c0c0c0] hover:bg-[#333]"
+        >
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
+            <path d="M21 12a9 9 0 1 1-2.6-6.3" />
+            <path d="M21 3v6h-6" />
+          </svg>
+        </button>
+      </div>
+      <div className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-xl px-4 py-8 text-center text-[13px] text-[#6e6e6e]">
+        {t("worktreesEmpty")}
+      </div>
     </div>
   );
 }
 
+type ArchivedChat = { title: string; time: string };
+type ArchivedGroup = { project: string; chats: ArchivedChat[] };
+
+const ARCHIVED_SEED: ArchivedGroup[] = [
+  {
+    project: "无项目",
+    chats: [
+      { title: "macOS 打包脚本与签名流程", time: "2024年9月4日 10:54" },
+      { title: "如何打包为桌面应用", time: "2024年9月4日 09:12" },
+      { title: "Electron 启动白屏排查", time: "2024年9月3日 21:40" },
+      { title: "更新日志模板", time: "2024年9月3日 18:05" },
+      { title: "ci 失败：pnpm lockfile", time: "2024年9月2日 16:22" },
+      { title: "本地代理配置", time: "2024年9月2日 11:08" },
+      { title: "快捷键冲突整理", time: "2024年9月1日 20:33" },
+      { title: "hi", time: "2024年9月1日 09:01" },
+    ],
+  },
+  {
+    project: "DeepTutor",
+    chats: [
+      { title: "课程大纲生成器", time: "2024年9月4日 14:20" },
+      { title: "测验题型设计", time: "2024年9月3日 19:45" },
+      { title: "向量检索效果对比", time: "2024年9月2日 15:10" },
+      { title: "学生进度看板原型", time: "2024年9月1日 22:18" },
+      { title: "导入 PDF 讲义", time: "2024年8月30日 17:50" },
+    ],
+  },
+  {
+    project: "cheris",
+    chats: [
+      { title: "个人站点改版", time: "2024年9月3日 12:05" },
+      { title: "博客配色调整", time: "2024年8月28日 21:16" },
+    ],
+  },
+];
+
 export function ArchivedPage() {
   const { t } = useTranslation("settings");
+  const [groups, setGroups] = useState(ARCHIVED_SEED);
+  const [q, setQ] = useState("");
+  const [chatFilter, setChatFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  const projects = useMemo(() => groups.map((g) => g.project), [groups]);
+
+  const visible = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return groups
+      .filter((g) => projectFilter === "all" || g.project === projectFilter)
+      .map((g) => ({
+        ...g,
+        chats: g.chats.filter((c) => {
+          if (chatFilter === "temp" && g.project !== "无项目") return false;
+          if (chatFilter === "project" && g.project === "无项目") return false;
+          if (!needle) return true;
+          return `${c.title} ${c.time}`.toLowerCase().includes(needle);
+        }),
+      }))
+      .filter((g) => g.chats.length > 0 || (!needle && projectFilter !== "all"));
+  }, [groups, q, chatFilter, projectFilter]);
+
+  const removeChat = (project: string, title: string) => {
+    setGroups((prev) =>
+      prev
+        .map((g) =>
+          g.project === project ? { ...g, chats: g.chats.filter((c) => c.title !== title) } : g,
+        )
+        .filter((g) => g.chats.length > 0),
+    );
+  };
+
   return (
-    <div className="max-w-[720px]">
-      <PageTitle>{t("archived")}</PageTitle>
-      <PageSub>{t("archivedDesc")}</PageSub>
-      <EmptyState title={t("noArchived")} desc={t("noArchivedDesc")} />
+    <div className="max-w-[760px]">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h2 className="text-[22px] font-semibold text-[#f0f0f0] tracking-tight m-0">{t("archived")}</h2>
+        <button
+          type="button"
+          className="text-[12.5px] text-[#f87171] hover:underline"
+          onClick={() => setGroups([])}
+        >
+          {t("deleteAllArchived")}
+        </button>
+      </div>
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="flex-1 min-w-[180px] flex items-center gap-2 bg-[#1e1e1e] border border-codex-border rounded-lg px-3 py-2">
+          <Search size={14} className="text-[#555] shrink-0" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t("searchArchived")}
+            aria-label={t("searchArchived")}
+            className="bg-transparent outline-none text-[13px] text-[#c0c0c0] placeholder:text-[#6a6a6a] w-full"
+          />
+        </div>
+        <select
+          value={chatFilter}
+          onChange={(e) => setChatFilter(e.target.value)}
+          aria-label={t("chatTypeFilter")}
+          className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-2 text-[12.5px] text-[#c0c0c0]"
+        >
+          <option value="all">{t("allChats")}</option>
+          <option value="temp">{t("tempChats")}</option>
+          <option value="project">{t("projectChats")}</option>
+        </select>
+        <select
+          value={projectFilter}
+          onChange={(e) => setProjectFilter(e.target.value)}
+          aria-label={t("projectFilter")}
+          className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-2 text-[12.5px] text-[#c0c0c0]"
+        >
+          <option value="all">{t("allProjects")}</option>
+          {projects.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {visible.length === 0 ? (
+        <div className="ac-empty text-center text-[13px] text-[#6e6e6e] py-10">
+          {groups.length === 0 ? t("noArchived") : t("noArchivedMatch")}
+        </div>
+      ) : (
+        <div className="ac-groups flex flex-col gap-2.5">
+          {visible.map((g) => {
+            const isCollapsed = !!collapsed[g.project];
+            return (
+              <div
+                key={g.project}
+                className={`ac-group bg-[#222] border border-[#2e2e2e] rounded-xl overflow-hidden${isCollapsed ? " is-collapsed" : ""}`}
+              >
+                <button
+                  type="button"
+                  className="ac-group-head flex items-center gap-2.5 w-full px-3.5 py-3 bg-transparent border-0 text-[#e0e0e0] text-left hover:bg-[#262626]"
+                  onClick={() =>
+                    setCollapsed((c) => ({ ...c, [g.project]: !c[g.project] }))
+                  }
+                >
+                  <svg
+                    className="w-[15px] h-[15px] shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#888"
+                    strokeWidth="1.6"
+                    aria-hidden="true"
+                  >
+                    <path d="M3.5 8a2 2 0 0 1 2-2h4l2 2.3h7a2 2 0 0 1 2 2V16a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
+                  </svg>
+                  <span className="text-[13.5px] font-medium flex-1">{g.project}</span>
+                  <span className="text-[12px] text-[#6e6e6e]">
+                    {t("archivedCount", { n: g.chats.length })}
+                  </span>
+                  <svg
+                    className={`w-3.5 h-3.5 shrink-0 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#666"
+                    strokeWidth="1.8"
+                    aria-hidden="true"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+                {!isCollapsed && (
+                  <div className="ac-group-body">
+                    {g.chats.map((c) => (
+                      <div
+                        key={`${g.project}-${c.title}`}
+                        className="flex items-center gap-3 px-3.5 py-2.5 border-t border-[#2a2a2a]"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] text-[#e8e8e8] truncate">{c.title}</div>
+                          <div className="text-[11.5px] text-[#6e6e6e] mt-0.5">{c.time}</div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            title={t("delete")}
+                            aria-label={t("delete")}
+                            onClick={() => removeChat(g.project, c.title)}
+                            className="w-7 h-7 inline-flex items-center justify-center rounded-md text-[#888] hover:bg-[#333] hover:text-[#f87171]"
+                          >
+                            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
+                              <path d="M3 6h18" />
+                              <path d="M8 6V4h8v2" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeChat(g.project, c.title)}
+                            className="text-[12.5px] text-[#4c8dff] hover:underline"
+                          >
+                            {t("unarchive")}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@
   "tokenTrend": "Token 消耗趋势",
   "costTrend": "成本趋势",
   "channelAttribution": "渠道成本归因",
+  "channelShare": "渠道分布",
   "inputTokens": "输入",
   "outputTokens": "输出",
   "costUsd": "成本(USD)",
@@ -16,5 +17,13 @@
   "successes": "成功",
   "failures": "失败",
   "successRate": "成功率",
-  "clearChannelFilter": "清除频道筛选"
+  "clearChannelFilter": "清除频道筛选",
+  "kpiTokens": "区间 Token",
+  "kpiChannels": "活跃渠道",
+  "kpiChannelsHint": "成本归因渠道数",
+  "kpiSkillCalls": "Skill 调用",
+  "kpiSkillCallsHint": "{{n}} 个技能",
+  "kpiErrorRate": "失败率",
+  "kpiErrorOk": "正常范围",
+  "kpiErrorWatch": "偏高，建议排查"
 }

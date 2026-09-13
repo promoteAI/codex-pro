@@ -63,9 +63,9 @@ export function Layout() {
                 <Outlet />
               </RouteErrorBoundary>
             </main>
-            <ToolsPanel />
+            {isHome && <ToolsPanel />}
           </div>
-          <TermPanel />
+          {isHome && <TermPanel />}
         </div>
         <Suspense fallback={null}>
           <SettingsOverlay />

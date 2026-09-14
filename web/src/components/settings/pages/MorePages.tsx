@@ -12,6 +12,8 @@ import {
   SettingsRow,
   Toggle,
 } from "../ui";
+import { AddMarketModal } from "../../AddMarketModal";
+import { toast } from "../../../stores/toast";
 
 export function VoicePage() {
   const { t } = useTranslation("settings");
@@ -378,6 +380,7 @@ export function SettingsPluginsPage() {
   const [tab, setTab] = useState<"plugins" | "mcp" | "skills">("plugins");
   const [q, setQ] = useState("");
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [marketOpen, setMarketOpen] = useState(false);
   const [enabled, setEnabled] = useState<Record<string, boolean>>(
     Object.fromEntries(PLUGIN_ITEMS.map((p) => [p.id, p.on])),
   );
@@ -430,7 +433,10 @@ export function SettingsPluginsPage() {
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={() => setAddMenuOpen(false)}
+                  onClick={() => {
+                    setAddMenuOpen(false);
+                    toast.info(t("createPlugin") + "（即将推出）");
+                  }}
                   className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#e0e0e0] hover:bg-[#353535]"
                 >
                   <span className="w-4 h-4 inline-flex items-center justify-center text-[#888]">
@@ -441,7 +447,10 @@ export function SettingsPluginsPage() {
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={() => setAddMenuOpen(false)}
+                  onClick={() => {
+                    setAddMenuOpen(false);
+                    setMarketOpen(true);
+                  }}
                   className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#e0e0e0] hover:bg-[#353535]"
                 >
                   <span className="w-4 h-4 inline-flex items-center justify-center text-[#888]">
@@ -452,7 +461,10 @@ export function SettingsPluginsPage() {
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={() => setAddMenuOpen(false)}
+                  onClick={() => {
+                    setAddMenuOpen(false);
+                    toast.info(t("addMcp") + "（即将推出）");
+                  }}
                   className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#e0e0e0] hover:bg-[#353535]"
                 >
                   <span className="w-4 h-4 inline-flex items-center justify-center text-[#888]">
@@ -523,6 +535,8 @@ export function SettingsPluginsPage() {
           </div>
         ))}
       </div>
+
+      <AddMarketModal open={marketOpen} onClose={() => setMarketOpen(false)} />
     </div>
   );
 }

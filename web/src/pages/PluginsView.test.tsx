@@ -80,13 +80,29 @@ describe("PluginsView", () => {
     expect(screen.queryByText("Computer Use")).not.toBeInTheDocument();
   });
 
-  it("添加菜单可打开插件设置", () => {
+  it("添加菜单打开添加插件市场弹窗", () => {
     mockApi();
     renderView();
     fireEvent.click(screen.getByRole("button", { name: /添加/ }));
     fireEvent.click(screen.getByRole("menuitem", { name: "添加插件市场" }));
-    expect(useShellStore.getState().settingsOpen).toBe(true);
-    expect(useShellStore.getState().settingsSection).toBe("plugins");
+    expect(screen.getByRole("dialog", { name: "添加插件市场" })).toBeInTheDocument();
+    expect(screen.getByLabelText("来源")).toBeInTheDocument();
+    expect(screen.getByLabelText("Git 引用")).toBeInTheDocument();
+    expect(screen.getByLabelText("稀疏路径")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.queryByRole("dialog", { name: "添加插件市场" })).not.toBeInTheDocument();
+  });
+
+  it("添加市场需填写来源", () => {
+    mockApi();
+    renderView();
+    fireEvent.click(screen.getByRole("button", { name: /添加/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "添加插件市场" }));
+    fireEvent.click(screen.getByRole("button", { name: "添加市场" }));
+    expect(screen.getByRole("dialog", { name: "添加插件市场" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("来源"), { target: { value: "openai/plugins" } });
+    fireEvent.click(screen.getByRole("button", { name: "添加市场" }));
+    expect(screen.queryByRole("dialog", { name: "添加插件市场" })).not.toBeInTheDocument();
   });
 
   it("切换到技能页并展示已安装技能", async () => {

@@ -4,6 +4,7 @@ import { useWsSubscribe } from "../hooks/use-ws";
 import { useShellStore } from "../stores/shell";
 import { toast } from "../stores/toast";
 import { SkillDetailDrawer } from "../components/SkillDetailDrawer";
+import { AddMarketModal } from "../components/AddMarketModal";
 import { useIsAdmin } from "../stores/capabilities";
 
 interface PluginItem {
@@ -229,6 +230,7 @@ export function PluginsView() {
   const [skillQuery, setSkillQuery] = useState("");
   const [skillTab, setSkillTab] = useState<SkillScope>("personal");
   const [addOpen, setAddOpen] = useState(false);
+  const [marketOpen, setMarketOpen] = useState(false);
   const [installedExpanded, setInstalledExpanded] = useState(false);
   const [scopeExpanded, setScopeExpanded] = useState(false);
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
@@ -385,7 +387,7 @@ export function PluginsView() {
                 role="menuitem"
                 onClick={() => {
                   setAddOpen(false);
-                  openSettings("plugins");
+                  setMarketOpen(true);
                 }}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -673,6 +675,8 @@ export function PluginsView() {
           onClose={() => setSelectedSkill(null)}
         />
       )}
+
+      <AddMarketModal open={marketOpen} onClose={() => setMarketOpen(false)} />
     </section>
   );
 }

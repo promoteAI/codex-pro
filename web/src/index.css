@@ -388,6 +388,28 @@ body {
 .add-plugin-item:hover{background:#353535;color:#fff}
 .add-plugin-item svg{width:16px;height:16px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
 .pl-sk-check.is-on{color:#6ecf9a}
+.pl-modal-overlay{position:fixed;inset:0;z-index:96;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.55)}
+.pl-modal-overlay.open{display:flex}
+.pl-modal{width:min(460px,100%);background:#2a2a2a;border:1px solid #3a3a3a;border-radius:14px;box-shadow:0 20px 48px rgba(0,0,0,.55);padding:20px 22px 18px}
+.pl-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}
+.pl-modal-title{font-size:17px;font-weight:600;color:#f0f0f0;margin:0}
+.pl-modal-close{width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:#888;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
+.pl-modal-close:hover{background:#353535;color:#ddd}
+.pl-modal-close svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.pl-modal-sub{font-size:12.5px;color:#8a8a8a;line-height:1.45;margin:0 0 18px;padding-right:28px}
+.pl-modal-sub a{color:#4c8dff;text-decoration:none}
+.pl-modal-sub a:hover{text-decoration:underline}
+.pl-modal-field{margin-bottom:14px}
+.pl-modal-label{display:block;font-size:12.5px;color:#9a9a9a;margin-bottom:7px}
+.pl-modal-input,.pl-modal-textarea{width:100%;box-sizing:border-box;background:#1e1e1e;border:1px solid #3a3a3a;border-radius:8px;color:#e4e4e4;font:inherit;font-size:13px;padding:9px 12px;outline:none}
+.pl-modal-input:focus,.pl-modal-textarea:focus{border-color:#4c8dff;box-shadow:0 0 0 1px rgba(76,141,255,.25)}
+.pl-modal-input::placeholder,.pl-modal-textarea::placeholder{color:#6a6a6a}
+.pl-modal-textarea{min-height:72px;resize:vertical;line-height:1.45}
+.pl-modal-foot{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:18px}
+.pl-modal-cancel{padding:7px 14px;border:1px solid #3a3a3a;border-radius:8px;background:#252525;color:#d0d0d0;font:inherit;font-size:13px;cursor:pointer}
+.pl-modal-cancel:hover{background:#2e2e2e;border-color:#4a4a4a;color:#fff}
+.pl-modal-submit{padding:7px 14px;border:1px solid #444;border-radius:8px;background:#3a3a3a;color:#f0f0f0;font:inherit;font-size:13px;cursor:pointer}
+.pl-modal-submit:hover{background:#454545;border-color:#555}
 @media(max-width:720px){
 .pl-body{padding:16px 16px 36px}
 .pl-top{padding:10px 12px}

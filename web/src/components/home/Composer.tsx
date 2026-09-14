@@ -10,15 +10,14 @@ import {
   RotateCcw,
   Target,
   Lightbulb,
-  Paperclip,
   X,
 } from "lucide-react";
-import { useChatStore, type GitRepo, type GitBranch as GitBranchType } from "../../stores/chat";
+import { useChatStore } from "../../stores/chat";
+import { ProjectMenu } from "../ProjectMenu";
+import { BranchMenu } from "../BranchMenu";
+import { ComposerAddMenu } from "../ComposerAddMenu";
 import {
-  MOCK_AGENT,
-  MOCK_BROWSER_TABS,
   MOCK_CTX_USAGE,
-  MOCK_MARKETPLACE,
   MOCK_MODELS,
   SLASH_COMMANDS,
 } from "../../mock/seeds";
@@ -59,11 +58,10 @@ export function Composer() {
 
   const [menu, setMenu] = useState<Menu>(null);
   const [modelQuery, setModelQuery] = useState("");
-  const [projectQuery, setProjectQuery] = useState("");
-  const [branchQuery, setBranchQuery] = useState("");
-  const [creatingBranch, setCreatingBranch] = useState(false);
-  const [newBranchName, setNewBranchName] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+  const projectBtnRef = useRef<HTMLButtonElement>(null);
+  const branchBtnRef = useRef<HTMLButtonElement>(null);
+  const addBtnRef = useRef<HTMLButtonElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   const ctxUsage = useMemo(() => {
@@ -85,10 +83,10 @@ export function Composer() {
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) {
-        setMenu(null);
-        setCreatingBranch(false);
-      }
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if ((target as Element).closest?.("#projectMenu,#branchMenu,#addMenu")) return;
+      setMenu(null);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -111,21 +109,7 @@ export function Composer() {
   const showGoalBtn = goalMode || planMode;
   const showCtxUsage = chatting;
 
-  const filteredRepos = useMemo(
-    () => repos.filter((r) => r.name.toLowerCase().includes(projectQuery.toLowerCase())),
-    [repos, projectQuery],
-  );
-  const filteredBranches = useMemo(
-    () => branches.filter((b) => b.name.toLowerCase().includes(branchQuery.toLowerCase())),
-    [branches, branchQuery],
-  );
-
-  const toggle = (m: Menu) =>
-    setMenu((cur) => {
-      if (cur === m) return null;
-      setCreatingBranch(false);
-      return m;
-    });
+  const toggle = (m: Menu) => setMenu((cur) => (cur === m ? null : m));
 
   const menuBox =
     "absolute z-30 left-0 bottom-[calc(100%+6px)] min-w-[260px] max-h-80 overflow-auto p-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[10px] shadow-xl";
@@ -136,35 +120,34 @@ export function Composer() {
     ["full", "permFullLong", "permFullDesc"],
   ] as const;
 
-  const commitCreateBranch = () => {
-    const name = newBranchName.trim();
-    if (!name) return;
-    setBranch(name);
-    setNewBranchName("");
-    setCreatingBranch(false);
-    setMenu(null);
-  };
-
   return (
     <div ref={rootRef} className="shrink-0 px-[clamp(16px,4vw,32px)] pb-[clamp(14px,2vw,22px)]">
       <div className="max-w-[720px] mx-auto bg-codex-surface border border-codex-border rounded-[14px] relative">
         {/* ctx-bar: separate top row (project / branch), hidden while chatting */}
         <div className={`flex flex-wrap items-center gap-1 px-3 pt-2.5 pb-1 border-b border-[#262626] ${chatting ? "hidden" : ""}`}>
           <button
+            ref={projectBtnRef}
             type="button"
             onClick={() => toggle("project")}
             className="inline-flex items-center gap-1.5 text-[12.5px] text-[#c0c0c0] px-2 py-1 rounded-md hover:bg-[#2a2a2a]"
             aria-label={t("project")}
+            aria-haspopup="menu"
+            aria-expanded={menu === "project"}
+            aria-controls="projectMenu"
           >
             <Folder size={14} />
             <span>{project || t("noProjectLabel")}</span>
             <svg className="w-2.5 h-2.5 opacity-65" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
           <button
+            ref={branchBtnRef}
             type="button"
             onClick={() => toggle("branch")}
             className="inline-flex items-center gap-1.5 text-[12.5px] text-[#c0c0c0] px-2 py-1 rounded-md hover:bg-[#2a2a2a]"
             aria-label={t("branch")}
+            aria-haspopup="menu"
+            aria-expanded={menu === "branch"}
+            aria-controls="branchMenu"
           >
             <GitBranch size={14} />
             <span>{branch}</span>
@@ -172,129 +155,25 @@ export function Composer() {
           </button>
         </div>
 
-        {menu === "project" && (
-          <div className={`${menuBox} w-[280px]`} role="menu">
-            <input
-              value={projectQuery}
-              onChange={(e) => setProjectQuery(e.target.value)}
-              placeholder={t("searchProject")}
-              className="w-full bg-[#1e1e1e] border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] mb-1 outline-none"
-              aria-label={t("searchProject")}
-            />
-            {filteredRepos.length === 0 && (
-              <div className="px-2.5 py-2 text-[13px] text-codex-muted">{t("noRepos")}</div>
-            )}
-            {filteredRepos.map((p: GitRepo) => (
-              <button
-                key={p.path}
-                type="button"
-                role="menuitem"
-                className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-left text-[13px] ${
-                  project === p.name ? "bg-[#353535]" : "hover:bg-[#353535]"
-                }`}
-                onClick={() => {
-                  setProject(p.name);
-                  setProjectQuery("");
-                  setMenu(null);
-                }}
-              >
-                <Folder size={14} />
-                <span className="truncate">{p.name}</span>
-                {p.current_branch && (
-                  <span className="text-[11px] text-codex-muted ml-auto shrink-0">{p.current_branch}</span>
-                )}
-              </button>
-            ))}
-            <div className="h-px bg-[#3a3a3a] my-1.5" role="separator" />
-            <button
-              type="button"
-              role="menuitem"
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-left text-[13px] hover:bg-[#353535]"
-              onClick={() => {
-                setProject("");
-                setMenu(null);
-              }}
-            >
-              {t("noProject")}
-            </button>
-          </div>
-        )}
+        <ProjectMenu
+          open={menu === "project"}
+          anchorEl={projectBtnRef.current}
+          project={project}
+          repos={repos}
+          onSelect={setProject}
+          onClose={() => setMenu(null)}
+        />
 
-        {menu === "branch" && (
-          <div className={`${menuBox} w-[280px]`} role="menu">
-            <input
-              value={branchQuery}
-              onChange={(e) => setBranchQuery(e.target.value)}
-              placeholder={t("searchBranch")}
-              className="w-full bg-[#1e1e1e] border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] mb-1 outline-none"
-              aria-label={t("searchBranch")}
-            />
-            {loadingBranches ? (
-              <div className="px-2.5 py-2 text-[13px] text-codex-muted flex items-center gap-2">
-                <Loader2 size={14} className="animate-spin" />
-                {t("loadingBranches")}
-              </div>
-            ) : filteredBranches.length === 0 ? (
-              <div className="px-2.5 py-2 text-[13px] text-codex-muted">{t("noBranches")}</div>
-            ) : (
-              filteredBranches.map((b: GitBranchType) => (
-                <button
-                  key={b.name}
-                  type="button"
-                  className={`w-full text-left px-2.5 py-2 rounded-md text-[13px] ${
-                    branch === b.name ? "bg-[#353535]" : "hover:bg-[#353535]"
-                  }`}
-                  onClick={() => {
-                    setBranch(b.name);
-                    setBranchQuery("");
-                    setMenu(null);
-                  }}
-                >
-                  <span className={b.is_current ? "text-codex-accent" : ""}>{b.name}</span>
-                  {b.is_current && (
-                    <span className="ml-2 text-[11px] text-codex-muted">({t("branchCurrent")})</span>
-                  )}
-                  {b.is_remote && (
-                    <span className="ml-2 text-[11px] text-codex-muted">{t("branchRemote")}</span>
-                  )}
-                </button>
-              ))
-            )}
-            <div className="h-px bg-[#3a3a3a] my-1.5" role="separator" />
-            {creatingBranch ? (
-              <div className="flex gap-1 px-1 pb-1">
-                <input
-                  autoFocus
-                  value={newBranchName}
-                  onChange={(e) => setNewBranchName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitCreateBranch();
-                    if (e.key === "Escape") setCreatingBranch(false);
-                  }}
-                  placeholder={t("createBranchPrompt")}
-                  className="flex-1 bg-[#1e1e1e] border border-[#333] rounded-md px-2 py-1.5 text-[12.5px] outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={commitCreateBranch}
-                  className="px-2 rounded-md bg-codex-accent text-white text-[12px]"
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                role="menuitem"
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-left text-[13px] hover:bg-[#353535]"
-                onClick={() => setCreatingBranch(true)}
-              >
-                <Plus size={14} />
-                {t("createBranch")}
-              </button>
-            )}
-          </div>
-        )}
+        <BranchMenu
+          open={menu === "branch"}
+          anchorEl={branchBtnRef.current}
+          project={project}
+          branch={branch}
+          branches={branches}
+          loading={loadingBranches}
+          onSelect={setBranch}
+          onClose={() => setMenu(null)}
+        />
 
         <div className="px-3 py-2 relative">
           <textarea
@@ -338,11 +217,15 @@ export function Composer() {
 
         <div className="flex items-center gap-1.5 px-2.5 pb-2.5 relative">
           <button
+            ref={addBtnRef}
             type="button"
             onClick={() => toggle("add")}
             className="w-7 h-7 rounded-md inline-flex items-center justify-center text-[#aaa] hover:bg-[#2a2a2a]"
             aria-label={t("add")}
             title={t("add")}
+            aria-haspopup="menu"
+            aria-expanded={menu === "add"}
+            aria-controls="addMenu"
           >
             <Plus size={16} />
           </button>
@@ -573,101 +456,14 @@ export function Composer() {
             </div>
           )}
 
-          {menu === "add" && (
-            <div className="absolute left-2 bottom-[calc(100%+4px)] w-[320px] max-h-[min(420px,55vh)] overflow-auto p-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[10px] shadow-xl z-30">
-              <div className="px-2.5 py-1 text-[11.5px] text-codex-muted">{t("addSection")}</div>
-              <button
-                type="button"
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-left text-[13px] hover:bg-[#353535]"
-                onClick={() => setMenu(null)}
-              >
-                <Paperclip size={14} className="shrink-0 text-codex-muted" />
-                <span>{t("addFiles")}</span>
-              </button>
-              <button
-                type="button"
-                className="w-full flex items-start gap-2 px-2.5 py-2 rounded-md text-left text-[13px] hover:bg-[#353535]"
-                onClick={() => {
-                  toggle("project");
-                }}
-              >
-                <Folder size={14} className="shrink-0 mt-0.5 text-codex-muted" />
-                <span>
-                  {t("addWork")}{" "}
-                  <span className="text-codex-muted text-[12px]">{t("addWorkHint")}</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className="w-full flex items-start gap-2 px-2.5 py-2 rounded-md text-left text-[13px] hover:bg-[#353535]"
-                onClick={() => {
-                  setGoalMode(true);
-                  setMenu(null);
-                }}
-              >
-                <Target size={14} className="shrink-0 mt-0.5 text-codex-muted" />
-                <span>
-                  {t("addGoal")}{" "}
-                  <span className="text-codex-muted text-[12px]">{t("addGoalHint")}</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className="w-full flex items-start gap-2 px-2.5 py-2 rounded-md text-left text-[13px] hover:bg-[#353535]"
-                onClick={() => {
-                  setPlanMode(true);
-                  setMenu(null);
-                }}
-              >
-                <Lightbulb size={14} className="shrink-0 mt-0.5 text-codex-muted" />
-                <span>
-                  {t("addPlan")}{" "}
-                  <span className="text-codex-muted text-[12px]">{t("addPlanHint")}</span>
-                </span>
-              </button>
-
-              <div className="px-2.5 py-1 mt-1 text-[11.5px] text-codex-muted">{t("addPlugins")}</div>
-              {MOCK_MARKETPLACE.map((p) => (
-                <button
-                  key={p.name}
-                  type="button"
-                  className="w-full text-left px-2.5 py-2 rounded-md hover:bg-[#353535]"
-                  onClick={() => setMenu(null)}
-                >
-                  <div className="text-[13px] text-[#e0e0e0]">{p.name}</div>
-                  <div className="text-[11.5px] text-codex-muted">{p.desc}</div>
-                </button>
-              ))}
-
-              <div className="px-2.5 py-1 mt-1 text-[11.5px] text-codex-muted">{t("addAgents")}</div>
-              <button
-                type="button"
-                className="w-full text-left px-2.5 py-2 rounded-md hover:bg-[#353535]"
-                onClick={() => setMenu(null)}
-              >
-                <div className="text-[13px] text-[#e0e0e0]">{MOCK_AGENT.name}</div>
-                <div className="text-[11.5px] text-codex-muted">{MOCK_AGENT.desc}</div>
-              </button>
-
-              <div className="px-2.5 py-1 mt-1 text-[11.5px] text-codex-muted">{t("addTabs")}</div>
-              {MOCK_BROWSER_TABS.map((tab) => (
-                <button
-                  key={tab.url}
-                  type="button"
-                  className="w-full text-left px-2.5 py-2 rounded-md hover:bg-[#353535]"
-                  onClick={() => setMenu(null)}
-                >
-                  <div className="text-[13px] text-[#e0e0e0]">
-                    {tab.title} <span className="text-codex-muted">{tab.suffix}</span>
-                  </div>
-                  <div className="text-[11.5px] text-codex-muted truncate">{tab.url}</div>
-                </button>
-              ))}
-
-              <div className="px-2.5 py-1 mt-1 text-[11.5px] text-codex-muted">{t("addFilesChats")}</div>
-              <div className="px-2.5 py-2 text-[12px] text-codex-muted">{t("addSearchHint")}</div>
-            </div>
-          )}
+          <ComposerAddMenu
+            open={menu === "add"}
+            anchorEl={addBtnRef.current}
+            onClose={() => setMenu(null)}
+            onOpenProject={() => setMenu("project")}
+            onGoal={() => setGoalMode(true)}
+            onPlan={() => setPlanMode(true)}
+          />
         </div>
       </div>
     </div>

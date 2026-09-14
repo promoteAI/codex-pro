@@ -437,6 +437,7 @@ body {
 .sch-freq-menu-item:hover{background:#353535;color:#f0f0f0}
 .sch-freq-menu-item.is-active{color:#f0f0f0}
 .sch-freq-menu-check{width:14px;height:14px;opacity:0;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sch-freq-menu-item.is-active .sch-freq-menu-check{opacity:1}
 .sch-runin-panel{display:none;position:fixed;z-index:145;width:min(420px,calc(100vw - 24px));max-height:min(420px,70vh);background:#252525;border:1px solid #3a3a3a;border-radius:12px;box-shadow:0 16px 40px rgba(0,0,0,.55);overflow:hidden;flex-direction:column}
 .sch-runin-panel.open{display:flex}
 .sch-runin-search{display:flex;align-items:center;gap:8px;margin:10px 10px 6px;padding:8px 10px;border-radius:8px;background:#1c1c1c;border:1px solid #333}

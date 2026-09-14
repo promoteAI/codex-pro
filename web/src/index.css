@@ -382,6 +382,12 @@ body {
 .pl-sk-scope.active{background:#2a2a2a;color:#f0f0f0}
 .pl-sk-scope-panel{display:none}
 .pl-sk-scope-panel.is-active{display:block}
+.add-plugin-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:30;min-width:200px;padding:6px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.45)}
+.add-plugin-menu.open{display:block}
+.add-plugin-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;border-radius:7px;background:transparent;color:#e0e0e0;cursor:pointer;text-align:left;font:inherit;font-size:13px}
+.add-plugin-item:hover{background:#353535;color:#fff}
+.add-plugin-item svg{width:16px;height:16px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.pl-sk-check.is-on{color:#6ecf9a}
 @media(max-width:720px){
 .pl-body{padding:16px 16px 36px}
 .pl-top{padding:10px 12px}

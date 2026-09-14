@@ -13,6 +13,7 @@ import {
   Toggle,
 } from "../ui";
 import { AddMarketModal } from "../../AddMarketModal";
+import { McpCreateView } from "../../McpCreateView";
 import { toast } from "../../../stores/toast";
 
 export function VoicePage() {
@@ -381,6 +382,8 @@ export function SettingsPluginsPage() {
   const [q, setQ] = useState("");
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [marketOpen, setMarketOpen] = useState(false);
+  const [creatingMcp, setCreatingMcp] = useState(false);
+  const [items, setItems] = useState(PLUGIN_ITEMS);
   const [enabled, setEnabled] = useState<Record<string, boolean>>(
     Object.fromEntries(PLUGIN_ITEMS.map((p) => [p.id, p.on])),
   );
@@ -396,7 +399,7 @@ export function SettingsPluginsPage() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [addMenuOpen]);
 
-  const filtered = PLUGIN_ITEMS.filter((p) => {
+  const filtered = items.filter((p) => {
     if (tab === "mcp" && p.tag !== "MCP") return false;
     if (tab === "plugins" && p.tag === "MCP") return false;
     if (tab === "skills") return false;
@@ -405,6 +408,36 @@ export function SettingsPluginsPage() {
     }
     return true;
   });
+
+  const mcpCount = items.filter((p) => p.tag === "MCP").length;
+  const pluginCount = items.filter((p) => p.tag !== "MCP").length;
+
+  if (creatingMcp) {
+    return (
+      <McpCreateView
+        onCancel={() => setCreatingMcp(false)}
+        onSaved={(name) => {
+          const id = name.toLowerCase().replace(/\s+/g, "-");
+          setItems((prev) => {
+            if (prev.some((p) => p.id === id || p.name === name)) return prev;
+            return [
+              ...prev,
+              {
+                id,
+                name,
+                desc: "Custom MCP server",
+                tag: "MCP",
+                on: true,
+              },
+            ];
+          });
+          setEnabled((s) => ({ ...s, [id]: true }));
+          setCreatingMcp(false);
+          setTab("mcp");
+        }}
+      />
+    );
+  }
 
   return (
     <div className="max-w-[800px]">
@@ -463,7 +496,7 @@ export function SettingsPluginsPage() {
                   role="menuitem"
                   onClick={() => {
                     setAddMenuOpen(false);
-                    toast.info(t("addMcp") + "（即将推出）");
+                    setCreatingMcp(true);
                   }}
                   className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#e0e0e0] hover:bg-[#353535]"
                 >
@@ -481,8 +514,8 @@ export function SettingsPluginsPage() {
       <div className="flex items-center gap-4 pt-2 pb-3 border-b border-codex-border mb-1">
         {(
           [
-            ["plugins", `${t("plugins")} 7`],
-            ["mcp", "MCP 4"],
+            ["plugins", `${t("plugins")} ${pluginCount}`],
+            ["mcp", `MCP ${mcpCount}`],
             ["skills", `${t("skillsTab")} 137`],
           ] as const
         ).map(([id, label]) => (

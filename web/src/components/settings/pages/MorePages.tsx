@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router";
 import {
   ActionBtn,
   EmptyState,
@@ -15,6 +16,7 @@ import {
 import { AddMarketModal } from "../../AddMarketModal";
 import { McpCreateView } from "../../McpCreateView";
 import { toast } from "../../../stores/toast";
+import { useShellStore } from "../../../stores/shell";
 
 export function VoicePage() {
   const { t } = useTranslation("settings");
@@ -356,12 +358,40 @@ export function ComputerPage() {
   );
 }
 
-const PLUGIN_ITEMS = [
-  { id: "automate", name: "Automate", desc: "Use this skill to create Codex Automations.", tag: "个人", on: true },
+type PluginKind = "plugins" | "mcp" | "skills";
+
+interface PluginListItem {
+  id: string;
+  name: string;
+  desc: string;
+  kind: PluginKind;
+  tag: string;
+  on: boolean;
+}
+
+/** Seed list matching prototype #pluginsListView. */
+const PLUGIN_ITEMS: PluginListItem[] = [
+  {
+    id: "automate",
+    name: "Automate",
+    desc: "Use this skill to create Codex Automations.",
+    kind: "plugins",
+    tag: "个人",
+    on: true,
+  },
   {
     id: "autopilot",
     name: "Autopilot",
-    desc: "Keep a PR merge-ready by triaging comments and fixing CI.",
+    desc: "Keep a PR merge-ready by triaging comments, resolving clear conflicts, and fixing CI in a loop.",
+    kind: "plugins",
+    tag: "个人",
+    on: true,
+  },
+  {
+    id: "baseline-ui",
+    name: "Baseline UI",
+    desc: "Quickly deslop UI code by fixing spacing, hierarchy, typography, and small layout issues.",
+    kind: "plugins",
     tag: "个人",
     on: true,
   },
@@ -369,16 +399,113 @@ const PLUGIN_ITEMS = [
     id: "canvas",
     name: "Canvas",
     desc: "A live React app that the user can open beside the chat.",
+    kind: "plugins",
     tag: "个人",
     on: true,
   },
-  { id: "filesystem", name: "filesystem", desc: "Read and write local files through MCP.", tag: "MCP", on: true },
-  { id: "github", name: "github", desc: "Issues, PRs and repository metadata via MCP.", tag: "MCP", on: false },
+  {
+    id: "create-hook",
+    name: "Create Hook",
+    desc: "Create Codex hooks. Use when you want to create a hook, write hooks.json, or manage lifecycle events.",
+    kind: "plugins",
+    tag: "个人",
+    on: true,
+  },
+  {
+    id: "create-rule",
+    name: "Create Rule",
+    desc: "Create Codex rules for persistent AI guidance.",
+    kind: "plugins",
+    tag: "个人",
+    on: true,
+  },
+  {
+    id: "create-skill",
+    name: "Create Skill",
+    desc: "Create Codex Agent Skills. Use when authoring a new skill or registering it in the system.",
+    kind: "plugins",
+    tag: "个人",
+    on: true,
+  },
+  {
+    id: "create-subagent",
+    name: "Create Subagent",
+    desc: "Create custom subagents for specialized AI tasks.",
+    kind: "plugins",
+    tag: "个人",
+    on: true,
+  },
+  {
+    id: "design-critique",
+    name: "Design Ops: Design Critique",
+    desc: "Facilitate a structured team critique — framing, feedback rules, and actionable outcomes.",
+    kind: "plugins",
+    tag: "个人",
+    on: true,
+  },
+  {
+    id: "filesystem",
+    name: "filesystem",
+    desc: "Read and write local files through MCP.",
+    kind: "mcp",
+    tag: "MCP",
+    on: true,
+  },
+  {
+    id: "github",
+    name: "github",
+    desc: "Issues, PRs and repository metadata via MCP.",
+    kind: "mcp",
+    tag: "MCP",
+    on: false,
+  },
+  {
+    id: "sqlite",
+    name: "sqlite",
+    desc: "Query local SQLite databases.",
+    kind: "mcp",
+    tag: "MCP",
+    on: true,
+  },
+  {
+    id: "browser-mcp",
+    name: "browser",
+    desc: "Control the embedded browser through MCP tools.",
+    kind: "mcp",
+    tag: "MCP",
+    on: false,
+  },
+  {
+    id: "frontend-design",
+    name: "frontend-design",
+    desc: "Distinctive visual design guidance for product UI.",
+    kind: "skills",
+    tag: "技能",
+    on: true,
+  },
+  {
+    id: "create-rule-skill",
+    name: "create-rule",
+    desc: "Author persistent coding guidance rules.",
+    kind: "skills",
+    tag: "技能",
+    on: true,
+  },
+  {
+    id: "review-security",
+    name: "review-security",
+    desc: "Security-focused review of local changes.",
+    kind: "skills",
+    tag: "技能",
+    on: false,
+  },
 ];
 
 export function SettingsPluginsPage() {
   const { t } = useTranslation("settings");
-  const [tab, setTab] = useState<"plugins" | "mcp" | "skills">("plugins");
+  const navigate = useNavigate();
+  const closeSettings = useShellStore((s) => s.closeSettings);
+  const [tab, setTab] = useState<PluginKind>("plugins");
   const [q, setQ] = useState("");
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [marketOpen, setMarketOpen] = useState(false);
@@ -400,17 +527,21 @@ export function SettingsPluginsPage() {
   }, [addMenuOpen]);
 
   const filtered = items.filter((p) => {
-    if (tab === "mcp" && p.tag !== "MCP") return false;
-    if (tab === "plugins" && p.tag === "MCP") return false;
-    if (tab === "skills") return false;
+    if (p.kind !== tab) return false;
     if (q && !p.name.toLowerCase().includes(q.toLowerCase()) && !p.desc.toLowerCase().includes(q.toLowerCase())) {
       return false;
     }
     return true;
   });
 
-  const mcpCount = items.filter((p) => p.tag === "MCP").length;
-  const pluginCount = items.filter((p) => p.tag !== "MCP").length;
+  const pluginCount = items.filter((p) => p.kind === "plugins").length;
+  const mcpCount = items.filter((p) => p.kind === "mcp").length;
+  const skillCount = items.filter((p) => p.kind === "skills").length;
+
+  const browseCatalog = () => {
+    closeSettings();
+    navigate("/plugins");
+  };
 
   if (creatingMcp) {
     return (
@@ -426,6 +557,7 @@ export function SettingsPluginsPage() {
                 id,
                 name,
                 desc: "Custom MCP server",
+                kind: "mcp",
                 tag: "MCP",
                 on: true,
               },
@@ -447,7 +579,7 @@ export function SettingsPluginsPage() {
           <PageSub>{t("pluginsDesc")}</PageSub>
         </div>
         <div className="flex gap-2.5 shrink-0 items-start">
-          <ActionBtn>{t("browseCatalog")}</ActionBtn>
+          <ActionBtn onClick={browseCatalog}>{t("browseCatalog")}</ActionBtn>
           <div className="relative" ref={addMenuRef}>
             <button
               type="button"
@@ -516,7 +648,7 @@ export function SettingsPluginsPage() {
           [
             ["plugins", `${t("plugins")} ${pluginCount}`],
             ["mcp", `MCP ${mcpCount}`],
-            ["skills", `${t("skillsTab")} 137`],
+            ["skills", `${t("skillsTab")} ${skillCount}`],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -544,29 +676,33 @@ export function SettingsPluginsPage() {
       </div>
 
       <div className="pt-4 space-y-2">
-        {tab === "skills" && (
-          <EmptyState title={t("noSkills")} desc={t("noSkillsDesc")} />
+        {filtered.length === 0 ? (
+          <EmptyState
+            title={tab === "skills" ? t("noSkills") : t("plugins")}
+            desc={tab === "skills" ? t("noSkillsDesc") : t("pluginsDesc")}
+          />
+        ) : (
+          filtered.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center gap-3.5 px-4 py-3.5 bg-[#1e1e1e] border border-[#262626] rounded-[10px] hover:border-[#333]"
+            >
+              <div className="w-9 h-9 rounded-lg bg-[#252525] grid place-items-center text-[#888] shrink-0 text-xs">
+                ◆
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13.5px] font-medium text-[#d4d4d4] mb-0.5">{p.name}</div>
+                <div className="text-xs text-codex-muted line-clamp-2">{p.desc}</div>
+              </div>
+              <span className="text-xs text-[#666] px-2 py-0.5 bg-[#252525] rounded shrink-0">{p.tag}</span>
+              <Toggle
+                checked={!!enabled[p.id]}
+                onChange={(v) => setEnabled((s) => ({ ...s, [p.id]: v }))}
+                label={p.name}
+              />
+            </div>
+          ))
         )}
-        {filtered.map((p) => (
-          <div
-            key={p.id}
-            className="flex items-center gap-3.5 px-4 py-3.5 bg-[#1e1e1e] border border-[#262626] rounded-[10px] hover:border-[#333]"
-          >
-            <div className="w-9 h-9 rounded-lg bg-[#252525] grid place-items-center text-[#888] shrink-0 text-xs">
-              ◆
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13.5px] font-medium text-[#d4d4d4] mb-0.5">{p.name}</div>
-              <div className="text-xs text-codex-muted line-clamp-2">{p.desc}</div>
-            </div>
-            <span className="text-xs text-[#666] px-2 py-0.5 bg-[#252525] rounded shrink-0">{p.tag}</span>
-            <Toggle
-              checked={!!enabled[p.id]}
-              onChange={(v) => setEnabled((s) => ({ ...s, [p.id]: v }))}
-              label={p.name}
-            />
-          </div>
-        ))}
       </div>
 
       <AddMarketModal open={marketOpen} onClose={() => setMarketOpen(false)} />

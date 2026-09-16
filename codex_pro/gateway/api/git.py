@@ -38,7 +38,7 @@ def _run_git(cwd: Path, args: list[str]) -> tuple[int, str]:
 class GitAPI:
     def __init__(self, server: GatewayServer):
         self._server = server
-        self._workspace = server._workspace
+        self._projects = server._projects
 
     def _guard(self, request: web.Request, action: str) -> web.Response | None:
         return self._server._require_api_token(request, action=action)
@@ -67,13 +67,15 @@ class GitAPI:
                 current_branch = stdout.strip() if rc == 0 else ""
             return {"path": str(path), "name": name, "current_branch": current_branch}
 
-        # Workspace root if it's a git repo
-        if (self._workspace / ".git").is_dir():
-            repos.append(_entry(self._workspace))
+        # Projects root if it's a git repo
+        if (self._projects / ".git").is_dir():
+            repos.append(_entry(self._projects))
 
-        # Scan workspace subdirectories as projects
+        # Scan projects subdirectories as projects. Only the projects dir is
+        # scanned — the workspace root holds system-state dirs (data/, cache/,
+        # models/, skills/, .codex-pro/, ...) that must never be exposed.
         try:
-            for child in sorted(self._workspace.iterdir()):
+            for child in sorted(self._projects.iterdir()):
                 if child.is_dir():
                     repos.append(_entry(child))
         except OSError:
@@ -121,10 +123,10 @@ class GitAPI:
         if err:
             return web.json_response({"error": err}, status=400)
 
-        target = (self._workspace / name).resolve()
-        # Ensure the resolved directory still sits under the workspace root.
+        target = (self._projects / name).resolve()
+        # Ensure the resolved directory still sits under the projects root.
         try:
-            target.relative_to(self._workspace)
+            target.relative_to(self._projects)
         except ValueError:
             return web.json_response({"error": "project path escapes workspace"}, status=400)
 
@@ -174,14 +176,14 @@ class GitAPI:
 
         if link_name:
             # User-supplied project name — use it as the symlink name.
-            target_link = (self._workspace / link_name).resolve()
+            target_link = (self._projects / link_name).resolve()
         else:
             # Fall back to the folder's basename.
-            target_link = (self._workspace / real_path.name).resolve()
+            target_link = (self._projects / real_path.name).resolve()
 
-        # Ensure the resolved link still sits under the workspace root.
+        # Ensure the resolved link still sits under the projects root.
         try:
-            target_link.relative_to(self._workspace)
+            target_link.relative_to(self._projects)
         except ValueError:
             return web.json_response({"error": "project path escapes workspace"}, status=400)
 
@@ -211,7 +213,7 @@ class GitAPI:
         if guard is not None:
             return guard
 
-        repo_path = request.query.get("path", str(self._workspace))
+        repo_path = request.query.get("path", str(self._projects))
         if not Path(repo_path).is_dir():
             return web.json_response({"error": "repo path not found"}, status=400)
 

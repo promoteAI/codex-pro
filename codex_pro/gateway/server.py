@@ -96,6 +96,11 @@ class GatewayServer:
         self.channel_manager = channel_manager
         self.session_manager = session_manager
         self._workspace = workspace
+        # Projects live in a dedicated subdir so the dashboard's project list
+        # and file browser never expose the workspace's system-state dirs
+        # (data/, cache/, models/, skills/, .codex-pro/, ...).
+        self._projects = (workspace / "workspace").resolve()
+        self._projects.mkdir(parents=True, exist_ok=True)
         self._agent_loop = agent_loop
         self._a2a_config = a2a_config
         self._config_path = config_path

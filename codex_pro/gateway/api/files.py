@@ -51,7 +51,9 @@ def _classify(path: Path) -> str:
 class FilesAPI:
     def __init__(self, server: GatewayServer):
         self._server = server
-        self._workspace = server._workspace
+        # Serve the projects dir so the file tree never exposes the workspace's
+        # system-state dirs (data/, cache/, models/, skills/, .codex-pro/, ...).
+        self._workspace = server._projects
 
     def _guard(self, request: web.Request, action: str) -> web.Response | None:
         return self._server._require_api_token(request, action=action)

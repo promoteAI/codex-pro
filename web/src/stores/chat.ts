@@ -62,6 +62,7 @@ function mapHistoryMessages(sessionId: string, rows: HistoryRow[]): ChatMessage[
 
 interface ChatState {
   project: string;
+  projectPath: string;
   env: string;
   branch: string;
   model: string;
@@ -82,7 +83,10 @@ interface ChatState {
   planMode: boolean;
   goalMode: boolean;
   planTask: string;
-  setProject: (project: string) => void;
+  setProject: (project: string, projectPath?: string) => void;
+  selectProject: (repo: GitRepo) => void;
+  createProject: (name: string, gitInit?: boolean) => Promise<GitRepo>;
+  openProject: (path: string) => Promise<void>;
   setEnv: (env: string) => void;
   setBranch: (branch: string) => void;
   setModel: (model: string) => void;
@@ -103,6 +107,7 @@ interface ChatState {
 
 export const useChatStore = create<ChatState>((set, get) => ({
   project: "codex-pro",
+  projectPath: "",
   env: "local",
   branch: "dev",
   model: "agnes-2.5-flash",
@@ -124,7 +129,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
   goalMode: false,
   planTask: "",
 
-  setProject: (project) => set({ project }),
+  setProject: (project, projectPath) => set({ project, projectPath: projectPath ?? get().projectPath }),
+
+  selectProject: (repo) => {
+    const { clearChat } = get();
+    clearChat();
+    set({
+      project: repo.name,
+      projectPath: repo.path,
+      branch: repo.current_branch || "main",
+    });
+    get().loadBranches(repo.path);
+  },
+
+  createProject: async (name, gitInit = false) => {
+    const result = await apiFetch<GitRepo>("/git/repos", {
+      method: "POST",
+      body: JSON.stringify({ name, git_init: gitInit }),
+    });
+    await get().loadRepos();
+    get().selectProject(result);
+    return result;
+  },
+
+  openProject: async (path) => {
+    const result = await apiFetch<GitRepo>("/git/open", {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    });
+    await get().loadRepos();
+    get().selectProject(result);
+  },
   setEnv: (env) => set({ env }),
   setBranch: (branch) => set({ branch }),
   setModel: (model) => set({ model }),
@@ -160,10 +195,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadRepos: async () => {
     try {
       const result = await apiFetch<{ repos: GitRepo[] }>("/git/repos");
-      set({ repos: result.repos });
-      if (result.repos.length > 0) {
-        const first = result.repos[0];
-        set({ project: first.name, branch: first.current_branch || "main" });
+      const repos = result.repos ?? [];
+      set({ repos });
+      if (repos.length > 0) {
+        const first = repos[0];
+        set({ project: first.name, projectPath: first.path, branch: first.current_branch || "main" });
       }
     } catch {
       // Silently fail — non-critical for UI
@@ -209,6 +245,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
 
     try {
+      const projectPath = get().projectPath;
       const result = await apiFetch<{
         status: string;
         event_id: string;
@@ -219,6 +256,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           text: content,
           session_key: sessionId,
           platform: "api",
+          ...(projectPath ? { project: projectPath } : {}),
         }),
       });
 

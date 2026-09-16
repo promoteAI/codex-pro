@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from codex_pro.agent.workspace_scope import session_workspace
 from codex_pro.tools import Tool, ToolExecutionContext, ToolResult
 from codex_pro.security.path_policy import check_read, check_write, resolve_path
 
@@ -31,20 +32,21 @@ class ReadFileTool(Tool):
 
     async def execute(self, params: dict[str, Any], ctx: ToolExecutionContext | None = None) -> ToolResult:
         path = params["path"]
+        ws = session_workspace(self._workspace)
         # spill_root 传入即启用 spill 闸门:产物按会话私有,而本工具只认路径、
         # 不认会话,故一律拒绝并指向 read_spill。已清扫的产物也走这条,提示
         # 由 read_spill 给——两种情况对模型的下一步动作是同一个。
-        violation = check_read(path, self._workspace, spill_root=self._spill_root)
+        violation = check_read(path, ws, spill_root=self._spill_root)
         if violation:
             return ToolResult(success=False, error=violation)
         if self._restrict:
-            resolved = resolve_path(path, self._workspace)
+            resolved = resolve_path(path, ws)
             try:
-                resolved.relative_to(self._workspace)
+                resolved.relative_to(ws)
             except ValueError:
-                return ToolResult(success=False, error=f"Path {path} is outside workspace {self._workspace}")
+                return ToolResult(success=False, error=f"Path {path} is outside workspace {ws}")
         try:
-            target = resolve_path(path, self._workspace)
+            target = resolve_path(path, ws)
             with open(target, encoding="utf-8", errors="replace") as f:
                 lines = f.readlines()
             offset = params.get("offset", 0)
@@ -78,17 +80,18 @@ class WriteFileTool(Tool):
 
     async def execute(self, params: dict[str, Any], ctx: ToolExecutionContext | None = None) -> ToolResult:
         path = params["path"]
-        violation = check_write(path, self._workspace, self._safe_write_root)
+        ws = session_workspace(self._workspace)
+        violation = check_write(path, ws, self._safe_write_root)
         if violation:
             return ToolResult(success=False, error=violation)
         if self._restrict:
-            resolved = resolve_path(path, self._workspace)
+            resolved = resolve_path(path, ws)
             try:
-                resolved.relative_to(self._workspace)
+                resolved.relative_to(ws)
             except ValueError:
-                return ToolResult(success=False, error=f"Path {path} is outside workspace {self._workspace}")
+                return ToolResult(success=False, error=f"Path {path} is outside workspace {ws}")
         try:
-            p = resolve_path(path, self._workspace)
+            p = resolve_path(path, ws)
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(params["content"], encoding="utf-8")
             return ToolResult(output=f"Written {len(params['content'])} chars to {path}")
@@ -117,17 +120,18 @@ class EditFileTool(Tool):
 
     async def execute(self, params: dict[str, Any], ctx: ToolExecutionContext | None = None) -> ToolResult:
         path = params["path"]
-        violation = check_write(path, self._workspace, self._safe_write_root)
+        ws = session_workspace(self._workspace)
+        violation = check_write(path, ws, self._safe_write_root)
         if violation:
             return ToolResult(success=False, error=violation)
         if self._restrict:
-            resolved = resolve_path(path, self._workspace)
+            resolved = resolve_path(path, ws)
             try:
-                resolved.relative_to(self._workspace)
+                resolved.relative_to(ws)
             except ValueError:
-                return ToolResult(success=False, error=f"Path {path} is outside workspace {self._workspace}")
+                return ToolResult(success=False, error=f"Path {path} is outside workspace {ws}")
         try:
-            target = resolve_path(path, self._workspace)
+            target = resolve_path(path, ws)
             content = target.read_text(encoding="utf-8")
             old = params["old_string"]
             if old not in content:
@@ -160,18 +164,19 @@ class ListDirTool(Tool):
 
     async def execute(self, params: dict[str, Any], ctx: ToolExecutionContext | None = None) -> ToolResult:
         path = params["path"]
+        ws = session_workspace(self._workspace)
         # 列举 spill 目录会泄漏"存在哪些会话、各产出多少",同样归 read_spill 管。
-        violation = check_read(path, self._workspace, spill_root=self._spill_root)
+        violation = check_read(path, ws, spill_root=self._spill_root)
         if violation:
             return ToolResult(success=False, error=violation)
         if self._restrict:
-            resolved = resolve_path(path, self._workspace)
+            resolved = resolve_path(path, ws)
             try:
-                resolved.relative_to(self._workspace)
+                resolved.relative_to(ws)
             except ValueError:
-                return ToolResult(success=False, error=f"Path {path} is outside workspace {self._workspace}")
+                return ToolResult(success=False, error=f"Path {path} is outside workspace {ws}")
         try:
-            target = resolve_path(path, self._workspace)
+            target = resolve_path(path, ws)
             entries = sorted(os.listdir(target))
             lines = []
             for entry in entries:

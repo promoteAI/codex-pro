@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from codex_pro.agent.media.document_extract import extract
+from codex_pro.agent.workspace_scope import session_workspace
 from codex_pro.tools import Tool, ToolExecutionContext, ToolResult
 from codex_pro.security.path_policy import check_read, resolve_path
 
@@ -37,16 +38,17 @@ class ReadDocumentTool(Tool):
 
     async def execute(self, params: dict[str, Any], ctx: ToolExecutionContext | None = None) -> ToolResult:
         path = params["path"]
+        ws = session_workspace(self._workspace)
         # spill 产物是 .txt,extract 认得它,故这里同样是一条会话无关的读取路径。
-        violation = check_read(path, self._workspace, spill_root=self._spill_root)
+        violation = check_read(path, ws, spill_root=self._spill_root)
         if violation:
             return ToolResult(success=False, error=violation)
         if self._restrict:
-            resolved = resolve_path(path, self._workspace)
+            resolved = resolve_path(path, ws)
             try:
-                resolved.relative_to(self._workspace)
+                resolved.relative_to(ws)
             except ValueError:
-                return ToolResult(success=False, error=f"Path {path} is outside workspace {self._workspace}")
+                return ToolResult(success=False, error=f"Path {path} is outside workspace {ws}")
         res = extract(path, max_chars=params.get("max_chars"), unit=params.get("unit"))
         if not res.text:
             err = res.meta.get("error") or f"no extractable text ({res.meta.get('format')})"

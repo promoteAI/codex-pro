@@ -58,7 +58,8 @@ interface ProjectMenuProps {
   anchorEl: HTMLElement | null;
   project: string;
   repos: GitRepo[];
-  onSelect: (name: string) => void;
+  onSelect: (repo: GitRepo) => void;
+  onCreate: () => void;
   onClose: () => void;
 }
 
@@ -69,6 +70,7 @@ export function ProjectMenu({
   project,
   repos,
   onSelect,
+  onCreate,
   onClose,
 }: ProjectMenuProps) {
   const { t } = useTranslation("composer");
@@ -175,7 +177,7 @@ export function ProjectMenu({
             className={`proj-menu-item${project === p.name ? " is-active" : ""}`}
             role="menuitem"
             onClick={() => {
-              onSelect(p.name);
+              onSelect(p);
               onClose();
             }}
           >
@@ -186,6 +188,18 @@ export function ProjectMenu({
         ))}
       </div>
       <div className="proj-menu-sep" role="separator" />
+      <button
+        type="button"
+        className="proj-menu-action"
+        role="menuitem"
+        onClick={() => {
+          onClose();
+          onCreate();
+        }}
+      >
+        <FolderIcon />
+        {t("createProject")}
+      </button>
       <button
         type="button"
         className="proj-menu-action"
@@ -215,7 +229,7 @@ export function ProjectMenu({
         className="proj-menu-action"
         role="menuitem"
         onClick={() => {
-          onSelect("");
+          onSelect({ name: "", path: "", current_branch: "" });
           onClose();
         }}
       >

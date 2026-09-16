@@ -12,7 +12,8 @@ import {
 import { useShellStore } from "../../stores/shell";
 import { useChatStore } from "../../stores/chat";
 import { useApi } from "../../hooks/use-api";
-import { MOCK_PROJECTS, MOCK_RECENTS } from "../../mock/seeds";
+import { CreateProjectDialog } from "../CreateProjectDialog";
+import { MOCK_RECENTS } from "../../mock/seeds";
 
 interface SessionItem {
   key: string;
@@ -78,8 +79,16 @@ export function CodexSidebar() {
   const loadSessionHistory = useChatStore((s) => s.loadSessionHistory);
   const sessionId = useChatStore((s) => s.sessionId);
   const project = useChatStore((s) => s.project);
+  const repos = useChatStore((s) => s.repos);
+  const loadRepos = useChatStore((s) => s.loadRepos);
+  const selectProject = useChatStore((s) => s.selectProject);
+  const [showCreateProject, setShowCreateProject] = useState(false);
   const kbdAnalytics = isMacPlatform() ? "⌥⌘P" : "Alt+Win+P";
   const kbdSettings = isMacPlatform() ? "⌘," : "Ctrl+,";
+
+  useEffect(() => {
+    void loadRepos();
+  }, [loadRepos]);
 
   useEffect(() => {
     if (!accountOpen) return;
@@ -236,6 +245,7 @@ export function CodexSidebar() {
               type="button"
               title={t("addProject")}
               aria-label={t("addProject")}
+              onClick={() => setShowCreateProject(true)}
               className="relative w-6 h-6 inline-flex items-center justify-center rounded-md text-[#8a8a8a] hover:bg-codex-active hover:text-[#d0d0d0]"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" aria-hidden="true">
@@ -245,11 +255,11 @@ export function CodexSidebar() {
           </div>
         </div>
 
-        {MOCK_PROJECTS.map((p) => {
-          const active = project === p.id;
+        {repos.map((repo) => {
+          const active = project === repo.name;
           return (
             <div
-              key={p.id}
+              key={repo.path}
               className={`mx-1 flex flex-col px-2 py-1 rounded-md group/row ${
                 active ? "bg-[#282828]" : "hover:bg-codex-hover"
               }`}
@@ -258,13 +268,13 @@ export function CodexSidebar() {
                 <button
                   type="button"
                   onClick={() => {
-                    useChatStore.getState().setProject(p.id);
+                    selectProject(repo);
                     navigate("/");
                   }}
                   className="flex items-center gap-1.5 flex-1 min-w-0 text-[13.5px] text-[#c8c8c8] text-left"
                 >
                   <Folder size={15} className="text-[#909090] shrink-0" />
-                  <span className="truncate">{p.label}</span>
+                  <span className="truncate">{repo.name}</span>
                 </button>
                 <div className="hidden group-hover/row:inline-flex items-center gap-px shrink-0">
                   <button
@@ -300,7 +310,7 @@ export function CodexSidebar() {
                     title={t("newChat")}
                     aria-label={t("newChat")}
                     onClick={() => {
-                      useChatStore.getState().setProject(p.id);
+                      selectProject(repo);
                       clearChat();
                       navigate("/");
                     }}
@@ -319,54 +329,7 @@ export function CodexSidebar() {
                 </div>
               </div>
 
-              {p.threads.length === 0 ? (
-                <span className="text-xs text-codex-muted pl-[22px] pr-1 truncate">{t("noChat")}</span>
-              ) : (
-                p.threads.map((thread) => (
-                  <div
-                    key={thread.id}
-                    className="flex items-center gap-1 pl-[18px] pr-0.5 py-0.5 group/thread min-w-0"
-                  >
-                    <button
-                      type="button"
-                      title={isPinned(thread.id, thread.pinned) ? t("unpin") : t("pin")}
-                      aria-label={isPinned(thread.id, thread.pinned) ? t("unpin") : t("pin")}
-                      aria-pressed={isPinned(thread.id, thread.pinned)}
-                      onClick={() => togglePin(thread.id)}
-                      className={`w-4 h-4 shrink-0 items-center justify-center rounded ${
-                        isPinned(thread.id, thread.pinned)
-                          ? "inline-flex text-[#c8c8c8]"
-                          : "hidden group-hover/thread:inline-flex text-[#6a6a6a] hover:text-[#b0b0b0]"
-                      }`}
-                    >
-                      <PinIcon className="w-3 h-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        useChatStore.getState().setProject(p.id);
-                        navigate("/");
-                      }}
-                      className="flex-1 min-w-0 text-left text-[12.5px] text-[#a8a8a8] truncate hover:text-[#d0d0d0]"
-                    >
-                      {thread.title}
-                    </button>
-                    {thread.time && (
-                      <span className="text-[11px] text-[#5e5e5e] shrink-0 group-hover/thread:hidden">
-                        {thread.time}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      title={t("archive")}
-                      aria-label={t("archive")}
-                      className="hidden group-hover/thread:inline-flex w-5 h-5 shrink-0 items-center justify-center rounded text-[#8a8a8a] hover:bg-[#333] hover:text-[#d8d8d8]"
-                    >
-                      <ArchiveIcon className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))
-              )}
+              <span className="text-xs text-codex-muted pl-[22px] pr-1 truncate">{t("noChat")}</span>
             </div>
           );
         })}
@@ -549,6 +512,10 @@ export function CodexSidebar() {
           </button>
         </div>
       </div>
+      <CreateProjectDialog
+        open={showCreateProject}
+        onClose={() => setShowCreateProject(false)}
+      />
     </aside>
   );
 }

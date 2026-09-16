@@ -7,6 +7,7 @@ with live data from the agent's current environment.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -43,10 +44,14 @@ class GitAPI:
         return self._server._require_api_token(request, action=action)
 
     async def list_repos(self, request: web.Request) -> web.Response:
-        """Return known git repos from the workspace directory.
+        """Return known projects (workspace subdirectories) as repos.
 
-        Scans top-level subdirectories for .git; also includes the workspace
-        root itself if it is a git repo.
+        Scans top-level subdirectories of the workspace. Each is a project /
+        local workspace regardless of whether it is a git repo — projects are
+        created as directories under the workspace (see create_repo). Repos
+        that are git repos carry their current branch; non-git dirs report an
+        empty current_branch. The workspace root itself is included if it is a
+        git repo.
         """
         guard = self._guard(request, "git_repos")
         if guard is not None:
@@ -54,33 +59,151 @@ class GitAPI:
 
         repos: list[dict] = []
 
+        def _entry(path: Path) -> dict:
+            name = path.name
+            current_branch = ""
+            if (path / ".git").is_dir():
+                rc, stdout = _run_git(path, ["rev-parse", "--abbrev-ref", "HEAD"])
+                current_branch = stdout.strip() if rc == 0 else ""
+            return {"path": str(path), "name": name, "current_branch": current_branch}
+
         # Workspace root if it's a git repo
         if (self._workspace / ".git").is_dir():
-            rc, stdout = _run_git(self._workspace, ["rev-parse", "--abbrev-ref", "HEAD"])
-            current_branch = stdout.strip() if rc == 0 else ""
-            repos.append({
-                "path": str(self._workspace),
-                "name": self._workspace.name,
-                "current_branch": current_branch,
-            })
+            repos.append(_entry(self._workspace))
 
-        # Scan sibling directories
+        # Scan workspace subdirectories as projects
         try:
-            for child in sorted(self._workspace.parent.iterdir()):
-                if not child.is_dir() or child == self._workspace:
-                    continue
-                if (child / ".git").is_dir():
-                    rc, stdout = _run_git(child, ["rev-parse", "--abbrev-ref", "HEAD"])
-                    current_branch = stdout.strip() if rc == 0 else ""
-                    repos.append({
-                        "path": str(child),
-                        "name": child.name,
-                        "current_branch": current_branch,
-                    })
+            for child in sorted(self._workspace.iterdir()):
+                if child.is_dir():
+                    repos.append(_entry(child))
         except OSError:
             pass
 
         return web.json_response({"repos": repos})
+
+    def _validate_project_name(self, name: str) -> str | None:
+        """Return an error message for an invalid project name, else None.
+
+        Names must be a single path segment so a created project cannot escape
+        the workspace via ``/`` or ``..``. A lenient whitelist keeps names
+        filesystem-safe and side-effect free on both POSIX and Windows.
+        """
+        if not name or name in {".", ".."}:
+            return "project name is empty or reserved"
+        if "/" in name or "\\" in name:
+            return "project name must not contain a path separator"
+        if any(ch in name for ch in "\\:*?\"<>|"):
+            return "project name must not contain invalid filesystem characters"
+        return None
+
+    async def create_repo(self, request: web.Request) -> web.Response:
+        """Create a local workspace project directory under the workspace root.
+
+        Body: ``{"name": str, "git_init": bool}``. ``git_init`` defaults to
+        False. Creates the directory (and optionally initialises a git repo),
+        returning the new project entry as ``{path, name, current_branch}``.
+        """
+        guard = self._guard(request, "git_repos_create")
+        if guard is not None:
+            return guard
+
+        try:
+            body = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({"error": "invalid JSON"}, status=400)
+        if not isinstance(body, dict):
+            return web.json_response({"error": "JSON body must be an object"}, status=400)
+
+        name = str(body.get("name", "")).strip()
+        git_init = bool(body.get("git_init", False))
+
+        err = self._validate_project_name(name)
+        if err:
+            return web.json_response({"error": err}, status=400)
+
+        target = (self._workspace / name).resolve()
+        # Ensure the resolved directory still sits under the workspace root.
+        try:
+            target.relative_to(self._workspace)
+        except ValueError:
+            return web.json_response({"error": "project path escapes workspace"}, status=400)
+
+        if target.exists():
+            return web.json_response({"error": "project already exists"}, status=409)
+
+        try:
+            target.mkdir(parents=False, exist_ok=False)
+        except OSError as e:
+            return web.json_response({"error": f"failed to create project: {e}"}, status=500)
+
+        if git_init:
+            rc, _ = _run_git(target, ["init", "-q"])
+            if rc != 0:
+                import shutil
+                shutil.rmtree(target, ignore_errors=True)
+                return web.json_response({"error": "git init failed"}, status=500)
+
+        return web.json_response({"path": str(target), "name": name, "current_branch": ""}, status=201)
+
+    async def open_folder(self, request: web.Request) -> web.Response:
+        """Open an existing external folder as a project.
+
+        Creates a symlink under the workspace pointing to the given absolute
+        path and returns the project entry. Rejects paths that escape the
+        workspace root.
+        """
+        guard = self._guard(request, "git_repos_open")
+        if guard is not None:
+            return guard
+
+        try:
+            body = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({"error": "invalid JSON"}, status=400)
+        if not isinstance(body, dict):
+            return web.json_response({"error": "JSON body must be an object"}, status=400)
+
+        folder_path = str(body.get("path", "")).strip()
+        link_name = str(body.get("name", "")).strip()
+
+        if not folder_path or not Path(folder_path).is_dir():
+            return web.json_response({"error": "folder path not found"}, status=400)
+
+        # Resolve the real absolute path (resolves symlinks).
+        real_path = Path(folder_path).resolve()
+
+        if link_name:
+            # User-supplied project name — use it as the symlink name.
+            target_link = (self._workspace / link_name).resolve()
+        else:
+            # Fall back to the folder's basename.
+            target_link = (self._workspace / real_path.name).resolve()
+
+        # Ensure the resolved link still sits under the workspace root.
+        try:
+            target_link.relative_to(self._workspace)
+        except ValueError:
+            return web.json_response({"error": "project path escapes workspace"}, status=400)
+
+        if target_link.exists() or target_link.is_symlink():
+            return web.json_response({"error": "project already exists"}, status=409)
+
+        try:
+            target_link.symlink_to(real_path, target_is_directory=True)
+        except OSError as e:
+            return web.json_response({"error": f"failed to create project: {e}"}, status=500)
+
+        # Determine current branch if the opened folder is a git repo.
+        current_branch = ""
+        if (real_path / ".git").is_dir():
+            rc, stdout = _run_git(real_path, ["rev-parse", "--abbrev-ref", "HEAD"])
+            current_branch = stdout.strip() if rc == 0 else ""
+
+        return web.json_response({
+            "path": str(real_path),
+            "name": target_link.name,
+            "current_branch": current_branch,
+        }, status=201)
 
     async def list_branches(self, request: web.Request) -> web.Response:
         """Return branches for a given repo path."""

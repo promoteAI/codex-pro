@@ -255,6 +255,23 @@ class InboundHandler:
         ClarifyCommands.maybe_bind_im_clarify_answer(loop, event)
         session_lock = await loop.sessions.acquire(event.session_key)
         async with session_lock:
+            # Per-message workspace scope. Only gateway-origin events may claim a
+            # project directory (external channels must not forge one). The tool
+            # layer reads this via session_workspace() and runs against the
+            # project dir for this turn; an invalid/missing path falls back to the
+            # global workspace.
+            from codex_pro.gateway.session_context import clear_session_vars, set_session_vars
+            from codex_pro.agent.workspace_scope import validate_project_workspace
+
+            workspace_tokens = None
+            claimed_workspace = event.metadata.get("workspace") if event.metadata.get("gateway") else ""
+            if claimed_workspace:
+                try:
+                    ws = validate_project_workspace(claimed_workspace, str(loop.workspace))
+                    workspace_tokens = set_session_vars(workspace=ws)
+                except ValueError as e:
+                    logger.warning("Rejected project workspace {} for session {}: {}",
+                                   claimed_workspace, event.session_key, e)
             trace_id = uuid.uuid4().hex[:12]
             span = loop.tracer.start_span(trace_id, f"s_{trace_id}", "process_message", "input")
             heartbeat = ProgressHeartbeat(
@@ -391,6 +408,8 @@ class InboundHandler:
                 # Deregister the turn so a finished turn leaves no residue for
                 # the next one to trip over (mirrors request() above).
                 loop.interrupt.clear(event.session_key)
+                if workspace_tokens is not None:
+                    clear_session_vars(workspace_tokens)
                 await heartbeat.stop()
                 loop.tracer.flush_trace(trace_id)
 

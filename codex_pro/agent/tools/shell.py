@@ -11,6 +11,7 @@ from typing import Any
 
 from codex_pro.agent.executors.base import BaseExecutor, ExecRequest, prepend_interpreter_bin
 from codex_pro.agent.proc_lifecycle import communicate_owned, spawn_shell
+from codex_pro.agent.workspace_scope import session_workspace
 from codex_pro.tools import Tool, ToolExecutionContext, ToolResult
 from codex_pro.security.guards import evaluate_shell_command
 from codex_pro.security.path_policy import check_cwd
@@ -99,9 +100,9 @@ class ShellTool(Tool):
             return None
         return f"Command blocked by execution policy: {decision.reason}"
 
-    def _resolve_cwd(self, cwd: str) -> str:
+    def _resolve_cwd(self, cwd: str, workspace: str) -> str:
         raw = Path(cwd).expanduser()
-        resolved = raw.resolve() if raw.is_absolute() else (Path(self._workspace) / raw).resolve()
+        resolved = raw.resolve() if raw.is_absolute() else (Path(workspace) / raw).resolve()
         violation = check_cwd(str(resolved))
         if violation:
             raise ValueError(violation)
@@ -110,7 +111,8 @@ class ShellTool(Tool):
     async def execute(self, params: dict[str, Any], ctx: ToolExecutionContext | None = None) -> ToolResult:
         command = params["command"]
         timeout = params.get("timeout", 30)
-        cwd = params.get("cwd", self._workspace)
+        ws = session_workspace(self._workspace)
+        cwd = params.get("cwd", ws)
 
         violation = self._check_command(command)
         if violation:
@@ -121,7 +123,7 @@ class ShellTool(Tool):
 
         try:
             try:
-                cwd = self._resolve_cwd(cwd)
+                cwd = self._resolve_cwd(cwd, ws)
             except ValueError:
                 return ToolResult(success=False, error=f"cwd is outside workspace: {cwd}")
             if self._executor:
@@ -129,7 +131,7 @@ class ShellTool(Tool):
                     command=command,
                     cwd=cwd,
                     timeout=timeout,
-                    env={"WORKSPACE": self._workspace},
+                    env={"WORKSPACE": ws},
                     credentials=ctx.credentials if ctx else {},
                 ))
                 output = response.stdout
@@ -142,7 +144,7 @@ class ShellTool(Tool):
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=cwd,
-                    env={**prepend_interpreter_bin(dict(os.environ)), "WORKSPACE": self._workspace},
+                    env={**prepend_interpreter_bin(dict(os.environ)), "WORKSPACE": ws},
                 )
                 stdout, stderr = await communicate_owned(proc, timeout=timeout)
                 output = stdout.decode(errors="replace")

@@ -5,6 +5,7 @@ import * as api from "../lib/api";
 beforeEach(() => {
   useChatStore.setState({
     project: "codex-pro",
+    projectPath: "",
     env: "local",
     branch: "dev",
     model: "agnes-2.5-flash",
@@ -140,5 +141,85 @@ describe("chat store", () => {
     useChatStore.getState().clearChat();
     expect(useChatStore.getState().messages).toHaveLength(0);
     expect(useChatStore.getState().chatting).toBe(false);
+  });
+
+  it("sendMessage includes project path when selected", async () => {
+    let messageBody: Record<string, unknown> | undefined;
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path, init) => {
+      if (path === "/message") {
+        messageBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return { status: "accepted", event_id: "evt-1", session_key: "cli:web-1" };
+      }
+      if (String(path).startsWith("/turns/")) {
+        return { turn: { status: "completed", response_text: "ok" } };
+      }
+      if (String(path).includes("/history")) {
+        return { messages: [{ role: "assistant", content: "ok" }] };
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+
+    useChatStore.setState({ projectPath: "/ws/myproj" });
+    await useChatStore.getState().sendMessage("hello");
+    expect(messageBody?.project).toBe("/ws/myproj");
+  });
+
+  it("sendMessage omits project when none selected", async () => {
+    let messageBody: Record<string, unknown> | undefined;
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path, init) => {
+      if (path === "/message") {
+        messageBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return { status: "accepted", event_id: "evt-1", session_key: "cli:web-1" };
+      }
+      if (String(path).startsWith("/turns/")) {
+        return { turn: { status: "completed", response_text: "ok" } };
+      }
+      if (String(path).includes("/history")) {
+        return { messages: [{ role: "assistant", content: "ok" }] };
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+
+    useChatStore.setState({ projectPath: "" });
+    await useChatStore.getState().sendMessage("hello");
+    expect(messageBody?.project).toBeUndefined();
+  });
+
+  it("createProject posts then selects the new repo", async () => {
+    const fetchSpy = vi.spyOn(api, "apiFetch").mockImplementation(async (path, init) => {
+      if (path === "/git/repos" && init?.method === "POST") {
+        const body = JSON.parse(String(init.body)) as { name: string };
+        expect(body.name).toBe("newproj");
+        return { path: "/ws/newproj", name: "newproj", current_branch: "main" };
+      }
+      if (path === "/git/repos") {
+        return { repos: [{ path: "/ws/newproj", name: "newproj", current_branch: "main" }] };
+      }
+      if (String(path).startsWith("/git/branches")) {
+        return { branches: [], current_branch: "main" };
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+
+    await useChatStore.getState().createProject("newproj");
+    expect(useChatStore.getState().project).toBe("newproj");
+    expect(useChatStore.getState().projectPath).toBe("/ws/newproj");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/git/repos",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("selectProject sets name, path and branch", async () => {
+    vi.spyOn(api, "apiFetch").mockResolvedValue({ branches: [], current_branch: "main" });
+    useChatStore.getState().selectProject({
+      path: "/ws/abc",
+      name: "abc",
+      current_branch: "dev",
+    });
+    expect(useChatStore.getState().project).toBe("abc");
+    expect(useChatStore.getState().projectPath).toBe("/ws/abc");
+    expect(useChatStore.getState().branch).toBe("dev");
+    expect(useChatStore.getState().messages).toHaveLength(0);
   });
 });

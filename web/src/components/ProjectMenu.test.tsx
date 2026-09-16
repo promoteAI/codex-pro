@@ -23,6 +23,7 @@ function renderMenu(overrides: Partial<Parameters<typeof ProjectMenu>[0]> = {}) 
   document.body.appendChild(anchor);
   const onClose = vi.fn();
   const onSelect = vi.fn();
+  const onCreate = vi.fn();
   render(
     <ProjectMenu
       open
@@ -30,11 +31,12 @@ function renderMenu(overrides: Partial<Parameters<typeof ProjectMenu>[0]> = {}) 
       project="codex-pro"
       repos={[]}
       onSelect={onSelect}
+      onCreate={onCreate}
       onClose={onClose}
       {...overrides}
     />,
   );
-  return { onClose, onSelect, anchor };
+  return { onClose, onSelect, onCreate, anchor };
 }
 
 describe("ProjectMenu", () => {
@@ -52,14 +54,23 @@ describe("ProjectMenu", () => {
   it("选择工作区", () => {
     const { onSelect, onClose } = renderMenu();
     fireEvent.click(screen.getByText("DeepTutor"));
-    expect(onSelect).toHaveBeenCalledWith("DeepTutor");
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "DeepTutor", path: "/DeepTutor" }),
+    );
     expect(onClose).toHaveBeenCalled();
   });
 
   it("不在项目中工作清空选择", () => {
     const { onSelect, onClose } = renderMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /不在项目中工作/ }));
-    expect(onSelect).toHaveBeenCalledWith("");
+    expect(onSelect).toHaveBeenCalledWith({ name: "", path: "", current_branch: "" });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("创建项目触发 onCreate", () => {
+    const { onCreate, onClose } = renderMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /创建项目/ }));
+    expect(onCreate).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
 

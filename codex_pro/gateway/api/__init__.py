@@ -100,6 +100,8 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
 
     # Git operations for Composer dropdowns
     app.router.add_get(f"{prefix}/git/repos", git_api.list_repos)
+    app.router.add_post(f"{prefix}/git/repos", git_api.create_repo)
+    app.router.add_post(f"{prefix}/git/open", git_api.open_folder)
     app.router.add_get(f"{prefix}/git/branches", git_api.list_branches)
 
     # File browser for tools panel

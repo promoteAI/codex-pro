@@ -14,6 +14,7 @@ from codex_pro.agent.proc_lifecycle import (
     spawn_shell,
     terminate_tree,
 )
+from codex_pro.agent.workspace_scope import session_workspace
 from codex_pro.tools import Tool, ToolExecutionContext, ToolResult
 from codex_pro.security.guards import evaluate_shell_command
 
@@ -87,7 +88,7 @@ class ProcessTool(Tool):
             cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=self._workspace,
+            cwd=session_workspace(self._workspace),
         )
         pid = f"proc_{proc.pid}"
         # Reclaim before inserting, so the cap counts entries already in the

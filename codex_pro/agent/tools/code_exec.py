@@ -11,6 +11,7 @@ from typing import Any
 
 from codex_pro.agent.executors.base import BaseExecutor, ExecRequest
 from codex_pro.agent.proc_lifecycle import communicate_owned, spawn_shell
+from codex_pro.agent.workspace_scope import session_workspace
 from codex_pro.tools import Tool, ToolExecutionContext, ToolResult
 from codex_pro.security.guards import evaluate_code_execution
 
@@ -103,13 +104,14 @@ class CodeExecTool(Tool):
             return ToolResult(success=False, error=f"Code blocked by execution policy: {decision.reason}")
 
         try:
+            ws = str(session_workspace(self._workspace))
             if self._executor:
                 response = await self._executor.execute(ExecRequest(
                     command=command,
-                    cwd=str(self._workspace),
+                    cwd=ws,
                     timeout=timeout,
                     stdin=code,
-                    env={"WORKSPACE": str(self._workspace)},
+                    env={"WORKSPACE": ws},
                     credentials=ctx.credentials if ctx else {},
                 ))
                 out = response.stdout
@@ -122,7 +124,7 @@ class CodeExecTool(Tool):
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     stdin=asyncio.subprocess.PIPE,
-                    cwd=str(self._workspace),
+                    cwd=ws,
                 )
                 stdout, stderr = await communicate_owned(
                     proc, code.encode(), timeout=timeout,

@@ -16,6 +16,7 @@ _SESSION_THREAD_ID: ContextVar[str] = ContextVar("session_thread_id", default=""
 _SESSION_USER_ID: ContextVar[str] = ContextVar("session_user_id", default="")
 _SESSION_USER_NAME: ContextVar[str] = ContextVar("session_user_name", default="")
 _SESSION_KEY: ContextVar[str] = ContextVar("session_key", default="")
+_SESSION_WORKSPACE: ContextVar[str] = ContextVar("session_workspace", default="")
 
 _ALL_VARS = {
     "platform": _SESSION_PLATFORM,
@@ -25,6 +26,7 @@ _ALL_VARS = {
     "user_id": _SESSION_USER_ID,
     "user_name": _SESSION_USER_NAME,
     "session_key": _SESSION_KEY,
+    "workspace": _SESSION_WORKSPACE,
 }
 
 

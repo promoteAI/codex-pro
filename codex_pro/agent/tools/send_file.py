@@ -12,6 +12,7 @@ import mimetypes
 from pathlib import Path
 from typing import Any
 
+from codex_pro.agent.workspace_scope import session_workspace
 from codex_pro.tools import Tool, ToolExecutionContext, ToolResult
 from codex_pro.bus.events import ContentBlock, ContentType, OutboundEvent
 from codex_pro.security.path_policy import check_read, resolve_path
@@ -82,18 +83,19 @@ class SendFileTool(Tool):
         if not self._publish:
             return ToolResult(success=False, error="Message bus not connected")
         file_path = params["file_path"]
+        ws = session_workspace(self._workspace)
 
-        violation = check_read(file_path, self._workspace, spill_root=self._spill_root)
+        violation = check_read(file_path, ws, spill_root=self._spill_root)
         if violation:
             return ToolResult(success=False, error=violation)
         if self._restrict:
-            resolved = resolve_path(file_path, self._workspace)
+            resolved = resolve_path(file_path, ws)
             try:
-                resolved.relative_to(self._workspace)
+                resolved.relative_to(ws)
             except ValueError:
-                return ToolResult(success=False, error=f"Path {file_path} is outside workspace {self._workspace}")
+                return ToolResult(success=False, error=f"Path {file_path} is outside workspace {ws}")
 
-        resolved = resolve_path(file_path, self._workspace)
+        resolved = resolve_path(file_path, ws)
         if not resolved.exists():
             return ToolResult(success=False, error=f"File not found: {file_path}")
 

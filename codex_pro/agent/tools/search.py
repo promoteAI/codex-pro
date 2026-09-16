@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from codex_pro.agent.workspace_scope import session_workspace
 from codex_pro.tools import Tool, ToolExecutionContext, ToolResult
 from codex_pro.security.path_policy import check_read, resolve_path
 
@@ -58,17 +59,18 @@ class SearchFilesTool(Tool):
         mode = params.get("mode", "content")
         sub = params.get("path", ".")
         max_results = params.get("max_results", 50)
+        ws = str(session_workspace(str(self._workspace)))
 
-        search_root = resolve_path(sub, str(self._workspace))
+        search_root = resolve_path(sub, ws)
         if self._restrict:
             try:
-                search_root.relative_to(self._workspace)
+                search_root.relative_to(ws)
             except ValueError:
                 return ToolResult(success=False, error="Path outside workspace")
         # spill 闸门:一次搜索会横扫整棵子树,若 spill 根落在工作区内(默认
         # data/spill 就是),一个 path="." 的搜索便会把其他会话的产物内容当作
         # 匹配行返回——比按路径读取更容易撞上,且模型并非有意越权。
-        violation = check_read(str(search_root), str(self._workspace), spill_root=self._spill_root)
+        violation = check_read(str(search_root), ws, spill_root=self._spill_root)
         if violation:
             return ToolResult(success=False, error=violation)
 
@@ -78,12 +80,12 @@ class SearchFilesTool(Tool):
         # Offload the blocking traversal to a worker thread so the event loop
         # (and thus channel polling / healthz / other sessions) stays live.
         if mode == "glob":
-            return await asyncio.to_thread(self._glob_search, search_root, pattern, max_results)
-        return await asyncio.to_thread(self._content_search, search_root, pattern, max_results)
+            return await asyncio.to_thread(self._glob_search, search_root, pattern, max_results, ws)
+        return await asyncio.to_thread(self._content_search, search_root, pattern, max_results, ws)
 
-    def _rel(self, path: Path) -> str:
+    def _rel(self, path: Path, workspace: str) -> str:
         try:
-            return str(path.relative_to(self._workspace))
+            return str(path.relative_to(workspace))
         except ValueError:
             return str(path)
 
@@ -122,7 +124,7 @@ class SearchFilesTool(Tool):
             return False
         return resolved == spill_root or spill_root in resolved.parents
 
-    def _glob_search(self, root: Path, pattern: str, limit: int) -> ToolResult:
+    def _glob_search(self, root: Path, pattern: str, limit: int, workspace: str) -> ToolResult:
         matches: list[str] = []
         scanned = 0
         deadline = time.monotonic() + _SOFT_BUDGET_SECONDS
@@ -133,7 +135,7 @@ class SearchFilesTool(Tool):
                 truncated = True
                 break
             if p.match(pattern):
-                matches.append(self._rel(p))
+                matches.append(self._rel(p, workspace))
                 if len(matches) >= limit:
                     truncated = True
                     break
@@ -142,7 +144,7 @@ class SearchFilesTool(Tool):
             meta["truncated"] = True
         return ToolResult(output="\n".join(matches) if matches else "No files matched.", metadata=meta)
 
-    def _content_search(self, root: Path, pattern: str, limit: int) -> ToolResult:
+    def _content_search(self, root: Path, pattern: str, limit: int, workspace: str) -> ToolResult:
         try:
             regex = re.compile(pattern)
         except re.error as e:
@@ -166,7 +168,7 @@ class SearchFilesTool(Tool):
                 continue
             for i, line in enumerate(text.splitlines(), 1):
                 if regex.search(line):
-                    results.append(f"{self._rel(path)}:{i}: {line.rstrip()[:200]}")
+                    results.append(f"{self._rel(path, workspace)}:{i}: {line.rstrip()[:200]}")
                     if len(results) >= limit:
                         truncated = True
                         break

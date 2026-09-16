@@ -6,6 +6,7 @@ import difflib
 from pathlib import Path
 from typing import Any
 
+from codex_pro.agent.workspace_scope import session_workspace
 from codex_pro.tools import Tool, ToolExecutionContext, ToolResult
 from codex_pro.security.path_policy import check_write, resolve_path
 
@@ -31,14 +32,15 @@ class PatchTool(Tool):
 
     async def execute(self, params: dict[str, Any], ctx: ToolExecutionContext | None = None) -> ToolResult:
         rel = params["file_path"]
-        target = resolve_path(rel, str(self._workspace))
+        ws = str(session_workspace(str(self._workspace)))
+        target = resolve_path(rel, ws)
 
-        violation = check_write(str(target), str(self._workspace), self._safe_write_root)
+        violation = check_write(str(target), ws, self._safe_write_root)
         if violation:
             return ToolResult(success=False, error=violation)
         if self._restrict:
             try:
-                target.relative_to(self._workspace)
+                target.relative_to(ws)
             except ValueError:
                 return ToolResult(success=False, error="Path outside workspace")
 

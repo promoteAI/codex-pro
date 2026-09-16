@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useChatStore } from "../../stores/chat";
 import { ProjectMenu } from "../ProjectMenu";
+import { CreateProjectDialog } from "../CreateProjectDialog";
 import { BranchMenu } from "../BranchMenu";
 import { ComposerAddMenu } from "../ComposerAddMenu";
 import {
@@ -42,7 +43,7 @@ export function Composer() {
   const perm = useChatStore((s) => s.perm);
   const planMode = useChatStore((s) => s.planMode);
   const goalMode = useChatStore((s) => s.goalMode);
-  const setProject = useChatStore((s) => s.setProject);
+  const selectProject = useChatStore((s) => s.selectProject);
   const setBranch = useChatStore((s) => s.setBranch);
   const setModel = useChatStore((s) => s.setModel);
   const setEffort = useChatStore((s) => s.setEffort);
@@ -57,6 +58,7 @@ export function Composer() {
   const chatting = useChatStore((s) => s.chatting);
 
   const [menu, setMenu] = useState<Menu>(null);
+  const [showCreateProject, setShowCreateProject] = useState(false);
   const [modelQuery, setModelQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
   const projectBtnRef = useRef<HTMLButtonElement>(null);
@@ -111,9 +113,6 @@ export function Composer() {
 
   const toggle = (m: Menu) => setMenu((cur) => (cur === m ? null : m));
 
-  const menuBox =
-    "absolute z-30 left-0 bottom-[calc(100%+6px)] min-w-[260px] max-h-80 overflow-auto p-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[10px] shadow-xl";
-
   const permOptions = [
     ["ask", "permAsk", "permAskDesc"],
     ["agent", "permAgent", "permAgentDesc"],
@@ -160,8 +159,13 @@ export function Composer() {
           anchorEl={projectBtnRef.current}
           project={project}
           repos={repos}
-          onSelect={setProject}
+          onSelect={selectProject}
+          onCreate={() => setShowCreateProject(true)}
           onClose={() => setMenu(null)}
+        />
+        <CreateProjectDialog
+          open={showCreateProject}
+          onClose={() => setShowCreateProject(false)}
         />
 
         <BranchMenu

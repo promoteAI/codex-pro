@@ -144,6 +144,7 @@ class WebSocketHandler:
 
                             text = data.get("text", "")
                             is_group = bool(data.get("is_group", False))
+                            project = data.get("project", "")
                             if not text:
                                 continue
 
@@ -171,6 +172,7 @@ class WebSocketHandler:
                                     "platform": platform,
                                     "user_id": user_id,
                                     "chat_id": chat_id,
+                                    "project": project,
                                 })
                                 claim = await self._server._message_idempotency.claim(
                                     namespace="gateway-message",
@@ -290,6 +292,7 @@ class WebSocketHandler:
                             tokens = set_session_vars(
                                 platform=platform, chat_id=chat_id,
                                 user_id=user_id, session_key=session_key,
+                                workspace=project,
                             )
                             try:
                                 event = InboundEvent.text_message(
@@ -304,6 +307,8 @@ class WebSocketHandler:
                                     event.event_id = event_id
                                 event.metadata["gateway"] = True
                                 event.metadata["platform"] = platform
+                                if project:
+                                    event.metadata["workspace"] = project
                                 if operation_fingerprint:
                                     event.metadata[IDEMPOTENCY_NAMESPACE_METADATA] = "gateway-message"
                                     event.metadata[IDEMPOTENCY_FINGERPRINT_METADATA] = operation_fingerprint

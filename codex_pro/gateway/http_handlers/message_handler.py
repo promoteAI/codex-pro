@@ -297,6 +297,10 @@ class MessageHandler:
         wait = bool(body.get("wait", False))
         is_group = bool(body.get("is_group", False))
         timeout_seconds = max(1, min(int(body.get("timeout_seconds", 180)), 600))
+        # Per-message project directory (local workspace). When present, the
+        # agent's tools run against this directory for the turn (see
+        # agent/workspace_scope.py). Absent/empty means the global workspace.
+        project = body.get("project", "")
 
         if not text and not media_urls:
             return web.json_response({"error": "text or media_urls required"}, status=400)
@@ -361,6 +365,7 @@ class MessageHandler:
                 "media_urls": media_urls,
                 "is_group": is_group,
                 "session_key": session_key,
+                "project": project,
             })
             claim = await self._server._message_idempotency.claim(
                 namespace="gateway-message",
@@ -512,9 +517,12 @@ class MessageHandler:
 
             session, _ = await self._server._reset_session_if_needed(session_key)
             from codex_pro.gateway.session_context import set_session_vars
+            # workspace 作为上报侧 contextvar 一并带上;真正驱动工具的是
+            # inbound.py 在派发任务上下文里根据 event.metadata["workspace"] 设置的
+            # 那份(见 agent/workspace_scope.py)。这里仅保持上报一致性。
             tokens = set_session_vars(
                 platform=platform, chat_id=chat_id, user_id=user_id,
-                session_key=session_key,
+                session_key=session_key, workspace=project,
             )
 
             content_blocks = [ContentBlock(type=ContentType.TEXT, text=text)]
@@ -536,6 +544,9 @@ class MessageHandler:
                         )
                     )
 
+            event_meta: dict[str, Any] = {"gateway": True, "platform": platform, "user_id": user_id}
+            if project:
+                event_meta["workspace"] = project
             event = InboundEvent(
                 channel=f"gateway:{platform}",
                 sender_id=user_id,
@@ -543,7 +554,7 @@ class MessageHandler:
                 content=content_blocks,
                 session_key_override=session_key,
                 is_group=is_group,
-                metadata={"gateway": True, "platform": platform, "user_id": user_id},
+                metadata=event_meta,
             )
             if event_id:
                 event.event_id = event_id

@@ -116,3 +116,11 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
         return web.json_response(schema)
 
     app.router.add_get(f"{prefix}/openapi.json", _openapi_json)
+
+    # Interactive API docs (Swagger UI) served at /docs, pointed at the schema.
+    # Assets are vendored locally so the page never depends on an external CDN
+    # or proxy.
+    from codex_pro.gateway.api.docs import docs_handler, register_swagger_assets
+
+    app.router.add_get("/docs", docs_handler(f"{prefix}/openapi.json"))
+    register_swagger_assets(app, server)

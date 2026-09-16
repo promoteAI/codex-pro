@@ -94,47 +94,49 @@ def generate_openapi_schema(server: GatewayServer, prefix: str = "/api/v1") -> d
     """Generate an OpenAPI 3.0 schema from registered routes."""
     paths: dict[str, dict[str, Any]] = {}
 
-    for route in server.app.router.routes():
+    for route in server._app.router.routes():
         resource = getattr(route, "resource", None)
         if resource is None:
             continue
-        pattern = str(getattr(resource, "pattern", ""))
-        # Skip non-API routes (SPA catch-all, static files, etc.)
-        if not pattern.startswith(prefix):
+        # aiohttp exposes the path on the resource via ``canonical`` (e.g.
+        # ``/api/v1/memory/{id}``) and the HTTP method on the route itself.
+        openapi_path = str(getattr(resource, "canonical", ""))
+        # Skip non-API routes (SPA catch-all, static files, docs, etc.)
+        if not openapi_path.startswith(prefix):
             continue
 
-        methods = getattr(resource, "methods", set())
-        for method in sorted(methods):
-            method_upper = method.upper()
-            if method_upper == "OPTIONS":
-                continue
-            openapi_path = pattern
-            # Normalize path params: {name} -> /{name} (already correct in aiohttp)
-            # Remove trailing slash for consistency
-            if openapi_path.endswith("/") and len(openapi_path) > 1:
-                openapi_path = openapi_path[:-1]
+        method = str(getattr(route, "method", "")).upper()
+        if method in ("", "OPTIONS", "HEAD"):
+            continue
 
-            # Build operation
-            operation: dict[str, Any] = {
-                "summary": "",
-                "tags": [],
-                "parameters": _path_to_openapi_params(openapi_path),
-                "responses": {"200": {"description": "Successful response"}},
-            }
+        # Remove trailing slash for consistency.
+        if openapi_path.endswith("/") and len(openapi_path) > 1:
+            openapi_path = openapi_path[:-1]
 
-            # Look up static docs
-            key = f"{method_upper} {openapi_path}"
-            doc = _ROUTE_DOCS.get(key)
-            if doc:
-                operation["summary"] = doc["summary"]
-                operation["tags"] = doc["tags"]
-            else:
-                operation["summary"] = f"{method_upper} {openapi_path}"
-                operation["tags"] = ["General"]
+        # Build operation
+        operation: dict[str, Any] = {
+            "summary": "",
+            "tags": [],
+            "parameters": _path_to_openapi_params(openapi_path),
+            "responses": {"200": {"description": "Successful response"}},
+        }
 
-            paths.setdefault(openapi_path, {})[method.lower()] = operation
+        # Look up static docs. _ROUTE_DOCS keys are prefix-stripped (e.g.
+        # "GET /memory"), so match against the path relative to the prefix.
+        rel_path = openapi_path[len(prefix):] or "/"
+        doc = _ROUTE_DOCS.get(f"{method} {rel_path}")
+        if doc:
+            operation["summary"] = doc["summary"]
+            operation["tags"] = doc["tags"]
+        else:
+            operation["summary"] = f"{method} {openapi_path}"
+            operation["tags"] = ["General"]
 
-    # Build top-level schema
+        paths.setdefault(openapi_path, {})[method.lower()] = operation
+
+    # Build top-level schema. Paths are absolute (include the prefix), and we
+    # omit ``servers`` so Swagger UI sends requests to the exact paths without
+    # double-prefixing the base URL.
     schema: dict[str, Any] = {
         "openapi": "3.0.3",
         "info": {
@@ -142,7 +144,6 @@ def generate_openapi_schema(server: GatewayServer, prefix: str = "/api/v1") -> d
             "description": "Management API for the Codex Pro agent runtime. All endpoints require an API token unless explicitly noted.",
             "version": "0.1.0",
         },
-        "servers": [{"url": prefix.rstrip("/")}],
         "paths": paths,
         "components": {
             "securitySchemes": {

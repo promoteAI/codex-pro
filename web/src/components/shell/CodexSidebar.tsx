@@ -348,7 +348,7 @@ export function CodexSidebar() {
                   return (
                     <div
                       key={s.key}
-                      className={`mx-1 flex items-center gap-1 px-2 py-1 rounded-md group/row ${
+                      className={`flex items-center gap-1 px-2 py-1 rounded-md group ${
                         active ? "bg-[#282828]" : "hover:bg-codex-hover"
                       }`}
                     >
@@ -361,7 +361,7 @@ export function CodexSidebar() {
                         className={`w-4 h-4 shrink-0 items-center justify-center rounded ${
                           isPinned(s.key)
                             ? "inline-flex text-[#c8c8c8]"
-                            : "hidden group-hover/row:inline-flex text-[#6a6a6a] hover:text-[#b0b0b0]"
+                            : "hidden group-hover:inline-flex text-[#6a6a6a] hover:text-[#b0b0b0]"
                         }`}
                       >
                         <PinIcon className="w-3 h-3" />
@@ -380,7 +380,7 @@ export function CodexSidebar() {
                         type="button"
                         title={t("archive")}
                         aria-label={t("archive")}
-                        className="hidden group-hover/row:inline-flex w-5 h-5 shrink-0 items-center justify-center rounded text-[#8a8a8a] hover:bg-[#333] hover:text-[#d8d8d8]"
+                        className="hidden group-hover:inline-flex w-5 h-5 shrink-0 items-center justify-center rounded text-[#8a8a8a] hover:bg-[#333] hover:text-[#d8d8d8]"
                       >
                         <ArchiveIcon className="w-3 h-3" />
                       </button>

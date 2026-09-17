@@ -591,6 +591,7 @@ class SQLiteBackend(StorageBackend):
                     "created_at": data.get("created_at") or created_at,
                     "updated_at": data.get("updated_at") or updated_at,
                     "metadata": metadata,
+                    "title": _session_title(data, messages),
                     "message_count": len(messages),
                 }
             )
@@ -982,3 +983,26 @@ class SQLiteBackend(StorageBackend):
             }
             for raw_messages, compression_id, created_at in rows
         ]
+
+
+def _session_title(data: dict[str, Any], messages: list[dict[str, Any]]) -> str:
+    """Resolve a session title, preferring the top-level persisted field.
+
+    The title is stored at the top level (alongside ``key``). For records written
+    before that field existed we derive one from the first user message —
+    mirroring ``Session.resolved_title`` so the storage listing matches the cache
+    path without needing a live ``Session``.
+    """
+    title = data.get("title", "")
+    if isinstance(title, str) and title:
+        return title
+    # Import lazily to avoid a module cycle (session.manager imports storage).
+    from codex_pro.session.manager import Session
+
+    for msg in messages:
+        if msg.get("role") == "user":
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                return Session.derive_title(content)
+            continue
+    return ""

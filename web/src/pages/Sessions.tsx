@@ -9,7 +9,7 @@ import { useIsAdmin } from "../stores/capabilities";
 import { useConfirm } from "../components/ConfirmDialog";
 import { runMutation } from "../stores/toast";
 
-interface SessionItem { key: string; message_count: number; updated_at: string }
+interface SessionItem { key: string; title?: string; message_count: number; updated_at: string }
 interface Message {
   role: string;
   content: string;
@@ -42,6 +42,7 @@ export function Sessions() {
     sessions: SessionItem[]; total: number; has_more: boolean;
   }>(`/sessions?limit=${PAGE_SIZE}&offset=${listOffset}${searchParam}`);
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedTitle, setSelectedTitle] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [turns, setTurns] = useState<TurnRun[]>([]);
   const [hasOlder, setHasOlder] = useState(false);
@@ -58,8 +59,8 @@ export function Sessions() {
     } catch { setTurns([]); }
   };
 
-  const loadHistory = async (key: string) => {
-    setSelected(key); setHistoryError(null); setHistoryLoading(true);
+  const loadHistory = async (key: string, title?: string) => {
+    setSelected(key); setSelectedTitle(title || ""); setHistoryError(null); setHistoryLoading(true);
     const seq = ++seqRef.current;
     try {
       const result = await apiFetch<{ messages: Message[]; has_more: boolean }>(
@@ -88,7 +89,7 @@ export function Sessions() {
     finally { setHistoryLoading(false); }
   };
 
-  const refreshAll = () => { refetch(); if (selected) loadHistory(selected); };
+  const refreshAll = () => { refetch(); if (selected) loadHistory(selected, selectedTitle); };
 
   useWsSubscribe(["sessions"], (event) => {
     refetch();
@@ -96,7 +97,7 @@ export function Sessions() {
     if (selected && payload?.session_key === selected) {
       loadTurns(selected);
       if (event.type === "session_reset" || ["completed", "incomplete", "failed", "interrupted"].includes(payload.status ?? "")) {
-        loadHistory(selected);
+        loadHistory(selected, selectedTitle);
       }
     }
   }, ["session_turn_updated", "session_reset"]);
@@ -132,9 +133,9 @@ export function Sessions() {
             {isAdmin === false || String(error).includes("403") ? t("common:adminOnly") : t("common:loadFailed", { error })}
           </div>}
           {!loading && !error && sessions.length === 0 && <div className="text-gray-400 text-sm px-3 py-2">{t("empty")}</div>}
-          {sessions.map((session) => <button key={session.key} onClick={() => loadHistory(session.key)}
+          {sessions.map((session) => <button key={session.key} onClick={() => loadHistory(session.key, session.title)}
             className={`w-full text-left px-3 py-2 rounded text-sm ${selected === session.key ? "bg-blue-50 text-blue-700" : "hover:bg-gray-100"}`}>
-            <div className="font-medium truncate">{session.key}</div>
+            <div className="font-medium truncate" title={session.key}>{session.title || t("untitled")}</div>
             <div className="text-xs text-gray-500">{t("messageCount", { count: session.message_count,
               time: relativeTime(session.updated_at, t("unknownTime")) })}</div>
           </button>)}
@@ -150,7 +151,7 @@ export function Sessions() {
 
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {selected && <div className="flex items-center gap-2 border-b pb-2 mb-2">
-          <div className="min-w-0 flex-1"><div className="font-medium text-sm truncate">{selected}</div>
+          <div className="min-w-0 flex-1"><div className="font-medium text-sm truncate" title={selected}>{selectedTitle || t("untitled")}</div>
             <div className="text-xs text-gray-400">{t("turnCount", { count: turns.length })}</div></div>
           <button onClick={resetSession} disabled={isAdmin === false}
             className="flex items-center gap-1 text-xs border rounded px-2 py-1 text-red-600 hover:bg-red-50 disabled:opacity-40">

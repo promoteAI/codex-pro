@@ -15,6 +15,7 @@
   "reset": "Reset session",
   "resetTitle": "Reset this session?",
   "resetMessage": "This clears conversation history and active state for \"{{key}}\".",
+  "untitled": "Untitled session",
   "resetSuccess": "Session reset",
   "resetFailed": "Reset failed",
   "turnCount": "{{count}} recent turn records",

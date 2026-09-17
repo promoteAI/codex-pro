@@ -27,11 +27,28 @@ class Session:
     messages: list[dict[str, Any]] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
+    title: str = ""  # human-readable label derived from the first user turn
     metadata: dict[str, Any] = field(default_factory=dict)
     last_consolidated: int = 0
     status: str = "active"  # active | expired | archived
 
     def add_message(self, role: str, content: str, **kwargs: Any) -> None:
+        # Give the session a human-readable title from its first user turn so the
+        # listing UI can show something meaningful instead of the raw key. Stored
+        # as a top-level field so it sits alongside ``key`` in the listing, not
+        # buried in metadata. See ``derive_title`` for the truncation rules.
+        #
+        # The guard is just "no title yet": a multimodal first message may have no
+        # derivable label, and in that case the next real text user message should
+        # take the title. Once a title is set here later messages never override
+        # it.
+        if role == "user" and not self.title:
+            derived = self.derive_title(content)
+            # Only persist a non-empty title; a multimodal first message may have
+            # no derivable label, and the next real text message should get the
+            # title instead.
+            if derived:
+                self.title = derived
         msg = {
             "role": role,
             "content": content,
@@ -40,6 +57,42 @@ class Session:
         }
         self.messages.append(msg)
         self.updated_at = datetime.now()
+
+    @staticmethod
+    def derive_title(content: str, max_len: int = 40) -> str:
+        """Build a short, single-line title from the text of a user's first message.
+
+        Takes the first non-blank line, strips markdown emphasis and code fences
+        that would leak into a list label, collapses runs of whitespace, and
+        truncates to ``max_len`` characters with an ellipsis so a long prompt does
+        not widen the session list. Content with no usable text falls back to the
+        key the caller is already using.
+        """
+        import re
+
+        # Non-string content (e.g. the structured list used for multimodal
+        # messages) has no single label to extract; fall back to empty so the
+        # listing shows the key instead of raising on an unexpected type.
+        if not isinstance(content, str) or not content:
+            return ""
+        text = content.strip()
+        # Drop code-fence blocks first (they may span lines) so the first-line
+        # selection below does not latch onto a bare opening fence like
+        # "```python" that has no closing marker on the same line.
+        text = re.sub(r"```[\s\S]*?```", " ", text)
+        for line in text.splitlines():
+            if line.strip():
+                text = line
+                break
+        # Drop inline emphasis and link syntax so a title like "**Seek** 文档"
+        # doesn't render oddly in a list.
+        text = re.sub(r"[`*_~\[\]]+", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        if not text:
+            return ""
+        if len(text) > max_len:
+            return text[: max_len - 1].rstrip() + "…"
+        return text
 
     def get_history(self, max_messages: int = 500) -> list[dict[str, Any]]:
         """Return unconsolidated messages for LLM input, aligned to a safe boundary.
@@ -140,6 +193,28 @@ class Session:
     @property
     def message_count(self) -> int:
         return len(self.messages)
+
+    def resolved_title(self) -> str:
+        """The title to show in listings, deriving one when none was persisted.
+
+        Returns the top-level ``title`` field; for a session read from disk that
+        predates the field (or whose first user message was multimodal), it
+        derives one from the first ``user`` message instead. The derived value is
+        not written back — that keeps read-only listing free of side effects.
+        In-memory sessions created by ``add_message`` always have ``title`` set
+        directly.
+        """
+        if isinstance(self.title, str) and self.title:
+            return self.title
+        for msg in self.messages:
+            if msg.get("role") == "user":
+                content = msg.get("content", "")
+                # Skip multimodal/user messages without a string label and keep
+                # looking, so the next plain-text user turn can still title it.
+                if isinstance(content, str):
+                    return self.derive_title(content)
+                continue
+        return ""
 
 
 class SessionManager:
@@ -324,18 +399,33 @@ class SessionManager:
         if not data:
             return None
         try:
-            return Session(
-                key=key,
-                messages=data.get("messages", []),
-                created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(),
-                updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(),
-                metadata=data.get("metadata", {}),
-                last_consolidated=data.get("last_consolidated", 0),
-                status=data.get("status", "active"),
-            )
+            return self._build_session(key, data.get("messages", []), data)
         except (ValueError, TypeError, KeyError) as e:
             logger.error("Corrupt session record for '{}': {}", key, e)
             raise CorruptData(f"session '{key}' fields are not parseable: {e}") from e
+
+    def _build_session(self, key: str, messages: list[dict[str, Any]], data: dict[str, Any]) -> Session:
+        """Construct a ``Session`` from a persisted record.
+
+        The title is a top-level field and is read straight from the record. Any
+        legacy ``metadata["title"]`` left in older records is ignored and will be
+        dropped on the next save (see ``_persisted_metadata``), so the field never
+        lives in metadata again.
+        """
+        metadata = dict(data.get("metadata") or {})
+        title = data.get("title", "")
+        if not isinstance(title, str):
+            title = ""
+        return Session(
+            key=key,
+            messages=messages,
+            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(),
+            updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(),
+            title=title,
+            metadata=metadata,
+            last_consolidated=data.get("last_consolidated", 0),
+            status=data.get("status", "active"),
+        )
 
     async def _load_from_file(self, key: str) -> Session | None:
         path = self._session_path(key)
@@ -351,6 +441,7 @@ class SessionManager:
                 updated_at = None
                 last_consolidated = 0
                 status = "active"
+                title = ""
 
                 with open(path, encoding="utf-8") as f:
                     for line in f:
@@ -360,6 +451,7 @@ class SessionManager:
                         data = json.loads(line)
                         if data.get("_type") == "metadata":
                             metadata = data.get("metadata", {})
+                            title = data.get("title", "")
                             created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None
                             updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
                             last_consolidated = data.get("last_consolidated", 0)
@@ -367,15 +459,14 @@ class SessionManager:
                         else:
                             messages.append(data)
 
-                return Session(
-                    key=key,
-                    messages=messages,
-                    created_at=created_at or datetime.now(),
-                    updated_at=updated_at or datetime.now(),
-                    metadata=metadata,
-                    last_consolidated=last_consolidated,
-                    status=status,
-                )
+                return self._build_session(key, messages, {
+                    "created_at": created_at.isoformat() if created_at else None,
+                    "updated_at": updated_at.isoformat() if updated_at else None,
+                    "metadata": metadata,
+                    "title": title,
+                    "last_consolidated": last_consolidated,
+                    "status": status,
+                })
 
             return await asyncio.to_thread(_sync_load)
         except Exception as e:
@@ -396,7 +487,8 @@ class SessionManager:
             "messages": session.messages,
             "created_at": session.created_at.isoformat(),
             "updated_at": session.updated_at.isoformat(),
-            "metadata": session.metadata,
+            "title": session.title,
+            "metadata": self._persisted_metadata(session),
             "last_consolidated": session.last_consolidated,
             "status": session.status,
         }
@@ -405,6 +497,19 @@ class SessionManager:
         except Exception as e:
             logger.warning("Failed to save session {} to storage, falling back to file: {}", session.key, e)
             await self._save_to_file(session)
+
+    @staticmethod
+    def _persisted_metadata(session: Session) -> dict[str, Any]:
+        """Metadata as written to disk, minus the title key.
+
+        The title lives at the top level of the session (alongside ``key``), so it
+        must not also be stored in metadata. Dropping it here also clears any
+        legacy ``metadata["title"]`` still present in older records, so the field
+        is fully removed from metadata on the next save.
+        """
+        metadata = dict(session.metadata)
+        metadata.pop("title", None)
+        return metadata
 
     async def _save_to_file(self, session: Session) -> None:
         import asyncio
@@ -418,7 +523,8 @@ class SessionManager:
             "key": session.key,
             "created_at": session.created_at.isoformat(),
             "updated_at": session.updated_at.isoformat(),
-            "metadata": dict(session.metadata),
+            "title": session.title,
+            "metadata": self._persisted_metadata(session),
             "last_consolidated": session.last_consolidated,
             "status": session.status,
         }
@@ -552,6 +658,7 @@ class SessionManager:
                             "created_at": session.created_at.isoformat(),
                             "updated_at": session.updated_at.isoformat(),
                             "metadata": session.metadata,
+                            "title": session.resolved_title(),
                             "message_count": len(session.messages),
                         }
                         for session in self._cache.values()
@@ -564,15 +671,25 @@ class SessionManager:
             try:
                 with open(path, encoding="utf-8") as f:
                     first = f.readline().strip()
-                if not first:
-                    continue
-                data = json.loads(first)
-                if data.get("_type") == "metadata":
+                    if not first:
+                        continue
+                    data = json.loads(first)
+                    if data.get("_type") != "metadata":
+                        continue
+                    title = data.get("title", "")
+                    # Sessions written before the top-level field existed have no
+                    # title; derive one from the first user message so the listing
+                    # still shows a meaningful label. Only the lines up to (and
+                    # including) the first user message are read, so a long
+                    # transcript is not fully materialized.
+                    if not (isinstance(title, str) and title):
+                        title = _first_user_title(f)
                     sessions.append({
                         "key": data.get("key", path.stem),
                         "status": data.get("status", "active"),
                         "created_at": data.get("created_at"),
                         "updated_at": data.get("updated_at"),
+                        "title": title,
                     })
             except Exception as e:
                 logger.debug("Failed to read session file {}: {}", path.name, e)
@@ -582,3 +699,28 @@ class SessionManager:
     async def invalidate(self, key: str) -> None:
         async with self._lock:
             self._cache.pop(key, None)
+
+
+def _first_user_title(f) -> str:
+    """Derive a title from the first ``user`` message in an open session file.
+
+    Called from ``SessionManager.list_sessions`` (file mode) when the persisted
+    top-level title is absent — i.e. sessions written before title generation
+    existed. Reads message lines already positioned past the metadata line and
+    stops at the first ``user`` message so a large transcript isn't fully
+    materialized.
+    """
+    for line in f:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+        except ValueError:
+            continue
+        if data.get("role") == "user":
+            content = data.get("content", "")
+            if isinstance(content, str):
+                return Session.derive_title(content)
+            continue
+    return ""

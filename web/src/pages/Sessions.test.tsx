@@ -17,8 +17,8 @@ afterEach(() => {
 describe("Sessions 页", () => {
   const SESSIONS = {
     sessions: [
-      { key: "feishu:oc 1", message_count: 3, updated_at: "2026-07-27T09:00:00Z" },
-      { key: "cli:local", message_count: 1, updated_at: "2026-07-27T08:00:00Z" },
+      { key: "feishu:oc 1", title: "飞书会话", message_count: 3, updated_at: "2026-07-27T09:00:00Z" },
+      { key: "cli:local", title: "本地会话", message_count: 1, updated_at: "2026-07-27T08:00:00Z" },
     ], total: 2, has_more: false,
   };
 
@@ -39,11 +39,32 @@ describe("Sessions 页", () => {
     });
   }
 
+  it("列表优先显示后端返回的 title 而非原始 key", async () => {
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path: string) => {
+      if (path.startsWith("/sessions?")) {
+        return {
+          sessions: [
+            { key: "feishu:oc 1", title: "帮我审校这份报告", message_count: 3, updated_at: "2026-07-27T09:00:00Z" },
+          ],
+          total: 1,
+          has_more: false,
+        } as never;
+      }
+      if (path.includes("/turns?")) return { turns: [] } as never;
+      return { messages: [], has_more: false } as never;
+    });
+    renderSessions();
+
+    // 标题可见,且原始 key 只能通过 title 属性的悬浮提示访问,不作为可见文本出现。
+    expect(await screen.findByText("帮我审校这份报告")).toBeInTheDocument();
+    expect(screen.queryByText("feishu:oc 1")).not.toBeInTheDocument();
+  });
+
   it("点击会话按编码后的 key 拉取历史", async () => {
     const spy = mockApi();
     renderSessions();
 
-    fireEvent.click(await screen.findByText("feishu:oc 1"));
+    fireEvent.click(await screen.findByText("飞书会话"));
 
     await waitFor(() =>
       expect(spy).toHaveBeenCalledWith("/sessions/feishu%3Aoc%201/history?limit=100&offset=0"),
@@ -55,7 +76,7 @@ describe("Sessions 页", () => {
     const spy = mockApi();
     renderSessions();
 
-    fireEvent.click(await screen.findByText("cli:local"));
+    fireEvent.click(await screen.findByText("本地会话"));
     await waitFor(() => expect(spy).toHaveBeenCalledWith("/sessions/cli%3Alocal/history?limit=100&offset=0"));
 
     const before = spy.mock.calls.length;
@@ -72,7 +93,7 @@ describe("Sessions 页", () => {
     const spy = mockApi();
     renderSessions();
 
-    await screen.findByText("cli:local");
+    await screen.findByText("本地会话");
     const before = spy.mock.calls.length;
     fireEvent.click(screen.getByRole("button", { name: "刷新" }));
 
@@ -87,7 +108,7 @@ describe("Sessions 页", () => {
     });
     renderSessions();
 
-    fireEvent.click(await screen.findByText("cli:local"));
+    fireEvent.click(await screen.findByText("本地会话"));
 
     expect(await screen.findByText(/加载历史失败：boom/)).toBeInTheDocument();
   });
@@ -96,12 +117,12 @@ describe("Sessions 页", () => {
     const spy = mockApi();
     renderSessions();
 
-    await screen.findByText("cli:local");
+    await screen.findByText("本地会话");
     fireEvent.change(screen.getByLabelText("搜索会话..."), { target: { value: "feishu" } });
 
     await waitFor(() => expect(spy).toHaveBeenCalledWith("/sessions?limit=50&offset=0&q=feishu", expect.anything()));
-    expect(await screen.findByText("feishu:oc 1")).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByText("cli:local")).not.toBeInTheDocument());
+    expect(await screen.findByText("飞书会话")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("本地会话")).not.toBeInTheDocument());
   });
 
   /**
@@ -131,7 +152,7 @@ describe("Sessions 页", () => {
     mockHistoryWithTools();
     renderSessions();
 
-    fireEvent.click(await screen.findByText("cli:local"));
+    fireEvent.click(await screen.findByText("本地会话"));
 
     // 真正的对话内容照常显示。
     expect(await screen.findByText("北京今天晴。")).toBeInTheDocument();
@@ -145,7 +166,7 @@ describe("Sessions 页", () => {
     mockHistoryWithTools();
     renderSessions();
 
-    fireEvent.click(await screen.findByText("cli:local"));
+    fireEvent.click(await screen.findByText("本地会话"));
     const summary = await screen.findByText("工具结果：web_search");
 
     const details = summary.closest("details") as HTMLDetailsElement;
@@ -159,7 +180,7 @@ describe("Sessions 页", () => {
     mockHistoryWithTools();
     renderSessions();
 
-    fireEvent.click(await screen.findByText("cli:local"));
+    fireEvent.click(await screen.findByText("本地会话"));
     const reply = await screen.findByText("北京今天晴。");
 
     expect(reply.closest("details")).toBeNull();

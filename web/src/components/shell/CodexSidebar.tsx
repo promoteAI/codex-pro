@@ -17,6 +17,7 @@ import { MOCK_RECENTS } from "../../mock/seeds";
 
 interface SessionItem {
   key: string;
+  title?: string;
   message_count: number;
   updated_at: string;
 }
@@ -113,7 +114,7 @@ export function CodexSidebar() {
 
   const recents = useMemo(() => {
     if (apiRecents.length > 0) {
-      return apiRecents.map((s) => ({ id: s.key, title: s.key }));
+      return apiRecents.map((s) => ({ id: s.key, title: s.title || s.key }));
     }
     return MOCK_RECENTS;
   }, [apiRecents]);

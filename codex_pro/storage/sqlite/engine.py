@@ -592,6 +592,7 @@ class SQLiteBackend(StorageBackend):
                     "updated_at": data.get("updated_at") or updated_at,
                     "metadata": metadata,
                     "title": _session_title(data, messages),
+                    "project": data.get("project", "") or "",
                     "message_count": len(messages),
                 }
             )

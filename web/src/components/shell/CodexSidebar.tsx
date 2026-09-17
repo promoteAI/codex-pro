@@ -20,6 +20,7 @@ interface SessionItem {
   title?: string;
   message_count: number;
   updated_at: string;
+  project?: string;
 }
 
 function isMacPlatform(): boolean {
@@ -112,9 +113,12 @@ export function CodexSidebar() {
   const { data } = useApi<{ sessions: SessionItem[] }>("/sessions?limit=20&offset=0");
   const apiRecents = data?.sessions ?? [];
 
+  // 带 project 的会话归到对应项目行下；project 为空的会话显示在「最近」列表。
   const recents = useMemo(() => {
     if (apiRecents.length > 0) {
-      return apiRecents.map((s) => ({ id: s.key, title: s.title || s.key }));
+      return apiRecents
+        .filter((s) => !s.project)
+        .map((s) => ({ id: s.key, title: s.title || s.key }));
     }
     return MOCK_RECENTS;
   }, [apiRecents]);
@@ -330,7 +334,29 @@ export function CodexSidebar() {
                 </div>
               </div>
 
-              <span className="text-xs text-codex-muted pl-[22px] pr-1 truncate">{t("noChat")}</span>
+              {(() => {
+                const projectSessions = apiRecents.filter((s) => s.project === repo.path);
+                if (projectSessions.length === 0) {
+                  return (
+                    <span className="text-xs text-codex-muted pl-[22px] pr-1 truncate">
+                      {t("noChat")}
+                    </span>
+                  );
+                }
+                return projectSessions.map((s) => (
+                  <button
+                    key={s.key}
+                    type="button"
+                    onClick={() => {
+                      void loadSessionHistory(s.key);
+                      navigate(`/chat/${encodeURIComponent(s.key)}`);
+                    }}
+                    className="block w-full text-left text-[12.5px] text-[#a8a8a8] hover:text-[#d0d0d0] pl-[22px] pr-1 py-0.5 truncate"
+                  >
+                    {s.title || s.key}
+                  </button>
+                ));
+              })()}
             </div>
           );
         })}
@@ -429,6 +455,7 @@ export function CodexSidebar() {
             </div>
           );
         })}
+
       </nav>
 
       <div className="shrink-0 flex items-center justify-between px-2.5 py-2 border-t border-[#262626]">

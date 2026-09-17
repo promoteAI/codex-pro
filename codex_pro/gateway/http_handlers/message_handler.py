@@ -516,6 +516,10 @@ class MessageHandler:
                 return web.json_response({"error": "rate limited"}, status=429)
 
             session, _ = await self._server._reset_session_if_needed(session_key)
+            # 会话持久化其归属项目(workspace)。`project` 可能为空(全局/未分类会话),
+            # 此时保持 "" 以向后兼容旧记录。
+            if project:
+                session.project = project
             from codex_pro.gateway.session_context import set_session_vars
             # workspace 作为上报侧 contextvar 一并带上;真正驱动工具的是
             # inbound.py 在派发任务上下文里根据 event.metadata["workspace"] 设置的

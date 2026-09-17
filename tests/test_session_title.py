@@ -10,6 +10,8 @@ derivation.
 
 from __future__ import annotations
 
+import pytest
+
 from codex_pro.session.manager import Session
 
 
@@ -128,3 +130,88 @@ class TestListIncludesTitle:
         rows = {r["key"]: r["title"] for r in manager.list_sessions()}
         assert rows["cli:local"] == "带标题"
         assert rows["cli:old"] == "没有标题的旧问题"
+
+
+class TestSessionProject:
+    """``Session.project`` — the workspace this session is scoped to.
+
+    Stored as a top-level field alongside ``key``/``title`` (never in metadata) so
+    the listing can group sessions under their project. Like ``title``, it is a
+    sibling of ``key``, not part of the message history.
+    """
+
+    def test_default_project_is_empty(self):
+        assert Session(key="cli:local").project == ""
+
+    def test_project_is_not_written_to_metadata(self):
+        session = Session(key="cli:local")
+        session.add_message("user", "hello")
+        assert "project" not in session.metadata
+
+    @pytest.mark.asyncio
+    async def test_project_round_trips_through_file_persistence(self, tmp_path):
+        from codex_pro.session.manager import SessionManager
+
+        manager = SessionManager(sessions_dir=tmp_path)
+        session = Session(key="cli:local", project="e:\\workspace\\codex-pro")
+        session.add_message("user", "hello")
+        await manager.save(session)
+
+        loaded = await manager.get_or_create("cli:local")
+        assert loaded.project == "e:\\workspace\\codex-pro"
+        # project is a top-level field, never metadata.
+        assert "project" not in loaded.metadata
+
+    @pytest.mark.asyncio
+    async def test_legacy_record_without_project_loads_as_empty(self, tmp_path):
+        # A session file written before the field existed: project is "".
+        path = tmp_path / "cli%3Aold.jsonl"
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(
+                '{"_type": "metadata", "key": "cli:old", '
+                '"created_at": "2026-01-01T00:00:00", '
+                '"updated_at": "2026-01-01T00:00:00", '
+                '"metadata": {}, "last_consolidated": 0, "status": "active"}\n'
+            )
+            f.write('{"role": "user", "content": "旧问题"}\n')
+
+        from codex_pro.session.manager import SessionManager
+
+        manager = SessionManager(sessions_dir=tmp_path)
+        session = await manager.get_or_create("cli:old")
+        assert session.project == ""
+
+
+class TestListIncludesProject:
+    def test_file_listing_exposes_top_level_project(self, tmp_path):
+        path = tmp_path / "cli%3Alocal.jsonl"
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(
+                '{"_type": "metadata", "key": "cli:local", "title": "带标题", '
+                '"project": "e:\\\\workspace\\\\codex-pro", '
+                '"created_at": "2026-01-01T00:00:00", '
+                '"updated_at": "2026-01-01T00:00:00", '
+                '"metadata": {}, "last_consolidated": 0, "status": "active"}\n'
+            )
+
+        from codex_pro.session.manager import SessionManager
+
+        manager = SessionManager(sessions_dir=tmp_path)
+        rows = {r["key"]: r["project"] for r in manager.list_sessions()}
+        assert rows["cli:local"] == "e:\\workspace\\codex-pro"
+
+    def test_listing_without_project_yields_empty(self, tmp_path):
+        path = tmp_path / "cli%3Aold.jsonl"
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(
+                '{"_type": "metadata", "key": "cli:old", '
+                '"created_at": "2026-01-01T00:00:00", '
+                '"updated_at": "2026-01-01T00:00:00", '
+                '"metadata": {}, "last_consolidated": 0, "status": "active"}\n'
+            )
+
+        from codex_pro.session.manager import SessionManager
+
+        manager = SessionManager(sessions_dir=tmp_path)
+        rows = {r["key"]: r["project"] for r in manager.list_sessions()}
+        assert rows["cli:old"] == ""

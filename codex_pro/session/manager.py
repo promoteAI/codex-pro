@@ -28,6 +28,7 @@ class Session:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     title: str = ""  # human-readable label derived from the first user turn
+    project: str = ""  # workspace path this session is scoped to; "" = none
     metadata: dict[str, Any] = field(default_factory=dict)
     last_consolidated: int = 0
     status: str = "active"  # active | expired | archived
@@ -416,12 +417,16 @@ class SessionManager:
         title = data.get("title", "")
         if not isinstance(title, str):
             title = ""
+        project = data.get("project", "")
+        if not isinstance(project, str):
+            project = ""
         return Session(
             key=key,
             messages=messages,
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(),
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(),
             title=title,
+            project=project,
             metadata=metadata,
             last_consolidated=data.get("last_consolidated", 0),
             status=data.get("status", "active"),
@@ -442,6 +447,7 @@ class SessionManager:
                 last_consolidated = 0
                 status = "active"
                 title = ""
+                project = ""
 
                 with open(path, encoding="utf-8") as f:
                     for line in f:
@@ -452,6 +458,7 @@ class SessionManager:
                         if data.get("_type") == "metadata":
                             metadata = data.get("metadata", {})
                             title = data.get("title", "")
+                            project = data.get("project", "")
                             created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None
                             updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
                             last_consolidated = data.get("last_consolidated", 0)
@@ -464,6 +471,7 @@ class SessionManager:
                     "updated_at": updated_at.isoformat() if updated_at else None,
                     "metadata": metadata,
                     "title": title,
+                    "project": project,
                     "last_consolidated": last_consolidated,
                     "status": status,
                 })
@@ -488,6 +496,7 @@ class SessionManager:
             "created_at": session.created_at.isoformat(),
             "updated_at": session.updated_at.isoformat(),
             "title": session.title,
+            "project": session.project,
             "metadata": self._persisted_metadata(session),
             "last_consolidated": session.last_consolidated,
             "status": session.status,
@@ -524,6 +533,7 @@ class SessionManager:
             "created_at": session.created_at.isoformat(),
             "updated_at": session.updated_at.isoformat(),
             "title": session.title,
+            "project": session.project,
             "metadata": self._persisted_metadata(session),
             "last_consolidated": session.last_consolidated,
             "status": session.status,
@@ -659,6 +669,7 @@ class SessionManager:
                             "updated_at": session.updated_at.isoformat(),
                             "metadata": session.metadata,
                             "title": session.resolved_title(),
+                            "project": session.project,
                             "message_count": len(session.messages),
                         }
                         for session in self._cache.values()
@@ -690,6 +701,7 @@ class SessionManager:
                         "created_at": data.get("created_at"),
                         "updated_at": data.get("updated_at"),
                         "title": title,
+                        "project": data.get("project", "") or "",
                     })
             except Exception as e:
                 logger.debug("Failed to read session file {}: {}", path.name, e)

@@ -58,6 +58,24 @@ async def test_list_sessions_returns_storage_metadata(backend: SQLiteBackend) ->
 
 
 @pytest.mark.asyncio
+async def test_list_sessions_returns_project(backend: SQLiteBackend) -> None:
+    await backend.store_session(
+        "test:1",
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "status": "active",
+            "project": "e:\\workspace\\codex-pro",
+        },
+    )
+
+    sessions = await backend.list_sessions()
+
+    assert sessions[0]["project"] == "e:\\workspace\\codex-pro"
+    # project is a top-level field, not nested in metadata.
+    assert "project" not in sessions[0]["metadata"]
+
+
+@pytest.mark.asyncio
 async def test_session_manager_archives_storage_session_without_deleting(tmp_path: Path, backend: SQLiteBackend) -> None:
     manager = SessionManager(sessions_dir=tmp_path / "sessions", storage=backend)
     session = await manager.get_or_create("store:1")

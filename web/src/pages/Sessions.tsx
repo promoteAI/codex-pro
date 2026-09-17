@@ -9,7 +9,7 @@ import { useIsAdmin } from "../stores/capabilities";
 import { useConfirm } from "../components/ConfirmDialog";
 import { runMutation } from "../stores/toast";
 
-interface SessionItem { key: string; title?: string; message_count: number; updated_at: string }
+interface SessionItem { key: string; title?: string; message_count: number; updated_at: string; project?: string }
 interface Message {
   role: string;
   content: string;

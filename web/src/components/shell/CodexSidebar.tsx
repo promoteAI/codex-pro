@@ -343,19 +343,50 @@ export function CodexSidebar() {
                     </span>
                   );
                 }
-                return projectSessions.map((s) => (
-                  <button
-                    key={s.key}
-                    type="button"
-                    onClick={() => {
-                      void loadSessionHistory(s.key);
-                      navigate(`/chat/${encodeURIComponent(s.key)}`);
-                    }}
-                    className="block w-full text-left text-[12.5px] text-[#a8a8a8] hover:text-[#d0d0d0] pl-[22px] pr-1 py-0.5 truncate"
-                  >
-                    {s.title || s.key}
-                  </button>
-                ));
+                return projectSessions.map((s) => {
+                  const active = sessionId === s.key || location.pathname === `/chat/${encodeURIComponent(s.key)}`;
+                  return (
+                    <div
+                      key={s.key}
+                      className={`mx-1 flex items-center gap-1 px-2 py-1 rounded-md group/row ${
+                        active ? "bg-[#282828]" : "hover:bg-codex-hover"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        title={isPinned(s.key) ? t("unpin") : t("pin")}
+                        aria-label={isPinned(s.key) ? t("unpin") : t("pin")}
+                        aria-pressed={isPinned(s.key)}
+                        onClick={() => togglePin(s.key)}
+                        className={`w-4 h-4 shrink-0 items-center justify-center rounded ${
+                          isPinned(s.key)
+                            ? "inline-flex text-[#c8c8c8]"
+                            : "hidden group-hover/row:inline-flex text-[#6a6a6a] hover:text-[#b0b0b0]"
+                        }`}
+                      >
+                        <PinIcon className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void loadSessionHistory(s.key);
+                          navigate(`/chat/${encodeURIComponent(s.key)}`);
+                        }}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <span className="block text-[13.5px] text-[#c8c8c8] truncate">{s.title || s.key}</span>
+                      </button>
+                      <button
+                        type="button"
+                        title={t("archive")}
+                        aria-label={t("archive")}
+                        className="hidden group-hover/row:inline-flex w-5 h-5 shrink-0 items-center justify-center rounded text-[#8a8a8a] hover:bg-[#333] hover:text-[#d8d8d8]"
+                      >
+                        <ArchiveIcon className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                });
               })()}
             </div>
           );

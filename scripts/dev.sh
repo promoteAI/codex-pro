@@ -5,9 +5,10 @@
 #   PORT=3000 bash scripts/dev.sh  # 覆盖前端端口
 #
 # 行为:
-#   * 后端以 .venv 里的 python 启动 `codex-pro gateway`(前台等价物),监听 58123,
+#   * 后端以 .venv 里的 python 启动 `codex-pro gateway`(后台),监听 58123,
 #     同时托管已构建的 web UI;
-#   * 前端以 Vite dev server 启动(5173),并把 /api 与 /ws 代理到后端;
+#   * 等后端健康检查(/api/v1/health)通过后,才启动前端 Vite dev server(5173),
+#     并把 /api 与 /ws 代理到后端;
 #   * Ctrl+C 时自动回收后端子进程。
 
 set -euo pipefail
@@ -36,8 +37,14 @@ if [ ! -f "$VITE_BIN" ]; then
   fi
 fi
 
+if ! command -v curl >/dev/null 2>&1; then
+  echo "[dev] 需要 curl 来做后端健康检查,请先安装。" >&2
+  exit 1
+fi
+
 PORT="${PORT:-5173}"
 GATEWAY_PORT="${GATEWAY_PORT:-58123}"
+HEALTH_URL="http://127.0.0.1:${GATEWAY_PORT}/api/v1/health"
 
 # --- 启动后端(后台) -----------------------------------------------------------
 echo "[dev] 启动后端 gateway(端口 $GATEWAY_PORT)..."
@@ -52,11 +59,28 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# 留出后端启动时间
-sleep 2
+# --- 等待后端健康检查通过 -------------------------------------------------------
+echo "[dev] 等待后端健康检查通过 ($HEALTH_URL)..."
+HEALTH_OK=0
+for _ in $(seq 1 60); do
+  if curl -fsS -o /dev/null "$HEALTH_URL" 2>/dev/null; then
+    HEALTH_OK=1
+    break
+  fi
+  if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+    echo "[dev] 后端进程已退出,无法完成健康检查。" >&2
+    exit 1
+  fi
+  sleep 1
+done
+if [ "$HEALTH_OK" -ne 1 ]; then
+  echo "[dev] 后端健康检查超时(60s),未通过,不启动前端。" >&2
+  exit 1
+fi
+echo "[dev] 后端健康检查通过。"
 
 echo "[dev] 启动前端 dev server(http://localhost:$PORT)..."
-echo "[dev] Ctrl+C 退出并同时停止后端。"
+echo "[dev] Ctrl+C 退出并同时停止前后端。"
 if [ -f "$PROJECT_DIR/web/node_modules/vite/bin/vite.js" ]; then
   ( cd "$PROJECT_DIR/web" && node node_modules/vite/bin/vite.js --port "$PORT" )
 else

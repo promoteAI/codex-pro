@@ -261,13 +261,10 @@ export function CodexSidebar() {
         </div>
 
         {repos.map((repo) => {
-          const active = project === repo.name;
           return (
             <div
               key={repo.path}
-              className={`mx-1 flex flex-col px-2 py-1 rounded-md group/row ${
-                active ? "bg-[#282828]" : "hover:bg-codex-hover"
-              }`}
+              className="mx-1 flex flex-col px-2 py-1 rounded-md group/row"
             >
               <div className="flex items-center gap-1 min-w-0">
                 <button
@@ -316,7 +313,6 @@ export function CodexSidebar() {
                     aria-label={t("newChat")}
                     onClick={() => {
                       selectProject(repo);
-                      clearChat();
                       navigate("/");
                     }}
                     className="w-5 h-5 inline-flex items-center justify-center rounded text-[#8a8a8a] hover:bg-[#333] hover:text-[#d8d8d8]"

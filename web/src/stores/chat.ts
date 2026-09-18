@@ -106,7 +106,7 @@ interface ChatState {
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
-  project: "codex-pro",
+  project: "",
   projectPath: "",
   env: "local",
   branch: "dev",
@@ -190,6 +190,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       draft: "",
       historyError: null,
       pendingEventId: null,
+      project: "",
+      projectPath: "",
     }),
 
   loadRepos: async () => {
@@ -197,10 +199,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const result = await apiFetch<{ repos: GitRepo[] }>("/git/repos");
       const repos = result.repos ?? [];
       set({ repos });
-      if (repos.length > 0) {
-        const first = repos[0];
-        set({ project: first.name, projectPath: first.path, branch: first.current_branch || "main" });
-      }
     } catch {
       // Silently fail — non-critical for UI
     }

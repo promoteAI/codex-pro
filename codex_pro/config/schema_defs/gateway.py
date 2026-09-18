@@ -361,6 +361,91 @@ class GatewayAuthConfig(_Base):
         },
     )
 
+# ── Terminal config ─────────────────────────────────────────────────────────
+
+# Defined before GatewayConfig so the `terminal` default_factory can reference it.
+class TerminalConfig(_Base):
+    enabled: bool = Field(
+        default=True,
+        json_schema_extra={
+            "status": "effective", "ref": "gateway/term/ws_term.py",
+            "desc_zh": "是否启用真实终端(底部面板连接真实 shell)",
+            "desc_en": "Enable the real terminal (bottom panel connects a live shell)",
+        },
+    )
+    default_shell: str = Field(
+        default="",
+        json_schema_extra={
+            "status": "effective", "ref": "gateway/term/pty.py:_default_shell",
+            "desc_zh": "交互 shell 路径;留空取 $SHELL(Unix)/COMSPEC(Windows)",
+            "desc_en": "Interactive shell path; empty picks $SHELL (Unix) / COMSPEC (Windows)",
+        },
+    )
+    default_cols: int = Field(
+        default=80,
+        json_schema_extra={
+            "status": "effective", "ref": "gateway/term/pty.py",
+            "desc_zh": "新终端默认列数",
+            "desc_en": "Default columns for a new terminal",
+        },
+    )
+    default_rows: int = Field(
+        default=24,
+        json_schema_extra={
+            "status": "effective", "ref": "gateway/term/pty.py",
+            "desc_zh": "新终端默认行数",
+            "desc_en": "Default rows for a new terminal",
+        },
+    )
+    default_executor: Literal["local"] = Field(
+        default="local",
+        json_schema_extra={
+            "status": "effective", "ref": "gateway/term/pty.py",
+            "desc_zh": "终端执行环境(v1 仅支持 local)",
+            "desc_en": "Terminal execution environment (v1 supports local only)",
+        },
+    )
+    working_dir: str = Field(
+        default="",
+        json_schema_extra={
+            "status": "effective", "ref": "gateway/term/pty.py",
+            "desc_zh": "终端启动工作目录;留空使用当前工作区",
+            "desc_en": "Terminal working directory; empty uses the current workspace",
+        },
+    )
+    max_processes_per_connection: int = Field(
+        default=4,
+        json_schema_extra={
+            "status": "effective", "ref": "gateway/term/ws_term.py",
+            "desc_zh": "单条连接允许的终端进程数上限",
+            "desc_en": "Max terminal processes per connection",
+        },
+    )
+    max_connections_total: int = Field(
+        default=16,
+        json_schema_extra={
+            "status": "effective", "ref": "gateway/term/ws_term.py",
+            "desc_zh": "网关终端连接总数上限(0 表示不限制)",
+            "desc_en": "Max total terminal connections (0 = unlimited)",
+        },
+    )
+    output_buffer_bytes: int = Field(
+        default=1_048_576,
+        json_schema_extra={
+            "status": "effective", "ref": "gateway/term/ws_term.py",
+            "desc_zh": "单个终端进程输出缓冲字节上限(超出丢弃最旧)",
+            "desc_en": "Per-process output buffer byte cap (oldest dropped when exceeded)",
+        },
+    )
+    max_chunk_bytes: int = Field(
+        default=8192,
+        json_schema_extra={
+            "status": "effective", "ref": "gateway/term/ws_term.py",
+            "desc_zh": "单帧输出块字节上限",
+            "desc_en": "Per-frame output chunk byte cap",
+        },
+    )
+
 class GatewayConfig(_Base):
     enabled: bool = Field(
         default=False,
@@ -579,6 +664,14 @@ class GatewayConfig(_Base):
             "status": "effective", "ref": "gateway/server.py:94",
             "desc_zh": "网关钩子脚本目录",
             "desc_en": "Gateway hook scripts directory",
+        },
+    )
+    terminal: TerminalConfig = Field(
+        default_factory=TerminalConfig,
+        json_schema_extra={
+            "status": "effective", "ref": "gateway/term/ws_term.py",
+            "desc_zh": "真实终端(底部面板)配置",
+            "desc_en": "Real terminal (bottom panel) configuration",
         },
     )
 

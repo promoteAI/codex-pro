@@ -1,44 +1,132 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { X, Plus } from "lucide-react";
+import "@xterm/xterm/css/xterm.css";
 import { useShellStore } from "../../stores/shell";
-import { MOCK_TERM_LINES } from "../../mock/seeds";
+import { TermSession } from "../../lib/term";
 
 interface TermTab {
   id: string;
   label: string;
-  lines: string[];
+  term: { write(data: string | Uint8Array): void; open(el: HTMLElement): void; element: HTMLElement | null; cols: number; rows: number; onData(cb: (d: string) => void): void; onResize(cb: (s: { cols: number; rows: number }) => void): void };
+  session: TermSession;
+  fit: { fit(): void };
 }
 
 let termSeq = 1;
+
+/**
+ * xterm is loaded lazily so a closed panel (the default) never imports it.
+ * jsdom cannot back a canvas, and importing @xterm/xterm already constructs a
+ * renderer row factory that touches one; loading it only on open keeps the
+ * Layout tests (which render TermPanel with the panel closed) green.
+ */
+async function createTerminal(label: string): Promise<TermTab> {
+  const [{ Terminal }, { FitAddon }] = await Promise.all([
+    import("@xterm/xterm"),
+    import("@xterm/addon-fit"),
+  ]);
+
+  const term = new Terminal({
+    cursorBlink: true,
+    fontSize: 12.5,
+    fontFamily: '"Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace',
+    theme: { background: "#121212", foreground: "#c8c8c8" },
+  });
+  const fit = new FitAddon();
+  term.loadAddon(fit);
+
+  const session = new TermSession();
+  session.onData = (chunk) => term.write(chunk);
+  session.onExit = (code) => {
+    term.write(`\r\n\x1b[90m[${code === -1 ? "disconnected" : `exited ${code}`}]\x1b[0m\r\n`);
+  };
+  term.onData((data) => session.write(data));
+  term.onResize(({ cols, rows }) => session.resize(cols, rows));
+
+  return { id: `t${termSeq++}`, label, term, session, fit };
+}
 
 export function TermPanel() {
   const { t } = useTranslation("tools");
   const termOpen = useShellStore((s) => s.termOpen);
   const closeTerm = useShellStore((s) => s.closeTerm);
-  const [tabs, setTabs] = useState<TermTab[]>([
-    { id: "t1", label: `${t("terminal")} 1`, lines: MOCK_TERM_LINES },
-  ]);
-  const [activeId, setActiveId] = useState("t1");
-  const active = tabs.find((x) => x.id === activeId) ?? tabs[0];
 
-  const addTab = () => {
-    termSeq += 1;
-    const id = `t${termSeq}`;
-    setTabs((prev) => [
-      ...prev,
-      { id, label: `${t("terminal")} ${termSeq}`, lines: ["$ ", ""] },
-    ]);
-    setActiveId(id);
+  // Terminals are created lazily so a closed panel never touches xterm. Tabs
+  // are cleared on close so the shell is reaped and a fresh one spins up the
+  // next time the panel opens.
+  const [tabs, setTabs] = useState<TermTab[]>([]);
+  const [activeId, setActiveId] = useState("");
+  const containers = useRef(new Map<string, HTMLDivElement>());
+
+  // Ensure at least one tab the moment the panel opens.
+  useEffect(() => {
+    if (!termOpen || tabs.length > 0) return;
+    let cancelled = false;
+    createTerminal(`${t("terminal")} 1`).then((tab) => {
+      if (cancelled) return;
+      setTabs([tab]);
+      setActiveId(tab.id);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [termOpen, tabs.length, t]);
+
+  // Open + fit the active terminal once its container is in the DOM.
+  useEffect(() => {
+    if (!termOpen) return;
+    const active = tabs.find((x) => x.id === activeId);
+    const el = containers.current.get(activeId);
+    if (!active || !el) return;
+    if (!active.term.element) active.term.open(el);
+    active.fit.fit();
+    active.session.connect("", "", active.term.cols, active.term.rows);
+  }, [activeId, termOpen, tabs]);
+
+  // Refit on window resize and push the new size to the backend.
+  useEffect(() => {
+    if (!termOpen) return;
+    const active = tabs.find((x) => x.id === activeId);
+    if (!active) return;
+    const onResize = () => {
+      active.fit.fit();
+      active.session.resize(active.term.cols, active.term.rows);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [activeId, termOpen, tabs]);
+
+  // Dispose every session when the panel closes so the shell is reaped. Guard
+  // the clear: setting an already-empty array to a fresh reference would retrigger
+  // this effect forever.
+  useEffect(() => {
+    if (!termOpen) {
+      tabs.forEach((tab) => tab.session.dispose());
+      if (tabs.length > 0) setTabs([]);
+    }
+  }, [termOpen, tabs]);
+
+  const addTab = async () => {
+    const tab = await createTerminal(`${t("terminal")} ${termSeq}`);
+    setTabs((prev) => [...prev, tab]);
+    setActiveId(tab.id);
   };
 
   const closeTab = (id: string) => {
     setTabs((prev) => {
       if (prev.length <= 1) return prev;
+      const target = prev.find((x) => x.id === id);
+      target?.session.dispose();
       const next = prev.filter((x) => x.id !== id);
       if (activeId === id) setActiveId(next[0]?.id ?? "");
       return next;
     });
+  };
+
+  const registerContainer = (id: string, el: HTMLDivElement | null) => {
+    if (el) containers.current.set(id, el);
+    else containers.current.delete(id);
   };
 
   return (
@@ -102,11 +190,13 @@ export function TermPanel() {
             <X size={14} />
           </button>
         </div>
-        <div className="flex-1 overflow-auto px-3 py-2 font-mono text-[12.5px] leading-relaxed text-[#c8c8c8] bg-[#121212]">
-          {(active?.lines ?? []).map((line, i) => (
-            <div key={i} className="whitespace-pre-wrap">
-              {line || "\u00a0"}
-            </div>
+        <div className="flex-1 min-h-0 bg-[#121212]">
+          {tabs.map((tab) => (
+            <div
+              key={tab.id}
+              ref={(el) => registerContainer(tab.id, el)}
+              className={`h-full ${activeId === tab.id ? "block" : "hidden"}`}
+            />
           ))}
         </div>
       </div>

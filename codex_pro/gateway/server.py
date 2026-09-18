@@ -14,8 +14,6 @@ See those modules for detailed implementation.
 from __future__ import annotations
 
 import asyncio
-import json
-import time
 from pathlib import Path
 from typing import Any
 
@@ -24,24 +22,15 @@ from aiohttp import web
 from loguru import logger
 
 from codex_pro.bus.events import (
-    ContentBlock,
     ContentType,
     FAULTED_TURN_OUTCOMES,
     InboundEvent,
     OutboundEvent,
     TERMINAL_TURN_OUTCOMES,
-    final_frame_http_status,
-    turn_outcome_http_status,
 )
 from codex_pro.bus.idempotency import (
     BoundedIdempotencyStore,
-    IDEMPOTENCY_FINGERPRINT_METADATA,
-    IDEMPOTENCY_NAMESPACE_METADATA,
-    canonical_operation_fingerprint,
-    deterministic_event_id,
-    durable_fingerprint_conflicts,
     idempotency_ledger_metadata,
-    normalize_idempotency_key,
 )
 from codex_pro.bus.queue import MessageBus
 from codex_pro.channels.base import SendResult
@@ -63,12 +52,11 @@ from codex_pro.gateway.http_handlers.session_handler import SessionHandlers
 from codex_pro.gateway.media import MediaCache
 from codex_pro.gateway.rate_limiter import RateLimiter
 from codex_pro.gateway.router import DeliveryRouter
-from codex_pro.gateway.session_context import set_session_vars, clear_session_vars
 from codex_pro.gateway.session_policy import SessionResetPolicy
-from codex_pro.gateway import ws_common
 from codex_pro.gateway.ws_handlers.websocket import WebSocketHandler
 from codex_pro.gateway.ws_web import WebUIWebSocket
-from codex_pro.gateway.ws_session import normalize_platform, resolve_client_session_key
+from codex_pro.gateway.ws_session import normalize_platform
+from codex_pro.gateway.term import TerminalWebSocket
 from codex_pro.session.manager import SessionManager
 
 
@@ -159,6 +147,7 @@ class GatewayServer:
         self.session_policy = SessionResetPolicy(config.session_policy)
         self.health = GatewayHealthProvider(self)
         self._web_ws = WebUIWebSocket(self)
+        self._term_ws = TerminalWebSocket(self, config.terminal)
         self._bus.subscribe_outbound_global(self._handle_outbound)
 
         for name, plat_cfg in config.platforms.items():
@@ -300,6 +289,10 @@ class GatewayServer:
         return self._web_ws
 
     @property
+    def term_ws(self) -> TerminalWebSocket:
+        return self._term_ws
+
+    @property
     def actual_port(self) -> int:
         if self._actual_port is not None:
             return self._actual_port
@@ -422,6 +415,7 @@ class GatewayServer:
             await jobs.close()
 
         await self._web_ws.close_all()
+        await self._term_ws.close_all()
 
         if self._site:
             await self._site.stop()
@@ -454,6 +448,8 @@ class GatewayServer:
         app.router.add_get(f"{prefix}/capabilities", self._meta_handler.handle_capabilities)
         app.router.add_get(self._config.ws_path, self._ws_handler.handle_websocket)
         app.router.add_get("/ws/web", self._web_ws.handle)
+        if self._config.terminal.enabled:
+            app.router.add_get("/ws/term", self._term_ws.handle)
 
         if self._a2a_config and self._a2a_config.enabled and self._agent_loop:
             from codex_pro.a2a.server import A2AServer
@@ -603,7 +599,6 @@ class GatewayServer:
 
     @staticmethod
     def _ws_turn_run_payload(row: dict[str, Any], event_id: str) -> tuple[dict[str, Any], bool]:
-        from codex_pro.bus.events import TERMINAL_TURN_OUTCOMES, FAULTED_TURN_OUTCOMES, final_frame_http_status
         status = str(row.get("status") or "accepted")
         if status not in TERMINAL_TURN_OUTCOMES:
             return {

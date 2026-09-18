@@ -24,6 +24,20 @@ export default defineConfig(({ mode }) => {
         "/ws": {
           target: gatewayWs,
           ws: true,
+          // The gateway's cross-site gate (ws_common.reject_cross_site)
+          // treats a request that carries an Origin but no Sec-Fetch-Site as
+          // cross-site and returns 403. Some browser/WebSocket combinations
+          // omit Sec-Fetch-Site, so the dev proxy might otherwise drop a
+          // legitimate same-origin terminal/dashboard connection. Injecting
+          // `same-origin` here makes the gateway treat these as the same-origin
+          // requests they are. This only affects the dev proxy — production
+          // serves the SPA from the gateway itself, which never goes through
+          // Vite, so the gate there stays as strong as configured.
+          configure(proxy) {
+            proxy.on("proxyReqWs", (proxyReq: any) => {
+              proxyReq.setHeader("Sec-Fetch-Site", "same-origin");
+            });
+          },
         },
       },
     },

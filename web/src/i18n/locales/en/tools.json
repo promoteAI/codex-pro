@@ -35,6 +35,8 @@
   "openBottomTerm": "Open bottom terminal",
   "termNewTab": "New terminal",
   "termAddTab": "Add tab",
+  "termConnecting": "Connecting…",
+  "termDisconnected": "Disconnected",
   "reviewBranch": "Branch",
   "reviewFilter": "Filter files…",
   "reviewCompare": "dev → origin/master",

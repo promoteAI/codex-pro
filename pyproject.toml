@@ -54,6 +54,7 @@ dependencies = [
     # swallowed by that backslash and rendered as literal text.
     "rich>=13.5",
     "cryptography>=50.0.1",
+    "pywinpty>=3.0.5",
 ]
 
 [project.urls]
@@ -89,6 +90,9 @@ documents = ["pymupdf>=1.24", "python-docx>=1.1", "openpyxl>=3.1", "python-pptx>
 # 8.2 is the version the TUI is developed and verified against; pinning the
 # floor to it avoids declaring an unverified 2.0–8.1 compatibility window.
 tui = ["textual>=8.2"]
+# Windows interactive terminal support uses ConPTY via pywinpty; optional so a
+# Unix deployment (which uses the stdlib openpty) need not install it.
+terminal = ["pywinpty>=0.5"]
 # `[all]` includes `[skills]` because a fresh `pip install codex-pro[all]`
 # on a machine that wants every bundled skill running is the documented path;
 # the previous omission meant "all" was a lie for any deployment that picked
@@ -98,6 +102,9 @@ all = [
     "httpx[socks]>=0.23", "psutil>=5.9", "faiss-cpu>=1.7", "cryptography>=41.0",
     "tiktoken>=0.7", "fal-client>=0.5", "pymupdf>=1.24", "python-docx>=1.1",
     "openpyxl>=3.1", "python-pptx>=1.0", "textual>=8.2", "playwright>=1.50",
+    # Windows interactive terminal support (ConPTY); required so the bottom
+    # panel's real terminal works out of the box on Windows.
+    "pywinpty>=0.5",
     # bundled skill deps (see the `[skills]` extra below)
     "duckduckgo_search>=7.0", "trafilatura>=2.0", "feedparser>=6.0",
     "croniter>=1.4", "caldav>=1.3", "icalendar>=5.0", "Pillow>=10.0",

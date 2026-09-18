@@ -35,6 +35,8 @@
   "openBottomTerm": "打开底部终端",
   "termNewTab": "新建终端",
   "termAddTab": "添加标签",
+  "termConnecting": "连接中…",
+  "termDisconnected": "已断开",
   "reviewBranch": "分支",
   "reviewFilter": "筛选文件…",
   "reviewCompare": "dev → origin/master",

@@ -14,6 +14,8 @@ import { useChatStore } from "../../stores/chat";
 import { useApi } from "../../hooks/use-api";
 import { CreateProjectDialog } from "../CreateProjectDialog";
 import { MOCK_RECENTS } from "../../mock/seeds";
+import { SideFilesPanel } from "./SideFilesPanel";
+import type { GitRepo } from "../../stores/chat";
 
 interface SessionItem {
   key: string;
@@ -85,6 +87,7 @@ export function CodexSidebar() {
   const loadRepos = useChatStore((s) => s.loadRepos);
   const selectProject = useChatStore((s) => s.selectProject);
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [filesRepo, setFilesRepo] = useState<GitRepo | null>(null);
   const kbdAnalytics = isMacPlatform() ? "⌥⌘P" : "Alt+Win+P";
   const kbdSettings = isMacPlatform() ? "⌘," : "Ctrl+,";
 
@@ -145,6 +148,10 @@ export function CodexSidebar() {
 
   return (
     <aside className="w-[clamp(200px,17vw,260px)] shrink-0 border-r border-codex-border flex flex-col min-h-0 bg-codex-sidebar">
+      {filesRepo ? (
+        <SideFilesPanel repo={filesRepo} onBack={() => setFilesRepo(null)} />
+      ) : (
+        <>
       <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5">
         <button
           type="button"
@@ -295,6 +302,7 @@ export function CodexSidebar() {
                     type="button"
                     title={t("viewFiles")}
                     aria-label={t("viewFiles")}
+                    onClick={() => setFilesRepo(repo)}
                     className="w-5 h-5 inline-flex items-center justify-center rounded text-[#8a8a8a] hover:bg-[#333] hover:text-[#d8d8d8]"
                   >
                     <svg className="w-3 h-3" viewBox="0 0 24 24" aria-hidden="true">
@@ -484,6 +492,8 @@ export function CodexSidebar() {
         })}
 
       </nav>
+        </>
+      )}
 
       <div className="shrink-0 flex items-center justify-between px-2.5 py-2 border-t border-[#262626]">
         <div className="account-wrap relative" ref={accountWrapRef}>

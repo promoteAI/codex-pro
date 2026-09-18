@@ -107,6 +107,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
 
     # File browser for tools panel
     app.router.add_get(f"{prefix}/files", files_api.list_dir)
+    app.router.add_get(f"{prefix}/files/content", files_api.read_file)
 
     # Pull requests
     app.router.add_get(f"{prefix}/prs", prs_api.list_prs)

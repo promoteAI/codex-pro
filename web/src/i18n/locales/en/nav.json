@@ -24,5 +24,11 @@
   "update": "Check for updates",
   "updateShort": "Update",
   "remoteConnect": "Remote connect",
-  "more": "More"
+  "more": "More",
+  "back": "Back",
+  "searchFiles": "Search files...",
+  "changedOnly": "Changed files only",
+  "refreshFiles": "Refresh",
+  "noMatchFile": "No matching files",
+  "fileContent": "File content"
 }

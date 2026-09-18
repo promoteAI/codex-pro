@@ -51,6 +51,7 @@ interface ShellState {
   sessionTabs: SessionTab[];
   activeTabId: string | null;
   settingsSection: SettingsSection;
+  pendingFilePath: { repoPath: string; filePath: string } | null;
   openTools: () => void;
   closeTools: () => void;
   toggleTools: () => void;
@@ -75,6 +76,8 @@ interface ShellState {
   closeOtherTabs: (id: string) => void;
   closeRightTabs: (id: string) => void;
   closeTab: (id: string) => void;
+  setPendingFilePath: (path: { repoPath: string; filePath: string } | null) => void;
+  resetFiles: () => void;
 }
 
 const TOOL_LABELS: Record<Exclude<ToolPane, "hub">, string> = {
@@ -99,6 +102,7 @@ export const useShellStore = create<ShellState>((set, get) => ({
   sessionTabs: [],
   activeTabId: null,
   settingsSection: "plugins",
+  pendingFilePath: null,
 
   openTools: () => set({ toolsOpen: true, layoutMode: get().layoutMode === "bottom" ? "side" : get().layoutMode }),
   closeTools: () => set({ toolsOpen: false, activeToolPane: "hub" }),
@@ -146,6 +150,9 @@ export const useShellStore = create<ShellState>((set, get) => ({
   },
 
   showHub: () => set({ activeToolPane: "hub", activeTabId: null, toolsOpen: true }),
+
+  setPendingFilePath: (path) => set({ pendingFilePath: path }),
+  resetFiles: () => set({ pendingFilePath: null }),
 
   openTool: (type) => {
     if (type === "terminal") {

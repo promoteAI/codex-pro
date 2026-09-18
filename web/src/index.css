@@ -658,6 +658,38 @@ body {
 .account-menu-item-label{flex:1;min-width:0}
 .account-menu-kbd{font-size:11.5px;color:#777;white-space:nowrap}
 
+/* ===== prototype sidebar file tree (查看文件) ===== */
+.side-files{display:none;flex:1;flex-direction:column;min-height:0;background:#1c1c1c}
+.side-files.is-open{display:flex}
+.sf-back{display:inline-flex;align-items:center;gap:6px;margin:10px 12px 8px;padding:4px 2px;border:0;background:transparent;color:#a8a8a8;font:inherit;font-size:13px;cursor:pointer;align-self:flex-start}
+.sf-back:hover{color:#e8e8e8}
+.sf-back svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.sf-search{display:flex;align-items:center;gap:8px;margin:0 10px 10px;padding:7px 10px;background:#242424;border:1px solid #2e2e2e;border-radius:8px}
+.sf-search svg{width:14px;height:14px;fill:none;stroke:#666;stroke-width:1.7;flex:0 0 auto}
+.sf-search input{flex:1;min-width:0;border:0;background:transparent;outline:none;color:#d0d0d0;font:inherit;font-size:12.5px}
+.sf-search input::placeholder{color:#5e5e5e}
+.sf-proj{display:flex;align-items:center;gap:6px;padding:2px 8px 8px 12px}
+.sf-proj-name{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#c8c8c8;min-width:0;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sf-proj-name svg{width:13px;height:13px;fill:none;stroke:#888;stroke-width:1.6;flex:0 0 auto}
+.sf-proj-actions{display:inline-flex;align-items:center;gap:1px;flex:0 0 auto}
+.sf-icon-btn{width:26px;height:26px;border:0;border-radius:6px;background:transparent;color:#888;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.sf-icon-btn:hover,.sf-icon-btn.is-active{background:#2a2a2a;color:#ddd}
+.sf-icon-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sf-tree{flex:1;overflow:auto;padding:0 6px 12px;min-height:0}
+.sf-item{display:flex;align-items:center;gap:7px;width:100%;padding:5px 8px;border:0;border-radius:6px;background:transparent;color:#c8c8c8;font:inherit;font-size:12.5px;cursor:pointer;text-align:left}
+.sf-item:hover{background:#262626}
+.sf-item.is-dim{color:#6a6a6a}
+.sf-item.is-active{color:#e8a04a}
+.sf-item svg.sf-chev{width:10px;height:10px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;opacity:.7;transform:rotate(-90deg);transition:transform .12s}
+.sf-item.is-open svg.sf-chev{transform:rotate(0deg)}
+.sf-children{display:none}
+.sf-item.is-open + .sf-children{display:block}
+.sf-item svg.sf-fico{width:14px;height:14px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.6}
+.sf-item svg.sf-fico.is-git{stroke:#e8a04a;fill:rgba(232,160,74,.15)}
+.sf-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sf-dot{width:6px;height:6px;border-radius:50%;background:#e8a04a;flex:0 0 auto;display:none}
+.sf-item.is-active .sf-dot{display:block}
+
 /* ===== prototype mobile-remote + remote-connect ===== */
 .mobile-btn-wrap{position:relative;flex:0 0 auto}
 .mobile-btn{width:30px;height:30px;border-radius:8px;border:0;background:transparent;color:#e8a04a;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}

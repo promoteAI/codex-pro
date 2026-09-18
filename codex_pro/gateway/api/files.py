@@ -42,6 +42,9 @@ _ICON_LABELS: dict[str, str] = {
     "img": "I",
 }
 
+# Read limit for file content: files larger than this are truncated and flagged.
+_MAX_CONTENT_BYTES = 2 * 1024 * 1024
+
 
 def _classify(path: Path) -> str:
     ext = path.suffix.lower()
@@ -59,13 +62,23 @@ class FilesAPI:
         return self._server._require_api_token(request, action=action)
 
     async def list_dir(self, request: web.Request) -> web.Response:
-        """Return a flat file-tree listing under optional sub-path."""
+        """Return a flat file-tree listing under a repo and optional sub-path.
+
+        Query params: ``repo`` (absolute path of the project, or empty for the
+        workspace root) and ``path`` (a sub-directory relative to that repo).
+        For backward compatibility, when ``repo`` is omitted the ``path`` is
+        interpreted relative to the workspace root as before.
+        """
         guard = self._guard(request, "files_list")
         if guard is not None:
             return guard
 
+        repo_path = request.query.get("repo", "")
         sub_path = request.query.get("path", "")
-        base = self._workspace
+
+        base = self._resolve_repo(repo_path) if repo_path else self._workspace
+        if base is None:
+            return web.json_response({"error": "repo not allowed"}, status=403)
         try:
             target = (base / sub_path).resolve()
             if not str(target).startswith(str(base.resolve())):
@@ -96,3 +109,76 @@ class FilesAPI:
             pass
 
         return web.json_response({"entries": entries, "path": sub_path})
+
+    def _resolve_repo(self, repo_path: str) -> Path | None:
+        """Resolve a repo request to the root inside the workspace.
+
+        Only the workspace root itself or a direct subdirectory (a normal
+        project) is allowed — external folders opened as symlinks are not
+        supported here. Returns ``None`` if the repo is not allowed.
+        """
+        base = self._workspace.resolve()
+        try:
+            target = Path(repo_path).resolve() if repo_path else base
+        except OSError:
+            return None
+        # The resolved repo must sit strictly within the workspace (or equal it).
+        try:
+            target.relative_to(base)
+        except ValueError:
+            return None
+        if not target.is_dir():
+            return None
+        return target
+
+    async def read_file(self, request: web.Request) -> web.Response:
+        """Return a text file's content within a repo.
+
+        Query params: ``repo`` (absolute path of the project, or empty for the
+        workspace root) and ``path`` (the file path relative to that repo).
+        Rejects directories, files escaping the repo root, and oversized files
+        (truncated with a ``truncated`` flag instead of failing).
+        """
+        guard = self._guard(request, "files_read")
+        if guard is not None:
+            return guard
+
+        repo_path = request.query.get("repo", "")
+        rel_path = request.query.get("path", "")
+
+        repo = self._resolve_repo(repo_path)
+        if repo is None:
+            return web.json_response({"error": "repo not allowed"}, status=403)
+
+        try:
+            target = (repo / rel_path).resolve()
+            target.relative_to(repo)
+        except (ValueError, OSError):
+            return web.json_response({"error": "access denied"}, status=403)
+
+        if not target.is_file():
+            return web.json_response({"error": "not a file"}, status=400)
+
+        try:
+            size = target.stat().st_size
+            if size > _MAX_CONTENT_BYTES:
+                with target.open("r", encoding="utf-8", errors="replace") as fh:
+                    content = fh.read(_MAX_CONTENT_BYTES)
+                return web.json_response({
+                    "path": rel_path,
+                    "name": target.name,
+                    "content": content,
+                    "size": size,
+                    "truncated": True,
+                })
+            content = target.read_text(encoding="utf-8", errors="replace")
+        except (OSError, UnicodeError):
+            return web.json_response({"error": "failed to read file"}, status=500)
+
+        return web.json_response({
+            "path": rel_path,
+            "name": target.name,
+            "content": content,
+            "size": size,
+            "truncated": False,
+        })

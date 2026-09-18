@@ -17,9 +17,10 @@ import {
 import { useShellStore, type ToolPane, type SessionTab } from "../../stores/shell";
 import {
   MOCK_DIFF,
-  MOCK_FILE_PREVIEW,
   MOCK_REVIEW_FILES,
 } from "../../mock/seeds";
+import { apiFetch } from "../../lib/api";
+import { Markdown } from "../../components/home/markdown";
 
 const TAB_ICONS: Record<SessionTab["type"], typeof Terminal> = {
   review: FileCode2,
@@ -158,15 +159,69 @@ function ReviewPane() {
   );
 }
 
+interface FileContent {
+  path: string;
+  name: string;
+  content: string;
+  size: number;
+  truncated: boolean;
+}
+
 /** Single-file viewer matching the prototype's `fv` pane: breadcrumb + preview/source
- *  toggle + copy path + open-external. Shows one file's content (mock), not a file tree. */
+ *  toggle + copy path + open-external. Shows one file's content from the API. */
 function FilesPane() {
   const { t } = useTranslation("tools");
+  const pendingFilePath = useShellStore((s) => s.pendingFilePath);
+
   const [view, setView] = useState<"preview" | "source">("source");
   const [moreOpen, setMoreOpen] = useState(false);
-  const filePath = MOCK_REVIEW_FILES[0]?.path ?? "web/src/App.tsx";
-  const fileName = filePath.split("/").pop() ?? filePath;
-  const previewLines = MOCK_FILE_PREVIEW.split("\n");
+  const [fileContent, setFileContent] = useState<FileContent | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pendingFilePath) {
+      setFileContent(null);
+      setError(null);
+      return;
+    }
+    const { repoPath, filePath } = pendingFilePath;
+    setLoading(true);
+    setError(null);
+    void apiFetch<{ entries: never }>(
+      `/files/content?repo=${encodeURIComponent(repoPath)}&path=${encodeURIComponent(filePath)}`,
+    )
+      .then((res) => {
+        setFileContent(res as unknown as FileContent);
+      })
+      .catch(() => {
+        setError(t("emptyFiles"));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [pendingFilePath, t]);
+
+  const filePath = fileContent?.path ?? "";
+  const fileName = fileContent?.name ?? (pendingFilePath?.filePath ?? "");
+  const isMd = fileName.split(".").pop()?.toLowerCase() === "md";
+  const lines = (fileContent?.content ?? "").split("\n");
+
+  const handleCopyAbs = () => {
+    void navigator.clipboard?.writeText(filePath);
+    setMoreOpen(false);
+  };
+
+  const handleCopyRel = () => {
+    void navigator.clipboard?.writeText(fileName);
+    setMoreOpen(false);
+  };
+
+  const handleOpenExt = () => {
+    if (!pendingFilePath) return;
+    void fetch(`/api/files/open?repo=${encodeURIComponent(pendingFilePath.repoPath)}&path=${encodeURIComponent(pendingFilePath.filePath)}`)
+      .catch(() => void 0);
+  };
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -176,7 +231,7 @@ function FilesPane() {
         <span className="text-[#555]" aria-hidden>›</span>
         <span className="inline-flex items-center gap-1.5 text-[12.5px] text-[#e0e0e0] font-medium min-w-0">
           <FileCode2 size={13} className="shrink-0 opacity-80" />
-          <span className="truncate">{fileName}</span>
+          <span className="truncate">{fileName || "—"}</span>
         </span>
         <span className="flex-1" />
         <div className="relative">
@@ -199,7 +254,9 @@ function FilesPane() {
               className="fixed z-[120] w-[180px] p-1 bg-[#2c2c2c] border border-[#3a3a3a] rounded-lg shadow-[0_10px_28px_rgba(0,0,0,.5)]"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="px-2.5 py-1.5 text-[11px] text-codex-muted">{view === "preview" ? "Markdown" : "Source"}</div>
+              <div className="px-2.5 py-1.5 text-[11px] text-codex-muted">
+                {isMd ? "Markdown" : "Source"}
+              </div>
               <button
                 type="button"
                 onClick={() => { setView("preview"); setMoreOpen(false); }}
@@ -217,14 +274,14 @@ function FilesPane() {
               <div className="h-px bg-[#3a3a3a] my-1" />
               <button
                 type="button"
-                onClick={() => { void navigator.clipboard?.writeText(filePath); setMoreOpen(false); }}
+                onClick={handleCopyAbs}
                 className="block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
               >
                 {t("filesCopyAbs")}
               </button>
               <button
                 type="button"
-                onClick={() => { void navigator.clipboard?.writeText(fileName); setMoreOpen(false); }}
+                onClick={handleCopyRel}
                 className="block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
               >
                 {t("filesCopyRel")}
@@ -237,17 +294,30 @@ function FilesPane() {
           className="w-7 h-7 inline-flex items-center justify-center rounded text-[#888] hover:bg-[#2a2a2a] hover:text-[#ddd]"
           title={t("filesOpen")}
           aria-label={t("filesOpen")}
+          onClick={handleOpenExt}
         >
           <ExternalLink size={14} />
         </button>
       </div>
-      {view === "preview" ? (
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center text-[#666] text-[13px]">
+          {t("emptyFiles")}…
+        </div>
+      ) : error ? (
+        <div className="flex-1 flex items-center justify-center text-[#666] text-[13px]">
+          {error}
+        </div>
+      ) : view === "preview" && isMd && fileContent ? (
+        <div className="flex-1 overflow-auto min-h-0 px-5 py-5 text-[14px] leading-relaxed text-[#d8d8d8]">
+          <Markdown>{fileContent.content}</Markdown>
+        </div>
+      ) : view === "preview" && !isMd && fileContent ? (
         <div className="flex-1 overflow-auto min-h-0 px-4 py-3 text-[13.5px] leading-relaxed text-[#d8d8d8]">
-          <pre className="whitespace-pre-wrap font-sans">{MOCK_FILE_PREVIEW}</pre>
+          <pre className="whitespace-pre-wrap font-sans">{fileContent.content}</pre>
         </div>
       ) : (
         <div className="flex-1 overflow-auto min-h-0 font-mono text-[12.5px] leading-[1.6] bg-[#121212]">
-          {previewLines.map((line, i) => (
+          {lines.map((line, i) => (
             <div key={i} className="flex min-w-max">
               <span className="w-11 shrink-0 text-right pr-3 pl-2 text-[#555] select-none">{i + 1}</span>
               <span className="pr-5 text-[#d4d4d4] whitespace-pre">{line || " "}</span>

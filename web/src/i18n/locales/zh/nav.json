@@ -24,5 +24,11 @@
   "update": "检查更新",
   "updateShort": "更新",
   "remoteConnect": "远程连接",
-  "more": "更多"
+  "more": "更多",
+  "back": "返回",
+  "searchFiles": "搜索文件...",
+  "changedOnly": "仅显示变更文件",
+  "refreshFiles": "刷新",
+  "noMatchFile": "无匹配文件",
+  "fileContent": "文件内容"
 }

@@ -72,6 +72,9 @@ _ROUTE_DOCS: dict[str, dict[str, dict[str, Any]]] = {
     "GET /analytics/tokens": {"summary": "Token usage over time", "tags": ["Analytics"]},
     "GET /analytics/skills": {"summary": "Skill usage statistics", "tags": ["Analytics"]},
     "GET /analytics/channels": {"summary": "Channel usage statistics", "tags": ["Analytics"]},
+    # Files
+    "GET /files": {"summary": "List a directory in the workspace", "tags": ["Files"]},
+    "GET /files/content": {"summary": "Read a file's content within a project", "tags": ["Files"]},
 }
 
 

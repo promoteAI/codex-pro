@@ -64,6 +64,9 @@ class GitAPI:
             current_branch = ""
             if (path / ".git").is_dir():
                 rc, stdout = _run_git(path, ["rev-parse", "--abbrev-ref", "HEAD"])
+                if rc != 0:
+                    # Fallback for freshly-initialized repos with no commits yet
+                    rc, stdout = _run_git(path, ["branch", "--show-current"])
                 current_branch = stdout.strip() if rc == 0 else ""
             return {"path": str(path), "name": name, "current_branch": current_branch}
 
@@ -145,7 +148,15 @@ class GitAPI:
                 shutil.rmtree(target, ignore_errors=True)
                 return web.json_response({"error": "git init failed"}, status=500)
 
-        return web.json_response({"path": str(target), "name": name, "current_branch": ""}, status=201)
+        # Determine current branch if the created project is a git repo.
+        current_branch = ""
+        if git_init and (target / ".git").is_dir():
+            rc, stdout = _run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"])
+            if rc != 0:
+                rc, stdout = _run_git(target, ["branch", "--show-current"])
+            current_branch = stdout.strip() if rc == 0 else ""
+
+        return web.json_response({"path": str(target), "name": name, "current_branch": current_branch}, status=201)
 
     async def open_folder(self, request: web.Request) -> web.Response:
         """Open an existing external folder as a project.
@@ -199,6 +210,8 @@ class GitAPI:
         current_branch = ""
         if (real_path / ".git").is_dir():
             rc, stdout = _run_git(real_path, ["rev-parse", "--abbrev-ref", "HEAD"])
+            if rc != 0:
+                rc, stdout = _run_git(real_path, ["branch", "--show-current"])
             current_branch = stdout.strip() if rc == 0 else ""
 
         return web.json_response({
@@ -218,7 +231,16 @@ class GitAPI:
             return web.json_response({"error": "repo path not found"}, status=400)
 
         rc, stdout = _run_git(Path(repo_path), ["branch", "-a", "--format=%(refname:short)"])
-        if rc != 0:
+        if rc != 0 or not stdout.strip():
+            # No branches yet (fresh repo with no commits) — surface the
+            # symbolic branch name so the UI isn't left showing stale fallbacks.
+            rc2, out2 = _run_git(Path(repo_path), ["branch", "--show-current"])
+            current = out2.strip() if rc2 == 0 else ""
+            if current and current != "HEAD":
+                return web.json_response({
+                    "branches": [{"name": current, "is_current": True, "is_remote": False}],
+                    "current_branch": current,
+                })
             return web.json_response({"branches": []})
 
         branches = []
@@ -240,3 +262,35 @@ class GitAPI:
             })
 
         return web.json_response({"branches": branches, "current_branch": current_branch})
+
+    async def create_branch(self, request: web.Request) -> web.Response:
+        """Create and checkout a new branch in a repo."""
+        guard = self._guard(request, "git_branch_create")
+        if guard is not None:
+            return guard
+
+        try:
+            body = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({"error": "invalid JSON"}, status=400)
+        if not isinstance(body, dict):
+            return web.json_response({"error": "JSON body must be an object"}, status=400)
+
+        repo_path = body.get("path", "")
+        branch_name = body.get("name", "").strip()
+        if not repo_path or not branch_name:
+            return web.json_response({"error": "path and name are required"}, status=400)
+
+        repo_path_obj = Path(repo_path).resolve()
+        if not repo_path_obj.is_dir():
+            return web.json_response({"error": "repo path not found"}, status=400)
+
+        rc, stdout = _run_git(repo_path_obj, ["branch", "--list", "--all", branch_name])
+        if rc == 0 and stdout.strip():
+            return web.json_response({"error": "branch already exists"}, status=409)
+
+        rc, stderr = _run_git(repo_path_obj, ["checkout", "-b", branch_name])
+        if rc != 0:
+            return web.json_response({"error": f"failed to create branch: {stderr.strip()}"}, status=500)
+
+        return web.json_response({"name": branch_name, "branch": branch_name}, status=201)

@@ -37,6 +37,7 @@ export function Composer() {
   const sendMessage = useChatStore((s) => s.sendMessage);
   const typing = useChatStore((s) => s.typing);
   const project = useChatStore((s) => s.project);
+  const isGit = useChatStore((s) => s.isGit);
   const branch = useChatStore((s) => s.branch);
   const model = useChatStore((s) => s.model);
   const effort = useChatStore((s) => s.effort);
@@ -138,20 +139,22 @@ export function Composer() {
             <span>{project || t("noProjectLabel")}</span>
             <svg className="w-2.5 h-2.5 opacity-65" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <button
-            ref={branchBtnRef}
-            type="button"
-            onClick={() => toggle("branch")}
-            className="inline-flex items-center gap-1.5 text-[12.5px] text-[#c0c0c0] px-2 py-1 rounded-md hover:bg-[#2a2a2a]"
-            aria-label={t("branch")}
-            aria-haspopup="menu"
-            aria-expanded={menu === "branch"}
-            aria-controls="branchMenu"
-          >
-            <GitBranch size={14} />
-            <span>{branch}</span>
-            <svg className="w-2.5 h-2.5 opacity-65" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </button>
+          {isGit && (
+            <button
+              ref={branchBtnRef}
+              type="button"
+              onClick={() => toggle("branch")}
+              className="inline-flex items-center gap-1.5 text-[12.5px] text-[#c0c0c0] px-2 py-1 rounded-md hover:bg-[#2a2a2a]"
+              aria-label={t("branch")}
+              aria-haspopup="menu"
+              aria-expanded={menu === "branch"}
+              aria-controls="branchMenu"
+            >
+              <GitBranch size={14} />
+              <span>{branch}</span>
+              <svg className="w-2.5 h-2.5 opacity-65" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+          )}
         </div>
 
         <ProjectMenu
@@ -176,6 +179,7 @@ export function Composer() {
           branches={branches}
           loading={loadingBranches}
           onSelect={setBranch}
+          onCreateBranch={useChatStore.getState().createBranch}
           onClose={() => setMenu(null)}
         />
 

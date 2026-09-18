@@ -103,6 +103,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_post(f"{prefix}/git/repos", git_api.create_repo)
     app.router.add_post(f"{prefix}/git/open", git_api.open_folder)
     app.router.add_get(f"{prefix}/git/branches", git_api.list_branches)
+    app.router.add_post(f"{prefix}/git/branches", git_api.create_branch)
 
     # File browser for tools panel
     app.router.add_get(f"{prefix}/files", files_api.list_dir)

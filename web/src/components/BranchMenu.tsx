@@ -36,6 +36,7 @@ interface BranchMenuProps {
   loading?: boolean;
   onSelect: (name: string) => void;
   onClose: () => void;
+  onCreateBranch?: (name: string) => Promise<void>;
 }
 
 /** Prototype #branchMenu — pick / create branch beside composer ctx-bar. */
@@ -48,6 +49,7 @@ export function BranchMenu({
   loading,
   onSelect,
   onClose,
+  onCreateBranch,
 }: BranchMenuProps) {
   const { t } = useTranslation("composer");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -136,11 +138,15 @@ export function BranchMenu({
     };
   }, [open, anchorEl, onClose, creating]);
 
-  const commitCreate = () => {
+  const commitCreate = async () => {
     const name = newName.trim();
     if (!name) return;
-    setExtra((prev) => [...prev, { name, is_current: false, is_remote: false }]);
-    onSelect(name);
+    if (onCreateBranch) {
+      await onCreateBranch(name);
+    } else {
+      setExtra((prev) => [...prev, { name, is_current: false, is_remote: false }]);
+      onSelect(name);
+    }
     onClose();
   };
 

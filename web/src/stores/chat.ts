@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { apiFetch } from "../lib/api";
+import { toast } from "./toast";
 
 export interface ToolCallFn {
   id: string;
@@ -83,6 +84,7 @@ interface ChatState {
   planMode: boolean;
   goalMode: boolean;
   planTask: string;
+  isGit: boolean;
   setProject: (project: string, projectPath?: string) => void;
   selectProject: (repo: GitRepo) => void;
   createProject: (name: string, gitInit?: boolean) => Promise<GitRepo>;
@@ -101,6 +103,7 @@ interface ChatState {
   loadSessionHistory: (sessionId: string) => Promise<void>;
   loadRepos: () => Promise<void>;
   loadBranches: (repoPath: string) => Promise<void>;
+  createBranch: (branchName: string) => Promise<void>;
   _pollForResponse: (sessionId: string, eventId: string, priorAssistantCount?: number) => void;
   _softReloadHistory: (sessionId: string) => Promise<void>;
 }
@@ -128,6 +131,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   planMode: false,
   goalMode: false,
   planTask: "",
+  isGit: false,
 
   setProject: (project, projectPath) => set({ project, projectPath: projectPath ?? get().projectPath }),
 
@@ -138,6 +142,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       project: repo.name,
       projectPath: repo.path,
       branch: repo.current_branch || "main",
+      isGit: repo.current_branch !== "",
     });
     get().loadBranches(repo.path);
   },
@@ -192,6 +197,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       pendingEventId: null,
       project: "",
       projectPath: "",
+      isGit: false,
     }),
 
   loadRepos: async () => {
@@ -213,6 +219,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({ branches: result.branches, loadingBranches: false });
     } catch {
       set({ branches: [], loadingBranches: false });
+    }
+  },
+
+  createBranch: async (branchName) => {
+    const repoPath = get().projectPath;
+    if (!repoPath) return;
+    try {
+      await apiFetch("/git/branches", {
+        method: "POST",
+        body: JSON.stringify({ path: repoPath, name: branchName }),
+      });
+      await get().loadBranches(repoPath);
+      get().setBranch(branchName);
+      toast.success(`已创建并切换至分支 ${branchName}`);
+    } catch {
+      toast.error(`创建分支 ${branchName} 失败`);
     }
   },
 

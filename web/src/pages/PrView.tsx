@@ -11,6 +11,7 @@ interface PrItem {
   url?: string;
   branch?: string;
   default_branch?: string;
+  files?: { file: string; additions: number; deletions: number }[];
 }
 
 const badgeClass = (s: string) =>
@@ -31,10 +32,10 @@ export function PrView() {
   const list = useMemo(() => {
     if (query.trim()) {
       const q = query.trim().toLowerCase();
-      return prs.filter((p) => p.title.toLowerCase().includes(q) || p.meta.toLowerCase().includes(q) || p.tabs.includes(tab));
+      return prs.filter((p) => p.title.toLowerCase().includes(q) || p.meta.toLowerCase().includes(q));
     }
     return prs;
-  }, [prs, query, tab]);
+  }, [prs, query]);
 
   const filtered = useMemo(() => {
     if (tab === "review") return list.filter((p) => p.tabs.includes("review") || p.status === "review");
@@ -91,8 +92,25 @@ export function PrView() {
           <div className="pr-detail is-visible" id="prDetail">
             <div className="pr-detail-kicker" id="prDetailKicker">{active.meta}</div>
             <h2 className="pr-detail-title" id="prDetailTitle">{active.title}</h2>
-            <div className="pr-detail-meta" id="prDetailMeta"><span>{badges[active.status] ?? active.status}</span></div>
+            <div className="pr-detail-meta" id="prDetailMeta">
+              <span>{badges[active.status] ?? active.status}</span>
+              {active.branch && <span>分支 {active.branch}</span>}
+              {active.branch && active.default_branch && <span>目标 {active.default_branch}</span>}
+            </div>
             <div className="pr-detail-body" id="prDetailBody"><p>{active.body}</p></div>
+            {active.files && active.files.length > 0 && (
+              <div className="pr-detail-files">
+                {active.files.map((f) => (
+                  <div key={f.file} className="pr-detail-file">
+                    <span>{f.file}</span>
+                    <span>
+                      <span className="add">+{f.additions}</span>
+                      <span className="del">-{f.deletions}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             {active.url && (
               <div className="pr-detail-actions">
                 <a href={active.url} target="_blank" rel="noreferrer" style={{ color: "#8b9cff", fontSize: 13 }}>在 GitHub 查看→</a>

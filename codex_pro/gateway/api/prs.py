@@ -28,6 +28,92 @@ def _run(cmd: list[str], cwd: Path, timeout: float = 15.0) -> tuple[int, str]:
         return 1, ""
 
 
+def _normalize_status(state: str, is_draft: bool = False) -> str:
+    """Map a GitHub PR state to the dashboard's normalized status value.
+
+    `state` arrives as OPEN/MERGED/CLOSED from `gh pr list`; a draft PR still
+    reports OPEN but carries `isDraft: true`, so we force the ``draft`` label.
+    Any unknown value falls back to ``closed`` rather than leaking raw text.
+    """
+    if is_draft:
+        return "draft"
+    normalized = (state or "").strip().lower()
+    if normalized == "open":
+        return "open"
+    if normalized == "merged":
+        return "merged"
+    if normalized == "closed":
+        return "closed"
+    return "closed"
+
+
+def _parse_gh_files(stdout: str) -> list[dict]:
+    """Parse ``gh pr view --json files`` output into file change entries.
+
+    gh returns ``[{"path": str, "additions": int, "deletions": int}, ...]``; we
+    remap to the shared ``{file, additions, deletions}`` contract. Malformed
+    entries are skipped.
+    """
+    if not stdout.strip():
+        return []
+    try:
+        raw = json.loads(stdout)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(raw, list):
+        return []
+    files = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        path = str(entry.get("path", ""))
+        if not path:
+            continue
+        files.append({
+            "file": path,
+            "additions": int(entry.get("additions", 0) or 0),
+            "deletions": int(entry.get("deletions", 0) or 0),
+        })
+    return files
+
+
+def _collect_gh_files(workspace: Path, number: str) -> list[dict]:
+    """Fetch the changed-files list for a single PR via `gh pr view`."""
+    rc, stdout = _run(["gh", "pr", "view", number, "--json", "files"], workspace)
+    if rc != 0:
+        return []
+    return _parse_gh_files(stdout)
+
+
+def _git_files(workspace: Path, default_branch: str) -> list[dict]:
+    """Build file change entries from `git diff --numstat` vs the default branch.
+
+    Each numstat line is ``<additions>\t<deletions>\t<path>``; a binary file
+    reports ``-`` in both count columns (counted as 0). The path may contain
+    spaces, so it is the remainder after the first two TAB-separated counts.
+    """
+    rc, stdout = _run(["git", "diff", "--numstat", default_branch], workspace)
+    if rc != 0:
+        rc, stdout = _run(["git", "diff", "--numstat", f"origin/{default_branch}"], workspace)
+    if rc != 0 or not stdout.strip():
+        return []
+    files = []
+    for line in stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) < 3:
+            continue
+        try:
+            additions = int(parts[0]) if parts[0].isdigit() else 0
+            deletions = int(parts[1]) if parts[1].isdigit() else 0
+        except ValueError:
+            continue
+        path = "\t".join(parts[2:])
+        if not path:
+            continue
+        files.append({"file": path, "additions": additions, "deletions": deletions})
+    return files
+
+
 def _git_prs(workspace: Path) -> list[dict]:
     """Build PR-like entries from local git state when gh CLI is unavailable."""
     default_branch = "main"
@@ -55,12 +141,9 @@ def _git_prs(workspace: Path) -> list[dict]:
     if rc3 == 0 and stdout3.strip():
         unmerged = [line.strip() for line in stdout3.splitlines() if line.strip()]
 
-    # Count changed files
-    rc4, stdout4 = _run(
-        ["git", "diff", "--stat", f"origin/{default_branch}" if f"origin/{default_branch}" else default_branch],
-        workspace,
-    )
-    # Fall back to diff against default_branch directly
+    # Count changed files. Try the remote-tracking ref first, then fall back to
+    # the local default branch (fresh clones may lack origin/<default>).
+    rc4, stdout4 = _run(["git", "diff", "--stat", f"origin/{default_branch}"], workspace)
     if rc4 != 0:
         rc4, stdout4 = _run(["git", "diff", "--stat", default_branch], workspace)
 
@@ -91,8 +174,10 @@ def _git_prs(workspace: Path) -> list[dict]:
                 + (f"\n\n(+{added}/-{removed} lines)" if added or removed else "")
             ),
             "status": "open",
+            "url": "",
             "branch": current_branch,
             "default_branch": default_branch,
+            "files": _git_files(workspace, default_branch),
         }
     ]
 
@@ -101,6 +186,7 @@ class PrsAPI:
     def __init__(self, server: GatewayServer):
         self._server = server
         self._workspace = server._workspace
+        self._projects = server._projects
 
     def _guard(self, request: web.Request, action: str) -> web.Response | None:
         return self._server._require_api_token(request, action=action)
@@ -111,20 +197,34 @@ class PrsAPI:
             return guard
 
         # Try gh CLI first
-        rc, stdout = _run(["gh", "pr", "list", "--json", "number,title,state,url,headRefName,baseRefName,body,createdAt"], self._workspace)
+        rc, stdout = _run(
+            ["gh", "pr", "list", "--json",
+             "number,title,state,url,headRefName,baseRefName,body,createdAt,isDraft"],
+            self._workspace,
+        )
         if rc == 0 and stdout.strip():
             try:
                 prs = json.loads(stdout)
                 result = []
                 for pr in prs:
+                    number = str(pr.get("number", ""))
+                    state = str(pr.get("state", ""))
+                    is_draft = bool(pr.get("isDraft", False))
+                    status = _normalize_status(state, is_draft)
+                    tabs = ["all", "mine"]
+                    if status == "open":
+                        tabs.append("review")
                     result.append({
-                        "id": str(pr.get("number", "")),
+                        "id": number,
                         "title": pr.get("title", ""),
-                        "meta": f"#{pr.get('number', '?')} · {pr.get('state', '?')}",
-                        "tabs": ["all", "mine"],
+                        "meta": f"#{number} · {status}",
+                        "tabs": tabs,
                         "body": pr.get("body") or "",
-                        "status": pr.get("state", "open"),
+                        "status": status,
                         "url": pr.get("url", ""),
+                        "branch": pr.get("headRefName", ""),
+                        "default_branch": pr.get("baseRefName", ""),
+                        "files": _collect_gh_files(self._workspace, number),
                     })
                 return web.json_response({"prs": result})
             except json.JSONDecodeError:
@@ -132,4 +232,12 @@ class PrsAPI:
 
         # Fallback to git-based view
         prs = _git_prs(self._workspace)
+
+        # Aggregate PR-like entries from all git projects under workspace/_projects.
+        if (self._projects / ".git").is_dir():
+            prs.extend(_git_prs(self._projects))
+        for child in sorted(self._projects.iterdir()):
+            if child.is_dir() and (child / ".git").is_dir():
+                prs.extend(_git_prs(child))
+
         return web.json_response({"prs": prs})

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { SettingsPluginsPage } from "./settings/pages/MorePages";
 import { useShellStore } from "../stores/shell";
@@ -10,46 +10,6 @@ const MOCK_PLUGINS = {
   plugins: [
     {
       name: "automate", version: "1.0.0", description: "Use this skill to create Codex Automations.",
-      source: "entrypoint", path: null, status: "available",
-      provides_tools: [], provides_hooks: [], depends_on: [],
-    },
-    {
-      name: "autopilot", version: "1.0.0", description: "Keep a PR merge-ready.",
-      source: "entrypoint", path: null, status: "available",
-      provides_tools: [], provides_hooks: [], depends_on: [],
-    },
-    {
-      name: "baseline-ui", version: "1.0.0", description: "Quickly deslop UI code.",
-      source: "entrypoint", path: null, status: "available",
-      provides_tools: [], provides_hooks: [], depends_on: [],
-    },
-    {
-      name: "canvas", version: "1.0.0", description: "A live React app.",
-      source: "entrypoint", path: null, status: "available",
-      provides_tools: [], provides_hooks: [], depends_on: [],
-    },
-    {
-      name: "create-hook", version: "1.0.0", description: "Create Codex hooks.",
-      source: "entrypoint", path: null, status: "available",
-      provides_tools: [], provides_hooks: [], depends_on: [],
-    },
-    {
-      name: "create-rule", version: "1.0.0", description: "Create Codex rules.",
-      source: "entrypoint", path: null, status: "available",
-      provides_tools: [], provides_hooks: [], depends_on: [],
-    },
-    {
-      name: "create-skill", version: "1.0.0", description: "Create Codex Agent Skills.",
-      source: "entrypoint", path: null, status: "available",
-      provides_tools: [], provides_hooks: [], depends_on: [],
-    },
-    {
-      name: "create-subagent", version: "1.0.0", description: "Create custom subagents.",
-      source: "entrypoint", path: null, status: "available",
-      provides_tools: [], provides_hooks: [], depends_on: [],
-    },
-    {
-      name: "design-critique", version: "1.0.0", description: "Facilitate a structured team critique.",
       source: "entrypoint", path: null, status: "available",
       provides_tools: [], provides_hooks: [], depends_on: [],
     },
@@ -69,31 +29,33 @@ const MOCK_PLUGINS = {
       provides_tools: ["query_sqlite"], provides_hooks: [], depends_on: [],
     },
     {
-      name: "browser-mcp", version: "1.0.0", description: "Control the embedded browser through MCP tools.",
-      source: "entrypoint", path: null, status: "disabled",
-      provides_tools: ["navigate", "click"], provides_hooks: [], depends_on: [],
-    },
-    {
       name: "frontend-design", version: "1.0.0", description: "Distinctive visual design guidance.",
-      source: "entrypoint", path: null, status: "available",
-      provides_tools: [], provides_hooks: [], depends_on: [],
-    },
-    {
-      name: "create-rule-skill", version: "1.0.0", description: "Author persistent coding guidance rules.",
-      source: "entrypoint", path: null, status: "available",
-      provides_tools: [], provides_hooks: [], depends_on: [],
+      source: "user", path: null, status: "available",
+      provides_tools: [], provides_hooks: ["pre_tool_call"], depends_on: [],
     },
     {
       name: "review-security", version: "1.0.0", description: "Security-focused review of local changes.",
-      source: "entrypoint", path: null, status: "disabled",
-      provides_tools: [], provides_hooks: [], depends_on: [],
+      source: "user", path: null, status: "disabled",
+      provides_tools: [], provides_hooks: ["post_tool_call"], depends_on: [],
     },
   ],
 };
 
-function mockApi() {
+function mockApi(togglePath: string | null = null) {
   return vi.spyOn(api, "apiFetch").mockImplementation(async (path: string) => {
     if (path === "/plugins") return MOCK_PLUGINS as never;
+    if (path === "/skills") return { skills: [] } as never;
+    if (togglePath && path === togglePath) {
+      return { success: true } as never;
+    }
+    return {} as never;
+  });
+}
+
+function mockEmptyApi() {
+  return vi.spyOn(api, "apiFetch").mockImplementation(async (path: string) => {
+    if (path === "/plugins") return { plugins: [] } as never;
+    if (path === "/skills") return { skills: [] } as never;
     return {} as never;
   });
 }
@@ -123,32 +85,58 @@ describe("SettingsPluginsPage", () => {
     expect(useShellStore.getState().settingsOpen).toBe(false);
   });
 
-  it("插件清单对齐原型数量", async () => {
+  it("显示真实插件数据并按来源标注 tag", async () => {
     mockApi();
     renderPage();
-    await screen.findByRole("button", { name: /插件 9|Plugins 9/i });
-    // Names come from the API mock, so look for a known string in the row
-    expect(screen.getByText("Use this skill to create Codex Automations.")).toBeInTheDocument();
-    expect(screen.getByText("Quickly deslop UI code.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("automate")).toBeInTheDocument();
+    });
+    // entrypoint source → "系统" tag
+    expect(screen.getByText(/系统/)).toBeInTheDocument();
   });
 
-  it("技能标签展示列表而非空态", async () => {
+  it("按 kind 分类显示正确计数", async () => {
     mockApi();
     renderPage();
-    // No mock has provides_hooks → 0 skills from API, but 3 seed skills fallback
-    await screen.findByRole("button", { name: /技能 3|Skills 3/i });
-    fireEvent.click(screen.getByRole("button", { name: /技能 3|Skills 3/i }));
-    expect(screen.getByText("frontend-design")).toBeInTheDocument();
-    expect(screen.getByText("review-security")).toBeInTheDocument();
-    expect(screen.queryByText(/暂无技能|No skills/i)).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /插件 1|plugins 1/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /MCP 3|mcp 3/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /技能 2|skills 2/i })).toBeInTheDocument();
+    });
   });
 
-  it("MCP 标签含 sqlite / filesystem", async () => {
+  it("点击 MCP tab 显示带 tools 的插件", async () => {
     mockApi();
     renderPage();
-    await screen.findByRole("button", { name: /MCP 4/i });
-    fireEvent.click(screen.getByRole("button", { name: /MCP 4/i }));
-    expect(screen.getByText("sqlite")).toBeInTheDocument();
-    expect(screen.getByText("filesystem")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("automate")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /MCP 3/i }));
+    await waitFor(() => {
+      expect(screen.getByText("filesystem")).toBeInTheDocument();
+      expect(screen.getByText("sqlite")).toBeInTheDocument();
+      expect(screen.getByText("github")).toBeInTheDocument();
+    });
+  });
+
+  it("已启用插件显示「已启用」按钮", async () => {
+    mockApi();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText("automate")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "已启用" })).toBeInTheDocument();
+  });
+
+  it("无插件时显示空态提示", async () => {
+    mockEmptyApi();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /插件 0|plugins 0/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /MCP 0|mcp 0/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /技能 0|skills 0/i })).toBeInTheDocument();
+    });
+    // Empty state shows the title and description
+    expect(screen.getAllByText(/管理插件、技能和 MCP/i).length).toBeGreaterThan(0);
   });
 });

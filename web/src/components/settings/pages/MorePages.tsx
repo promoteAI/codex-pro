@@ -384,148 +384,13 @@ interface PluginListItem {
   on: boolean;
 }
 
-/** Default seed used only as a placeholder until the real plugin list loads. */
-const PLUGIN_SEEDS: PluginListItem[] = [
-  {
-    id: "automate",
-    name: "Automate",
-    desc: "Use this skill to create Codex Automations.",
-    kind: "plugins",
-    tag: "个人",
-    on: true,
-  },
-  {
-    id: "autopilot",
-    name: "Autopilot",
-    desc: "Keep a PR merge-ready by triaging comments, resolving clear conflicts, and fixing CI in a loop.",
-    kind: "plugins",
-    tag: "个人",
-    on: true,
-  },
-  {
-    id: "baseline-ui",
-    name: "Baseline UI",
-    desc: "Quickly deslop UI code by fixing spacing, hierarchy, typography, and small layout issues.",
-    kind: "plugins",
-    tag: "个人",
-    on: true,
-  },
-  {
-    id: "canvas",
-    name: "Canvas",
-    desc: "A live React app that the user can open beside the chat.",
-    kind: "plugins",
-    tag: "个人",
-    on: true,
-  },
-  {
-    id: "create-hook",
-    name: "Create Hook",
-    desc: "Create Codex hooks. Use when you want to create a hook, write hooks.json, or manage lifecycle events.",
-    kind: "plugins",
-    tag: "个人",
-    on: true,
-  },
-  {
-    id: "create-rule",
-    name: "Create Rule",
-    desc: "Create Codex rules for persistent AI guidance.",
-    kind: "plugins",
-    tag: "个人",
-    on: true,
-  },
-  {
-    id: "create-skill",
-    name: "Create Skill",
-    desc: "Create Codex Agent Skills. Use when authoring a new skill or registering it in the system.",
-    kind: "plugins",
-    tag: "个人",
-    on: true,
-  },
-  {
-    id: "create-subagent",
-    name: "Create Subagent",
-    desc: "Create custom subagents for specialized AI tasks.",
-    kind: "plugins",
-    tag: "个人",
-    on: true,
-  },
-  {
-    id: "design-critique",
-    name: "Design Ops: Design Critique",
-    desc: "Facilitate a structured team critique — framing, feedback rules, and actionable outcomes.",
-    kind: "plugins",
-    tag: "个人",
-    on: true,
-  },
-  {
-    id: "filesystem",
-    name: "filesystem",
-    desc: "Read and write local files through MCP.",
-    kind: "mcp",
-    tag: "MCP",
-    on: true,
-  },
-  {
-    id: "github",
-    name: "github",
-    desc: "Issues, PRs and repository metadata via MCP.",
-    kind: "mcp",
-    tag: "MCP",
-    on: false,
-  },
-  {
-    id: "sqlite",
-    name: "sqlite",
-    desc: "Query local SQLite databases.",
-    kind: "mcp",
-    tag: "MCP",
-    on: true,
-  },
-  {
-    id: "browser-mcp",
-    name: "browser",
-    desc: "Control the embedded browser through MCP tools.",
-    kind: "mcp",
-    tag: "MCP",
-    on: false,
-  },
-  {
-    id: "frontend-design",
-    name: "frontend-design",
-    desc: "Distinctive visual design guidance for product UI.",
-    kind: "skills",
-    tag: "技能",
-    on: true,
-  },
-  {
-    id: "create-rule-skill",
-    name: "create-rule",
-    desc: "Author persistent coding guidance rules.",
-    kind: "skills",
-    tag: "技能",
-    on: true,
-  },
-  {
-    id: "review-security",
-    name: "review-security",
-    desc: "Security-focused review of local changes.",
-    kind: "skills",
-    tag: "技能",
-    on: false,
-  },
-];
-
-function pluginKindFromApi(p: ApiPlugin, seedKind?: PluginKind): PluginKind {
-  // MCP servers expose tools via the API.
+function pluginKind(p: ApiPlugin): PluginKind {
   if (p.provides_tools.length > 0) return "mcp";
-  // Skills expose hooks (not tools) via the API.
   if (p.provides_hooks.length > 0) return "skills";
-  // Fallback to the seed kind so MCP/skills tabs still work when API is empty.
-  return seedKind ?? "plugins";
+  return "plugins";
 }
 
-function pluginTagFromApi(p: ApiPlugin): string {
+function pluginTag(p: ApiPlugin): string {
   if (p.source === "entrypoint") return "系统";
   if (p.source === "user") return "用户";
   if (p.source === "project") return "项目";
@@ -542,15 +407,12 @@ export function SettingsPluginsPage() {
   const [marketOpen, setMarketOpen] = useState(false);
   const [creatingMcp, setCreatingMcp] = useState(false);
   const [apiPlugins, setApiPlugins] = useState<ApiPlugin[]>([]);
-  const [enabled, setEnabled] = useState<Record<string, boolean>>(
-    Object.fromEntries(PLUGIN_SEEDS.map((p) => [p.id, p.on])),
-  );
+  const [enabled, setEnabled] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
 
-  // Fetch skills once on mount and keep subscribed via WebSocket
   const { data: skillsApiData } = useApi<{ skills: { name: string; description: string; enabled: boolean }[] }>("/skills");
 
   const loadPlugins = async () => {
@@ -559,14 +421,11 @@ export function SettingsPluginsPage() {
     try {
       const data = await apiFetch<{ plugins: ApiPlugin[] }>("/plugins");
       setApiPlugins(data.plugins);
-      setEnabled((prev) => {
-        const next: Record<string, boolean> = { ...prev };
-        for (const p of data.plugins) {
-          if (p.status !== "disabled") next[p.name] = true;
-          else next[p.name] = false;
-        }
-        return next;
-      });
+      const next: Record<string, boolean> = {};
+      for (const p of data.plugins) {
+        next[p.name] = p.status !== "disabled";
+      }
+      setEnabled(next);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -606,33 +465,43 @@ export function SettingsPluginsPage() {
     }
   };
 
-  const mergedItems = useMemo<PluginListItem[]>(() => {
-    const pluginMap = new Map(apiPlugins.map((p) => [p.name.toLowerCase(), p]));
-    // Build a lookup of real skills from the API so we can mark them correctly.
-    const skillsList = skillsApiData?.skills ?? [];
-    const skillMap = new Map(skillsList.map((s) => [s.name.toLowerCase(), s]));
-    return PLUGIN_SEEDS.map((seed) => {
-      const api = pluginMap.get(seed.id.toLowerCase());
-      if (!api) {
-        // For seeds without a matching plugin API entry, check if it's a known skill.
-        const skill = skillMap.get(seed.id.toLowerCase());
-        if (skill) {
-          return { ...seed, desc: skill.description || seed.desc, kind: "skills", on: skill.enabled };
-        }
-        return seed;
-      }
-      return {
-        ...seed,
-        name: api.name,
-        desc: api.description || seed.desc,
-        kind: pluginKindFromApi(api, seed.kind),
-        tag: pluginTagFromApi(api),
-        on: api.status !== "disabled",
-      };
-    });
-  }, [apiPlugins, skillsApiData]);
+  const skillsList = skillsApiData?.skills ?? [];
+  const skillMap = new Map(skillsList.map((s) => [s.name.toLowerCase(), s]));
 
-  const filtered = mergedItems.filter((p) => {
+  const allItems = useMemo<PluginListItem[]>(() => {
+    const items: PluginListItem[] = [];
+    for (const p of apiPlugins) {
+      items.push({
+        id: p.name,
+        name: p.name,
+        desc: p.description,
+        kind: pluginKind(p),
+        tag: pluginTag(p),
+        on: p.status !== "disabled",
+      });
+    }
+    for (const s of skillsList) {
+      if (!skillMap.has(s.name.toLowerCase())) continue;
+      // Already added via apiPlugins if it matches; skip duplicates.
+      const found = items.find((i) => i.id.toLowerCase() === s.name.toLowerCase());
+      if (found) {
+        found.kind = "skills";
+        found.on = s.enabled;
+      } else {
+        items.push({
+          id: s.name,
+          name: s.name,
+          desc: s.description || "",
+          kind: "skills",
+          tag: "技能",
+          on: s.enabled,
+        });
+      }
+    }
+    return items;
+  }, [apiPlugins, skillsList, skillMap]);
+
+  const filtered = allItems.filter((p) => {
     if (p.kind !== tab) return false;
     if (q && !p.name.toLowerCase().includes(q.toLowerCase()) && !p.desc.toLowerCase().includes(q.toLowerCase())) {
       return false;
@@ -640,9 +509,9 @@ export function SettingsPluginsPage() {
     return true;
   });
 
-  const pluginCount = mergedItems.filter((p) => p.kind === "plugins").length;
-  const mcpCount = mergedItems.filter((p) => p.kind === "mcp").length;
-  const skillCount = mergedItems.filter((p) => p.kind === "skills").length;
+  const pluginCount = allItems.filter((p) => p.kind === "plugins").length;
+  const mcpCount = allItems.filter((p) => p.kind === "mcp").length;
+  const skillCount = allItems.filter((p) => p.kind === "skills").length;
 
   const browseCatalog = () => {
     closeSettings();

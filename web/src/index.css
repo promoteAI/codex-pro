@@ -365,14 +365,14 @@ body {
 .pl-sk-block{margin-bottom:28px}
 .pl-sk-block-title{font-size:13px;font-weight:600;color:#c8c8c8;margin:0 0 12px}
 .pl-sk-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.pl-sk-card{display:flex;align-items:center;gap:12px;padding:12px 12px;border-radius:12px;background:#1a1a1a;border:1px solid #262626;cursor:pointer;text-align:left;min-width:0}
+.pl-sk-card{display:flex;align-items:flex-start;gap:12px;padding:12px 12px;border-radius:12px;background:#1a1a1a;border:1px solid #262626;cursor:pointer;text-align:left;min-width:0}
 .pl-sk-card:hover{background:#202020;border-color:#333}
 .pl-sk-ico{width:36px;height:36px;border-radius:10px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;color:#fff}
 .pl-sk-ico svg{width:20px;height:20px}
 .pl-sk-info{flex:1;min-width:0}
 .pl-sk-name{font-size:13.5px;font-weight:600;color:#f0f0f0;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pl-sk-desc{font-size:12px;color:#888;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pl-sk-check{width:18px;height:18px;flex:0 0 auto;color:#6b7280}
+.pl-sk-desc{font-size:12px;color:#888;margin:0;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pl-sk-check{width:18px;height:18px;flex:0 0 auto;color:#6b7280;margin-top:2px}
 .pl-sk-check svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .pl-sk-more{display:inline-block;margin-top:12px;font-size:12.5px;color:#8b9cff;cursor:pointer;background:none;border:0;padding:0;font:inherit}
 .pl-sk-more:hover{color:#b4c0ff;text-decoration:underline}

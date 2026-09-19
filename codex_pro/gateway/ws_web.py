@@ -188,6 +188,7 @@ class WebUIWebSocket:
         "session": "sessions",
         "memory": "memory",
         "skill": "skills",
+        "plugin": "plugins",
         "channel": "channels",
         "log": "logs",
         "analytics": "analytics",

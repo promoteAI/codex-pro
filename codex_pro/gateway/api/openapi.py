@@ -31,6 +31,10 @@ _ROUTE_DOCS: dict[str, dict[str, dict[str, Any]]] = {
     "POST /skills/{name}/deps/install": {"summary": "Install skill dependencies", "tags": ["Skills"]},
     "POST /skills/{name}/toggle": {"summary": "Enable/disable a skill", "tags": ["Skills"]},
     "DELETE /skills/{name}": {"summary": "Delete a skill", "tags": ["Skills"]},
+    # Plugins
+    "GET /plugins": {"summary": "List all discovered plugins", "tags": ["Plugins"]},
+    "GET /plugins/{name}": {"summary": "Get plugin details", "tags": ["Plugins"]},
+    "POST /plugins/{name}/toggle": {"summary": "Enable/disable a plugin", "tags": ["Plugins"]},
     # Channels
     "GET /channels": {"summary": "List configured channels", "tags": ["Channels"]},
     "POST /channels/{name}/{action}": {"summary": "Channel lifecycle action", "tags": ["Channels"]},

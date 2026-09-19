@@ -17,6 +17,21 @@ import { AddMarketModal } from "../../AddMarketModal";
 import { McpCreateView } from "../../McpCreateView";
 import { toast } from "../../../stores/toast";
 import { useShellStore } from "../../../stores/shell";
+import { useWsSubscribe } from "../../../hooks/use-ws";
+import { useApi } from "../../../hooks/use-api";
+import { apiFetch } from "../../../lib/api";
+
+interface ApiPlugin {
+  name: string;
+  version: string;
+  description: string;
+  source: string;
+  path: string | null;
+  status: string;
+  provides_tools: string[];
+  provides_hooks: string[];
+  depends_on: string[];
+}
 
 export function VoicePage() {
   const { t } = useTranslation("settings");
@@ -369,8 +384,8 @@ interface PluginListItem {
   on: boolean;
 }
 
-/** Seed list matching prototype #pluginsListView. */
-const PLUGIN_ITEMS: PluginListItem[] = [
+/** Default seed used only as a placeholder until the real plugin list loads. */
+const PLUGIN_SEEDS: PluginListItem[] = [
   {
     id: "automate",
     name: "Automate",
@@ -501,6 +516,22 @@ const PLUGIN_ITEMS: PluginListItem[] = [
   },
 ];
 
+function pluginKindFromApi(p: ApiPlugin, seedKind?: PluginKind): PluginKind {
+  // MCP servers expose tools via the API.
+  if (p.provides_tools.length > 0) return "mcp";
+  // Skills expose hooks (not tools) via the API.
+  if (p.provides_hooks.length > 0) return "skills";
+  // Fallback to the seed kind so MCP/skills tabs still work when API is empty.
+  return seedKind ?? "plugins";
+}
+
+function pluginTagFromApi(p: ApiPlugin): string {
+  if (p.source === "entrypoint") return "系统";
+  if (p.source === "user") return "用户";
+  if (p.source === "project") return "项目";
+  return "插件";
+}
+
 export function SettingsPluginsPage() {
   const { t } = useTranslation("settings");
   const navigate = useNavigate();
@@ -510,12 +541,45 @@ export function SettingsPluginsPage() {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [marketOpen, setMarketOpen] = useState(false);
   const [creatingMcp, setCreatingMcp] = useState(false);
-  const [items, setItems] = useState(PLUGIN_ITEMS);
+  const [apiPlugins, setApiPlugins] = useState<ApiPlugin[]>([]);
   const [enabled, setEnabled] = useState<Record<string, boolean>>(
-    Object.fromEntries(PLUGIN_ITEMS.map((p) => [p.id, p.on])),
+    Object.fromEntries(PLUGIN_SEEDS.map((p) => [p.id, p.on])),
   );
-
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [toggling, setToggling] = useState<string | null>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
+
+  // Fetch skills once on mount and keep subscribed via WebSocket
+  const { data: skillsApiData } = useApi<{ skills: { name: string; description: string; enabled: boolean }[] }>("/skills");
+
+  const loadPlugins = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiFetch<{ plugins: ApiPlugin[] }>("/plugins");
+      setApiPlugins(data.plugins);
+      setEnabled((prev) => {
+        const next: Record<string, boolean> = { ...prev };
+        for (const p of data.plugins) {
+          if (p.status !== "disabled") next[p.name] = true;
+          else next[p.name] = false;
+        }
+        return next;
+      });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadPlugins();
+  }, []);
+
+  useWsSubscribe(["plugins"], loadPlugins, ["plugin_changed"]);
+  useWsSubscribe(["skills"], loadPlugins, ["skill_changed"]);
 
   useEffect(() => {
     if (!addMenuOpen) return;
@@ -526,7 +590,49 @@ export function SettingsPluginsPage() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [addMenuOpen]);
 
-  const filtered = items.filter((p) => {
+  const togglePlugin = async (name: string, enable: boolean) => {
+    setToggling(name);
+    try {
+      await apiFetch(`/plugins/${encodeURIComponent(name)}/toggle`, {
+        method: "POST",
+        body: JSON.stringify({ enabled: enable }),
+      });
+      setEnabled((s) => ({ ...s, [name]: enable }));
+      toast.success(enable ? `插件「${name}」已启用` : `插件「${name}」已禁用`);
+    } catch (e: unknown) {
+      toast.error(`操作失败：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setToggling(null);
+    }
+  };
+
+  const mergedItems = useMemo<PluginListItem[]>(() => {
+    const pluginMap = new Map(apiPlugins.map((p) => [p.name.toLowerCase(), p]));
+    // Build a lookup of real skills from the API so we can mark them correctly.
+    const skillsList = skillsApiData?.skills ?? [];
+    const skillMap = new Map(skillsList.map((s) => [s.name.toLowerCase(), s]));
+    return PLUGIN_SEEDS.map((seed) => {
+      const api = pluginMap.get(seed.id.toLowerCase());
+      if (!api) {
+        // For seeds without a matching plugin API entry, check if it's a known skill.
+        const skill = skillMap.get(seed.id.toLowerCase());
+        if (skill) {
+          return { ...seed, desc: skill.description || seed.desc, kind: "skills", on: skill.enabled };
+        }
+        return seed;
+      }
+      return {
+        ...seed,
+        name: api.name,
+        desc: api.description || seed.desc,
+        kind: pluginKindFromApi(api, seed.kind),
+        tag: pluginTagFromApi(api),
+        on: api.status !== "disabled",
+      };
+    });
+  }, [apiPlugins, skillsApiData]);
+
+  const filtered = mergedItems.filter((p) => {
     if (p.kind !== tab) return false;
     if (q && !p.name.toLowerCase().includes(q.toLowerCase()) && !p.desc.toLowerCase().includes(q.toLowerCase())) {
       return false;
@@ -534,9 +640,9 @@ export function SettingsPluginsPage() {
     return true;
   });
 
-  const pluginCount = items.filter((p) => p.kind === "plugins").length;
-  const mcpCount = items.filter((p) => p.kind === "mcp").length;
-  const skillCount = items.filter((p) => p.kind === "skills").length;
+  const pluginCount = mergedItems.filter((p) => p.kind === "plugins").length;
+  const mcpCount = mergedItems.filter((p) => p.kind === "mcp").length;
+  const skillCount = mergedItems.filter((p) => p.kind === "skills").length;
 
   const browseCatalog = () => {
     closeSettings();
@@ -549,20 +655,6 @@ export function SettingsPluginsPage() {
         onCancel={() => setCreatingMcp(false)}
         onSaved={(name) => {
           const id = name.toLowerCase().replace(/\s+/g, "-");
-          setItems((prev) => {
-            if (prev.some((p) => p.id === id || p.name === name)) return prev;
-            return [
-              ...prev,
-              {
-                id,
-                name,
-                desc: "Custom MCP server",
-                kind: "mcp",
-                tag: "MCP",
-                on: true,
-              },
-            ];
-          });
           setEnabled((s) => ({ ...s, [id]: true }));
           setCreatingMcp(false);
           setTab("mcp");
@@ -675,6 +767,16 @@ export function SettingsPluginsPage() {
         </div>
       </div>
 
+      {loading && (
+        <div style={{ color: "#888", fontSize: 13, textAlign: "center", padding: 24 }}>加载中…</div>
+      )}
+      {!loading && error && (
+        <div style={{ color: "#e85d5d", fontSize: 13, textAlign: "center", padding: 24 }}>
+          加载失败：{error}
+        </div>
+      )}
+
+      {!loading && !error && (
       <div className="pt-4 space-y-2">
         {filtered.length === 0 ? (
           <EmptyState
@@ -695,15 +797,23 @@ export function SettingsPluginsPage() {
                 <div className="text-xs text-codex-muted line-clamp-2">{p.desc}</div>
               </div>
               <span className="text-xs text-[#666] px-2 py-0.5 bg-[#252525] rounded shrink-0">{p.tag}</span>
-              <Toggle
-                checked={!!enabled[p.id]}
-                onChange={(v) => setEnabled((s) => ({ ...s, [p.id]: v }))}
-                label={p.name}
-              />
+              <button
+                type="button"
+                disabled={toggling === p.id}
+                onClick={() => togglePlugin(p.id, !enabled[p.id])}
+                className={`px-3 py-1 rounded-md text-[12px] font-medium border ${
+                  enabled[p.id]
+                    ? "bg-[#2a3a2a] border-[#3a5a3a] text-codex-success hover:bg-[#324a32]"
+                    : "bg-[#2a2a2a] border-[#3a3a3a] text-[#c0c0c0] hover:bg-[#323232]"
+                }`}
+              >
+                {toggling === p.id ? "…" : enabled[p.id] ? "已启用" : "启用"}
+              </button>
             </div>
           ))
         )}
       </div>
+      )}
 
       <AddMarketModal open={marketOpen} onClose={() => setMarketOpen(false)} />
     </div>

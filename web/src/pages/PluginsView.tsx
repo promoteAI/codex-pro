@@ -7,15 +7,16 @@ import { SkillDetailDrawer } from "../components/SkillDetailDrawer";
 import { AddMarketModal } from "../components/AddMarketModal";
 import { useIsAdmin } from "../stores/capabilities";
 
-interface PluginItem {
-  id: string;
+interface ApiPlugin {
   name: string;
-  desc: string;
-  scope: "public" | "personal";
-  category: "featured" | "productivity";
-  chip: string;
-  color: string;
-  installed?: boolean;
+  version: string;
+  description: string;
+  source: string;
+  path: string | null;
+  status: string;
+  provides_tools: string[];
+  provides_hooks: string[];
+  depends_on: string[];
 }
 
 interface SkillItem {
@@ -26,92 +27,55 @@ interface SkillItem {
 
 type SkillScope = "personal" | "system" | "recommended";
 
-const INSTALLED_CHIPS: { title: string; label: string; color: string }[] = [
-  { title: "GitHub", label: "GH", color: "#24292f" },
-  { title: "Sheets", label: "Sh", color: "#0f9d58" },
-  { title: "Docs", label: "Do", color: "#4285f4" },
-  { title: "Slides", label: "Sl", color: "#f4b400" },
-  { title: "PDF", label: "PDF", color: "#ea4335" },
-  { title: "Figma", label: "Fi", color: "#7c4dff" },
-  { title: "Notion", label: "No", color: "#00c853" },
-  { title: "Linear", label: "Li", color: "#ff6d00" },
-  { title: "Slack", label: "Sk", color: "#0091ea" },
-  { title: "Jira", label: "Ji", color: "#c2185b" },
-  { title: "Terminal", label: ">_", color: "#455a64" },
-  { title: "Browser", label: "Br", color: "#6a1b9a" },
-];
+function PLUGIN_CHIP_FOR(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.includes("sheet") || lower.includes("spread")) return "Sh";
+  if (lower.includes("present") || lower.includes("slide")) return "Sl";
+  if (lower.includes("doc") || lower.includes("document")) return "Do";
+  if (lower.includes("pdf")) return "PDF";
+  if (lower.includes("figma")) return "Fi";
+  if (lower.includes("notion")) return "No";
+  if (lower.includes("linear")) return "Li";
+  if (lower.includes("slack")) return "Sk";
+  if (lower.includes("jira")) return "Ji";
+  if (lower.includes("terminal") || lower.includes("term")) return ">_";
+  if (lower.includes("browser") || lower.includes("web")) return "Br";
+  if (lower.includes("github") || lower.includes("git")) return "GH";
+  if (lower.includes("computer") || lower.includes("use")) return "CU";
+  if (lower.includes("automate")) return "Au";
+  if (lower.includes("canvas")) return "Ca";
+  if (lower.includes("hook")) return "Ho";
+  if (lower.includes("rule")) return "Rl";
+  if (lower.includes("skill")) return "Sk";
+  if (lower.includes("agent") || lower.includes("subagent")) return "Ag";
+  return name.substring(0, 2).toUpperCase();
+}
 
-/** Marketplace catalog matching the Codex Pro prototype. */
-const MARKETPLACE: PluginItem[] = [
-  {
-    id: "computer-use",
-    name: "Computer Use",
-    desc: "Control Windows apps",
-    scope: "public",
-    category: "featured",
-    chip: "",
-    color: "#1b5e20",
-    installed: true,
-  },
-  {
-    id: "spreadsheets",
-    name: "Spreadsheets",
-    desc: "Create and edit spreadsheets",
-    scope: "public",
-    category: "featured",
-    chip: "Sh",
-    color: "#0f9d58",
-    installed: true,
-  },
-  {
-    id: "presentations",
-    name: "Presentations",
-    desc: "Create and edit presentations",
-    scope: "public",
-    category: "featured",
-    chip: "Sl",
-    color: "#f4b400",
-    installed: true,
-  },
-  {
-    id: "documents",
-    name: "Documents",
-    desc: "Create and edit documents",
-    scope: "public",
-    category: "productivity",
-    chip: "Do",
-    color: "#4285f4",
-    installed: true,
-  },
-  {
-    id: "pdf",
-    name: "PDF",
-    desc: "Read and annotate PDFs",
-    scope: "public",
-    category: "productivity",
-    chip: "PDF",
-    color: "#ea4335",
-    installed: true,
-  },
-  {
-    id: "spreadsheets-pro",
-    name: "Spreadsheets",
-    desc: "Create and edit spreadsheets",
-    scope: "personal",
-    category: "productivity",
-    chip: "Sh",
-    color: "#0f9d58",
-  },
-  {
-    id: "presentations-pro",
-    name: "Presentations",
-    desc: "Create and edit presentations",
-    scope: "personal",
-    category: "productivity",
-    chip: "Sl",
-    color: "#f4b400",
-  },
-];
+const PLUGIN_CHIP_COLOR_FOR = (name: string): string => {
+  const lower = name.toLowerCase();
+  if (lower.includes("computer") || lower.includes("use")) return "#1b5e20";
+  if (lower.includes("sheet")) return "#0f9d58";
+  if (lower.includes("present")) return "#f4b400";
+  if (lower.includes("doc") || lower.includes("document")) return "#4285f4";
+  if (lower.includes("pdf")) return "#ea4335";
+  if (lower.includes("figma")) return "#7c4dff";
+  if (lower.includes("notion")) return "#00c853";
+  if (lower.includes("linear")) return "#ff6d00";
+  if (lower.includes("slack")) return "#0091ea";
+  if (lower.includes("jira")) return "#c2185b";
+  if (lower.includes("terminal")) return "#455a64";
+  if (lower.includes("browser")) return "#6a1b9a";
+  if (lower.includes("github") || lower.includes("git")) return "#24292f";
+  if (lower.includes("automate")) return "#5b8def";
+  if (lower.includes("canvas")) return "#7c5cff";
+  if (lower.includes("hook")) return "#fb7185";
+  if (lower.includes("rule")) return "#fbbf24";
+  if (lower.includes("skill")) return "#c084fc";
+  if (lower.includes("agent") || lower.includes("subagent")) return "#67e8f9";
+  if (lower.includes("design")) return "#a78bfa";
+  if (lower.includes("file")) return "#818cf8";
+  return "#6e6e6e";
+};
 
 const SYSTEM_SKILL_NAMES = new Set([
   "frontend-design",
@@ -157,31 +121,27 @@ function SkillGlyph() {
   );
 }
 
-function ComputerUseIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="12" rx="2" />
-      <path d="M8 20h8M12 16v4" />
-    </svg>
-  );
-}
-
-function MoreDots() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="5" cy="12" r="1.8" />
-      <circle cx="12" cy="12" r="1.8" />
-      <circle cx="19" cy="12" r="1.8" />
-    </svg>
-  );
-}
-
 function GearIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
+  );
+}
+
+function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      className={`pl-toggle${checked ? " is-on" : ""}`}
+      onClick={() => onChange(!checked)}
+    >
+      <span className="pl-toggle-knob" />
+    </button>
   );
 }
 
@@ -225,7 +185,6 @@ export function PluginsView() {
   const canAdmin = isAdmin !== false;
 
   const [tab, setTab] = useState<"plugins" | "skills">("plugins");
-  const [pluginScope, setPluginScope] = useState<"public" | "personal">("public");
   const [pluginQuery, setPluginQuery] = useState("");
   const [skillQuery, setSkillQuery] = useState("");
   const [skillTab, setSkillTab] = useState<SkillScope>("personal");
@@ -234,12 +193,17 @@ export function PluginsView() {
   const [installedExpanded, setInstalledExpanded] = useState(false);
   const [scopeExpanded, setScopeExpanded] = useState(false);
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
+  const [toggling, setToggling] = useState<string | null>(null);
   const addWrapRef = useRef<HTMLDivElement>(null);
 
-  const { data: skillsData, loading: skillsLoading, error: skillsError, refetch } =
+  const { data: pluginsData, loading: pluginsLoading, error: pluginsError, refetch: refetchPlugins } =
+    useApi<{ plugins: ApiPlugin[] }>(tab === "plugins" ? "/plugins" : null);
+
+  const { data: skillsData, loading: skillsLoading, error: skillsError, refetch: refetchSkills } =
     useApi<{ skills: SkillItem[] }>(tab === "skills" ? "/skills" : null);
 
-  useWsSubscribe(["skills"], () => refetch(), ["skill_changed"]);
+  useWsSubscribe(["plugins"], () => refetchPlugins(), ["plugin_changed"]);
+  useWsSubscribe(["skills"], () => refetchSkills(), ["skill_changed"]);
 
   useEffect(() => {
     if (!addOpen) return;
@@ -258,17 +222,25 @@ export function PluginsView() {
     };
   }, [addOpen]);
 
-  const plugins = useMemo(() => {
-    const q = pluginQuery.trim().toLowerCase();
-    return MARKETPLACE.filter((p) => {
-      if (p.scope !== pluginScope) return false;
-      if (!q) return true;
-      return p.name.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q);
-    });
-  }, [pluginQuery, pluginScope]);
+  const apiPlugins = useMemo<ApiPlugin[]>(() => pluginsData?.plugins ?? [], [pluginsData]);
 
-  const featured = plugins.filter((p) => p.category === "featured");
-  const productivity = plugins.filter((p) => p.category === "productivity");
+  const enabledPlugins = useMemo(() => {
+    const q = pluginQuery.trim().toLowerCase();
+    return apiPlugins.filter((p) => {
+      if (p.status === "disabled") return false;
+      if (!q) return true;
+      return p.name.toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q);
+    });
+  }, [apiPlugins, pluginQuery]);
+
+  const disabledPlugins = useMemo(() => {
+    const q = pluginQuery.trim().toLowerCase();
+    return apiPlugins.filter((p) => {
+      if (p.status !== "disabled") return false;
+      if (!q) return true;
+      return p.name.toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q);
+    });
+  }, [apiPlugins, pluginQuery]);
 
   const skills = useMemo(() => skillsData?.skills ?? [], [skillsData]);
 
@@ -295,12 +267,25 @@ export function PluginsView() {
   const installedExtra = Math.max(0, installedSkills.length - 6);
   const scopeExtra = Math.max(0, scopedSkills.length - 6);
 
-  const onPluginClick = (p: PluginItem) => {
-    toast.info(`插件「${p.name}」· ${p.desc}`);
-  };
-
-  const onChipClick = (title: string) => {
-    toast.info(`已安装：${title}`);
+  const togglePlugin = async (name: string, enable: boolean) => {
+    setToggling(name);
+    try {
+      const resp = await fetch(`/api/v1/plugins/${encodeURIComponent(name)}/toggle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: enable }),
+      });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${resp.status}`);
+      }
+      await refetchPlugins();
+      toast.success(enable ? `插件「${name}」已启用` : `插件「${name}」已禁用`);
+    } catch (e: unknown) {
+      toast.error(`操作失败：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setToggling(null);
+    }
   };
 
   return (
@@ -333,7 +318,8 @@ export function PluginsView() {
             title="刷新"
             aria-label="刷新"
             onClick={() => {
-              if (tab === "skills") void refetch();
+              if (tab === "skills") void refetchSkills();
+              else void refetchPlugins();
               toast.success("已刷新");
             }}
           >
@@ -417,147 +403,74 @@ export function PluginsView() {
             />
           </div>
 
-          <div className="pl-installed">
-            <div className="pl-installed-head">
-              <h3>已安装</h3>
-              <button
-                type="button"
-                className="pl-icon-btn"
-                title="管理已安装"
-                aria-label="管理已安装"
-                onClick={() => openSettings("plugins")}
-              >
-                <GearIcon />
-              </button>
+          {pluginsLoading && (
+            <div style={{ color: "#888", fontSize: 13, textAlign: "center", padding: 24 }}>加载中…</div>
+          )}
+          {!pluginsLoading && pluginsError && (
+            <div style={{ color: "#e85d5d", fontSize: 13, textAlign: "center", padding: 24 }}>
+              加载失败：{pluginsError}
             </div>
-            <div className="pl-installed-row" aria-label="已安装插件">
-              {INSTALLED_CHIPS.map((c) => (
-                <button
-                  key={c.title}
-                  type="button"
-                  className="pl-chip"
-                  style={{ background: c.color }}
-                  title={c.title}
-                  onClick={() => onChipClick(c.title)}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
 
-          <div className="pl-filters" role="tablist" aria-label="插件来源">
-            <button
-              type="button"
-              className={`pl-filter${pluginScope === "public" ? " active" : ""}`}
-              onClick={() => setPluginScope("public")}
-            >
-              公开
-            </button>
-            <button
-              type="button"
-              className={`pl-filter${pluginScope === "personal" ? " active" : ""}`}
-              onClick={() => setPluginScope("personal")}
-            >
-              个人
-            </button>
-            <button type="button" className="pl-icon-btn" title="排序" aria-label="排序">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 5h16l-6 7.5V19l-4 2v-8.5L4 5z" />
-              </svg>
-            </button>
-          </div>
-
-          {featured.length > 0 && (
+          {!pluginsLoading && !pluginsError && (
+          <>
+            {enabledPlugins.length > 0 && (
             <div className="pl-section">
-              <h3 className="pl-section-title">Featured</h3>
+              <h3 className="pl-section-title">已启用 ({enabledPlugins.length})</h3>
               <div className="pl-grid">
-                {featured.map((p) => (
-                  <div
-                    key={p.id}
-                    className="pl-card"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onPluginClick(p)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onPluginClick(p);
-                      }
-                    }}
-                  >
-                    <span className="pl-card-ico" style={{ background: p.color }}>
-                      {p.id === "computer-use" ? <ComputerUseIcon /> : p.chip}
+                {enabledPlugins.map((p) => (
+                  <div key={p.name} className="pl-card">
+                    <span className="pl-card-ico" style={{ background: PLUGIN_CHIP_COLOR_FOR(p.name) }}>
+                      {PLUGIN_CHIP_FOR(p.name)}
                     </span>
                     <div className="pl-card-info">
                       <p className="pl-card-name">{p.name}</p>
-                      <p className="pl-card-desc">{p.desc}</p>
+                      <p className="pl-card-desc">{p.description || "—"}</p>
+                    </div>
+                    <ToggleSwitch
+                      checked={true}
+                      onChange={() => togglePlugin(p.name, false)}
+                      label={`禁用 ${p.name}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+            )}
+
+            {disabledPlugins.length > 0 && (
+            <div className="pl-section">
+              <h3 className="pl-section-title">已禁用 ({disabledPlugins.length})</h3>
+              <div className="pl-grid">
+                {disabledPlugins.map((p) => (
+                  <div key={p.name} className="pl-card pl-card--dimmed">
+                    <span className="pl-card-ico" style={{ background: PLUGIN_CHIP_COLOR_FOR(p.name) }}>
+                      {PLUGIN_CHIP_FOR(p.name)}
+                    </span>
+                    <div className="pl-card-info">
+                      <p className="pl-card-name">{p.name}</p>
+                      <p className="pl-card-desc">{p.description || "—"}</p>
                     </div>
                     <button
                       type="button"
-                      className="pl-card-more"
-                      title="更多"
-                      aria-label="更多"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPluginClick(p);
-                      }}
+                      className="pl-card-btn"
+                      disabled={toggling === p.name}
+                      onClick={() => togglePlugin(p.name, true)}
                     >
-                      <MoreDots />
+                      {toggling === p.name ? "…" : "启用"}
                     </button>
                   </div>
                 ))}
               </div>
             </div>
-          )}
+            )}
 
-          {productivity.length > 0 && (
-            <div className="pl-section">
-              <h3 className="pl-section-title">Productivity</h3>
-              <div className="pl-grid">
-                {productivity.map((p) => (
-                  <div
-                    key={p.id}
-                    className="pl-card"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onPluginClick(p)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onPluginClick(p);
-                      }
-                    }}
-                  >
-                    <span className="pl-card-ico" style={{ background: p.color }}>
-                      {p.chip}
-                    </span>
-                    <div className="pl-card-info">
-                      <p className="pl-card-name">{p.name}</p>
-                      <p className="pl-card-desc">{p.desc}</p>
-                    </div>
-                    <button
-                      type="button"
-                      className="pl-card-more"
-                      title="更多"
-                      aria-label="更多"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPluginClick(p);
-                      }}
-                    >
-                      <MoreDots />
-                    </button>
-                  </div>
-                ))}
+            {enabledPlugins.length === 0 && disabledPlugins.length === 0 && (
+              <div className="pl-section" style={{ textAlign: "center", color: "#6e6e6e", fontSize: 13, padding: 32 }}>
+                未发现插件
               </div>
-            </div>
-          )}
-
-          {plugins.length === 0 && (
-            <div className="pl-section" style={{ textAlign: "center", color: "#6e6e6e", fontSize: 13, padding: 32 }}>
-              未找到插件
-            </div>
+            )}
+          </>
           )}
         </div>
         )}

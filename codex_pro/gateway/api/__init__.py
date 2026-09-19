@@ -28,6 +28,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     from codex_pro.gateway.api.git import GitAPI
     from codex_pro.gateway.api.files import FilesAPI
     from codex_pro.gateway.api.prs import PrsAPI
+    from codex_pro.gateway.api.plugins import register_plugin_api_routes
 
     memory_api = MemoryAPI(server)
     skills_api = SkillsAPI(server)
@@ -97,6 +98,9 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_get(f"{prefix}/analytics/tokens", analytics_api.token_usage)
     app.router.add_get(f"{prefix}/analytics/skills", analytics_api.skill_usage)
     app.router.add_get(f"{prefix}/analytics/channels", analytics_api.channel_usage)
+
+    # Plugins
+    register_plugin_api_routes(app, prefix, server)
 
     # Git operations for Composer dropdowns
     app.router.add_get(f"{prefix}/git/repos", git_api.list_repos)

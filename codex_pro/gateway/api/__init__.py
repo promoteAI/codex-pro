@@ -79,6 +79,8 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_get(f"{prefix}/providers", providers_api.list_providers)
     app.router.add_get(f"{prefix}/providers/{{name}}", providers_api.get_provider)
     app.router.add_post(f"{prefix}/providers", providers_api.create_provider)
+    app.router.add_patch(f"{prefix}/providers/{{name}}", providers_api.update_provider)
+    app.router.add_patch(f"{prefix}/providers/{{name}}/rename", providers_api.rename_provider)
     app.router.add_delete(f"{prefix}/providers/{{name}}", providers_api.delete_provider)
     app.router.add_post(f"{prefix}/providers/{{name}}/test", providers_api.test_provider)
     app.router.add_get(f"{prefix}/providers/health", providers_api.get_health)

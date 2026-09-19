@@ -28,6 +28,7 @@ export interface ProviderEntry extends ProviderConfig {
   health?: ProviderHealth;
 }
 
+
 interface ProvidersState {
   providers: ProviderEntry[];
   activeName: string | null;
@@ -39,8 +40,12 @@ interface ProvidersState {
   setActive: (name: string) => void;
   addProvider: (input: Omit<ProviderConfig, "health">) => Promise<void>;
   deleteProvider: (name: string) => Promise<void>;
+  updateProvider: (name: string, patch: Partial<ProviderConfig>) => Promise<void>;
+  renameProvider: (oldName: string, newName: string) => Promise<void>;
   testProvider: (name: string) => Promise<void>;
   refreshHealth: () => Promise<void>;
+  addModel: (providerName: string, modelId: string) => Promise<void>;
+  removeModel: (providerName: string, modelId: string) => Promise<void>;
 }
 
 export const useProvidersStore = create<ProvidersState>((set, get) => ({
@@ -98,6 +103,36 @@ export const useProvidersStore = create<ProvidersState>((set, get) => ({
     }
   },
 
+  updateProvider: async (name: string, patch: Partial<ProviderConfig>) => {
+    try {
+      await apiFetch(`/providers/${encodeURIComponent(name)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      toast.success("保存成功");
+      await get().fetchProviders();
+    } catch (e: any) {
+      toast.error(e.message ?? "保存失败");
+      throw e;
+    }
+  },
+
+  renameProvider: async (oldName: string, newName: string) => {
+    try {
+      await apiFetch(`/providers/${encodeURIComponent(oldName)}/rename`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName }),
+      });
+      toast.success(`已重命名为 "${newName}"`);
+      await get().fetchProviders();
+    } catch (e: any) {
+      toast.error(e.message ?? "重命名失败");
+      throw e;
+    }
+  },
+
   testProvider: async (name: string) => {
     set({ testingName: name, testResult: null });
     try {
@@ -128,6 +163,32 @@ export const useProvidersStore = create<ProvidersState>((set, get) => ({
       }));
     } catch {
       // best-effort, ignore
+    }
+  },
+
+  addModel: async (providerName: string, modelId: string) => {
+    const providers = get().providers;
+    const provider = providers.find((p) => p.name === providerName);
+    if (!provider) return;
+    try {
+      await get().updateProvider(providerName, { models: [...provider.models, modelId] });
+      toast.success(`已添加模型 "${modelId}"`);
+    } catch (e: any) {
+      toast.error(e.message ?? "添加模型失败");
+    }
+  },
+
+  removeModel: async (providerName: string, modelId: string) => {
+    const providers = get().providers;
+    const provider = providers.find((p) => p.name === providerName);
+    if (!provider) return;
+    try {
+      await get().updateProvider(providerName, {
+        models: provider.models.filter((m) => m !== modelId),
+      });
+      toast.success(`已删除模型 "${modelId}"`);
+    } catch (e: any) {
+      toast.error(e.message ?? "删除模型失败");
     }
   },
 }));

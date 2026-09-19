@@ -258,3 +258,94 @@ async def test_get_health_returns_all_providers():
     assert "providers" in data
     assert "openai" in data["providers"]
     assert data["providers"]["openai"]["status"] == "unknown"
+
+
+@pytest.mark.asyncio
+async def test_update_provider_changes_base_url():
+    p = _config_path()
+    p.write_text("models:\n  providers:\n    - name: openai\n      apiKey: sk-x\n      apiBase: https://api.openai.com/v1\n      models: [gpt-4o]\n", encoding="utf-8")
+    server = _make_server(
+        providers=[ProviderConfig(name="openai", api_key="sk-x", api_base="https://api.openai.com/v1", models=["gpt-4o"])],
+        config_path=p,
+    )
+    api = ProvidersAPI(server)
+    body = {"api_base": "https://custom.example.com/v1"}
+    req = _fake_request(json_body=body)
+    req.match_info = {"name": "openai"}
+    resp = await api.update_provider(req)
+    assert resp.status == 200
+    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
+    updated = raw["models"]["providers"][0]
+    assert updated["api_base"] == "https://custom.example.com/v1"
+    assert updated["api_key"] == "sk-x"  # unchanged
+    server.web_ws.broadcast.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_update_provider_invalid_field_rejected():
+    p = _config_path()
+    p.write_text("_version: 1\n", encoding="utf-8")
+    server = _make_server(
+        providers=[ProviderConfig(name="openai", api_key="", models=["gpt-4o"])],
+        config_path=p,
+    )
+    api = ProvidersAPI(server)
+    body = {"name": "newname"}  # name is not updatable
+    req = _fake_request(json_body=body)
+    req.match_info = {"name": "openai"}
+    resp = await api.update_provider(req)
+    assert resp.status == 400
+
+
+@pytest.mark.asyncio
+async def test_update_provider_not_found():
+    p = _config_path()
+    p.write_text("_version: 1\n", encoding="utf-8")
+    server = _make_server(config_path=p)
+    api = ProvidersAPI(server)
+    body = {"api_base": "https://x.com/v1"}
+    req = _fake_request(json_body=body)
+    req.match_info = {"name": "missing"}
+    resp = await api.update_provider(req)
+    assert resp.status == 404
+
+
+@pytest.mark.asyncio
+async def test_rename_provider():
+    p = _config_path()
+    p.write_text("models:\n  providers:\n    - name: openai\n      models: [gpt-4o]\n  routes:\n    - model: gpt-4o\n      provider: openai\n", encoding="utf-8")
+    server = _make_server(
+        providers=[ProviderConfig(name="openai", api_key="", models=["gpt-4o"])],
+        config_path=p,
+    )
+    api = ProvidersAPI(server)
+    body = {"name": "gpt-openai"}
+    req = _fake_request(json_body=body)
+    req.match_info = {"name": "openai"}
+    resp = await api.rename_provider(req)
+    assert resp.status == 200
+    data = _json.loads(resp.text)
+    assert data["success"] is True
+    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
+    assert raw["models"]["providers"][0]["name"] == "gpt-openai"
+    # Route references should also be updated
+    assert raw["models"]["routes"][0]["provider"] == "gpt-openai"
+
+
+@pytest.mark.asyncio
+async def test_rename_provider_duplicate():
+    p = _config_path()
+    p.write_text("models:\n  providers:\n    - name: openai\n      models: [gpt-4o]\n    - name: anthropic\n      models: [claude]\n", encoding="utf-8")
+    server = _make_server(
+        providers=[
+            ProviderConfig(name="openai", api_key="", models=["gpt-4o"]),
+            ProviderConfig(name="anthropic", api_key="", models=["claude"]),
+        ],
+        config_path=p,
+    )
+    api = ProvidersAPI(server)
+    body = {"name": "anthropic"}
+    req = _fake_request(json_body=body)
+    req.match_info = {"name": "openai"}
+    resp = await api.rename_provider(req)
+    assert resp.status == 409

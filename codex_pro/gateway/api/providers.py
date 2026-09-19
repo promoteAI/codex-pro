@@ -168,6 +168,131 @@ class ProvidersAPI:
         )
         return web.json_response({"success": True, "name": name, "restart_required": True})
 
+    # ── update (PATCH) ──────────────────────────────────────────────────────
+
+    async def update_provider(self, request: web.Request) -> web.Response:
+        """Partially update a provider's mutable fields."""
+        guard = self._guard(request, "providers_update")
+        if guard is not None:
+            return guard
+        name = request.match_info["name"]
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid JSON body"}, status=400)
+        if not isinstance(body, dict):
+            return web.json_response({"error": "body must be a JSON object"}, status=400)
+        # Fields allowed to change; everything else is read-only
+        _ALLOWED = {
+            "api_base", "api_key", "api_key_env", "models",
+            "extra_headers", "max_retries", "timeout_seconds",
+            "stream_include_usage", "rate_limit_rpm",
+        }
+        updates = {k: v for k, v in body.items() if k in _ALLOWED}
+        if not updates:
+            return web.json_response({"error": "no updatable fields provided"}, status=400)
+        config = self._get_config()
+        if config is None:
+            return web.json_response({"error": "config not available"}, status=500)
+        target: ProviderConfig | None = None
+        for pc in config.models.providers:
+            if pc.name.lower() == name.lower():
+                target = pc
+                break
+        if target is None:
+            return web.json_response({"error": f"provider '{name}' not found"}, status=404)
+        # Rebuild a minimal ProviderConfig from the union of current + updates,
+        # then validate so we catch invalid values before writing.
+        merged: dict[str, Any] = target.model_dump(mode="json")
+        merged.update(updates)
+        try:
+            validated = ProviderConfig(**merged)
+        except Exception as exc:
+            return web.json_response({"error": f"validation failed: {exc}"}, status=400)
+        try:
+            validate_provider_config(validated)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        target = self._config_path()
+        raw: dict[str, Any] = {}
+        if target.exists():
+            try:
+                loaded = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
+                if not isinstance(loaded, dict):
+                    raise ValueError("root must be a mapping")
+                raw = loaded
+            except Exception as exc:
+                return web.json_response({"error": f"cannot read config: {exc}"}, status=409)
+        providers_list = raw.setdefault("models", {}).setdefault("providers", [])
+        for entry in providers_list:
+            if entry.get("name", "").lower() == name.lower():
+                for k, v in validated.model_dump(mode="json").items():
+                    if k in _ALLOWED:
+                        entry[k] = v
+                break
+        from codex_pro.config.loader import save_config
+        try:
+            save_config(raw, target)
+        except OSError as exc:
+            return web.json_response({"error": f"save failed: {exc}"}, status=500)
+        await self._server.web_ws.broadcast(
+            "config_updated", {"paths": ["models.providers"], "restart_required": True}
+        )
+        return web.json_response({"success": True, "name": name, "restart_required": True})
+
+    # ── rename ──────────────────────────────────────────────────────────────
+
+    async def rename_provider(self, request: web.Request) -> web.Response:
+        """Rename a provider (changes its key in routes as well)."""
+        guard = self._guard(request, "providers_rename")
+        if guard is not None:
+            return guard
+        old_name = request.match_info["name"]
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid JSON body"}, status=400)
+        new_name = (body.get("name") or "").strip() if isinstance(body, dict) else ""
+        if not new_name:
+            return web.json_response({"error": "name is required"}, status=400)
+        if new_name.lower() == old_name.lower():
+            return web.json_response({"success": True, "restart_required": False})
+        config = self._get_config()
+        if config is None:
+            return web.json_response({"error": "config not available"}, status=500)
+        existing_names = {pc.name.lower() for pc in config.models.providers}
+        if new_name.lower() in existing_names and new_name.lower() != old_name.lower():
+            return web.json_response({"error": f"provider '{new_name}' already exists"}, status=409)
+        target = self._config_path()
+        raw: dict[str, Any] = {}
+        if target.exists():
+            try:
+                loaded = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
+                if not isinstance(loaded, dict):
+                    raise ValueError("root must be a mapping")
+                raw = loaded
+            except Exception as exc:
+                return web.json_response({"error": f"cannot read config: {exc}"}, status=409)
+        providers_list = raw.get("models", {}).get("providers", [])
+        for entry in providers_list:
+            if entry.get("name", "").lower() == old_name.lower():
+                entry["name"] = new_name
+                break
+        # Also update route references
+        routes = raw.get("models", {}).get("routes", [])
+        for route in routes:
+            if isinstance(route.get("provider"), str) and route["provider"].lower() == old_name.lower():
+                route["provider"] = new_name
+        from codex_pro.config.loader import save_config
+        try:
+            save_config(raw, target)
+        except OSError as exc:
+            return web.json_response({"error": f"save failed: {exc}"}, status=500)
+        await self._server.web_ws.broadcast(
+            "config_updated", {"paths": ["models.providers"], "restart_required": True}
+        )
+        return web.json_response({"success": True, "name": new_name, "restart_required": True})
+
     # ── test connection ───────────────────────────────────────────────────────
 
     async def test_provider(self, request: web.Request) -> web.Response:

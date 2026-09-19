@@ -171,7 +171,10 @@ interface FileContent {
  *  toggle + copy path + open-external. Shows one file's content from the API. */
 function FilesPane() {
   const { t } = useTranslation("tools");
-  const pendingFilePath = useShellStore((s) => s.pendingFilePath);
+  const activeTabId = useShellStore((s) => s.activeTabId);
+  const sessionTabs = useShellStore((s) => s.sessionTabs);
+  const activeTab = sessionTabs.find((tab) => tab.id === activeTabId);
+  const filePath = activeTab?.filePath ?? null;
 
   const [view, setView] = useState<"preview" | "source">("source");
   const [moreOpen, setMoreOpen] = useState(false);
@@ -180,16 +183,16 @@ function FilesPane() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!pendingFilePath) {
+    if (!filePath) {
       setFileContent(null);
       setError(null);
       return;
     }
-    const { repoPath, filePath } = pendingFilePath;
+    const { repoPath, filePath: fp } = filePath;
     setLoading(true);
     setError(null);
     void apiFetch<{ entries: never }>(
-      `/files/content?repo=${encodeURIComponent(repoPath)}&path=${encodeURIComponent(filePath)}`,
+      `/files/content?repo=${encodeURIComponent(repoPath)}&path=${encodeURIComponent(fp)}`,
     )
       .then((res) => {
         setFileContent(res as unknown as FileContent);
@@ -200,27 +203,30 @@ function FilesPane() {
       .finally(() => {
         setLoading(false);
       });
-  }, [pendingFilePath, t]);
+  }, [filePath, t]);
 
-  const filePath = fileContent?.path ?? "";
-  const fileName = fileContent?.name ?? (pendingFilePath?.filePath ?? "");
-  const isMd = fileName.split(".").pop()?.toLowerCase() === "md";
+  const resolvedPath = fileContent?.path ?? "";
+  const resolvedName = fileContent?.name ?? (filePath?.filePath ?? "");
+  const isMd = resolvedName.split(".").pop()?.toLowerCase() === "md";
   const lines = (fileContent?.content ?? "").split("\n");
 
   const handleCopyAbs = () => {
-    void navigator.clipboard?.writeText(filePath);
+    void navigator.clipboard?.writeText(resolvedPath);
     setMoreOpen(false);
   };
 
   const handleCopyRel = () => {
-    void navigator.clipboard?.writeText(fileName);
+    void navigator.clipboard?.writeText(resolvedName);
     setMoreOpen(false);
   };
 
-  const handleOpenExt = () => {
-    if (!pendingFilePath) return;
-    void fetch(`/api/files/open?repo=${encodeURIComponent(pendingFilePath.repoPath)}&path=${encodeURIComponent(pendingFilePath.filePath)}`)
-      .catch(() => void 0);
+  const handleOpenExt = async () => {
+    if (!filePath) return;
+    try {
+      await apiFetch(`/files/open?repo=${encodeURIComponent(filePath.repoPath)}&path=${encodeURIComponent(filePath.filePath)}`);
+    } catch {
+      void 0;
+    }
   };
 
   return (
@@ -231,7 +237,7 @@ function FilesPane() {
         <span className="text-[#555]" aria-hidden>›</span>
         <span className="inline-flex items-center gap-1.5 text-[12.5px] text-[#e0e0e0] font-medium min-w-0">
           <FileCode2 size={13} className="shrink-0 opacity-80" />
-          <span className="truncate">{fileName || "—"}</span>
+          <span className="truncate">{resolvedName || "—"}</span>
         </span>
         <span className="flex-1" />
         <div className="relative">
@@ -255,7 +261,7 @@ function FilesPane() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="px-2.5 py-1.5 text-[11px] text-codex-muted">
-                {isMd ? "Markdown" : "Source"}
+                {t(isMd ? "filesCategoryMd" : "filesCategorySource")}
               </div>
               <button
                 type="button"

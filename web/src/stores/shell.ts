@@ -35,6 +35,7 @@ export interface SessionTab {
   id: string;
   type: Exclude<ToolPane, "hub">;
   label: string;
+  filePath?: { repoPath: string; filePath: string };
 }
 
 interface ShellState {
@@ -51,7 +52,6 @@ interface ShellState {
   sessionTabs: SessionTab[];
   activeTabId: string | null;
   settingsSection: SettingsSection;
-  pendingFilePath: { repoPath: string; filePath: string } | null;
   openTools: () => void;
   closeTools: () => void;
   toggleTools: () => void;
@@ -71,13 +71,11 @@ interface ShellState {
   closeBots: () => void;
   setLayoutMode: (mode: LayoutMode) => void;
   showHub: () => void;
-  openTool: (type: Exclude<ToolPane, "hub">) => void;
+  openTool: (type: Exclude<ToolPane, "hub">, opts?: { filePath?: { repoPath: string; filePath: string }; label?: string }) => void;
   activateTab: (id: string) => void;
   closeOtherTabs: (id: string) => void;
   closeRightTabs: (id: string) => void;
   closeTab: (id: string) => void;
-  setPendingFilePath: (path: { repoPath: string; filePath: string } | null) => void;
-  resetFiles: () => void;
 }
 
 const TOOL_LABELS: Record<Exclude<ToolPane, "hub">, string> = {
@@ -102,7 +100,6 @@ export const useShellStore = create<ShellState>((set, get) => ({
   sessionTabs: [],
   activeTabId: null,
   settingsSection: "plugins",
-  pendingFilePath: null,
 
   openTools: () => set({ toolsOpen: true, layoutMode: get().layoutMode === "bottom" ? "side" : get().layoutMode }),
   closeTools: () => set({ toolsOpen: false, activeToolPane: "hub" }),
@@ -151,15 +148,58 @@ export const useShellStore = create<ShellState>((set, get) => ({
 
   showHub: () => set({ activeToolPane: "hub", activeTabId: null, toolsOpen: true }),
 
-  setPendingFilePath: (path) => set({ pendingFilePath: path }),
-  resetFiles: () => set({ pendingFilePath: null }),
-
-  openTool: (type) => {
+  openTool: (type, opts) => {
     if (type === "terminal") {
       set({ termOpen: true, toolsOpen: get().toolsOpen });
       return;
     }
     const { sessionTabs } = get();
+    if (type === "files" && !opts?.filePath) {
+      // No file specified — reuse or create an empty files tab
+      const existing = sessionTabs.find((t) => t.type === type);
+      if (existing) {
+        set({ toolsOpen: true, activeToolPane: type, activeTabId: existing.id });
+        return;
+      }
+      const id = `${type}-${Date.now()}`;
+      set({
+        toolsOpen: true,
+        activeToolPane: type,
+        activeTabId: id,
+        sessionTabs: [...sessionTabs, { id, type, label: TOOL_LABELS[type] }],
+        layoutMode: get().layoutMode === "bottom" ? "side" : get().layoutMode,
+      });
+      return;
+    }
+    if (opts?.filePath) {
+      // Reuse existing tab if it has the same file (same repo + path)
+      const match = sessionTabs.find(
+        (t) => t.type === type && t.filePath?.repoPath === opts.filePath!.repoPath && t.filePath?.filePath === opts.filePath!.filePath,
+      );
+      if (match) {
+        set({
+          toolsOpen: true,
+          activeToolPane: type,
+          activeTabId: match.id,
+          layoutMode: get().layoutMode === "bottom" ? "side" : get().layoutMode,
+        });
+        return;
+      }
+      // Open as a new tab alongside any existing file tabs
+      const id = `${type}-${Date.now()}`;
+      set({
+        toolsOpen: true,
+        activeToolPane: type,
+        activeTabId: id,
+        sessionTabs: [
+          ...sessionTabs,
+          { id, type, label: opts.label ?? opts.filePath!.filePath.split("/").pop() ?? TOOL_LABELS[type], filePath: opts.filePath },
+        ],
+        layoutMode: get().layoutMode === "bottom" ? "side" : get().layoutMode,
+      });
+      return;
+    }
+    // Non-files pane: original reuse logic
     const existing = sessionTabs.find((t) => t.type === type);
     if (existing) {
       set({

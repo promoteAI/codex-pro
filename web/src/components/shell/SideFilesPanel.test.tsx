@@ -40,12 +40,12 @@ function renderPanel(onBack = vi.fn()) {
 
 beforeEach(() => {
   vi.restoreAllMocks();
-  useShellStore.setState({ pendingFilePath: null });
+  useShellStore.setState({ sessionTabs: [], activeTabId: null });
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
-  useShellStore.setState({ pendingFilePath: null });
+  useShellStore.setState({ sessionTabs: [], activeTabId: null });
 });
 
 describe("SideFilesPanel", () => {
@@ -58,7 +58,7 @@ describe("SideFilesPanel", () => {
     expect(screen.getByText("README.md")).toBeInTheDocument();
   });
 
-  it("点击文件时设置 pendingFilePath", async () => {
+  it("点击文件时创建带 filePath 的 session tab", async () => {
     mockApi();
     renderPanel();
     await waitFor(() => {
@@ -67,7 +67,58 @@ describe("SideFilesPanel", () => {
     fireEvent.click(screen.getByText("README.md"));
     await waitFor(() => {
       const state = useShellStore.getState();
-      expect(state.pendingFilePath).toEqual({ repoPath: REPO.path, filePath: "README.md" });
+      const tab = state.sessionTabs.find((t) => t.filePath);
+      expect(tab).toBeDefined();
+      expect(tab!.filePath).toEqual({ repoPath: REPO.path, filePath: "README.md" });
+      expect(tab!.label).toBe("README.md");
+      expect(state.activeToolPane).toBe("files");
+    });
+  });
+
+  it("多次点击不同文件时打开多个标签页", async () => {
+    const ENTRIES = {
+      entries: [
+        { path: "README.md", kind: "file", icon: "M", ext: "md" },
+        { path: "src/main.ts", kind: "file", icon: "T", ext: "ts" },
+        { path: "package.json", kind: "file", icon: "J", ext: "json" },
+      ],
+    };
+    const spy = mockApi();
+    spy.mockImplementation(async (path: string) => {
+      if (path.includes("/files/content?")) {
+        const match = ENTRIES.entries.find(
+          (e) => `${encodeURIComponent(REPO.path)}/${encodeURIComponent(e.path)}` === path.split("path=")[1],
+        );
+        return {
+          path: match!.path,
+          name: match!.path.split("/").pop()!,
+          content: "content",
+          size: 7,
+          truncated: false,
+        } as never;
+      }
+      if (path.includes("/files?")) return ENTRIES as never;
+      return {} as never;
+    });
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText("README.md")).toBeInTheDocument();
+    });
+
+    // 第一次点击
+    fireEvent.click(screen.getByText("README.md"));
+    // 第二次点击
+    fireEvent.click(screen.getByText("main.ts"));
+    // 第三次点击
+    fireEvent.click(screen.getByText("package.json"));
+
+    await waitFor(() => {
+      const state = useShellStore.getState();
+      const fileTabs = state.sessionTabs.filter((t) => t.type === "files" && t.filePath);
+      expect(fileTabs).toHaveLength(3);
+      expect(fileTabs.map((t) => t.label)).toContain("README.md");
+      expect(fileTabs.map((t) => t.label)).toContain("main.ts");
+      expect(fileTabs.map((t) => t.label)).toContain("package.json");
     });
   });
 

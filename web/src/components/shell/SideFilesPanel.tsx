@@ -127,7 +127,6 @@ const SF_DIM: Record<string, 1> = {
 
 export function SideFilesPanel({ repo, onBack }: { repo: GitRepo; onBack: () => void }) {
   const openTool = useShellStore((s) => s.openTool);
-  const setPendingFilePath = useShellStore((s) => s.setPendingFilePath);
   const [nodes, setNodes] = useState<Record<string, DirNode>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [activePath, setActivePath] = useState<string | null>(null);
@@ -157,10 +156,9 @@ export function SideFilesPanel({ repo, onBack }: { repo: GitRepo; onBack: () => 
   const handleFileClick = useCallback(
     (entry: FileEntry) => {
       setActivePath(entry.path);
-      setPendingFilePath({ repoPath: repo.path, filePath: entry.path });
-      openTool("files");
+      openTool("files", { filePath: { repoPath: repo.path, filePath: entry.path }, label: entry.path.split("/").pop() ?? entry.path });
     },
-    [setPendingFilePath, openTool, repo.path],
+    [openTool, repo.path],
   );
 
   const toggleFolder = useCallback(

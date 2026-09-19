@@ -276,8 +276,9 @@ async def test_update_provider_changes_base_url():
     assert resp.status == 200
     raw = yaml.safe_load(p.read_text(encoding="utf-8"))
     updated = raw["models"]["providers"][0]
-    assert updated["api_base"] == "https://custom.example.com/v1"
-    assert updated["api_key"] == "sk-x"  # unchanged
+    # YAML preserves the original key casing; update was written using the existing spelling
+    assert updated["apiBase"] == "https://custom.example.com/v1"
+    assert updated["apiKey"] == "sk-x"  # unchanged
     server.web_ws.broadcast.assert_called_once()
 
 

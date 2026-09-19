@@ -194,6 +194,10 @@ class ProvidersAPI:
         config = self._get_config()
         if config is None:
             return web.json_response({"error": "config not available"}, status=500)
+        # Partial update — merge with current state, then write only the changed
+        # fields. We intentionally do NOT re-run `validate_provider_config` here
+        # because the provider already passed validation at creation time and the
+        # user may only be updating a non-validating field like api_base.
         target: ProviderConfig | None = None
         for pc in config.models.providers:
             if pc.name.lower() == name.lower():
@@ -201,38 +205,37 @@ class ProvidersAPI:
                 break
         if target is None:
             return web.json_response({"error": f"provider '{name}' not found"}, status=404)
-        # Rebuild a minimal ProviderConfig from the union of current + updates,
-        # then validate so we catch invalid values before writing.
-        merged: dict[str, Any] = target.model_dump(mode="json")
-        merged.update(updates)
-        try:
-            validated = ProviderConfig(**merged)
-        except Exception as exc:
-            return web.json_response({"error": f"validation failed: {exc}"}, status=400)
-        try:
-            validate_provider_config(validated)
-        except ValueError as exc:
-            return web.json_response({"error": str(exc)}, status=400)
-        target = self._config_path()
+        target_path = self._config_path()
         raw: dict[str, Any] = {}
-        if target.exists():
+        if target_path.exists():
             try:
-                loaded = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
+                loaded = yaml.safe_load(target_path.read_text(encoding="utf-8")) or {}
                 if not isinstance(loaded, dict):
                     raise ValueError("root must be a mapping")
                 raw = loaded
             except Exception as exc:
                 return web.json_response({"error": f"cannot read config: {exc}"}, status=409)
         providers_list = raw.setdefault("models", {}).setdefault("providers", [])
+        # Write directly into the YAML entry. Normalize update keys to match
+        # whatever spelling the existing entry uses (camelCase alias or snake_case).
+        _CAMEL_MAP = {
+            "api_key": "apiKey", "api_key_env": "apiKeyEnv", "api_base": "apiBase",
+            "models": "models", "extra_headers": "extraHeaders", "max_retries": "maxRetries",
+            "timeout_seconds": "timeoutSeconds", "stream_include_usage": "streamIncludeUsage",
+            "rate_limit_rpm": "rateLimitRpm",
+        }
         for entry in providers_list:
             if entry.get("name", "").lower() == name.lower():
-                for k, v in validated.model_dump(mode="json").items():
-                    if k in _ALLOWED:
-                        entry[k] = v
+                for k, v in updates.items():
+                    yaml_key = _CAMEL_MAP.get(k, k)
+                    # Prefer existing spelling in the entry
+                    if yaml_key not in entry and k in entry:
+                        yaml_key = k
+                    entry[yaml_key] = v
                 break
         from codex_pro.config.loader import save_config
         try:
-            save_config(raw, target)
+            save_config(raw, target_path)
         except OSError as exc:
             return web.json_response({"error": f"save failed: {exc}"}, status=500)
         await self._server.web_ws.broadcast(

@@ -264,12 +264,12 @@ export function ModelsPage() {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (!active.health?.status || active.health.status !== "disabled") {
-                          await updateProvider(active.name, {});
+                        if (active.disabled) {
+                          await updateProvider(active.name, { disabled: false });
                         }
                       }}
                       className={`px-2.5 py-1 ${
-                        !active.health || active.health.status !== "disabled"
+                        !active.disabled
                           ? "bg-codex-success/20 text-codex-success"
                           : "text-codex-muted hover:bg-codex-surface-raised"
                       }`}
@@ -279,12 +279,12 @@ export function ModelsPage() {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (active.health?.status && active.health.status !== "disabled") {
-                          await updateProvider(active.name, {});
+                        if (!active.disabled) {
+                          await updateProvider(active.name, { disabled: true });
                         }
                       }}
                       className={`px-2.5 py-1 border-l border-codex-border-input ${
-                        active.health?.status === "disabled"
+                        active.disabled
                           ? "bg-codex-danger/20 text-codex-danger"
                           : "text-codex-muted hover:bg-codex-surface-raised"
                       }`}

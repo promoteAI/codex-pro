@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json as _json
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -25,8 +26,10 @@ def _fake_request(query: dict | None = None, json_body: Any = None) -> object:
             self.query = query or {}
             self.match_info: dict = {}
             self._json_body = json_body
+
         async def json(self):
             return self._json_body
+
     return _Req()
 
 
@@ -350,3 +353,56 @@ async def test_rename_provider_duplicate():
     req.match_info = {"name": "openai"}
     resp = await api.rename_provider(req)
     assert resp.status == 409
+
+
+@pytest.mark.asyncio
+async def test_update_provider_disabled():
+    """PATCH with disabled field should succeed and persist."""
+    p = _config_path()
+    yaml_content = (
+        "models:\n"
+        "  providers:\n"
+        "    - name: openai\n"
+        "      apiKey: sk-x\n"
+        "      apiBase: https://api.openai.com/v1\n"
+        "      models: [gpt-4o]\n"
+    )
+    p.write_text(yaml_content, encoding="utf-8")
+    server = _make_server(
+        providers=[ProviderConfig(name="openai", api_key="sk-x", api_base="https://api.openai.com/v1", models=["gpt-4o"])],
+        config_path=p,
+    )
+    api = ProvidersAPI(server)
+    body = {"disabled": True}
+    req = _fake_request(json_body=body)
+    req.match_info = {"name": "openai"}
+    resp = await api.update_provider(req)
+    assert resp.status == 200
+    # Verify disabled was persisted to YAML
+    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
+    assert raw["models"]["providers"][0]["disabled"] is True
+
+
+@pytest.mark.asyncio
+async def test_list_providers_includes_disabled():
+    """GET should serialize the disabled field."""
+    p = _config_path()
+    yaml_content = (
+        "models:\n"
+        "  providers:\n"
+        "    - name: openai\n"
+        "      apiKey: sk-x\n"
+        "      apiBase: https://api.openai.com/v1\n"
+        "      models: [gpt-4o]\n"
+        "      disabled: true\n"
+    )
+    p.write_text(yaml_content, encoding="utf-8")
+    server = _make_server(
+        providers=[ProviderConfig(name="openai", api_key="sk-x", api_base="https://api.openai.com/v1", models=["gpt-4o"], disabled=True)],
+        config_path=p,
+    )
+    api = ProvidersAPI(server)
+    req = _fake_request()
+    resp = await api.list_providers(req)
+    data = _json.loads(resp.body)
+    assert data["providers"][0]["disabled"] is True

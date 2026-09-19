@@ -41,6 +41,7 @@ class ProvidersAPI:
             "timeout_seconds": pc.timeout_seconds,
             "stream_include_usage": pc.stream_include_usage,
             "rate_limit_rpm": pc.rate_limit_rpm,
+            "disabled": pc.disabled,
             "credential_pool": [],   # never expose the pool
         }
 
@@ -107,8 +108,14 @@ class ProvidersAPI:
                 return web.json_response({"error": f"cannot read config: {exc}"}, status=409)
         models_section = raw.setdefault("models", {})
         providers_list = models_section.setdefault("providers", [])
-        providers_list.append({
-            "name": pc.name,
+        _KEY_MAP = {
+            "api_key": "apiKey", "api_key_env": "apiKeyEnv", "api_base": "apiBase",
+            "extra_headers": "extraHeaders", "max_retries": "maxRetries",
+            "timeout_seconds": "timeoutSeconds", "stream_include_usage": "streamIncludeUsage",
+            "rate_limit_rpm": "rateLimitRpm",
+        }
+        entry: dict[str, Any] = {"name": pc.name}
+        for py_key, val in {
             "api_key": pc.api_key,
             "api_key_env": pc.api_key_env,
             "api_base": pc.api_base,
@@ -118,7 +125,10 @@ class ProvidersAPI:
             "timeout_seconds": pc.timeout_seconds,
             "stream_include_usage": pc.stream_include_usage,
             "rate_limit_rpm": pc.rate_limit_rpm,
-        })
+            "disabled": pc.disabled,
+        }.items():
+            entry[_KEY_MAP.get(py_key, py_key)] = val
+        providers_list.append(entry)
         from codex_pro.config.loader import save_config
         try:
             save_config(raw, target)
@@ -186,7 +196,7 @@ class ProvidersAPI:
         _ALLOWED = {
             "api_base", "api_key", "api_key_env", "models",
             "extra_headers", "max_retries", "timeout_seconds",
-            "stream_include_usage", "rate_limit_rpm",
+            "stream_include_usage", "rate_limit_rpm", "disabled",
         }
         updates = {k: v for k, v in body.items() if k in _ALLOWED}
         if not updates:
@@ -222,7 +232,7 @@ class ProvidersAPI:
             "api_key": "apiKey", "api_key_env": "apiKeyEnv", "api_base": "apiBase",
             "models": "models", "extra_headers": "extraHeaders", "max_retries": "maxRetries",
             "timeout_seconds": "timeoutSeconds", "stream_include_usage": "streamIncludeUsage",
-            "rate_limit_rpm": "rateLimitRpm",
+            "rate_limit_rpm": "rateLimitRpm", "disabled": "disabled",
         }
         for entry in providers_list:
             if entry.get("name", "").lower() == name.lower():

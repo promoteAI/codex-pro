@@ -15,6 +15,7 @@ export interface ProviderConfig {
   timeout_seconds: number;
   stream_include_usage: boolean;
   rate_limit_rpm: number;
+  disabled?: boolean;
 }
 
 export interface ProviderHealth {
@@ -38,7 +39,7 @@ interface ProvidersState {
   testResult: { ok: boolean; error: string } | null;
   fetchProviders: () => Promise<void>;
   setActive: (name: string) => void;
-  addProvider: (input: Omit<ProviderConfig, "health">) => Promise<void>;
+  addProvider: (input: Omit<ProviderConfig, "health"> & { disabled?: boolean }) => Promise<void>;
   deleteProvider: (name: string) => Promise<void>;
   updateProvider: (name: string, patch: Partial<ProviderConfig>) => Promise<void>;
   renameProvider: (oldName: string, newName: string) => Promise<void>;
@@ -68,6 +69,7 @@ export const useProvidersStore = create<ProvidersState>((set, get) => ({
         timeout_seconds: p.timeout_seconds ?? 120,
         stream_include_usage: p.stream_include_usage ?? true,
         rate_limit_rpm: p.rate_limit_rpm ?? 0,
+        disabled: p.disabled ?? false,
       }));
       set({ providers: enriched, loading: false, activeName: enriched[0]?.name ?? null });
     } catch (e: any) {

@@ -327,7 +327,7 @@ class ModelRouter:
         if preferred_provider and preferred_provider in self._providers and self._provider_available(preferred_provider):
             return preferred_provider, self._providers[preferred_provider]
         for pc in self._config.providers:
-            if not pc.name or pc.name not in self._providers or not self._provider_available(pc.name):
+            if not pc.name or pc.disabled or pc.name not in self._providers or not self._provider_available(pc.name):
                 continue
             if self._provider_config_supports_model(pc.name, model):
                 return pc.name, self._providers[pc.name]

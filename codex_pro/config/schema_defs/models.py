@@ -102,6 +102,15 @@ class ProviderConfig(_Base):
             "desc_en": "Pool of API keys rotated for this provider",
         },
     )
+    disabled: bool = Field(
+        default=False,
+        json_schema_extra={
+            "status": "effective",
+            "desc_zh": "是否禁用该提供商（禁用后不参与路由）",
+            "desc_en": "Whether to disable this provider (excluded from routing when true)",
+        },
+    )
+
 
 class ModelRouteConfig(_Base):
     model: str = Field(

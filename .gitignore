@@ -31,6 +31,7 @@ botpy.log
 .cursor/
 reference
 .codex-pro/
+.*
 
 
 # Editor / IDE

@@ -5,6 +5,7 @@ import { apiFetch } from "../lib/api";
 import { dateTime } from "../lib/datetime";
 import { runMutation } from "../stores/toast";
 import { useIsAdmin } from "../stores/capabilities";
+import { useConfirm } from "../components/ConfirmDialog";
 import type { CronJob } from "./Cron";
 import {
   cronToFreq,
@@ -116,12 +117,22 @@ export function ScheduledView() {
   const [selectedSnapshot, setSelectedSnapshot] = useState<CronJob | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState>({ kind: null, anchor: null });
+  const confirm = useConfirm();
   const [deleteTarget, setDeleteTarget] = useState<CronJob | null>(null);
   const [promptDraft, setPromptDraft] = useState("");
   const [freq, setFreq] = useState<FreqState>(DEFAULT_FREQ);
   const [runInLabel, setRunInLabel] = useState("每次运行时新建聊天");
   const [runInQuery, setRunInQuery] = useState("");
   const [saving, setSaving] = useState(false);
+  // Delivery slots — mirrors Cron.tsx's DELIVERY_KEYS; these are just UI state.
+  const [deliverChannel, setDeliverChannel] = useState("");
+  const [deliverChatId, setDeliverChatId] = useState("");
+  const [sourceSessionKey, setSourceSessionKey] = useState("");
+  const [payloadKeys, setPayloadKeys] = useState<Record<"channel"|"chatId"|"sessionKey", string | null>>({
+    channel: null, chatId: null, sessionKey: null,
+  });
+  const [authorizeUnattended, setAuthorizeUnattended] = useState(false);
+  const [authorizedSnapshot, setAuthorizedSnapshot] = useState("");
 
   const createWrapRef = useRef<HTMLDivElement>(null);
   const promptSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -182,7 +193,25 @@ export function ScheduledView() {
     setSelectedSnapshot(job);
     setPromptDraft(jobPrompt(job));
     setFreq(cronToFreq(job.cron_expr));
+    // Seed delivery slots from job.payload so the user can edit them.
+    const p = job.payload ?? {};
+    const strVal = (v: unknown) => typeof v === "string" ? v : "";
+    // Find which key the payload actually uses for each slot (may be alias).
+    const findSlot = (keys: string[]) => {
+      for (const k of keys) { if (k in p) return [k, strVal(p[k])]; }
+      return [null as string | null, ""];
+    };
+    const [chKey, chVal] = findSlot(["deliver_channel", "channel"]);
+    const [ciKey, ciVal] = findSlot(["deliver_chat_id", "chat_id"]);
+    const [skKey, skVal] = findSlot(["source_session_key", "session_key"]);
+    setDeliverChannel(chVal ?? "");
+    setDeliverChatId(ciVal ?? "");
+    setSourceSessionKey(skVal ?? "");
+    setPayloadKeys({ channel: chKey, chatId: ciKey, sessionKey: skKey });
     setRunInLabel("每次运行时新建聊天");
+    // Authorization state is server-tracked; never pre-check the box.
+    setAuthorizeUnattended(false);
+    setAuthorizedSnapshot("");
     closeMenus();
   }, [closeMenus]);
 
@@ -192,6 +221,13 @@ export function ScheduledView() {
     closeMenus();
   }, [closeMenus]);
 
+  // Mirrors Cron.tsx's DELIVERY_KEYS for the client-side merge.
+  const DELIVERY_SLOT_KEYS: Record<string, readonly string[]> = {
+    channel: ["deliver_channel", "channel"],
+    chatId: ["deliver_chat_id", "chat_id"],
+    sessionKey: ["source_session_key", "session_key"],
+  };
+
   const persistJob = useCallback(
     async (
       job: CronJob,
@@ -200,6 +236,7 @@ export function ScheduledView() {
         cron_expr?: string;
         enabled?: boolean;
         prompt?: string;
+        authorize?: boolean;
       },
     ) => {
       if (!canWrite) return false;
@@ -210,8 +247,34 @@ export function ScheduledView() {
       if (patch.cron_expr !== undefined) body.cron_expr = patch.cron_expr;
       if (patch.enabled !== undefined) body.enabled = patch.enabled;
       if (patch.prompt !== undefined || patch.cron_expr !== undefined || patch.name !== undefined) {
-        body.payload = { [key]: prompt };
+        // Preserve existing payload keys (e.g. delivery targets) by merging
+        // with the current stored payload, then overlaying the edited values.
+        const current = (job.payload ?? {}) as Record<string, unknown>;
+        const merged: Record<string, string> = { ...Object.fromEntries(
+          Object.entries(current).filter(([, v]) => typeof v === "string")
+        ) as Record<string, string> };
+        merged[key] = prompt;
+        // Keep delivery slot values from UI state if present.
+        for (const [slot, uiVal] of [["channel", deliverChannel], ["chatId", deliverChatId], ["sessionKey", sourceSessionKey]] as const) {
+          if (uiVal) {
+            const existing = payloadKeys[slot];
+            merged[existing ?? DELIVERY_SLOT_KEYS[slot][0]] = uiVal;
+          }
+        }
+        body.payload = merged;
       }
+      // Same consent-staleness guard as Cron.tsx.
+      let authorizeFlag = false;
+      if (patch.authorize === true) {
+        const digest = JSON.stringify([
+          prompt.trim(),
+          (patch.cron_expr ?? job.cron_expr).trim(),
+          [deliverChannel.trim(), deliverChatId.trim()].filter(Boolean).join(":") || sourceSessionKey.trim(),
+        ]);
+        if (digest === authorizedSnapshot) authorizeFlag = true;
+        else setAuthorizeUnattended(false);
+      }
+      if (authorizeFlag) body.authorize_unattended = true;
       setSaving(true);
       const ok = await runMutation(
         () => apiFetch(`/cron/${job.id}`, { method: "PUT", body: JSON.stringify(body) }),
@@ -221,7 +284,7 @@ export function ScheduledView() {
       if (ok) refetch();
       return ok;
     },
-    [canWrite, refetch],
+    [canWrite, refetch, jobPrompt, jobCommandKey, deliverChannel, deliverChatId, sourceSessionKey, payloadKeys, authorizedSnapshot],
   );
 
   const createAndSelect = useCallback(
@@ -592,6 +655,49 @@ export function ScheduledView() {
               onChange={(e) => schedulePromptSave(selected, e.target.value)}
             />
 
+            {canWrite && (
+              <div className="sch-detail-section" aria-labelledby="schDetailSectionAuth">
+                <div className="sch-freq-row" style={{ alignItems: "flex-start", gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    id="sch-authorize-unattended"
+                    checked={authorizeUnattended}
+                    disabled={!selected.enabled}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setAuthorizeUnattended(checked);
+                      if (!checked) {
+                        setAuthorizedSnapshot("");
+                        return;
+                      }
+                      // Consent snapshot = what's on screen at the moment of check.
+                      const digest = JSON.stringify([
+                        promptDraft.trim(),
+                        selected.cron_expr.trim(),
+                        [deliverChannel.trim(), deliverChatId.trim()].filter(Boolean).join(":") || sourceSessionKey.trim(),
+                      ]);
+                      void confirm({
+                        title: "确认授权无人值守执行？",
+                        message: `该任务将在无人查看的情况下执行下列指令，并可调用写入与命令类工具。\n\n指令：${promptDraft.trim() || "(未填写)"}\n频率：${selected.cron_expr}\n投递：${[deliverChannel.trim(), deliverChatId.trim()].filter(Boolean).join(":") || sourceSessionKey.trim() || "(无投递目标)"}`,
+                        confirmLabel: "我已确认，授权",
+                        destructive: true,
+                      }).then((ok) => {
+                        if (ok) setAuthorizedSnapshot(digest);
+                        else setAuthorizeUnattended(false);
+                      });
+                    }}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="sch-authorize-unattended" className="text-sm flex-1">
+                    允许无人值守执行写入/命令类工具
+                    <span className="block text-xs text-gray-500">
+                      不勾选时任务仍会按时运行，但写入与命令类工具会被拒绝。
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
+
             <section className="sch-detail-section" aria-labelledby="schDetailSectionDetails">
               <h3 className="sch-detail-section-title" id="schDetailSectionDetails">详情</h3>
               <div className="sch-freq-card">
@@ -768,6 +874,53 @@ export function ScheduledView() {
               </div>
             </section>
 
+            {canWrite && (
+              <section className="sch-detail-section" aria-labelledby="schDetailSectionDelivery">
+                <h3 className="sch-detail-section-title" id="schDetailSectionDelivery">投递目标</h3>
+                <div className="sch-freq-card">
+                  <div className="sch-freq-row">
+                    <span className="sch-detail-label">渠道</span>
+                    <input
+                      type="text"
+                      className="sch-detail-delivery-input"
+                      placeholder="如: telegram, slack, gateway"
+                      value={deliverChannel}
+                      disabled={!canWrite}
+                      onChange={(e) => setDeliverChannel(e.target.value)}
+                    />
+                  </div>
+                  <div className="sch-freq-row">
+                    <span className="sch-detail-label">会话/群 ID</span>
+                    <input
+                      type="text"
+                      className="sch-detail-delivery-input"
+                      placeholder="如: 123456789"
+                      value={deliverChatId}
+                      disabled={!canWrite}
+                      onChange={(e) => setDeliverChatId(e.target.value)}
+                    />
+                  </div>
+                  <div className="sch-freq-row">
+                    <span className="sch-detail-label">Session Key</span>
+                    <input
+                      type="text"
+                      className="sch-detail-delivery-input"
+                      placeholder="可选，填了可自动解析渠道"
+                      value={sourceSessionKey}
+                      disabled={!canWrite}
+                      onChange={(e) => setSourceSessionKey(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {authorizedSnapshot && (
+              <div className="sch-detail-auth-note" style={{ fontSize: "12px", color: "#1a7f37", padding: "4px 0" }}>
+                已授权无人值守执行写入/命令类工具
+              </div>
+            )}
+
             <section className="sch-detail-section" aria-labelledby="schDetailSectionHistory">
               <h3 className="sch-detail-section-title" id="schDetailSectionHistory">运行历史记录</h3>
               <div className="sch-detail-history">
@@ -804,6 +957,9 @@ export function ScheduledView() {
                 >
                   {selected.enabled ? "暂停任务" : "开启任务"}
                 </button>
+                <div className="sch-detail-retention-note" style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}>
+                  每个任务保留最近 100 次执行结果
+                </div>
               </section>
             )}
           </div>
@@ -842,14 +998,14 @@ export function ScheduledView() {
             role="menuitem"
             onClick={() => {
               const job = jobs.find((j) => j.id === menu.jobId);
-              if (job) openDetail(job);
-              closeMenus();
+              if (job) void toggleEnabled(job);
             }}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              <rect x="6" y="4" width="4" height="16" />
+              <rect x="14" y="4" width="4" height="16" />
             </svg>
-            继续
+            {(jobs.find((j) => j.id === menu.jobId)?.enabled ?? true) ? "暂停任务" : "继续任务"}
           </button>
           <button
             type="button"

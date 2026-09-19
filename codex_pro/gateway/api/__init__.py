@@ -29,6 +29,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     from codex_pro.gateway.api.files import FilesAPI
     from codex_pro.gateway.api.prs import PrsAPI
     from codex_pro.gateway.api.plugins import register_plugin_api_routes
+    from codex_pro.gateway.api.providers import ProvidersAPI
 
     memory_api = MemoryAPI(server)
     skills_api = SkillsAPI(server)
@@ -43,6 +44,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     git_api = GitAPI(server)
     files_api = FilesAPI(server)
     prs_api = PrsAPI(server)
+    providers_api = ProvidersAPI(server)
 
     app.router.add_get(f"{prefix}/memory", memory_api.list_entries)
     app.router.add_get(f"{prefix}/memory/stats", memory_api.stats)
@@ -73,6 +75,13 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
 
     app.router.add_get(f"{prefix}/config", config_api.get_config)
     app.router.add_patch(f"{prefix}/config", config_api.update_config)
+
+    app.router.add_get(f"{prefix}/providers", providers_api.list_providers)
+    app.router.add_get(f"{prefix}/providers/{{name}}", providers_api.get_provider)
+    app.router.add_post(f"{prefix}/providers", providers_api.create_provider)
+    app.router.add_delete(f"{prefix}/providers/{{name}}", providers_api.delete_provider)
+    app.router.add_post(f"{prefix}/providers/{{name}}/test", providers_api.test_provider)
+    app.router.add_get(f"{prefix}/providers/health", providers_api.get_health)
 
     app.router.add_get(f"{prefix}/tasks", tasks_api.list_tasks)
     app.router.add_post(f"{prefix}/tasks", tasks_api.create_task)

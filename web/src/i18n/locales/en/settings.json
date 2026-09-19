@@ -357,5 +357,22 @@
   "contentFont": "Content font",
   "codeFont": "Code font",
   "fontRegular": "Regular",
-  "sameAsUiFont": "Same as UI font"
+  "sameAsUiFont": "Same as UI font",
+  "testConnection": "Test Connection",
+  "testSuccess": "Connection successful",
+  "testFail": "Connection failed",
+  "healthHealthy": "Healthy",
+  "healthDegraded": "Degraded",
+  "healthCooldown": "Cooldown",
+  "healthDisabled": "Disabled",
+  "healthUnknown": "Unknown",
+  "deleteProviderConfirm": "Delete provider {{name}}? Requires restart.",
+  "addProviderRequire": "Name and Base URL are required",
+  "noProviders": "No providers yet. Click Add to start.",
+  "selectProvider": "Select a provider from the list",
+  "noModels": "No models configured",
+  "apiKey": "API Key",
+  "providerName": "Name",
+  "apiBaseUrl": "Base URL",
+  "cancel": "Cancel"
 }

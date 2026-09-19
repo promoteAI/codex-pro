@@ -357,5 +357,22 @@
   "contentFont": "内容字体",
   "codeFont": "代码字体",
   "fontRegular": "常规",
-  "sameAsUiFont": "与界面字体相同"
+  "sameAsUiFont": "与界面字体相同",
+  "testConnection": "测试连接",
+  "testSuccess": "连接正常",
+  "testFail": "连接失败",
+  "healthHealthy": "正常",
+  "healthDegraded": "退化",
+  "healthCooldown": "冷却中",
+  "healthDisabled": "已禁用",
+  "healthUnknown": "未知",
+  "deleteProviderConfirm": "确定删除提供商 {{name}}？需要重启生效。",
+  "addProviderRequire": "名称和 Base URL 不能为空",
+  "noProviders": "暂无提供商，点击添加开始",
+  "selectProvider": "选择左侧提供商",
+  "noModels": "未配置模型",
+  "apiKey": "API Key",
+  "providerName": "名称",
+  "apiBaseUrl": "Base URL",
+  "cancel": "取消"
 }

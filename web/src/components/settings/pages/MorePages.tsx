@@ -17,6 +17,7 @@ import { AddMarketModal } from "../../AddMarketModal";
 import { McpCreateView } from "../../McpCreateView";
 import { toast } from "../../../stores/toast";
 import { useShellStore } from "../../../stores/shell";
+import { useSettingsStore } from "../../../stores/settings";
 import { useWsSubscribe } from "../../../hooks/use-ws";
 import { useApi } from "../../../hooks/use-api";
 import { apiFetch } from "../../../lib/api";
@@ -150,9 +151,19 @@ export function VoicePage() {
 
 export function PersonalizationPage() {
   const { t } = useTranslation("settings");
-  const [text, setText] = useState("代码注释始终用英文，回答始终用中文");
-  const [localMem, setLocalMem] = useState(false);
-  const [toolMem, setToolMem] = useState(true);
+  const prefs = useSettingsStore((s) => s.prefs);
+  const updatePrefs = useSettingsStore((s) => s.updatePrefs);
+  const [text, setText] = useState(prefs.codexInstructions);
+
+  useEffect(() => {
+    void useSettingsStore.getState().loadPrefs();
+  }, []);
+
+  useEffect(() => {
+    setText(prefs.codexInstructions);
+  }, [prefs.codexInstructions]);
+
+  const saveInstructions = () => updatePrefs({ codexInstructions: text });
 
   return (
     <div className="max-w-[720px]">
@@ -164,11 +175,12 @@ export function PersonalizationPage() {
             <div className="text-[14px] font-medium text-[#e8e8e8] mb-1">{t("codexInstructions")}</div>
             <div className="text-xs text-codex-muted">{t("codexInstructionsDesc")}</div>
           </div>
-          <ActionBtn>{t("save")}</ActionBtn>
+          <ActionBtn onClick={saveInstructions}>{t("save")}</ActionBtn>
         </div>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onBlur={saveInstructions}
           rows={5}
           className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-[13px] text-[#e0e0e0] outline-none focus:border-[#555] resize-y min-h-[100px]"
           placeholder={t("instructionsPlaceholder")}
@@ -180,10 +192,10 @@ export function PersonalizationPage() {
         <div className="text-xs text-codex-muted mb-3">{t("memorySettingsDesc")}</div>
         <SettingsCard className="mb-0 border-0 bg-[#1e1e1e]">
           <SettingsRow label={t("localMemory")} desc={t("localMemoryDesc")}>
-            <Toggle checked={localMem} onChange={setLocalMem} label={t("localMemory")} />
+            <Toggle checked={prefs.localMemory} onChange={(v) => updatePrefs({ localMemory: v })} label={t("localMemory")} />
           </SettingsRow>
           <SettingsRow label={t("toolMemory")} desc={t("toolMemoryDesc")}>
-            <Toggle checked={toolMem} onChange={setToolMem} label={t("toolMemory")} />
+            <Toggle checked={prefs.toolMemory} onChange={(v) => updatePrefs({ toolMemory: v })} label={t("toolMemory")} />
           </SettingsRow>
           <SettingsRow label={t("deleteLocalMemory")} desc={t("deleteLocalMemoryDesc")}>
             <ActionBtn danger>{t("delete")}</ActionBtn>
@@ -383,9 +395,12 @@ export function AccountPage() {
 
 export function ComputerPage() {
   const { t } = useTranslation("settings");
-  const [anyScreen, setAnyScreen] = useState(true);
-  const [chrome, setChrome] = useState(true);
-  const [excel, setExcel] = useState(true);
+  const prefs = useSettingsStore((s) => s.prefs);
+  const updatePrefs = useSettingsStore((s) => s.updatePrefs);
+
+  useEffect(() => {
+    void useSettingsStore.getState().loadPrefs();
+  }, []);
 
   return (
     <div className="max-w-[720px]">
@@ -399,7 +414,7 @@ export function ComputerPage() {
             <div className="text-[13.5px] font-medium text-[#e0e0e0]">{t("anyScreen")}</div>
             <div className="text-xs text-codex-muted">{t("anyScreenDesc")}</div>
           </div>
-          <Toggle checked={anyScreen} onChange={setAnyScreen} label={t("anyScreen")} />
+          <Toggle checked={prefs.allowAnyScreen} onChange={(v) => updatePrefs({ allowAnyScreen: v })} label={t("anyScreen")} />
         </div>
         <div className="flex items-center gap-3.5 px-4 py-3.5 border-b border-codex-border">
           <div className="w-9 h-9 rounded-lg bg-white shrink-0 grid place-items-center text-[#4285F4] text-xs font-bold">
@@ -410,7 +425,7 @@ export function ComputerPage() {
             <div className="text-xs text-codex-muted">{t("chromeConnected")}</div>
           </div>
           <ActionBtn>{t("manage")}</ActionBtn>
-          <Toggle checked={chrome} onChange={setChrome} label="Chrome" />
+          <Toggle checked={prefs.chromeEnabled} onChange={(v) => updatePrefs({ chromeEnabled: v })} label="Chrome" />
         </div>
         <div className="flex items-center gap-3.5 px-4 py-3.5 border-b border-codex-border">
           <div className="w-9 h-9 rounded-lg bg-[#0a2a4a] shrink-0 grid place-items-center text-[#36c5f0] text-xs font-bold">
@@ -430,7 +445,7 @@ export function ComputerPage() {
             <div className="text-[13.5px] font-medium text-[#e0e0e0]">Microsoft Excel</div>
             <div className="text-xs text-codex-muted">{t("excelDesc")}</div>
           </div>
-          <Toggle checked={excel} onChange={setExcel} label="Excel" />
+          <Toggle checked={prefs.excelEnabled} onChange={(v) => updatePrefs({ excelEnabled: v })} label="Excel" />
         </div>
       </SettingsCard>
       <SectionTitle>{t("alwaysAllowApps")}</SectionTitle>
@@ -759,20 +774,25 @@ export function SettingsPluginsPage() {
 
 export function BrowserSettingsPage() {
   const { t } = useTranslation("settings");
-  const [enabled, setEnabled] = useState(true);
-  const [ignoreCert, setIgnoreCert] = useState(true);
+  const prefs = useSettingsStore((s) => s.prefs);
+  const updatePrefs = useSettingsStore((s) => s.updatePrefs);
+
+  useEffect(() => {
+    void useSettingsStore.getState().loadPrefs();
+  }, []);
+
   return (
     <div className="max-w-[720px]">
       <PageTitle>{t("browser")}</PageTitle>
       <SettingsCard>
         <SettingsRow label={t("embeddedBrowser")} desc={t("embeddedBrowserDesc")}>
-          <Toggle checked={enabled} onChange={setEnabled} label={t("embeddedBrowser")} />
+          <Toggle checked={prefs.embeddedBrowser} onChange={(v) => updatePrefs({ embeddedBrowser: v })} label={t("embeddedBrowser")} />
         </SettingsRow>
       </SettingsCard>
       <SectionTitle>{t("browserSecurity")}</SectionTitle>
       <SettingsCard>
         <SettingsRow label={t("ignoreCert")} desc={t("ignoreCertDesc")}>
-          <Toggle checked={ignoreCert} onChange={setIgnoreCert} label={t("ignoreCert")} />
+          <Toggle checked={prefs.ignoreCert} onChange={(v) => updatePrefs({ ignoreCert: v })} label={t("ignoreCert")} />
         </SettingsRow>
       </SettingsCard>
       <SectionTitle>{t("browserData")}</SectionTitle>
@@ -1531,15 +1551,29 @@ export function ConnectionsPage() {
 
 export function GitPage() {
   const { t } = useTranslation("settings");
-  const [prefix, setPrefix] = useState("codex_pro");
-  const [merge, setMerge] = useState("merge");
-  const [force, setForce] = useState(false);
-  const [draftPr, setDraftPr] = useState(true);
-  const [review, setReview] = useState("separate");
-  const [autoMerge, setAutoMerge] = useState(false);
-  const [monitorInstr, setMonitorInstr] = useState("");
-  const [commitInstr, setCommitInstr] = useState("");
-  const [prInstr, setPrInstr] = useState("");
+  const prefs = useSettingsStore((s) => s.prefs);
+  const updatePrefs = useSettingsStore((s) => s.updatePrefs);
+  // Text fields are held locally so keystrokes don't PATCH; committed on blur.
+  const [prefix, setPrefix] = useState(prefs.gitBranchPrefix);
+  const [monitorInstr, setMonitorInstr] = useState(prefs.gitMonitorInstr);
+  const [commitInstr, setCommitInstr] = useState(prefs.gitCommitInstr);
+  const [prInstr, setPrInstr] = useState(prefs.gitPrInstr);
+
+  useEffect(() => {
+    void useSettingsStore.getState().loadPrefs();
+  }, []);
+
+  useEffect(() => {
+    setPrefix(prefs.gitBranchPrefix);
+    setMonitorInstr(prefs.gitMonitorInstr);
+    setCommitInstr(prefs.gitCommitInstr);
+    setPrInstr(prefs.gitPrInstr);
+  }, [
+    prefs.gitBranchPrefix,
+    prefs.gitMonitorInstr,
+    prefs.gitCommitInstr,
+    prefs.gitPrInstr,
+  ]);
 
   return (
     <div className="max-w-[720px]">
@@ -1549,13 +1583,14 @@ export function GitPage() {
           <input
             value={prefix}
             onChange={(e) => setPrefix(e.target.value)}
+            onBlur={() => updatePrefs({ gitBranchPrefix: prefix })}
             className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#e0e0e0] w-36 outline-none"
           />
         </SettingsRow>
         <SettingsRow label={t("prMergeMethod")} desc={t("prMergeMethodDesc")}>
           <SegGroup
-            value={merge}
-            onChange={setMerge}
+            value={prefs.gitMergeMethod}
+            onChange={(v: string) => updatePrefs({ gitMergeMethod: v as "merge" | "squash" })}
             options={[
               { id: "merge", label: t("merge") },
               { id: "squash", label: t("squash") },
@@ -1563,15 +1598,15 @@ export function GitPage() {
           />
         </SettingsRow>
         <SettingsRow label={t("forcePush")} desc={t("forcePushDesc")}>
-          <Toggle checked={force} onChange={setForce} label={t("forcePush")} />
+          <Toggle checked={prefs.gitForcePush} onChange={(v) => updatePrefs({ gitForcePush: v })} label={t("forcePush")} />
         </SettingsRow>
         <SettingsRow label={t("draftPr")} desc={t("draftPrDesc")}>
-          <Toggle checked={draftPr} onChange={setDraftPr} label={t("draftPr")} />
+          <Toggle checked={prefs.gitDraftPr} onChange={(v) => updatePrefs({ gitDraftPr: v })} label={t("draftPr")} />
         </SettingsRow>
         <SettingsRow label={t("reviewPresentation")} desc={t("reviewPresentationDesc")}>
           <SegGroup
-            value={review}
-            onChange={setReview}
+            value={prefs.gitReviewPresentation}
+            onChange={(v: string) => updatePrefs({ gitReviewPresentation: v as "inline" | "separate" })}
             options={[
               { id: "inline", label: t("reviewInline") },
               { id: "separate", label: t("reviewSeparate") },
@@ -1588,11 +1623,12 @@ export function GitPage() {
               <div className="text-[13.5px] font-medium text-[#e4e4e4]">{t("autoMergeWhenReady")}</div>
               <div className="text-[12px] text-[#6e6e6e] mt-1">{t("autoMergeWhenReadyDesc")}</div>
             </div>
-            <Toggle checked={autoMerge} onChange={setAutoMerge} label={t("autoMergeWhenReady")} />
+            <Toggle checked={prefs.gitAutoMerge} onChange={(v) => updatePrefs({ gitAutoMerge: v })} label={t("autoMergeWhenReady")} />
           </div>
           <textarea
             value={monitorInstr}
             onChange={(e) => setMonitorInstr(e.target.value)}
+            onBlur={() => updatePrefs({ gitMonitorInstr: monitorInstr })}
             rows={3}
             placeholder={t("monitorInstrPlaceholder")}
             className="w-full bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-[#e0e0e0] outline-none resize-y"
@@ -1608,6 +1644,7 @@ export function GitPage() {
           <textarea
             value={commitInstr}
             onChange={(e) => setCommitInstr(e.target.value)}
+            onBlur={() => updatePrefs({ gitCommitInstr: commitInstr })}
             rows={3}
             placeholder={t("commitInstrPlaceholder")}
             className="w-full bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-[#e0e0e0] outline-none resize-y"
@@ -1622,6 +1659,7 @@ export function GitPage() {
           <textarea
             value={prInstr}
             onChange={(e) => setPrInstr(e.target.value)}
+            onBlur={() => updatePrefs({ gitPrInstr: prInstr })}
             rows={3}
             placeholder={t("prInstrPlaceholder")}
             className="w-full bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-[#e0e0e0] outline-none resize-y"
@@ -1682,10 +1720,20 @@ export function EnvironmentPage() {
 
 export function WorktreesPage() {
   const { t } = useTranslation("settings");
-  const [root, setRoot] = useState("C:/Users/cheris/.codex/worktrees");
-  const [pullUpstream, setPullUpstream] = useState(false);
-  const [autoDelete, setAutoDelete] = useState(true);
-  const [deleteLimit, setDeleteLimit] = useState(15);
+  const prefs = useSettingsStore((s) => s.prefs);
+  const updatePrefs = useSettingsStore((s) => s.updatePrefs);
+  // Text/number inputs are held locally so typing doesn't PATCH per keystroke.
+  const [root, setRoot] = useState(prefs.worktreeRoot);
+  const [deleteLimit, setDeleteLimit] = useState(prefs.worktreeDeleteLimit);
+
+  useEffect(() => {
+    void useSettingsStore.getState().loadPrefs();
+  }, []);
+
+  useEffect(() => {
+    setRoot(prefs.worktreeRoot);
+    setDeleteLimit(prefs.worktreeDeleteLimit);
+  }, [prefs.worktreeRoot, prefs.worktreeDeleteLimit]);
 
   return (
     <div className="max-w-[720px]">
@@ -1695,14 +1743,15 @@ export function WorktreesPage() {
           <input
             value={root}
             onChange={(e) => setRoot(e.target.value)}
+            onBlur={() => updatePrefs({ worktreeRoot: root })}
             className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#e0e0e0] w-[280px] max-w-[40vw] outline-none"
           />
         </SettingsRow>
         <SettingsRow label={t("pullUpstream")} desc={t("pullUpstreamDesc")}>
-          <Toggle checked={pullUpstream} onChange={setPullUpstream} label={t("pullUpstream")} />
+          <Toggle checked={prefs.worktreePullUpstream} onChange={(v) => updatePrefs({ worktreePullUpstream: v })} label={t("pullUpstream")} />
         </SettingsRow>
         <SettingsRow label={t("autoDeleteWorktrees")} desc={t("autoDeleteWorktreesDesc")}>
-          <Toggle checked={autoDelete} onChange={setAutoDelete} label={t("autoDeleteWorktrees")} />
+          <Toggle checked={prefs.worktreeAutoDelete} onChange={(v) => updatePrefs({ worktreeAutoDelete: v })} label={t("autoDeleteWorktrees")} />
         </SettingsRow>
         <SettingsRow label={t("autoDeleteLimit")} desc={t("autoDeleteLimitDesc")}>
           <input
@@ -1711,6 +1760,7 @@ export function WorktreesPage() {
             max={999}
             value={deleteLimit}
             onChange={(e) => setDeleteLimit(Number(e.target.value) || 1)}
+            onBlur={() => updatePrefs({ worktreeDeleteLimit: deleteLimit })}
             className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#e0e0e0] w-20 outline-none"
             aria-label={t("autoDeleteLimit")}
           />

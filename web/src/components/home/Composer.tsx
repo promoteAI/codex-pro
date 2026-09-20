@@ -120,8 +120,7 @@ export function Composer() {
     perm === "ask" ? t("permAsk") : perm === "agent" ? t("permAgent") : t("permFull");
   const effortLabels = [t("effortLow"), t("effortMed"), t("effortHigh"), t("effortMax")];
   const effortLabel = effortLabels[effort] ?? effortLabels[0];
-  const modelLabel =
-    model === "agnes-2.5-flash" || model === "自定义" ? t("modelCustom") : model;
+  const modelLabel = model;
   const canSend = draft.trim().length > 0 && !typing;
   const showGoalBtn = goalMode || planMode;
   const showCtxUsage = chatting;

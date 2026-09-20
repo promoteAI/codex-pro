@@ -12,6 +12,7 @@ import {
   SettingsRow,
   Toggle,
 } from "../ui";
+import { useSettingsStore } from "../../../stores/settings";
 
 const OPEN_IN_OPTIONS: Array<{ id: string; label: string; icon: ReactNode }> = [
   {
@@ -90,25 +91,18 @@ const OPEN_IN_OPTIONS: Array<{ id: string; label: string; icon: ReactNode }> = [
 
 export function GeneralPage() {
   const { t } = useTranslation("settings");
-  const [defaultPerm, setDefaultPerm] = useState(true);
-  const [fullAccess, setFullAccess] = useState(true);
-  const [bottomPanel, setBottomPanel] = useState(true);
-  const [termPos, setTermPos] = useState<"bottom" | "right">("bottom");
-  const [plugins, setPlugins] = useState(true);
-  const [plainEditor, setPlainEditor] = useState(false);
-  const [contextUsage, setContextUsage] = useState(false);
-  const [followUp, setFollowUp] = useState<"queue" | "steer">("queue");
-  const [standaloneChat, setStandaloneChat] = useState(false);
-  const [permNotify, setPermNotify] = useState(true);
-  const [questionNotify, setQuestionNotify] = useState(true);
-  const [openIn, setOpenIn] = useState("vscode");
+  const prefs = useSettingsStore((s) => s.prefs);
+  const updatePrefs = useSettingsStore((s) => s.updatePrefs);
   const [openInOpen, setOpenInOpen] = useState(false);
   const openInRef = useRef<HTMLDivElement>(null);
-  const openInOpt = OPEN_IN_OPTIONS.find((o) => o.id === openIn) ?? OPEN_IN_OPTIONS[0];
-  const [shell, setShell] = useState("PowerShell");
+  const openInOpt = OPEN_IN_OPTIONS.find((o) => o.id === prefs.openIn) ?? OPEN_IN_OPTIONS[0];
   const [shellOpen, setShellOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const shellOptions = ["PowerShell", "Command Prompt", "Git Bash", "WSL"];
+
+  useEffect(() => {
+    void useSettingsStore.getState().loadPrefs();
+  }, []);
 
   useEffect(() => {
     if (!openInOpen && !shellOpen) return;
@@ -137,8 +131,8 @@ export function GeneralPage() {
       <SettingsCard>
         <SettingsRow label={t("defaultPermissions")} desc={t("defaultPermissionsDesc")}>
           <Toggle
-            checked={defaultPerm}
-            onChange={setDefaultPerm}
+            checked={prefs.defaultPermissions}
+            onChange={(v) => updatePrefs({ defaultPermissions: v })}
             label={t("defaultPermissions")}
           />
         </SettingsRow>
@@ -157,7 +151,7 @@ export function GeneralPage() {
             </>
           }
         >
-          <Toggle checked={fullAccess} onChange={setFullAccess} label={t("fullAccessPerm")} />
+          <Toggle checked={prefs.fullAccess} onChange={(v) => updatePrefs({ fullAccess: v })} label={t("fullAccessPerm")} />
         </SettingsRow>
       </SettingsCard>
 
@@ -195,13 +189,13 @@ export function GeneralPage() {
                     key={opt.id}
                     type="button"
                     role="option"
-                    aria-selected={opt.id === openIn}
+                    aria-selected={opt.id === prefs.openIn}
                     onClick={() => {
-                      setOpenIn(opt.id);
+                      updatePrefs({ openIn: opt.id });
                       setOpenInOpen(false);
                     }}
                     className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-left text-[#e4e4e4] hover:bg-[#343434] ${
-                      opt.id === openIn ? "bg-[#343434]" : ""
+                      opt.id === prefs.openIn ? "bg-[#343434]" : ""
                     }`}
                   >
                     {opt.icon}
@@ -227,7 +221,7 @@ export function GeneralPage() {
               }}
               className="inline-flex items-center gap-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0] hover:bg-[#323232] whitespace-nowrap"
             >
-              {shell}
+              {prefs.integratedShell}
               <span className="text-[10px] opacity-70">▾</span>
             </button>
             {shellOpen && (
@@ -240,15 +234,15 @@ export function GeneralPage() {
                     key={opt}
                     type="button"
                     role="option"
-                    aria-selected={opt === shell}
+                    aria-selected={opt === prefs.integratedShell}
                     onClick={() => {
-                      setShell(opt);
+                      updatePrefs({ integratedShell: opt });
                       setShellOpen(false);
                     }}
                     className="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-lg text-[13px] text-left text-[#e8e8e8] hover:bg-[#343434]"
                   >
                     {opt}
-                    <span className={`text-[12px] ${opt === shell ? "opacity-100" : "opacity-0"}`}>✓</span>
+                    <span className={`text-[12px] ${opt === prefs.integratedShell ? "opacity-100" : "opacity-0"}`}>✓</span>
                   </button>
                 ))}
               </div>
@@ -259,12 +253,12 @@ export function GeneralPage() {
           <DropdownBtn>{t("autoDetect")}</DropdownBtn>
         </SettingsRow>
         <SettingsRow label={t("bottomPanel")} desc={t("bottomPanelDesc")}>
-          <Toggle checked={bottomPanel} onChange={setBottomPanel} label={t("bottomPanel")} />
+          <Toggle checked={prefs.bottomPanel} onChange={(v) => updatePrefs({ bottomPanel: v })} label={t("bottomPanel")} />
         </SettingsRow>
         <SettingsRow label={t("defaultTermPos")} desc={t("defaultTermPosDesc")}>
           <SegGroup
-            value={termPos}
-            onChange={(v: string) => setTermPos(v as "bottom" | "right")}
+            value={prefs.terminalPosition}
+            onChange={(v: string) => updatePrefs({ terminalPosition: v as "bottom" | "right" })}
             options={[
               { id: "bottom", label: t("termBottom") },
               { id: "right", label: t("termRight") },
@@ -272,25 +266,25 @@ export function GeneralPage() {
           />
         </SettingsRow>
         <SettingsRow label={t("pluginsToggle")} desc={t("pluginsToggleDesc")}>
-          <Toggle checked={plugins} onChange={setPlugins} label={t("pluginsToggle")} />
+          <Toggle checked={prefs.pluginsEnabled} onChange={(v) => updatePrefs({ pluginsEnabled: v })} label={t("pluginsToggle")} />
         </SettingsRow>
       </SettingsCard>
 
       <SectionTitle>{t("secEditor")}</SectionTitle>
       <SettingsCard>
         <SettingsRow label={t("plainEditor")} desc={t("plainEditorDesc")}>
-          <Toggle checked={plainEditor} onChange={setPlainEditor} label={t("plainEditor")} />
+          <Toggle checked={prefs.plainEditor} onChange={(v) => updatePrefs({ plainEditor: v })} label={t("plainEditor")} />
         </SettingsRow>
         <SettingsRow label={t("showContextUsage")}>
-          <Toggle checked={contextUsage} onChange={setContextUsage} label={t("showContextUsage")} />
+          <Toggle checked={prefs.showContextUsage} onChange={(v) => updatePrefs({ showContextUsage: v })} label={t("showContextUsage")} />
         </SettingsRow>
         <SettingsRow label={t("sendShortcut")} desc={t("sendShortcutDesc")}>
           <DropdownBtn>{t("pressEnter")}</DropdownBtn>
         </SettingsRow>
         <SettingsRow label={t("followUpMode")} desc={t("followUpModeDesc")}>
           <SegGroup
-            value={followUp}
-            onChange={(v: string) => setFollowUp(v as "queue" | "steer")}
+            value={prefs.followUpMode}
+            onChange={(v: string) => updatePrefs({ followUpMode: v as "queue" | "steer" })}
             options={[
               { id: "queue", label: t("queueFollowUp") },
               { id: "steer", label: t("steerFollowUp") },
@@ -322,8 +316,8 @@ export function GeneralPage() {
         </SettingsRow>
         <SettingsRow label={t("standaloneChat")} desc={t("standaloneChatDesc")}>
           <Toggle
-            checked={standaloneChat}
-            onChange={setStandaloneChat}
+            checked={prefs.standaloneChat}
+            onChange={(v) => updatePrefs({ standaloneChat: v })}
             label={t("standaloneChat")}
           />
         </SettingsRow>
@@ -335,12 +329,12 @@ export function GeneralPage() {
           <DropdownBtn>{t("notifyUnfocused")}</DropdownBtn>
         </SettingsRow>
         <SettingsRow label={t("permNotify")} desc={t("permNotifyDesc")}>
-          <Toggle checked={permNotify} onChange={setPermNotify} label={t("permNotify")} />
+          <Toggle checked={prefs.permissionNotify} onChange={(v) => updatePrefs({ permissionNotify: v })} label={t("permNotify")} />
         </SettingsRow>
         <SettingsRow label={t("questionNotify")} desc={t("questionNotifyDesc")}>
           <Toggle
-            checked={questionNotify}
-            onChange={setQuestionNotify}
+            checked={prefs.questionNotify}
+            onChange={(v) => updatePrefs({ questionNotify: v })}
             label={t("questionNotify")}
           />
         </SettingsRow>
@@ -351,9 +345,32 @@ export function GeneralPage() {
 
 export function AppearancePage() {
   const { t } = useTranslation("settings");
-  const [theme, setTheme] = useState<"system" | "light" | "dark">("dark");
-  const [contrast, setContrast] = useState(45);
-  const [translucent, setTranslucent] = useState(true);
+  const prefs = useSettingsStore((s) => s.prefs);
+  const updatePrefs = useSettingsStore((s) => s.updatePrefs);
+  // Local contrast state so a drag doesn't fire a PATCH per pixel; saved
+  // (debounced) once the user settles.
+  const [contrast, setContrast] = useState(prefs.contrast);
+  const contrastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    void useSettingsStore.getState().loadPrefs();
+  }, []);
+
+  useEffect(() => {
+    setContrast(prefs.contrast);
+  }, [prefs.contrast]);
+
+  const onContrastChange = (value: number) => {
+    setContrast(value);
+    if (contrastTimer.current) clearTimeout(contrastTimer.current);
+    contrastTimer.current = setTimeout(() => updatePrefs({ contrast: value }), 250);
+  };
+  useEffect(
+    () => () => {
+      if (contrastTimer.current) clearTimeout(contrastTimer.current);
+    },
+    [],
+  );
 
   const themes = [
     { id: "system" as const, label: t("themeSystem"), bg: "linear-gradient(135deg,#1e1e1e 50%,#2a2a2a 50%)" },
@@ -372,9 +389,9 @@ export function AppearancePage() {
           <button
             key={th.id}
             type="button"
-            onClick={() => setTheme(th.id)}
+            onClick={() => updatePrefs({ theme: th.id })}
             className={`flex-1 rounded-xl border p-2 text-left transition ${
-              theme === th.id ? "border-[#555] bg-[#222]" : "border-codex-border bg-transparent hover:border-[#3a3a3a]"
+              prefs.theme === th.id ? "border-[#555] bg-[#222]" : "border-codex-border bg-transparent hover:border-[#3a3a3a]"
             }`}
           >
             <div className="h-16 rounded-lg mb-2 grid place-items-center" style={{ background: th.bg }}>
@@ -464,7 +481,7 @@ export function AppearancePage() {
           </select>
         </SettingsRow>
         <SettingsRow label={t("translucentSidebar")}>
-          <Toggle checked={translucent} onChange={setTranslucent} label={t("translucentSidebar")} />
+          <Toggle checked={prefs.translucentSidebar} onChange={(v) => updatePrefs({ translucentSidebar: v })} label={t("translucentSidebar")} />
         </SettingsRow>
         <SettingsRow label={t("contrast")}>
           <input
@@ -472,7 +489,7 @@ export function AppearancePage() {
             min={0}
             max={100}
             value={contrast}
-            onChange={(e) => setContrast(Number(e.target.value))}
+            onChange={(e) => onContrastChange(Number(e.target.value))}
             className="contrast-slider"
           />
           <span className="text-[12.5px] text-[#999] w-6 text-right">{contrast}</span>
@@ -495,7 +512,7 @@ export function AppearancePage() {
           <ActionBtn>{t("default")}</ActionBtn>
         </SettingsRow>
         <SettingsRow label={t("translucentSidebar")}>
-          <Toggle checked={translucent} onChange={setTranslucent} label={t("translucentSidebar")} />
+          <Toggle checked={prefs.translucentSidebar} onChange={(v) => updatePrefs({ translucentSidebar: v })} label={t("translucentSidebar")} />
         </SettingsRow>
         <SettingsRow label={t("contrast")}>
           <input
@@ -503,7 +520,7 @@ export function AppearancePage() {
             min={0}
             max={100}
             value={contrast}
-            onChange={(e) => setContrast(Number(e.target.value))}
+            onChange={(e) => onContrastChange(Number(e.target.value))}
             className="contrast-slider"
           />
           <span className="text-[12.5px] text-[#999] w-6 text-right">{contrast}</span>
@@ -515,9 +532,12 @@ export function AppearancePage() {
 
 export function AgentConfigPage() {
   const { t } = useTranslation("settings");
-  const [ultra, setUltra] = useState(false);
-  const [deps, setDeps] = useState(true);
-  const [webSearch, setWebSearch] = useState(true);
+  const prefs = useSettingsStore((s) => s.prefs);
+  const updatePrefs = useSettingsStore((s) => s.updatePrefs);
+
+  useEffect(() => {
+    void useSettingsStore.getState().loadPrefs();
+  }, []);
 
   return (
     <div className="max-w-[720px]">
@@ -540,7 +560,7 @@ export function AgentConfigPage() {
           <DropdownBtn>{t("fullAccess")}</DropdownBtn>
         </SettingsRow>
         <SettingsRow label={t("webSearch")} desc={t("webSearchDesc")}>
-          <Toggle checked={webSearch} onChange={setWebSearch} label={t("webSearch")} />
+          <Toggle checked={prefs.webSearch} onChange={(v) => updatePrefs({ webSearch: v })} label={t("webSearch")} />
         </SettingsRow>
         <SettingsRow label={t("verbosity")} desc={t("verbosityDesc")}>
           <DropdownBtn>{t("modelDefault")}</DropdownBtn>
@@ -560,7 +580,7 @@ export function AgentConfigPage() {
           </span>
         </SettingsRow>
         <SettingsRow label={t("ultraInPicker")} desc={t("ultraInPickerDesc")}>
-          <Toggle checked={ultra} onChange={setUltra} label={t("ultraInPicker")} />
+          <Toggle checked={prefs.ultraInPicker} onChange={(v) => updatePrefs({ ultraInPicker: v })} label={t("ultraInPicker")} />
         </SettingsRow>
       </SettingsCard>
 
@@ -569,7 +589,7 @@ export function AgentConfigPage() {
           <SectionTitle>{t("workspaceDeps")}</SectionTitle>
         </div>
         <SettingsRow label={t("codexDeps")} desc={t("codexDepsDesc")}>
-          <Toggle checked={deps} onChange={setDeps} label={t("codexDeps")} />
+          <Toggle checked={prefs.workspaceDeps} onChange={(v) => updatePrefs({ workspaceDeps: v })} label={t("codexDeps")} />
         </SettingsRow>
       </SettingsCard>
     </div>

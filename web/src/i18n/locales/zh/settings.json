@@ -137,7 +137,7 @@
   "modelsDesc": "管理自定义模型供应商，配置后可在聊天时选择使用。",
   "refresh": "刷新",
   "addProvider": "添加供应商",
-  "enabled": "已启用",
+  "enabled": "启用",
   "disabled": "禁用",
   "delete": "删除",
   "apiFormat": "API 格式",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useProvidersStore } from "../../../stores/providers";
 
@@ -6,20 +6,34 @@ interface AddModelModalProps {
   open: boolean;
   onClose: () => void;
   providerName: string;
+  /** 传入则为编辑模式：预填模型 id，标题显示"编辑模型"，保存时重命名 */
+  editModelId?: string;
 }
 
 const INPUT_TYPES = ["text", "image", "video", "pdf"] as const;
 const OUTPUT_TYPES = ["text"] as const;
 
-export function AddModelModal({ open, onClose, providerName }: AddModelModalProps) {
+export function AddModelModal({ open, onClose, providerName, editModelId }: AddModelModalProps) {
   const { t } = useTranslation("settings");
   const addModel = useProvidersStore((s) => s.addModel);
+  const renameModel = useProvidersStore((s) => s.renameModel);
+  const isEdit = Boolean(editModelId);
 
   const [modelId, setModelId] = useState("");
   const [contextWindow, setContextWindow] = useState("1000000");
   const [maxOutputTokens, setMaxOutputTokens] = useState("128000");
   const [inputTypes, setInputTypes] = useState<Set<string>>(new Set(["text"]));
   const [outputTypes, setOutputTypes] = useState<Set<string>>(new Set(["text"]));
+
+  useEffect(() => {
+    if (open) {
+      setModelId(editModelId ?? "");
+      setContextWindow("1000000");
+      setMaxOutputTokens("128000");
+      setInputTypes(new Set(["text"]));
+      setOutputTypes(new Set(["text"]));
+    }
+  }, [open, editModelId]);
 
   const toggleInputType = (type: string) => {
     setInputTypes((prev) => {
@@ -35,7 +49,11 @@ export function AddModelModal({ open, onClose, providerName }: AddModelModalProp
     const id = modelId.trim();
     if (!id) return;
     try {
-      await addModel(providerName, id);
+      if (isEdit && editModelId) {
+        await renameModel(providerName, editModelId, id);
+      } else {
+        await addModel(providerName, id);
+      }
       handleClose();
     } catch {
       // error shown by toast
@@ -64,7 +82,7 @@ export function AddModelModal({ open, onClose, providerName }: AddModelModalProp
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[15px] font-semibold text-codex-text" id="addModelTitle">
-            {t("addModel")}
+            {isEdit ? t("editModel") : t("addModel")}
           </h3>
           <button
             type="button"

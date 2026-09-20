@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCw, Eye, EyeOff, Trash2, Pencil, Loader2, ExternalLink } from "lucide-react";
+import { RefreshCw, Eye, EyeOff, Trash2, Pencil, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ActionBtn, PageSub, PageTitle, SettingsCard, SettingsRow, Toggle } from "../ui";
 import { useProvidersStore, type ProviderEntry } from "../../../stores/providers";
+import { apiFetch } from "../../../lib/api";
 import { toast } from "../../../stores/toast";
 import { AddModelModal } from "./AddModelModal";
 import { useWsSubscribe } from "../../../hooks/use-ws";
@@ -26,10 +27,13 @@ export function ModelsPage() {
     removeModel,
   } = useProvidersStore();
 
-  const [active, setActiveLocal] = useState<ProviderEntry | null>(null);
-  const [showKey, setShowKey] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const active = useMemo(
+    () => providers.find((p) => p.name === activeName) ?? null,
+    [providers, activeName],
+  );
+  const [showKey, setShowKey] = useState(false);  const [showAddModal, setShowAddModal] = useState(false);
   const [showAddModelModal, setShowAddModelModal] = useState(false);
+  const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [renameInput, setRenameInput] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
   const [editValues, setEditValues] = useState({ baseUrl: "", apiKey: "", format: "openai" as "openai" | "anthropic" | "responses" });
@@ -65,7 +69,6 @@ export function ModelsPage() {
     if (!activeName) return;
     const found = providersRef.current.find((p) => p.name === activeName);
     if (!found) return;
-    setActiveLocal(found);
     dirtyFieldsRef.current.clear();
     setEditValues({
       baseUrl: found.api_base,
@@ -161,16 +164,6 @@ export function ModelsPage() {
     } catch { /* error shown by toast */ }
   };
 
-  const healthColor = (status?: string) => {
-    switch (status) {
-      case "healthy": return "bg-codex-success";
-      case "degraded": return "bg-yellow-500";
-      case "cooldown": return "bg-orange-500";
-      case "disabled": return "bg-[#444]";
-      default: return "bg-[#555]";
-    }
-  };
-
   if (error) {
     return (
       <div className="flex flex-col h-full">
@@ -213,7 +206,6 @@ export function ModelsPage() {
                 <div key={group} className="mb-3.5">
                   <div className="text-[11.5px] text-codex-muted font-medium px-2 pb-1.5">{group}</div>
                   {list.map((p) => {
-                    const h = p.health;
                     return (
                       <button
                         key={p.name}
@@ -225,7 +217,7 @@ export function ModelsPage() {
                             : "border-transparent text-codex-muted hover:bg-codex-surface"
                         }`}
                       >
-                        <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${healthColor(h?.status)}`} />
+                        <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${p.disabled ? "bg-[#444]" : "bg-codex-success"}`} />
                         <span className="flex-1 truncate">{p.name}</span>
                       </button>
                     );
@@ -283,53 +275,19 @@ export function ModelsPage() {
                   )}
 
                   {/* Enable/disable toggle */}
-                  <div className="inline-flex rounded-md border border-codex-border-input overflow-hidden text-[12px]" role="group" aria-label={t("enabled")}>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (active.disabled) {
-                          await updateProvider(active.name, { disabled: false });
-                        }
-                      }}
-                      className={`px-2.5 py-1 ${
-                        !active.disabled
-                          ? "bg-codex-success/20 text-codex-success"
-                          : "text-codex-muted hover:bg-codex-surface-raised"
-                      }`}
-                    >
-                      {t("enabled")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!active.disabled) {
-                          await updateProvider(active.name, { disabled: true });
-                        }
-                      }}
-                      className={`px-2.5 py-1 border-l border-codex-border-input ${
-                        active.disabled
-                          ? "bg-codex-danger/20 text-codex-danger"
-                          : "text-codex-muted hover:bg-codex-surface-raised"
-                      }`}
-                    >
-                      {t("disabled")}
-                    </button>
-                  </div>
-
-                  {/* Test connection */}
                   <button
                     type="button"
-                    onClick={() => handleTest(active.name)}
-                    disabled={testingName === active.name}
-                    className="w-7 h-7 rounded-md grid place-items-center text-codex-muted hover:bg-codex-surface-raised hover:text-codex-text"
-                    title={t("testConnection")}
-                    aria-label={t("testConnection")}
+                    onClick={async () => {
+                      await updateProvider(active.name, { disabled: !active.disabled });
+                    }}
+                    className={`px-2.5 py-1 rounded-md border border-codex-border-input text-[12px] ${
+                      active.disabled
+                        ? "bg-codex-danger/20 text-codex-danger"
+                        : "bg-codex-success/20 text-codex-success"
+                    }`}
+                    aria-label={active.disabled ? t("enabled") : t("disabled")}
                   >
-                    {testingName === active.name ? (
-                      <Loader2 size={13} className="animate-spin" />
-                    ) : (
-                      <RefreshCw size={13} />
-                    )}
+                    {active.disabled ? t("enabled") : t("disabled")}
                   </button>
 
                   {/* Delete */}
@@ -414,6 +372,9 @@ export function ModelsPage() {
                       key={m}
                       modelId={m}
                       onDelete={() => handleDeleteModel(m)}
+                      onTest={() => handleTest(active.name)}
+                      onEdit={() => { setEditingModelId(m); setShowAddModelModal(true); }}
+                      testing={testingName === active.name}
                       t={t}
                     />
                   )) : (
@@ -445,17 +406,18 @@ export function ModelsPage() {
         />
       )}
 
-      {/* Add model modal */}
+      {/* Add/edit model modal */}
       <AddModelModal
         open={showAddModelModal}
-        onClose={() => setShowAddModelModal(false)}
+        onClose={() => { setShowAddModelModal(false); setEditingModelId(null); }}
         providerName={active?.name ?? ""}
+        editModelId={editingModelId ?? undefined}
       />
     </div>
   );
 }
 
-function ModelItem({ modelId, onDelete, t }: { modelId: string; onDelete: () => void; t: (k: string) => string }) {
+function ModelItem({ modelId, onDelete, onTest, onEdit, testing, t }: { modelId: string; onDelete: () => void; onTest: () => void; onEdit: () => void; testing: boolean; t: (k: string) => string }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-codex-bg border border-codex-border-input">
       <div className="flex-1 min-w-0 text-[13px] text-codex-text font-medium truncate">{modelId}</div>
@@ -467,14 +429,17 @@ function ModelItem({ modelId, onDelete, t }: { modelId: string; onDelete: () => 
       <div className="flex gap-0.5 text-codex-muted">
         <button
           type="button"
-          className="w-7 h-7 rounded-md grid place-items-center hover:bg-codex-surface-raised hover:text-codex-text"
-          title={t("openDocs")}
-          aria-label={t("openDocs")}
+          onClick={onTest}
+          disabled={testing}
+          className="w-7 h-7 rounded-md grid place-items-center hover:bg-codex-surface-raised hover:text-codex-text disabled:opacity-60"
+          title={t("testConnection")}
+          aria-label={t("testConnection")}
         >
-          <ExternalLink size={13} />
+          {testing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
         </button>
         <button
           type="button"
+          onClick={onEdit}
           className="w-7 h-7 rounded-md grid place-items-center hover:bg-codex-surface-raised hover:text-codex-text"
           title={t("editModel")}
           aria-label={t("editModel")}
@@ -522,6 +487,34 @@ function resolveApiBase(_format: "openai" | "anthropic" | "responses", baseUrl: 
 
 // ── Add Provider Modal ───────────────────────────────────────────────────────
 
+interface CatalogEntry {
+  id: string;
+  label: string;
+  group: string;
+  dialect: string;
+  api_base: string;
+  api_key_env_vars: string[];
+  fallback_models: string[];
+  models_endpoint: string;
+  needs_api_base: boolean;
+}
+
+const CATALOG_GROUP_ORDER = ["mainstream", "domestic", "aggregator", "local", "cloud"];
+const CATALOG_GROUP_LABELS: Record<string, string> = {
+  mainstream: "主流",
+  domestic: "国内",
+  aggregator: "聚合平台",
+  local: "本地",
+  cloud: "云服务",
+};
+
+/** 根据 dialect 推断 API 格式，与后端 provider 方言一致 */
+function dialectToFormat(dialect: string): "openai" | "anthropic" | "responses" {
+  if (dialect === "anthropic") return "anthropic";
+  if (dialect === "gemini" || dialect === "bedrock") return "responses";
+  return "openai";
+}
+
 interface AddProviderModalProps {
   onClose: () => void;
   onCreated: () => void;
@@ -531,6 +524,8 @@ function AddProviderModal({ onClose, onCreated }: AddProviderModalProps) {
   const { t } = useTranslation("settings");
   const addProvider = useProvidersStore((s) => s.addProvider);
 
+  const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
+  const [presetId, setPresetId] = useState("");
   const [name, setName] = useState("");
   const [apiBase, setApiBase] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -539,7 +534,27 @@ function AddProviderModal({ onClose, onCreated }: AddProviderModalProps) {
   const [newModelId, setNewModelId] = useState("");
   const [newModelCtx, setNewModelCtx] = useState("1000000");
 
+  useEffect(() => {
+    apiFetch<{ catalog: CatalogEntry[] }>("/providers/catalog")
+      .then((d) => setCatalog(d.catalog))
+      .catch(() => setCatalog([]));
+  }, []);
+
   const canSubmit = name.trim() && apiBase.trim() && models.length > 0;
+
+  const applyPreset = (presetId: string) => {
+    if (!presetId) return;
+    const entry = catalog.find((c) => c.id === presetId);
+    if (!entry) return;
+    setName(entry.dialect);
+    setApiBase(entry.api_base);
+    setFormat(dialectToFormat(entry.dialect));
+    if (entry.fallback_models.length > 0) {
+      setModels(entry.fallback_models.map((m) => ({ id: m, ctx: "1000000" })));
+    } else if (entry.needs_api_base) {
+      setApiBase("");
+    }
+  };
 
   const handleAddModel = () => {
     const id = newModelId.trim();
@@ -581,6 +596,29 @@ function AddProviderModal({ onClose, onCreated }: AddProviderModalProps) {
       >
         <div className="text-[15px] font-semibold text-codex-text mb-1">{t("createProvider")}</div>
         <div className="text-[12px] text-codex-muted mb-4">{t("createProviderSub")}</div>
+
+        {catalog.length > 0 && (
+          <Field label="供应商预设">
+            <select
+              className="w-full bg-codex-bg border border-codex-border-input rounded-lg px-3 py-2 text-[13px] text-codex-text outline-none focus:border-codex-accent"
+              value={presetId}
+              onChange={(e) => { setPresetId(e.target.value); applyPreset(e.target.value); }}
+            >
+              <option value="">自定义（手动填写）</option>
+              {CATALOG_GROUP_ORDER.map((g) => {
+                const entries = catalog.filter((c) => c.group === g);
+                if (entries.length === 0) return null;
+                return (
+                  <optgroup key={g} label={CATALOG_GROUP_LABELS[g] ?? g}>
+                    {entries.map((c) => (
+                      <option key={c.id} value={c.id}>{c.label}</option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </select>
+          </Field>
+        )}
 
         <Field label={t("providerName")}>
           <input

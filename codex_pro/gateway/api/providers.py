@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 from codex_pro.config.schema import ProviderConfig
 from codex_pro.models.providers import create_provider, validate_provider_config
+from codex_pro.cli.setup.providers import CATALOG as PROVIDER_CATALOG
 
 
 class ProvidersAPI:
@@ -79,6 +80,27 @@ class ProvidersAPI:
             if pc.name.lower() == name.lower():
                 return web.json_response(self._serialize_provider(pc))
         return web.json_response({"error": f"provider '{name}' not found"}, status=404)
+
+    async def get_catalog(self, request: web.Request) -> web.Response:
+        """Built-in provider brand catalog (mirrors the CLI setup wizard)."""
+        guard = self._guard(request, "providers_catalog")
+        if guard is not None:
+            return guard
+        entries = [
+            {
+                "id": e.id,
+                "label": e.label,
+                "group": e.group,
+                "dialect": e.dialect,
+                "api_base": e.api_base,
+                "api_key_env_vars": list(e.api_key_env_vars),
+                "fallback_models": list(e.fallback_models),
+                "models_endpoint": e.models_endpoint,
+                "needs_api_base": e.needs_api_base,
+            }
+            for e in PROVIDER_CATALOG
+        ]
+        return web.json_response({"catalog": entries})
 
     # ── create ────────────────────────────────────────────────────────────────
 

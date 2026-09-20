@@ -47,6 +47,7 @@ interface ProvidersState {
   refreshHealth: () => Promise<void>;
   addModel: (providerName: string, modelId: string) => Promise<void>;
   removeModel: (providerName: string, modelId: string) => Promise<void>;
+  renameModel: (providerName: string, oldId: string, newId: string) => Promise<void>;
 }
 
 export const useProvidersStore = create<ProvidersState>((set, get) => ({
@@ -195,6 +196,22 @@ export const useProvidersStore = create<ProvidersState>((set, get) => ({
       toast.success(`已删除模型 "${modelId}"`);
     } catch (e: any) {
       toast.error(e.message ?? "删除模型失败");
+    }
+  },
+
+  renameModel: async (providerName: string, oldId: string, newId: string) => {
+    if (oldId === newId) return;
+    const providers = get().providers;
+    const provider = providers.find((p) => p.name === providerName);
+    if (!provider) return;
+    try {
+      const models = provider.models.filter((m) => m !== oldId);
+      if (!models.includes(newId)) models.push(newId);
+      await get().updateProvider(providerName, { models });
+      toast.success(`已将模型 "${oldId}" 改为 "${newId}"`);
+    } catch (e: any) {
+      toast.error(e.message ?? "编辑模型失败");
+      throw e;
     }
   },
 }));

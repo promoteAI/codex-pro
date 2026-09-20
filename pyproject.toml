@@ -55,6 +55,9 @@ dependencies = [
     "rich>=13.5",
     "cryptography>=50.0.1",
     "pywinpty>=3.0.5",
+    # gateway/config_watcher.py imports watchdog at module load; without it
+    # every gateway module fails to collect under pytest.
+    "watchdog>=4.0",
 ]
 
 [project.urls]

@@ -299,3 +299,112 @@ async def test_turn_status_limit_is_bounded(mock_server, api):
         for value in ("0", "101", "oops"):
             resp = await client.get(f"/api/v1/sessions/s/turns?limit={value}")
             assert resp.status == 400
+
+
+@pytest.mark.asyncio
+async def test_list_sessions_archived_filter_true(mock_server, api):
+    """?archived=true 把 filter 解析并透传给 manager(实际过滤在 manager 层完成)。"""
+    mock_server.session_manager.list_sessions_async = AsyncMock(return_value=[
+        {"key": "a:1", "status": "archived", "updated_at": "2026-07-07T10:00:00"},
+    ])
+
+    app = web.Application()
+    app.router.add_get("/api/v1/sessions", api.list_sessions)
+    async with TestClient(TestServer(app)) as client:
+        resp = await client.get("/api/v1/sessions?archived=true")
+        assert resp.status == 200
+        data = await resp.json()
+
+    mock_server.session_manager.list_sessions_async.assert_awaited_once_with(archived=True)
+    assert [s["key"] for s in data["sessions"]] == ["a:1"]
+
+
+@pytest.mark.asyncio
+async def test_list_sessions_archived_filter_false(mock_server, api):
+    """?archived=false 解析为 False 并透传,保留非归档会话的旧行为。"""
+    mock_server.session_manager.list_sessions_async = AsyncMock(return_value=[
+        {"key": "a:2", "status": "active", "updated_at": "2026-07-07T11:00:00"},
+    ])
+
+    app = web.Application()
+    app.router.add_get("/api/v1/sessions", api.list_sessions)
+    async with TestClient(TestServer(app)) as client:
+        resp = await client.get("/api/v1/sessions?archived=false")
+        data = await resp.json()
+
+    mock_server.session_manager.list_sessions_async.assert_awaited_once_with(archived=False)
+    assert [s["key"] for s in data["sessions"]] == ["a:2"]
+
+
+@pytest.mark.asyncio
+async def test_list_sessions_without_archived_param_passes_none(mock_server, api):
+    """未带 archived 参数时不过滤,保留旧行为(返回全部)。"""
+    mock_server.session_manager.list_sessions_async = AsyncMock(return_value=[
+        {"key": "a:1", "status": "archived", "updated_at": "2026-07-07T10:00:00"},
+        {"key": "a:2", "status": "active", "updated_at": "2026-07-07T11:00:00"},
+    ])
+
+    app = web.Application()
+    app.router.add_get("/api/v1/sessions", api.list_sessions)
+    async with TestClient(TestServer(app)) as client:
+        resp = await client.get("/api/v1/sessions")
+        data = await resp.json()
+
+    mock_server.session_manager.list_sessions_async.assert_awaited_once_with(archived=None)
+    assert len(data["sessions"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_archive_session_endpoint(mock_server, api):
+    mock_server.session_manager.archive_session = AsyncMock(return_value=True)
+    app = web.Application()
+    app.router.add_post("/api/v1/sessions/{key}/archive", api.archive_session)
+    async with TestClient(TestServer(app)) as client:
+        resp = await client.post("/api/v1/sessions/cli%3Alocal/archive")
+        assert resp.status == 200
+        assert (await resp.json())["status"] == "archived"
+    mock_server.session_manager.archive_session.assert_awaited_once_with("cli:local")
+
+
+@pytest.mark.asyncio
+async def test_archive_session_missing_returns_404(mock_server, api):
+    mock_server.session_manager.archive_session = AsyncMock(return_value=False)
+    app = web.Application()
+    app.router.add_post("/api/v1/sessions/{key}/archive", api.archive_session)
+    async with TestClient(TestServer(app)) as client:
+        resp = await client.post("/api/v1/sessions/nobody/archive")
+        assert resp.status == 404
+
+
+@pytest.mark.asyncio
+async def test_unarchive_session_endpoint(mock_server, api):
+    mock_server.session_manager.unarchive_session = AsyncMock(return_value=True)
+    app = web.Application()
+    app.router.add_post("/api/v1/sessions/{key}/unarchive", api.unarchive_session)
+    async with TestClient(TestServer(app)) as client:
+        resp = await client.post("/api/v1/sessions/cli%3Alocal/unarchive")
+        assert resp.status == 200
+        assert (await resp.json())["status"] == "active"
+    mock_server.session_manager.unarchive_session.assert_awaited_once_with("cli:local")
+
+
+@pytest.mark.asyncio
+async def test_delete_session_endpoint(mock_server, api):
+    mock_server.session_manager.delete_session = AsyncMock(return_value=True)
+    app = web.Application()
+    app.router.add_delete("/api/v1/sessions/{key}", api.delete_session)
+    async with TestClient(TestServer(app)) as client:
+        resp = await client.delete("/api/v1/sessions/cli%3Alocal")
+        assert resp.status == 200
+        assert (await resp.json())["status"] == "deleted"
+    mock_server.session_manager.delete_session.assert_awaited_once_with("cli:local")
+
+
+@pytest.mark.asyncio
+async def test_delete_session_missing_returns_404(mock_server, api):
+    mock_server.session_manager.delete_session = AsyncMock(return_value=False)
+    app = web.Application()
+    app.router.add_delete("/api/v1/sessions/{key}", api.delete_session)
+    async with TestClient(TestServer(app)) as client:
+        resp = await client.delete("/api/v1/sessions/nobody")
+        assert resp.status == 404

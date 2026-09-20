@@ -20,6 +20,7 @@ import { useShellStore } from "../../../stores/shell";
 import { useWsSubscribe } from "../../../hooks/use-ws";
 import { useApi } from "../../../hooks/use-api";
 import { apiFetch } from "../../../lib/api";
+import { dateTime } from "../../../lib/datetime";
 
 interface ApiPlugin {
   name: string;
@@ -1589,61 +1590,75 @@ export function WorktreesPage() {
   );
 }
 
-type ArchivedChat = { title: string; time: string };
+type ArchivedChat = { key: string; title: string; time: string };
 type ArchivedGroup = { project: string; chats: ArchivedChat[] };
 
-const ARCHIVED_SEED: ArchivedGroup[] = [
-  {
-    project: "无项目",
-    chats: [
-      { title: "macOS 打包脚本与签名流程", time: "2024年9月4日 10:54" },
-      { title: "如何打包为桌面应用", time: "2024年9月4日 09:12" },
-      { title: "Electron 启动白屏排查", time: "2024年9月3日 21:40" },
-      { title: "更新日志模板", time: "2024年9月3日 18:05" },
-      { title: "ci 失败：pnpm lockfile", time: "2024年9月2日 16:22" },
-      { title: "本地代理配置", time: "2024年9月2日 11:08" },
-      { title: "快捷键冲突整理", time: "2024年9月1日 20:33" },
-      { title: "hi", time: "2024年9月1日 09:01" },
-    ],
-  },
-  {
-    project: "DeepTutor",
-    chats: [
-      { title: "课程大纲生成器", time: "2024年9月4日 14:20" },
-      { title: "测验题型设计", time: "2024年9月3日 19:45" },
-      { title: "向量检索效果对比", time: "2024年9月2日 15:10" },
-      { title: "学生进度看板原型", time: "2024年9月1日 22:18" },
-      { title: "导入 PDF 讲义", time: "2024年8月30日 17:50" },
-    ],
-  },
-  {
-    project: "cheris",
-    chats: [
-      { title: "个人站点改版", time: "2024年9月3日 12:05" },
-      { title: "博客配色调整", time: "2024年8月28日 21:16" },
-    ],
-  },
-];
+interface ArchivedSession {
+  key: string;
+  title?: string;
+  project?: string;
+  updated_at?: string;
+  created_at?: string;
+  status?: string;
+}
+
+const NO_PROJECT = "__no_project__";
 
 export function ArchivedPage() {
   const { t } = useTranslation("settings");
-  const [groups, setGroups] = useState(ARCHIVED_SEED);
+  const [groups, setGroups] = useState<ArchivedGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [chatFilter, setChatFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  const projects = useMemo(() => groups.map((g) => g.project), [groups]);
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiFetch<{ sessions: ArchivedSession[] }>("/sessions?archived=true");
+      // Group archived sessions by project, preserving backend order (newest first).
+      const byProject = new Map<string, ArchivedChat[]>();
+      for (const s of data.sessions) {
+        const key = s.key;
+        const title = s.title && s.title.length > 0 ? s.title : key;
+        const time = dateTime(s.updated_at || s.created_at);
+        const project = s.project && s.project.length > 0 ? s.project : NO_PROJECT;
+        const list = byProject.get(project) ?? [];
+        list.push({ key, title, time });
+        byProject.set(project, list);
+      }
+      setGroups(
+        Array.from(byProject.entries()).map(([project, chats]) => ({ project, chats })),
+      );
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const projectLabel = (project: string) => (project === NO_PROJECT ? t("noProject") : project);
+  const isNoProject = (project: string) => project === NO_PROJECT;
+
+  const projects = useMemo(() => groups.map((g) => projectLabel(g.project)), [groups]);
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return groups
-      .filter((g) => projectFilter === "all" || g.project === projectFilter)
+      .filter((g) => projectFilter === "all" || projectLabel(g.project) === projectFilter)
       .map((g) => ({
         ...g,
         chats: g.chats.filter((c) => {
-          if (chatFilter === "temp" && g.project !== "无项目") return false;
-          if (chatFilter === "project" && g.project === "无项目") return false;
+          if (chatFilter === "temp" && !isNoProject(g.project)) return false;
+          if (chatFilter === "project" && isNoProject(g.project)) return false;
           if (!needle) return true;
           return `${c.title} ${c.time}`.toLowerCase().includes(needle);
         }),
@@ -1651,14 +1666,54 @@ export function ArchivedPage() {
       .filter((g) => g.chats.length > 0 || (!needle && projectFilter !== "all"));
   }, [groups, q, chatFilter, projectFilter]);
 
-  const removeChat = (project: string, title: string) => {
+  const removeChat = (key: string) => {
     setGroups((prev) =>
       prev
-        .map((g) =>
-          g.project === project ? { ...g, chats: g.chats.filter((c) => c.title !== title) } : g,
-        )
+        .map((g) => ({ ...g, chats: g.chats.filter((c) => c.key !== key) }))
         .filter((g) => g.chats.length > 0),
     );
+  };
+
+  const unarchive = async (key: string) => {
+    setBusyKey(key);
+    try {
+      await apiFetch(`/sessions/${encodeURIComponent(key)}/unarchive`, { method: "POST" });
+      removeChat(key);
+      toast.success(t("unarchiveDone"));
+    } catch (e: unknown) {
+      toast.error(t("archivedActionFailed", { error: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const deleteChat = async (key: string) => {
+    setBusyKey(key);
+    try {
+      await apiFetch(`/sessions/${encodeURIComponent(key)}`, { method: "DELETE" });
+      removeChat(key);
+      toast.success(t("deleteDone"));
+    } catch (e: unknown) {
+      toast.error(t("archivedActionFailed", { error: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const deleteAll = async () => {
+    setLoading(true);
+    try {
+      const keys = groups.flatMap((g) => g.chats.map((c) => c.key));
+      await Promise.all(
+        keys.map((key) => apiFetch(`/sessions/${encodeURIComponent(key)}`, { method: "DELETE" })),
+      );
+      setGroups([]);
+      toast.success(t("deleteAllDone"));
+    } catch (e: unknown) {
+      toast.error(t("archivedActionFailed", { error: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1667,8 +1722,9 @@ export function ArchivedPage() {
         <h2 className="text-[22px] font-semibold text-[#f0f0f0] tracking-tight m-0">{t("archived")}</h2>
         <button
           type="button"
-          className="text-[12.5px] text-[#f87171] hover:underline"
-          onClick={() => setGroups([])}
+          className="text-[12.5px] text-[#f87171] hover:underline disabled:opacity-50"
+          onClick={() => void deleteAll()}
+          disabled={loading || groups.length === 0}
         >
           {t("deleteAllArchived")}
         </button>
@@ -1709,92 +1765,105 @@ export function ArchivedPage() {
         </select>
       </div>
 
-      {visible.length === 0 ? (
-        <div className="ac-empty text-center text-[13px] text-[#6e6e6e] py-10">
-          {groups.length === 0 ? t("noArchived") : t("noArchivedMatch")}
-        </div>
-      ) : (
-        <div className="ac-groups flex flex-col gap-2.5">
-          {visible.map((g) => {
-            const isCollapsed = !!collapsed[g.project];
-            return (
-              <div
-                key={g.project}
-                className={`ac-group bg-[#222] border border-[#2e2e2e] rounded-xl overflow-hidden${isCollapsed ? " is-collapsed" : ""}`}
-              >
-                <button
-                  type="button"
-                  className="ac-group-head flex items-center gap-2.5 w-full px-3.5 py-3 bg-transparent border-0 text-[#e0e0e0] text-left hover:bg-[#262626]"
-                  onClick={() =>
-                    setCollapsed((c) => ({ ...c, [g.project]: !c[g.project] }))
-                  }
-                >
-                  <svg
-                    className="w-[15px] h-[15px] shrink-0"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#888"
-                    strokeWidth="1.6"
-                    aria-hidden="true"
+      {loading && (
+        <div className="text-center text-[13px] text-[#6e6e6e] py-10">{t("loading")}</div>
+      )}
+      {!loading && error && (
+        <div className="text-center text-[13px] text-[#e85d5d] py-10">{t("archivedLoadFailed", { error })}</div>
+      )}
+
+      {!loading && !error && (
+        <>
+          {visible.length === 0 ? (
+            <div className="ac-empty text-center text-[13px] text-[#6e6e6e] py-10">
+              {groups.length === 0 ? t("noArchived") : t("noArchivedMatch")}
+            </div>
+          ) : (
+            <div className="ac-groups flex flex-col gap-2.5">
+              {visible.map((g) => {
+                const isCollapsed = !!collapsed[g.project];
+                return (
+                  <div
+                    key={g.project}
+                    className={`ac-group bg-[#222] border border-[#2e2e2e] rounded-xl overflow-hidden${isCollapsed ? " is-collapsed" : ""}`}
                   >
-                    <path d="M3.5 8a2 2 0 0 1 2-2h4l2 2.3h7a2 2 0 0 1 2 2V16a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
-                  </svg>
-                  <span className="text-[13.5px] font-medium flex-1">{g.project}</span>
-                  <span className="text-[12px] text-[#6e6e6e]">
-                    {t("archivedCount", { n: g.chats.length })}
-                  </span>
-                  <svg
-                    className={`w-3.5 h-3.5 shrink-0 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#666"
-                    strokeWidth="1.8"
-                    aria-hidden="true"
-                  >
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </button>
-                {!isCollapsed && (
-                  <div className="ac-group-body">
-                    {g.chats.map((c) => (
-                      <div
-                        key={`${g.project}-${c.title}`}
-                        className="flex items-center gap-3 px-3.5 py-2.5 border-t border-[#2a2a2a]"
+                    <button
+                      type="button"
+                      className="ac-group-head flex items-center gap-2.5 w-full px-3.5 py-3 bg-transparent border-0 text-[#e0e0e0] text-left hover:bg-[#262626]"
+                      onClick={() =>
+                        setCollapsed((c) => ({ ...c, [g.project]: !c[g.project] }))
+                      }
+                    >
+                      <svg
+                        className="w-[15px] h-[15px] shrink-0"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#888"
+                        strokeWidth="1.6"
+                        aria-hidden="true"
                       >
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] text-[#e8e8e8] truncate">{c.title}</div>
-                          <div className="text-[11.5px] text-[#6e6e6e] mt-0.5">{c.time}</div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            title={t("delete")}
-                            aria-label={t("delete")}
-                            onClick={() => removeChat(g.project, c.title)}
-                            className="w-7 h-7 inline-flex items-center justify-center rounded-md text-[#888] hover:bg-[#333] hover:text-[#f87171]"
+                        <path d="M3.5 8a2 2 0 0 1 2-2h4l2 2.3h7a2 2 0 0 1 2 2V16a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
+                      </svg>
+                      <span className="text-[13.5px] font-medium flex-1">{projectLabel(g.project)}</span>
+                      <span className="text-[12px] text-[#6e6e6e]">
+                        {t("archivedCount", { n: g.chats.length })}
+                      </span>
+                      <svg
+                        className={`w-3.5 h-3.5 shrink-0 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#666"
+                        strokeWidth="1.8"
+                        aria-hidden="true"
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
+                    {!isCollapsed && (
+                      <div className="ac-group-body">
+                        {g.chats.map((c) => (
+                          <div
+                            key={c.key}
+                            className="flex items-center gap-3 px-3.5 py-2.5 border-t border-[#2a2a2a]"
                           >
-                            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
-                              <path d="M3 6h18" />
-                              <path d="M8 6V4h8v2" />
-                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeChat(g.project, c.title)}
-                            className="text-[12.5px] text-[#4c8dff] hover:underline"
-                          >
-                            {t("unarchive")}
-                          </button>
-                        </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[13px] text-[#e8e8e8] truncate">{c.title}</div>
+                              <div className="text-[11.5px] text-[#6e6e6e] mt-0.5">{c.time}</div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                title={t("delete")}
+                                aria-label={t("delete")}
+                                disabled={busyKey === c.key}
+                                onClick={() => void deleteChat(c.key)}
+                                className="w-7 h-7 inline-flex items-center justify-center rounded-md text-[#888] hover:bg-[#333] hover:text-[#f87171] disabled:opacity-40"
+                              >
+                                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
+                                  <path d="M3 6h18" />
+                                  <path d="M8 6V4h8v2" />
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busyKey === c.key}
+                                onClick={() => void unarchive(c.key)}
+                                className="text-[12.5px] text-[#4c8dff] hover:underline disabled:opacity-40"
+                              >
+                                {busyKey === c.key ? "…" : t("unarchive")}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

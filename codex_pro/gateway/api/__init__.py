@@ -30,6 +30,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     from codex_pro.gateway.api.prs import PrsAPI
     from codex_pro.gateway.api.plugins import register_plugin_api_routes
     from codex_pro.gateway.api.providers import ProvidersAPI
+    from codex_pro.gateway.api.connections import ConnectionsAPI
 
     memory_api = MemoryAPI(server)
     skills_api = SkillsAPI(server)
@@ -45,6 +46,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     files_api = FilesAPI(server)
     prs_api = PrsAPI(server)
     providers_api = ProvidersAPI(server)
+    connections_api = ConnectionsAPI(server)
 
     app.router.add_get(f"{prefix}/memory", memory_api.list_entries)
     app.router.add_get(f"{prefix}/memory/stats", memory_api.stats)
@@ -85,6 +87,13 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_delete(f"{prefix}/providers/{{name}}", providers_api.delete_provider)
     app.router.add_post(f"{prefix}/providers/{{name}}/test", providers_api.test_provider)
     app.router.add_get(f"{prefix}/providers/health", providers_api.get_health)
+
+    app.router.add_get(f"{prefix}/connections", connections_api.list_connections)
+    app.router.add_post(f"{prefix}/connections", connections_api.add_connection)
+    app.router.add_get(f"{prefix}/connections/refresh", connections_api.refresh_connections)
+    app.router.add_put(f"{prefix}/connections/{{name}}", connections_api.update_connection)
+    app.router.add_delete(f"{prefix}/connections/{{name}}", connections_api.delete_connection)
+    app.router.add_post(f"{prefix}/connections/{{name}}/test", connections_api.test_connection)
 
     app.router.add_get(f"{prefix}/tasks", tasks_api.list_tasks)
     app.router.add_post(f"{prefix}/tasks", tasks_api.create_task)

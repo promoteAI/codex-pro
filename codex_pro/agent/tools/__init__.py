@@ -211,6 +211,15 @@ def discover_tools(
         tools.append(KnowledgeSearchTool(index=knowledge_index, default_limit=config.knowledge.max_results))
         tools.append(KnowledgeIndexTool(index=knowledge_index))
 
+    if config.a2a.enabled:
+        from codex_pro.agent.tools.a2a_delegate import A2ADelegateTool
+        remote_agents = [
+            {"id": ra.id, "url": ra.url, "description": ra.description}
+            for ra in config.a2a.remote_agents
+            if ra.id and ra.url
+        ]
+        tools.append(A2ADelegateTool(remote_agents=remote_agents))
+
     tools = filter_tools_by_policy(config, tools)
     logger.info("Discovered {} tools after policy filtering", len(tools))
     return tools

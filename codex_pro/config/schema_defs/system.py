@@ -256,6 +256,43 @@ class A2AConfig(_Base):
             "desc_en": "Backstop retention for non-terminal A2A tasks (seconds); a leak guard, not a task deadline",
         },
     )
+    # Outbound delegation registry. Each entry names a peer agent the runtime can
+    # delegate to via the delegate_a2a tool; operators may also pass a raw URL
+    # per-call, but a configured entry lets the model reuse a known, vetted peer.
+    remote_agents: list[RemoteAgentConfig] = Field(
+        default_factory=list,
+        json_schema_extra={
+            "status": "effective", "ref": "agent/tools/a2a_delegate.py",
+            "desc_zh": "A2A 出站委派目标注册表(名称/URL 对),供 delegate_a2a 工具按名调用",
+            "desc_en": "Outbound A2A delegation targets (name/URL pairs) callable by the delegate_a2a tool",
+        },
+    )
+
+class RemoteAgentConfig(_Base):
+    id: str = Field(
+        default="",
+        json_schema_extra={
+            "status": "effective", "ref": "agent/tools/a2a_delegate.py",
+            "desc_zh": "远程 A2A 代理的注册名,供 delegate_a2a 工具按名引用",
+            "desc_en": "Registered name of the remote A2A agent, referenced by the delegate_a2a tool",
+        },
+    )
+    url: str = Field(
+        default="",
+        json_schema_extra={
+            "status": "effective", "ref": "agent/tools/a2a_delegate.py",
+            "desc_zh": "远程 A2A 代理的根 URL(含协议与主机,可含路径前缀)",
+            "desc_en": "Root URL of the remote A2A agent (scheme and host, optionally a path prefix)",
+        },
+    )
+    description: str = Field(
+        default="",
+        json_schema_extra={
+            "status": "effective", "ref": "agent/tools/a2a_delegate.py",
+            "desc_zh": "远程 A2A 代理用途描述,帮助模型选择委托目标",
+            "desc_en": "Description of the remote A2A agent, to help the model choose a target",
+        },
+    )
 
 class PluginsConfig(_Base):
     """Plugin system configuration."""

@@ -177,7 +177,7 @@ codex-pro gateway uninstall  # 取消注册
 | **模型路由** | 主推理、上下文压缩、向量嵌入、风险审批可独立配置 provider 与模型 | [路由与 Fallback](https://codex-pro.io/codex-pro/guides/models/routing-fallback/) |
 | **工具审批** | 三档策略 `manual` / `smart` / `off`，无人值守通道默认拒绝高风险调用 | [工具与权限](https://codex-pro.io/codex-pro/guides/tools-permissions/) |
 | **多模型支持** | OpenAI、Anthropic、Gemini、Bedrock、OpenRouter，以及 DeepSeek、Qwen、Kimi、GLM、Ollama 等 OpenAI 兼容端点 | [Provider 总览](https://codex-pro.io/codex-pro/guides/models/providers/) |
-| **跨进程互操作** | A2A JSON-RPC 入站任务端点 + MCP 客户端（含 OAuth 与动态工具注册）；当前 Agent 运行时不提供 A2A 出站委派入口 | [MCP](https://codex-pro.io/codex-pro/integrations/mcp/) · [A2A](https://codex-pro.io/codex-pro/integrations/a2a/) |
+| **跨进程互操作** | A2A JSON-RPC 入站任务端点与出站委派工具（`delegate_a2a`，可对远程 A2A 代理发现/下发/查询/取消任务）+ MCP 客户端（含 OAuth 与动态工具注册） | [MCP](https://codex-pro.io/codex-pro/integrations/mcp/) · [A2A](https://codex-pro.io/codex-pro/integrations/a2a/) |
 | **插件体系** | 通过 entry-point 注册外部插件 | [使用插件](https://codex-pro.io/codex-pro/integrations/plugins/using-plugins/) |
 | **Codex Pro** | 内置 Web 界面，支持对话、费用与运行状态查看 | [Codex Pro](https://codex-pro.io/codex-pro/guides/web-ui/) |
 | **定时任务** | 内置 Cron 调度器，按计划触发 Agent 执行 | [定时任务](https://codex-pro.io/codex-pro/guides/scheduled-jobs/) |

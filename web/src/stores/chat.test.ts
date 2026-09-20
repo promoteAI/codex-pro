@@ -131,6 +131,25 @@ describe("chat store", () => {
     expect(useChatStore.getState().messages.filter((m) => m.role === "user")).toHaveLength(2);
   });
 
+  it("setModel persists models.default_model via /config PATCH", async () => {
+    const fetchSpy = vi.spyOn(api, "apiFetch").mockResolvedValue({ success: true });
+    await useChatStore.getState().setModel("agnes-2.0-flash");
+    expect(useChatStore.getState().model).toBe("agnes-2.0-flash");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/config",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ changes: { "models.default_model": "agnes-2.0-flash" } }),
+      }),
+    );
+  });
+
+  it("setModel keeps local model on PATCH failure", async () => {
+    vi.spyOn(api, "apiFetch").mockRejectedValue(new Error("unauthorized"));
+    await useChatStore.getState().setModel("o3");
+    expect(useChatStore.getState().model).toBe("o3");
+  });
+
   it("clearChat resets thread", async () => {
     vi.spyOn(api, "apiFetch").mockResolvedValue({
       status: "accepted",

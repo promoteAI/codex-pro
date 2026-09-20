@@ -54,6 +54,7 @@
   "openFolderToast": "选择要打开的文件夹…",
   "remoteConnect": "远程连接",
   "searchModel": "搜索模型",
+  "loadingModels": "加载中…",
   "noRepos": "未找到仓库",
   "loadingBranches": "加载分支…",
   "noBranches": "未找到分支",

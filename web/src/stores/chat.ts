@@ -91,7 +91,7 @@ interface ChatState {
   openProject: (path: string) => Promise<void>;
   setEnv: (env: string) => void;
   setBranch: (branch: string) => void;
-  setModel: (model: string) => void;
+  setModel: (model: string) => Promise<void>;
   setEffort: (effort: number) => void;
   setPerm: (perm: "ask" | "agent" | "full") => void;
   setDraft: (draft: string) => void;
@@ -134,6 +134,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isGit: false,
 
   setProject: (project, projectPath) => set({ project, projectPath: projectPath ?? get().projectPath }),
+  setModel: async (model: string) => {
+    set({ model });
+    try {
+      await apiFetch("/config", {
+        method: "PATCH",
+        body: JSON.stringify({ changes: { "models.default_model": model } }),
+      });
+      toast.success(`已设为默认模型 ${model}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "设为默认模型失败");
+    }
+  },
 
   selectProject: (repo) => {
     const { clearChat } = get();
@@ -167,7 +179,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
   setEnv: (env) => set({ env }),
   setBranch: (branch) => set({ branch }),
-  setModel: (model) => set({ model }),
   setEffort: (effort) => set({ effort }),
   setPerm: (perm) => set({ perm }),
   setDraft: (draft) => set({ draft }),

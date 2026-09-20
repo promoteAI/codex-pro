@@ -1051,6 +1051,42 @@ class TestConfigAPI:
         server.web_ws.broadcast.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_update_models_default_model_persists_and_hot_reloads(self, tmp_path):
+        import yaml
+
+        from codex_pro.config.schema import Config
+
+        api, _, server = self._make(config=Config())
+        server._config_path = tmp_path / "codex-pro.yaml"
+        server.web_ws.broadcast = AsyncMock()
+        server.reload_config = AsyncMock(return_value={"ok": True})
+
+        resp = await api.update_config(
+            _Request(body={"changes": {"models.default_model": "agnes-2.5-flash"}})
+        )
+        assert resp.status == 200
+        saved = yaml.safe_load(server._config_path.read_text(encoding="utf-8"))
+        assert saved["models"]["default_model"] == "agnes-2.5-flash"
+        assert (await _payload(resp))["hot_reload"] is True
+        server.reload_config.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_update_config_rejects_models_provider_paths(self, tmp_path):
+        from codex_pro.config.schema import Config
+
+        api, _, server = self._make(config=Config())
+        server._config_path = tmp_path / "codex-pro.yaml"
+        server.web_ws.broadcast = AsyncMock()
+
+        # providers/routes are handled by their own endpoints — the generic
+        # config PATCH must reject them even though models is partly editable.
+        resp = await api.update_config(
+            _Request(body={"changes": {"models.providers": [{"name": "openai"}]}})
+        )
+        assert resp.status == 400
+        assert not server._config_path.exists()
+
+    @pytest.mark.asyncio
     async def test_update_config_rejects_sensitive_and_invalid_values(self, tmp_path):
         from codex_pro.config.schema import Config
 

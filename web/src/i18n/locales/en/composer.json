@@ -54,6 +54,7 @@
   "openFolderToast": "Choose a folder to open…",
   "remoteConnect": "Remote connect",
   "searchModel": "Search models",
+  "loadingModels": "Loading…",
   "noRepos": "No repos found",
   "loadingBranches": "Loading branches…",
   "noBranches": "No branches found",

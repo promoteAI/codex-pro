@@ -13,13 +13,13 @@ import {
   X,
 } from "lucide-react";
 import { useChatStore } from "../../stores/chat";
+import { useProvidersStore } from "../../stores/providers";
 import { ProjectMenu } from "../ProjectMenu";
 import { CreateProjectDialog } from "../CreateProjectDialog";
 import { BranchMenu } from "../BranchMenu";
 import { ComposerAddMenu } from "../ComposerAddMenu";
 import {
   MOCK_CTX_USAGE,
-  MOCK_MODELS,
   SLASH_COMMANDS,
 } from "../../mock/seeds";
 
@@ -58,14 +58,28 @@ export function Composer() {
   const loadingBranches = useChatStore((s) => s.loadingBranches);
   const chatting = useChatStore((s) => s.chatting);
 
+  const providers = useProvidersStore((s) => s.providers);
+  const fetchProviders = useProvidersStore((s) => s.fetchProviders);
+
   const [menu, setMenu] = useState<Menu>(null);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [modelQuery, setModelQuery] = useState("");
+  const [providersLoaded, setProvidersLoaded] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const projectBtnRef = useRef<HTMLButtonElement>(null);
   const branchBtnRef = useRef<HTMLButtonElement>(null);
   const addBtnRef = useRef<HTMLButtonElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    fetchProviders().then(() => setProvidersLoaded(true)).catch(() => setProvidersLoaded(true));
+  }, []);
+
+  const availableModels = useMemo(() => {
+    const set = new Set<string>();
+    providers.forEach((p) => p.models?.forEach((m) => set.add(m)));
+    return set.size > 0 ? Array.from(set).sort() : null;
+  }, [providers]);
 
   const ctxUsage = useMemo(() => {
     const used = MOCK_CTX_USAGE.segments.reduce((s, x) => s + x.tokens, 0);
@@ -451,23 +465,27 @@ export function Composer() {
                 className="w-full bg-[#1e1e1e] border border-[#333] rounded-md px-2 py-1.5 text-[12.5px] mb-1 outline-none"
               />
               <div className="max-h-40 overflow-auto">
-                {MOCK_MODELS.filter((m) => m.toLowerCase().includes(modelQuery.toLowerCase())).map(
-                  (m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => {
-                        setModel(m);
-                        setMenu(null);
-                      }}
-                      className={`w-full text-left px-2 py-1.5 rounded text-[13px] ${
-                        model === m ? "bg-[#353535]" : "hover:bg-[#353535]"
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ),
-                )}
+                {providersLoaded && !availableModels ? (
+                  <div className="px-2 py-1.5 text-[12.5px] text-codex-muted">{t("loadingModels")}</div>
+                ) : availableModels !== null ? (
+                  availableModels
+                    .filter((m) => m.toLowerCase().includes(modelQuery.toLowerCase()))
+                    .map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          void setModel(m);
+                          setMenu(null);
+                        }}
+                        className={`w-full text-left px-2 py-1.5 rounded text-[13px] ${
+                          model === m ? "bg-[#353535]" : "hover:bg-[#353535]"
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))
+                ) : null}
               </div>
             </div>
           )}

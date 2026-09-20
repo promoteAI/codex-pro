@@ -94,6 +94,13 @@ class GatewayServer:
         self._a2a_config = a2a_config
         self._config_path = config_path
         self._config_watcher: Any = None
+        # Serialize reload_config() calls. A config PATCH writes the file and
+        # then reloads explicitly, while the config watcher fires an async reload
+        # on the same file change — two concurrent router.reload() calls race on
+        # dict internals and can aclose() a provider that a live turn is still
+        # using, surfacing as "client has been closed". The lock makes both
+        # serial; callers that don't need the result may still await it.
+        self._reload_lock = asyncio.Lock()
 
         self._app: web.Application | None = None
         self._runner: web.AppRunner | None = None
@@ -619,35 +626,42 @@ class GatewayServer:
         in-process view stays coherent after a hot-reload.  Broadcasts a
         ``config_updated`` WebSocket event so the frontend refreshes its UI.
         """
-        from codex_pro.config.loader import load_config
+        # Serialize against concurrent reloads (the config watcher may fire on
+        # the same file mutation that also triggered this call). Without the
+        # lock, two router.reload() calls race and can aclose() a provider a
+        # live turn still uses — "Cannot send a request, as the client has been
+        # closed". The second waiter re-reads the file after the lock, so it
+        # picks up the latest on-disk state.
+        async with self._reload_lock:
+            from codex_pro.config.loader import load_config
 
-        try:
-            new_config = load_config(self._config_path)
-        except Exception as exc:
-            logger.error("Config reload failed: {}", exc)
-            await self.web_ws.broadcast(
-                "config_updated", {"paths": ["*"], "hot_reload": False, "error": str(exc)}
-            )
-            return {"ok": False, "error": str(exc)}
-
-        self._set_models_config(new_config.models)
-
-        loop = getattr(self, "_agent_loop", None)
-        router = getattr(loop, "router", None) if loop is not None else None
-        if router is not None:
             try:
-                await router.reload(default_model=new_config.models.default_model)
+                new_config = load_config(self._config_path)
             except Exception as exc:
-                logger.error("Router reload failed: {}", exc)
+                logger.error("Config reload failed: {}", exc)
                 await self.web_ws.broadcast(
                     "config_updated", {"paths": ["*"], "hot_reload": False, "error": str(exc)}
                 )
                 return {"ok": False, "error": str(exc)}
 
-        await self.web_ws.broadcast(
-            "config_updated", {"paths": ["models"], "hot_reload": True}
-        )
-        return {"ok": True}
+            self._set_models_config(new_config.models)
+
+            loop = getattr(self, "_agent_loop", None)
+            router = getattr(loop, "router", None) if loop is not None else None
+            if router is not None:
+                try:
+                    await router.reload(default_model=new_config.models.default_model)
+                except Exception as exc:
+                    logger.error("Router reload failed: {}", exc)
+                    await self.web_ws.broadcast(
+                        "config_updated", {"paths": ["*"], "hot_reload": False, "error": str(exc)}
+                    )
+                    return {"ok": False, "error": str(exc)}
+
+            await self.web_ws.broadcast(
+                "config_updated", {"paths": ["models"], "hot_reload": True}
+            )
+            return {"ok": True}
 
     @staticmethod
     def _http_final_response(event_id: str, session_key: str, reply: dict[str, Any]) -> tuple[int, dict[str, Any]]:

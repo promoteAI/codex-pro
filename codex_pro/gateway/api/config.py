@@ -113,6 +113,11 @@ class ConfigAPI:
         parts = path.split(".")
         if not parts or any(not part or part.startswith("_") for part in parts):
             return False
+        # `models` is only editable at models.default_model so the Composer can
+        # set the default model; providers/routes have their own dedicated APIs
+        # and must not be rewritten through this generic endpoint.
+        if parts[0] == "models":
+            return path == "models.default_model"
         if parts[0] not in {
             "ui",
             "observability",
@@ -229,6 +234,9 @@ class ConfigAPI:
                 "evolution",
                 "cost",
                 "channels",
+                # Only models.defaultModel is editable; providers/routes use
+                # their own dedicated endpoints.
+                "models",
             ],
             "config_path": str(self._config_path()),
         }
@@ -294,7 +302,12 @@ class ConfigAPI:
         # Keep the authoritative in-process model coherent for status pages and
         # channel lifecycle operations. For provider/model config changes we
         # hot-reload the router so no restart is needed.
-        needs_reload = any(p.startswith("models.providers") or p.startswith("models.routes") for p in changes)
+        needs_reload = any(
+            p.startswith("models.providers")
+            or p.startswith("models.routes")
+            or p == "models.default_model"
+            for p in changes
+        )
         response: dict[str, Any] = {
             "success": True,
             "paths": list(changes),

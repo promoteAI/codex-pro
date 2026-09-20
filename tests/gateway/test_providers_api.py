@@ -53,6 +53,7 @@ def _make_server(
     server._agent_loop = MagicMock()
     server._agent_loop.config = cfg
     server.web_ws = MagicMock()
+    server.reload_config = AsyncMock(return_value={"ok": True})
     server.web_ws.broadcast = AsyncMock()
     if config_path is not None:
         server._config_path = config_path
@@ -154,8 +155,8 @@ async def test_create_provider_success():
     data = _json.loads(resp.text)
     assert data["success"] is True
     assert data["name"] == "deepseek"
-    assert data["restart_required"] is True
-    server.web_ws.broadcast.assert_called_once()
+    assert data["hot_reload"] is True
+    server.reload_config.assert_called_once()
     raw = yaml.safe_load(p.read_text(encoding="utf-8"))
     assert raw["models"]["providers"][0]["name"] == "deepseek"
 
@@ -282,7 +283,7 @@ async def test_update_provider_changes_base_url():
     # YAML preserves the original key casing; update was written using the existing spelling
     assert updated["apiBase"] == "https://custom.example.com/v1"
     assert updated["apiKey"] == "sk-x"  # unchanged
-    server.web_ws.broadcast.assert_called_once()
+    server.reload_config.assert_called_once()
 
 
 @pytest.mark.asyncio

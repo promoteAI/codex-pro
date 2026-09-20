@@ -55,6 +55,7 @@ from codex_pro.gateway.router import DeliveryRouter
 from codex_pro.gateway.session_policy import SessionResetPolicy
 from codex_pro.gateway.ws_handlers.websocket import WebSocketHandler
 from codex_pro.gateway.ws_web import WebUIWebSocket
+from codex_pro.gateway.config_watcher import ConfigWatcher
 from codex_pro.gateway.ws_session import normalize_platform
 from codex_pro.gateway.term import TerminalWebSocket
 from codex_pro.session.manager import SessionManager
@@ -92,6 +93,7 @@ class GatewayServer:
         self._agent_loop = agent_loop
         self._a2a_config = a2a_config
         self._config_path = config_path
+        self._config_watcher: Any = None
 
         self._app: web.Application | None = None
         self._runner: web.AppRunner | None = None
@@ -337,6 +339,12 @@ class GatewayServer:
 
         self._running = True
 
+        # Start config file watcher for hot-reload
+        if self._config_path is not None:
+            self._config_watcher = ConfigWatcher(self, self._config_path)
+            self._config_watcher.start()
+            logger.info("Config watcher started for {}", self._config_path)
+
         from codex_pro.observability.log_buffer import subscribe_log_events
 
         loop = asyncio.get_running_loop()
@@ -390,6 +398,9 @@ class GatewayServer:
 
     async def stop(self) -> None:
         self._running = False
+        if self._config_watcher is not None:
+            self._config_watcher.stop()
+            self._config_watcher = None
         if self._unsubscribe_log_events is not None:
             self._unsubscribe_log_events()
             self._unsubscribe_log_events = None
@@ -588,6 +599,55 @@ class GatewayServer:
 
     async def _release_durable_claim(self, event_id: str) -> None:
         await self._msg_handler._release_durable_claim(event_id)
+
+    def _set_models_config(self, models_config: Any) -> None:
+        """Update in-memory models config on both loop and router."""
+        loop = getattr(self, "_agent_loop", None)
+        if loop is not None:
+            try:
+                loop.config.models = models_config
+            except Exception:
+                pass  # loop.config may not have .models in some test setups
+        router = getattr(loop, "router", None) if loop is not None else None
+        if router is not None:
+            router._config = models_config
+
+    async def reload_config(self) -> dict[str, Any]:
+        """Re-read config from disk and rebuild the model router.
+
+        Updates both ``loop.config.models`` and ``router._config`` so the
+        in-process view stays coherent after a hot-reload.  Broadcasts a
+        ``config_updated`` WebSocket event so the frontend refreshes its UI.
+        """
+        from codex_pro.config.loader import load_config
+
+        try:
+            new_config = load_config(self._config_path)
+        except Exception as exc:
+            logger.error("Config reload failed: {}", exc)
+            await self.web_ws.broadcast(
+                "config_updated", {"paths": ["*"], "hot_reload": False, "error": str(exc)}
+            )
+            return {"ok": False, "error": str(exc)}
+
+        self._set_models_config(new_config.models)
+
+        loop = getattr(self, "_agent_loop", None)
+        router = getattr(loop, "router", None) if loop is not None else None
+        if router is not None:
+            try:
+                await router.reload(default_model=new_config.models.default_model)
+            except Exception as exc:
+                logger.error("Router reload failed: {}", exc)
+                await self.web_ws.broadcast(
+                    "config_updated", {"paths": ["*"], "hot_reload": False, "error": str(exc)}
+                )
+                return {"ok": False, "error": str(exc)}
+
+        await self.web_ws.broadcast(
+            "config_updated", {"paths": ["models"], "hot_reload": True}
+        )
+        return {"ok": True}
 
     @staticmethod
     def _http_final_response(event_id: str, session_key: str, reply: dict[str, Any]) -> tuple[int, dict[str, Any]]:

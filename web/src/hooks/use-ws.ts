@@ -42,6 +42,10 @@ export function useWsSubscribe(
     const unsubs = typeList.map((type) =>
       webWS.on(type, (ev) => handlerRef.current(ev)),
     );
+
+    // Always subscribe to channels when possible. When auth is not required
+    // (openMode), use an empty token so the socket still registers the
+    // channel and receives broadcasts (e.g. config_updated).
     const release = webWS.subscribe(token || "", channelList);
 
     // The token the socket authenticated with is no longer accepted; drop it

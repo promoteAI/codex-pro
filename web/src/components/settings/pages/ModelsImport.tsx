@@ -5,6 +5,7 @@ import { ActionBtn, PageSub, PageTitle, SettingsCard, SettingsRow, Toggle } from
 import { useProvidersStore, type ProviderEntry } from "../../../stores/providers";
 import { toast } from "../../../stores/toast";
 import { AddModelModal } from "./AddModelModal";
+import { useWsSubscribe } from "../../../hooks/use-ws";
 
 export function ModelsPage() {
   const { t } = useTranslation("settings");
@@ -40,6 +41,12 @@ export function ModelsPage() {
     const interval = setInterval(refreshHealth, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  useWsSubscribe(
+    ["models"],
+    () => { fetchProviders(); refreshHealth(); },
+    ["config_updated"],
+  );
 
   useEffect(() => {
     if (providers.length > 0 && (!activeName || !providers.find((p) => p.name === activeName))) {

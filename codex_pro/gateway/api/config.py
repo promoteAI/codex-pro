@@ -292,21 +292,19 @@ class ConfigAPI:
             return web.json_response({"error": f"save failed: {exc}"}, status=500)
 
         # Keep the authoritative in-process model coherent for status pages and
-        # channel lifecycle operations. Most subsystems capture settings during
-        # construction, so the response explicitly requires restart; channel
-        # start/stop is the one supported live operation.
-        for path in changes:
-            value = self._get_model_path(validated, path)
-            self._set_model_path(config, path, value)
-        await self._server.web_ws.broadcast(
-            "config_updated",
-            {"paths": list(changes), "restart_required": True},
-        )
-        return web.json_response(
-            {
-                "success": True,
-                "paths": list(changes),
-                "restart_required": True,
-                "config_path": str(target),
-            }
-        )
+        # channel lifecycle operations. For provider/model config changes we
+        # hot-reload the router so no restart is needed.
+        needs_reload = any(p.startswith("models.providers") or p.startswith("models.routes") for p in changes)
+        response: dict[str, Any] = {
+            "success": True,
+            "paths": list(changes),
+            "config_path": str(target),
+        }
+        if needs_reload:
+            response["hot_reload"] = True
+            result = await self._server.reload_config()
+            if not result.get("ok", True):
+                response["error"] = result.get("error", "hot reload failed")
+        else:
+            response["restart_required"] = True
+        return web.json_response(response)

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 from aiohttp import web
+from loguru import logger
 
 if TYPE_CHECKING:
     from codex_pro.gateway.server import GatewayServer
@@ -26,6 +27,15 @@ class ProvidersAPI:
 
     def _get_config(self):
         return getattr(getattr(self._server, "_agent_loop", None), "config", None)
+
+    async def _reload_and_broadcast(self, paths: list[str]) -> None:
+        """Trigger a hot-reload via server.reload_config (handles broadcast internally)."""
+        try:
+            result = await self._server.reload_config()
+            if not result.get("ok", True):
+                logger.warning("Config reload after provider write failed: {}", result.get("error"))
+        except Exception as exc:
+            logger.warning("Config reload after provider write failed: {}", exc)
 
     @staticmethod
     def _serialize_provider(pc: ProviderConfig) -> dict[str, Any]:
@@ -134,11 +144,9 @@ class ProvidersAPI:
             save_config(raw, target)
         except OSError as exc:
             return web.json_response({"error": f"save failed: {exc}"}, status=500)
-        await self._server.web_ws.broadcast(
-            "config_updated", {"paths": ["models.providers"], "restart_required": True}
-        )
+        await self._reload_and_broadcast(["models.providers"])
         return web.json_response(
-            {"success": True, "name": pc.name, "restart_required": True}, status=201
+            {"success": True, "name": pc.name, "hot_reload": True}, status=201
         )
 
     # ── delete ────────────────────────────────────────────────────────────────
@@ -173,10 +181,8 @@ class ProvidersAPI:
             save_config(raw, target)
         except OSError as exc:
             return web.json_response({"error": f"save failed: {exc}"}, status=500)
-        await self._server.web_ws.broadcast(
-            "config_updated", {"paths": ["models.providers"], "restart_required": True}
-        )
-        return web.json_response({"success": True, "name": name, "restart_required": True})
+        await self._reload_and_broadcast(["models.providers"])
+        return web.json_response({"success": True, "name": name, "hot_reload": True})
 
     # ── update (PATCH) ──────────────────────────────────────────────────────
 
@@ -248,10 +254,8 @@ class ProvidersAPI:
             save_config(raw, target_path)
         except OSError as exc:
             return web.json_response({"error": f"save failed: {exc}"}, status=500)
-        await self._server.web_ws.broadcast(
-            "config_updated", {"paths": ["models.providers"], "restart_required": True}
-        )
-        return web.json_response({"success": True, "name": name, "restart_required": True})
+        await self._reload_and_broadcast(["models.providers"])
+        return web.json_response({"success": True, "name": name, "hot_reload": True})
 
     # ── rename ──────────────────────────────────────────────────────────────
 
@@ -301,10 +305,8 @@ class ProvidersAPI:
             save_config(raw, target)
         except OSError as exc:
             return web.json_response({"error": f"save failed: {exc}"}, status=500)
-        await self._server.web_ws.broadcast(
-            "config_updated", {"paths": ["models.providers"], "restart_required": True}
-        )
-        return web.json_response({"success": True, "name": new_name, "restart_required": True})
+        await self._reload_and_broadcast(["models.providers"])
+        return web.json_response({"success": True, "name": new_name, "hot_reload": True})
 
     # ── test connection ───────────────────────────────────────────────────────
 

@@ -101,6 +101,7 @@ class ModelRouter:
         self._config = config
         self._providers: dict[str, LLMProvider] = {}
         self._health: dict[str, ProviderHealth] = {}
+        self._provider_fingerprints: dict[str, str] = {}
         self._cooldown_seconds = cooldown_seconds
         self._health_file = health_file
         self._health_save_lock = threading.Lock()
@@ -124,6 +125,77 @@ class ModelRouter:
         self._providers[name] = provider
         if name not in self._health:
             self._health[name] = ProviderHealth()
+
+    async def reload(self, default_model: str = "") -> None:
+        """Re-create providers from the current in-memory ``_config``.
+
+        Only rebuilds providers whose non-sensitive config fields have
+        actually changed.  Providers with missing credentials are kept
+        from the previous run so a user who saves a draft (no api_key
+        yet) does not lose a previously-working instance.
+
+        Health state is preserved for names that still exist; removed
+        providers are closed and dropped.  The config object itself is
+        *not* re-read from disk — callers must update ``self._config``
+        before invoking this method.
+        """
+        from codex_pro.models.providers import create_provider
+
+        def _fingerprint(pc) -> str:
+            """Hash of non-sensitive fields to detect real config changes."""
+            import hashlib
+            parts = [
+                pc.name, pc.api_base, pc.api_key_env,
+                tuple(sorted(pc.models)),
+                tuple(sorted(pc.extra_headers.items())),
+                pc.max_retries, pc.timeout_seconds,
+                pc.stream_include_usage, pc.rate_limit_rpm,
+                pc.disabled, tuple(sorted(pc.credential_pool)),
+            ]
+            return hashlib.md5(str(parts).encode()).hexdigest()[:8]
+
+        old_fingerprints = {
+            pc.name: _fingerprint(pc)
+            for pc in self._config.providers
+            if pc.name
+        }
+
+        new_providers: dict[str, LLMProvider] = {}
+        for pc in self._config.providers:
+            if not pc.name or pc.disabled:
+                continue
+            name = pc.name
+            # Preserve existing instance if config unchanged.
+            if name in self._providers and old_fingerprints.get(name) == self._provider_fingerprints.get(name):
+                new_providers[name] = self._providers[name]
+                if name not in self._health:
+                    self._health[name] = ProviderHealth()
+                continue
+            # Config changed or new provider — attempt rebuild.
+            try:
+                provider = create_provider(pc, default_model=default_model)
+                new_providers[name] = provider
+                self._provider_fingerprints[name] = old_fingerprints[name]
+            except Exception as e:
+                # Save failed (e.g. missing api_key): keep old instance
+                # if one exists, so we don't tear down a working provider.
+                logger.warning("Failed to create provider '{}' during reload: {}", name, e)
+                if name in self._providers:
+                    new_providers[name] = self._providers[name]
+            if name not in self._health:
+                self._health[name] = ProviderHealth()
+
+        # Close providers that are gone from config.
+        for name, provider in self._providers.items():
+            if name not in new_providers:
+                try:
+                    aclose = getattr(provider, "aclose", None)
+                    if aclose:
+                        await aclose()
+                except Exception:
+                    pass
+
+        self._providers = new_providers
 
     def route(self, task_type: str = "", content: str = "", preferred_model: str = "") -> RouteDecision:
         if preferred_model:

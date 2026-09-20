@@ -193,6 +193,7 @@ class WebUIWebSocket:
         "log": "logs",
         "analytics": "analytics",
         "knowledge": "knowledge",
+        "config": "models",   # config_updated → models channel for provider UI
     }
 
     async def broadcast(self, event_type: str, payload: dict[str, Any], channel: str | None = None) -> None:

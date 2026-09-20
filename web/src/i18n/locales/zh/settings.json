@@ -428,6 +428,7 @@
   "providerNameRequired": "供应商名称不能为空",
   "baseUrlRequired": "Base URL 不能为空",
   "saveSuccess": "保存成功",
+  "deleteSuccess": "删除成功",
   "createProvider": "添加供应商",
   "createProviderSub": "配置一个完全自定义的 API 端点和初始模型。",
   "contextWindowDefault": "1000000",

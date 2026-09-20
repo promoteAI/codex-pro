@@ -28,6 +28,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     from codex_pro.gateway.api.git import GitAPI
     from codex_pro.gateway.api.files import FilesAPI
     from codex_pro.gateway.api.prs import PrsAPI
+    from codex_pro.gateway.api.hooks import register_hook_api_routes
     from codex_pro.gateway.api.plugins import register_plugin_api_routes
     from codex_pro.gateway.api.providers import ProvidersAPI
     from codex_pro.gateway.api.connections import ConnectionsAPI
@@ -125,6 +126,9 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
 
     # Plugins
     register_plugin_api_routes(app, prefix, server)
+
+    # User-configured lifecycle hooks
+    register_hook_api_routes(app, prefix, server)
 
     # Git operations for Composer dropdowns
     app.router.add_get(f"{prefix}/git/repos", git_api.list_repos)

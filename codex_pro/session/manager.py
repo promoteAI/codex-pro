@@ -597,6 +597,59 @@ class SessionManager:
             self._cache.pop(key, None)
         return True
 
+    async def unarchive_session(self, key: str) -> bool:
+        """Restore an archived session to active. Returns False if it is not found.
+
+        The inverse of ``archive_session``: storage mode flips ``status`` back to
+        ``active`` (the record stays in the sessions table either way), file mode
+        moves the file back out of ``archive/`` into the main sessions directory.
+        """
+        if self._storage:
+            async with self._lock:
+                session = self._cache.get(key)
+            if session is None:
+                session = await self._load(key)
+            if session is None or session.status != "archived":
+                return False
+            session.status = "active"
+            session.updated_at = datetime.now()
+            await self.save(session)
+            async with self._lock:
+                self._cache.pop(key, None)
+            return True
+        path = self._session_path(key)
+        archive_path = self.sessions_dir / "archive" / path.name
+        if archive_path.exists():
+            self.sessions_dir.mkdir(exist_ok=True)
+            shutil.move(str(archive_path), str(path))
+        elif not path.exists():
+            return False
+        async with self._lock:
+            self._cache.pop(key, None)
+        return True
+
+    async def delete_session(self, key: str) -> bool:
+        """Permanently delete a session from both cache and persistence.
+
+        Covers whichever location the session is in, so a key archived (file
+        mode, in ``archive/``) or active (in the sessions dir) is equally
+        removable. Returns True if anything was deleted.
+        """
+        async with self._lock:
+            self._cache.pop(key, None)
+        if self._storage:
+            return await self._storage.delete_session(key)
+        path = self._session_path(key)
+        archive_path = self.sessions_dir / "archive" / path.name
+        existed = False
+        if path.exists():
+            path.unlink()
+            existed = True
+        if archive_path.exists():
+            archive_path.unlink()
+            existed = True
+        return existed
+
     async def cleanup_expired(self) -> int:
         """Expire stale sessions and archive old expired ones. Returns count processed."""
         now = datetime.now()
@@ -644,41 +697,59 @@ class SessionManager:
                 continue
         return count
 
-    async def list_sessions_async(self) -> list[dict[str, Any]]:
+    async def list_sessions_async(self, archived: bool | None = None) -> list[dict[str, Any]]:
         if self._storage and hasattr(self._storage, "list_sessions"):
             sessions = await self._storage.list_sessions()
+            if archived is not None:
+                sessions = [s for s in sessions if (s.get("status") == "archived") is archived]
             return sorted(sessions, key=lambda x: x.get("updated_at", ""), reverse=True)
-        return self.list_sessions()
+        return self.list_sessions(archived=archived)
 
-    def list_sessions(self) -> list[dict[str, Any]]:
+    def list_sessions(self, archived: bool | None = None) -> list[dict[str, Any]]:
         """Synchronous listing. With SQLite storage and a running event loop
         this can only see the in-memory cache (≤ max_cache_size entries) —
-        prefer ``list_sessions_async`` for a complete listing."""
+        prefer ``list_sessions_async`` for a complete listing.
+
+        ``archived`` filters the result: True keeps only archived sessions,
+        False keeps only non-archived ones, and None (the default) returns the
+        main sessions list (never the archive dir), so existing callers keep
+        their behaviour.
+        """
         if self._storage:
             try:
                 loop = asyncio.get_running_loop()
             except RuntimeError:
-                return asyncio.run(self.list_sessions_async())
+                return asyncio.run(self.list_sessions_async(archived=archived))
             if loop.is_running():
-                return sorted(
-                    [
-                        {
-                            "key": session.key,
-                            "status": session.status,
-                            "created_at": session.created_at.isoformat(),
-                            "updated_at": session.updated_at.isoformat(),
-                            "metadata": session.metadata,
-                            "title": session.resolved_title(),
-                            "project": session.project,
-                            "message_count": len(session.messages),
-                        }
-                        for session in self._cache.values()
-                    ],
-                    key=lambda x: x.get("updated_at", ""),
-                    reverse=True,
-                )
+                items = [
+                    {
+                        "key": session.key,
+                        "status": session.status,
+                        "created_at": session.created_at.isoformat(),
+                        "updated_at": session.updated_at.isoformat(),
+                        "metadata": session.metadata,
+                        "title": session.resolved_title(),
+                        "project": session.project,
+                        "message_count": len(session.messages),
+                    }
+                    for session in self._cache.values()
+                ]
+                if archived is not None:
+                    items = [s for s in items if (s["status"] == "archived") is archived]
+                return sorted(items, key=lambda x: x.get("updated_at", ""), reverse=True)
+        archive_dir = self.sessions_dir / "archive"
+        # File-mode archival moves files into ``archive/`` without rewriting their
+        # status field, so the on-disk location (not the status) is the
+        # authoritative signal. The default (archived=None) must keep scanning only
+        # the main sessions dir so existing callers — cleanup_expired, search,
+        # health — see exactly what they saw before; only an explicit archived=True
+        # reaches into the archive dir.
+        if archived is True:
+            paths = sorted(archive_dir.glob("*.jsonl")) if archive_dir.exists() else []
+        else:
+            paths = list(self.sessions_dir.glob("*.jsonl"))
         sessions = []
-        for path in self.sessions_dir.glob("*.jsonl"):
+        for path in paths:
             try:
                 with open(path, encoding="utf-8") as f:
                     first = f.readline().strip()
@@ -686,6 +757,12 @@ class SessionManager:
                         continue
                     data = json.loads(first)
                     if data.get("_type") != "metadata":
+                        continue
+                    status = data.get("status", "active")
+                    # A session is archived if it lives in ``archive/`` or its
+                    # status field already says so (storage-written records).
+                    is_archived = path.parent == archive_dir or status == "archived"
+                    if archived is not None and is_archived is not archived:
                         continue
                     title = data.get("title", "")
                     # Sessions written before the top-level field existed have no

@@ -95,6 +95,59 @@ async def test_session_manager_archives_storage_session_without_deleting(tmp_pat
 
 
 @pytest.mark.asyncio
+async def test_unarchive_session_restores_to_active(tmp_path: Path, backend: SQLiteBackend) -> None:
+    manager = SessionManager(sessions_dir=tmp_path / "sessions", storage=backend)
+    session = await manager.get_or_create("store:2")
+    session.add_message("user", "persist me")
+    await manager.save(session)
+
+    assert await manager.archive_session("store:2") is True
+    assert await manager.unarchive_session("store:2") is True
+
+    loaded = await backend.load_session("store:2")
+    assert loaded is not None
+    assert loaded["status"] == "active"
+
+    # 只有解归档成功的会话回到 active;不存在的会话应返回 False。
+    assert await manager.unarchive_session("missing:2") is False
+
+
+@pytest.mark.asyncio
+async def test_list_sessions_archived_filter(tmp_path: Path, backend: SQLiteBackend) -> None:
+    manager = SessionManager(sessions_dir=tmp_path / "sessions", storage=backend)
+    for key in ("f:active", "f:archived"):
+        session = await manager.get_or_create(key)
+        session.add_message("user", f"hi {key}")
+        await manager.save(session)
+    await manager.archive_session("f:archived")
+
+    only_archived = await manager.list_sessions_async(archived=True)
+    only_active = await manager.list_sessions_async(archived=False)
+    all_sessions = await manager.list_sessions_async()
+
+    assert [s["key"] for s in only_archived] == ["f:archived"]
+    assert [s["key"] for s in only_active] == ["f:active"]
+    assert len(all_sessions) == 2
+
+
+@pytest.mark.asyncio
+async def test_delete_session_removes_from_storage(tmp_path: Path, backend: SQLiteBackend) -> None:
+    manager = SessionManager(sessions_dir=tmp_path / "sessions", storage=backend)
+    session = await manager.get_or_create("del:1")
+    session.add_message("user", "to be deleted")
+    await manager.save(session)
+
+    assert await manager.delete_session("del:1") is True
+    assert await backend.load_session("del:1") is None
+    assert await manager.delete_session("del:1") is False
+    # 已归档的会话同样可删除。
+    await manager.get_or_create("del:2")
+    await manager.archive_session("del:2")
+    assert await manager.delete_session("del:2") is True
+    assert await backend.load_session("del:2") is None
+
+
+@pytest.mark.asyncio
 async def test_load_missing_session(backend: SQLiteBackend) -> None:
     result = await backend.load_session("nonexistent")
     assert result is None
@@ -172,3 +225,37 @@ async def test_concurrent_writes(backend: SQLiteBackend) -> None:
     for i in range(20):
         loaded = await backend.load_session(f"c:{i}")
         assert loaded is not None
+
+
+@pytest.mark.asyncio
+async def test_file_mode_archive_unarchive_delete_and_filter(tmp_path: Path) -> None:
+    """No-storage (file) mode: archival moves files into ``archive/``, so the
+    default listing must keep scanning only the main dir (preserving existing
+    caller behaviour) while archived=True reads the archive dir."""
+    manager = SessionManager(sessions_dir=tmp_path / "sessions")
+    for key in ("cli:a", "cli:b"):
+        session = await manager.get_or_create(key)
+        session.add_message("user", f"hi {key}")
+        await manager.save(session)
+
+    # Archive cli:a; the file moves into archive/ without a status rewrite.
+    assert await manager.archive_session("cli:a") is True
+
+    only_archived = await manager.list_sessions_async(archived=True)
+    only_active = await manager.list_sessions_async(archived=False)
+    default_all = await manager.list_sessions_async()
+
+    assert [s["key"] for s in only_archived] == ["cli:a"]
+    assert [s["key"] for s in only_active] == ["cli:b"]
+    # Default listing must NOT include the archived session (regression guard).
+    assert sorted(s["key"] for s in default_all) == ["cli:b"]
+
+    # Unarchive moves it back and it reappears in the active/default listing.
+    assert await manager.unarchive_session("cli:a") is True
+    assert sorted(s["key"] for s in await manager.list_sessions_async()) == ["cli:a", "cli:b"]
+
+    # Delete removes from whichever location it currently lives in.
+    await manager.archive_session("cli:b")
+    assert await manager.delete_session("cli:b") is True
+    assert [s["key"] for s in await manager.list_sessions_async()] == ["cli:a"]
+    assert await manager.delete_session("cli:b") is False

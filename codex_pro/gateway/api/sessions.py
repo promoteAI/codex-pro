@@ -28,9 +28,16 @@ class SessionsAPI:
             return guard
 
         channel = request.query.get("channel")
+        # Filter on archival before pagination so the Archived chats page can ask
+        # for only archived sessions and the Dashboard only active ones. The query
+        # accepts any truthy/falsy spelling ("true"/"1"/"yes" vs anything else).
+        archived_param = request.query.get("archived")
+        archived: bool | None = None
+        if archived_param is not None:
+            archived = archived_param.strip().lower() in ("1", "true", "yes", "on")
         # 用 async 版:同步 list_sessions 在运行的事件循环里只能看到内存缓存,
         # 且 await 一个同步返回的 list 会抛 TypeError。
-        sessions = await self._server.session_manager.list_sessions_async()
+        sessions = await self._server.session_manager.list_sessions_async(archived=archived)
 
         if channel:
             sessions = [s for s in sessions if s.get("key", "").startswith(channel)]
@@ -65,6 +72,33 @@ class SessionsAPI:
                 "has_more": offset + len(page) < total,
             }
         )
+
+    async def archive_session(self, request: web.Request) -> web.Response:
+        guard = self._guard(request, "sessions_archive")
+        if guard is not None:
+            return guard
+        key = request.match_info["key"]
+        if not await self._server.session_manager.archive_session(key):
+            return web.json_response({"error": "not found"}, status=404)
+        return web.json_response({"key": key, "status": "archived"})
+
+    async def unarchive_session(self, request: web.Request) -> web.Response:
+        guard = self._guard(request, "sessions_unarchive")
+        if guard is not None:
+            return guard
+        key = request.match_info["key"]
+        if not await self._server.session_manager.unarchive_session(key):
+            return web.json_response({"error": "not found"}, status=404)
+        return web.json_response({"key": key, "status": "active"})
+
+    async def delete_session(self, request: web.Request) -> web.Response:
+        guard = self._guard(request, "sessions_delete")
+        if guard is not None:
+            return guard
+        key = request.match_info["key"]
+        if not await self._server.session_manager.delete_session(key):
+            return web.json_response({"error": "not found"}, status=404)
+        return web.json_response({"key": key, "status": "deleted"})
 
     async def get_history(self, request: web.Request) -> web.Response:
         guard = self._guard(request, "sessions_history")

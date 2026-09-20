@@ -98,6 +98,9 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_get(f"{prefix}/sessions/{{key}}/history", sessions_api.get_history)
     app.router.add_get(f"{prefix}/sessions/{{key}}/turns", sessions_api.list_turns)
     app.router.add_get(f"{prefix}/turns/{{event_id}}", sessions_api.get_turn)
+    app.router.add_post(f"{prefix}/sessions/{{key}}/archive", sessions_api.archive_session)
+    app.router.add_post(f"{prefix}/sessions/{{key}}/unarchive", sessions_api.unarchive_session)
+    app.router.add_delete(f"{prefix}/sessions/{{key}}", sessions_api.delete_session)
 
     app.router.add_get(f"{prefix}/cron", cron_api.list_jobs)
     app.router.add_post(f"{prefix}/cron", cron_api.create_job)

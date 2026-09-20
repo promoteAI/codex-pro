@@ -425,16 +425,24 @@ export function Composer() {
                 </button>
               </div>
               <div className="px-2 py-2">
-                <input
-                  type="range"
-                  min={0}
-                  max={3}
-                  step={1}
-                  value={effort}
-                  onChange={(e) => setEffort(Number(e.target.value))}
-                  aria-label={effortLabel}
-                  className="w-full"
-                />
+                <div className="model-menu-slider">
+                  <div className="model-menu-track">
+                    <div className="model-menu-fill" style={{ width: `${(effort / 3) * 100}%` }} />
+                    <div className="model-menu-dots" aria-hidden="true">
+                      <span /><span /><span /><span />
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={3}
+                      step={1}
+                      value={effort}
+                      onChange={(e) => setEffort(Number(e.target.value))}
+                      aria-label={effortLabel}
+                      className="model-menu-range"
+                    />
+                  </div>
+                </div>
               </div>
               <input
                 value={modelQuery}

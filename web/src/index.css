@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+*::-webkit-scrollbar{width:6px;height:6px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+*::-webkit-scrollbar-thumb:hover{background:#3f3f3f}
+*::-webkit-scrollbar-corner{background:transparent}
+
 @theme {
   --color-codex-bg: #181818;
   --color-codex-sidebar: #1c1c1c;
@@ -822,6 +828,21 @@ body {
 .toggle input:checked+.toggle-slider{background:var(--accent)}
 .toggle input:checked+.toggle-slider:before{transform:translateX(16px);background:#fff}
 input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outline-offset:2px}
+
+/* ===== prototype range sliders ===== */
+.model-menu-slider{position:relative;padding:6px 2px 2px}
+.model-menu-track{position:relative;height:8px;border-radius:999px;background:#3a3a3a;overflow:visible}
+.model-menu-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:#6eb6ff;pointer-events:none}
+.model-menu-dots{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;padding:0 3px;pointer-events:none}
+.model-menu-dots span{width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.35)}
+.model-menu-range{-webkit-appearance:none;appearance:none;position:absolute;inset:0;width:100%;height:100%;margin:0;background:transparent;outline:none;cursor:pointer}
+.model-menu-range::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:0;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;position:relative;z-index:2}
+.model-menu-range::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:0;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer}
+.model-menu-range::-moz-range-track{background:transparent;border:0}
+.contrast-slider{-webkit-appearance:none;appearance:none;width:120px;height:4px;background:#3a3a3a;border-radius:2px;outline:none}
+.contrast-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;background:#e0e0e0;border-radius:50%;cursor:pointer}
+.contrast-slider::-moz-range-thumb{width:14px;height:14px;background:#e0e0e0;border-radius:50%;cursor:pointer;border:0}
+.contrast-slider::-moz-range-track{height:4px;background:#3a3a3a;border-radius:2px;border:0}
 
 
 /* ===== prototype remote-connect wizard ===== */

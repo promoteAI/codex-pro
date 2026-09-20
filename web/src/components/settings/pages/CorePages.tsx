@@ -473,7 +473,7 @@ export function AppearancePage() {
             max={100}
             value={contrast}
             onChange={(e) => setContrast(Number(e.target.value))}
-            className="w-32 accent-codex-accent"
+            className="contrast-slider"
           />
           <span className="text-[12.5px] text-[#999] w-6 text-right">{contrast}</span>
         </SettingsRow>
@@ -504,7 +504,7 @@ export function AppearancePage() {
             max={100}
             value={contrast}
             onChange={(e) => setContrast(Number(e.target.value))}
-            className="w-32 accent-codex-accent"
+            className="contrast-slider"
           />
           <span className="text-[12.5px] text-[#999] w-6 text-right">{contrast}</span>
         </SettingsRow>

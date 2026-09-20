@@ -34,6 +34,9 @@ export function ModelsPage() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [editValues, setEditValues] = useState({ baseUrl: "", apiKey: "", format: "openai" as "openai" | "anthropic" | "responses" });
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const dirtyFieldsRef = useRef<Set<string>>(new Set());
+  const providersRef = useRef(providers);
+  providersRef.current = providers;
 
   useEffect(() => {
     fetchProviders();
@@ -54,13 +57,22 @@ export function ModelsPage() {
     }
   }, [providers, activeName]);
 
+  // Sync editValues only when switching providers (not on every refetch)
+  const prevActiveNameRef = useRef<string | null>(null);
   useEffect(() => {
-    const found = providers.find((p) => p.name === activeName);
-    if (found) {
-      setActiveLocal(found);
-      setEditValues({ baseUrl: found.api_base, apiKey: found.api_key, format: "openai" });
-    }
-  }, [providers, activeName]);
+    if (activeName === prevActiveNameRef.current) return;
+    prevActiveNameRef.current = activeName;
+    if (!activeName) return;
+    const found = providersRef.current.find((p) => p.name === activeName);
+    if (!found) return;
+    setActiveLocal(found);
+    dirtyFieldsRef.current.clear();
+    setEditValues({
+      baseUrl: found.api_base,
+      apiKey: found.api_key,
+      format: "openai",
+    });
+  }, [activeName]);
 
   const groups = useMemo(() => {
     const map = new Map<string, ProviderEntry[]>();
@@ -115,6 +127,7 @@ export function ModelsPage() {
 
   const handleFieldBlur = (field: string) => {
     if (!active) return;
+    dirtyFieldsRef.current.add(field);
     clearTimeout(debounceRef.current[field]);
     debounceRef.current[field] = setTimeout(async () => {
       const values = { ...editValues };
@@ -124,6 +137,8 @@ export function ModelsPage() {
         else if (field === "apiKey") patch.api_key = values.apiKey;
         else if (field === "format") patch.api_base = resolveApiBase(values.format, values.baseUrl);
         await updateProvider(active.name, patch);
+        // Keep dirty flag so a refetch doesn't overwrite the user's value
+        // with the empty serialized key. Clear only when switching providers.
       } catch { /* error shown by toast */ }
     }, 500);
   };
@@ -134,6 +149,7 @@ export function ModelsPage() {
     } else if (e.key === "Escape") {
       if (active) {
         setEditValues({ baseUrl: active.api_base, apiKey: active.api_key, format: "openai" });
+        dirtyFieldsRef.current.clear();
       }
     }
   };

@@ -100,7 +100,7 @@ async def test_list_providers_sanitized():
     data = _json.loads(resp.text)
     assert len(data["providers"]) == 2
     openai = next(pr for pr in data["providers"] if pr["name"] == "openai")
-    assert openai["api_key"] == ""
+    assert openai["api_key"] == "sk-secret"
     assert openai["api_base"] == "https://api.openai.com/v1"
     assert openai["models"] == ["gpt-4o"]
     anthropic = next(pr for pr in data["providers"] if pr["name"] == "anthropic")
@@ -122,7 +122,7 @@ async def test_get_provider_found():
     assert resp.status == 200
     data = _json.loads(resp.text)
     assert data["name"] == "openai"
-    assert data["api_key"] == ""
+    assert data["api_key"] == "sk-x"
 
 
 @pytest.mark.asyncio

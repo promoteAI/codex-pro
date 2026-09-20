@@ -39,10 +39,10 @@ class ProvidersAPI:
 
     @staticmethod
     def _serialize_provider(pc: ProviderConfig) -> dict[str, Any]:
-        """Return provider dict with all secrets masked."""
+        """Return provider dict with secrets preserved for the edit UI."""
         return {
             "name": pc.name,
-            "api_key": "",           # never expose the real key on GET
+            "api_key": pc.api_key,
             "api_key_env": pc.api_key_env,
             "api_base": pc.api_base,
             "models": list(pc.models),

@@ -71,7 +71,11 @@ export const useProvidersStore = create<ProvidersState>((set, get) => ({
         rate_limit_rpm: p.rate_limit_rpm ?? 0,
         disabled: p.disabled ?? false,
       }));
-      set({ providers: enriched, loading: false, activeName: enriched[0]?.name ?? null });
+      const currentActiveName = get().activeName;
+      const newActiveName = currentActiveName && enriched.find((p) => p.name === currentActiveName)
+        ? currentActiveName
+        : enriched[0]?.name ?? null;
+      set({ providers: enriched, loading: false, activeName: newActiveName });
     } catch (e: any) {
       set({ error: e.message ?? "加载失败", loading: false });
     }

@@ -128,6 +128,7 @@ class ConfigAPI:
             "evolution",
             "cost",
             "channels",
+            "permissions",
         }:
             return False
         return not any(_is_sensitive(part) for part in parts)
@@ -205,6 +206,7 @@ class ConfigAPI:
             "observability",
             "cost",
             "channels",
+            "permissions",
         ):
             section = getattr(config, field_name, None)
             if section is None:
@@ -234,6 +236,7 @@ class ConfigAPI:
                 "evolution",
                 "cost",
                 "channels",
+                "permissions",
                 # Only models.defaultModel is editable; providers/routes use
                 # their own dedicated endpoints.
                 "models",
@@ -313,11 +316,28 @@ class ConfigAPI:
             "paths": list(changes),
             "config_path": str(target),
         }
+        # permissions 是纯配置热载字段:写 YAML 后直接回写 live config 对象,
+        # 让 ApprovalGate/ApprovalManager 在下一个工具调用即可读到新模式。
+        # 与 models 的 router 重建不同,这里不需要 reload_config。
+        perm_changed = any(
+            p == "permissions" or p.startswith("permissions.") for p in changes
+        )
+        # 除 models / permissions 外的字段(ui/memory/knowledge/cost/...)走
+        # 重启路径。permissions 与这些字段可在同一次 PATCH 中共存,此时应同时
+        # 标记热载(permissions 即时生效)与重启(其余字段需重启)。
+        non_hot = any(
+            not p.startswith("models")
+            and not (p == "permissions" or p.startswith("permissions."))
+            for p in changes
+        )
+        if perm_changed:
+            config.permissions = validated.permissions
+            response["hot_reload"] = True
         if needs_reload:
             response["hot_reload"] = True
             result = await self._server.reload_config()
             if not result.get("ok", True):
                 response["error"] = result.get("error", "hot reload failed")
-        else:
+        if non_hot:
             response["restart_required"] = True
         return web.json_response(response)

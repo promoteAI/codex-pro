@@ -4,7 +4,7 @@ import { Save, RotateCw } from "lucide-react";
 import { useApi } from "../hooks/use-api";
 import { apiFetch } from "../lib/api";
 import { useIsAdmin } from "../stores/capabilities";
-import { runMutation } from "../stores/toast";
+import { toast } from "../stores/toast";
 
 interface ConfigResponse {
   ui?: { locale?: string };
@@ -12,6 +12,14 @@ interface ConfigResponse {
   memory?: { enabled?: boolean };
   knowledge?: { enabled?: boolean; auto_index?: boolean };
   cost?: { enabled?: boolean; daily_budget_usd?: number; soft_threshold_ratio?: number };
+  permissions?: {
+    approval?: {
+      mode?: string;
+      smart_model?: string;
+      unattended_policy?: string;
+      cli_auto_approve?: boolean;
+    };
+  };
   _meta?: { config_path?: string; editable_roots?: string[] };
   [key: string]: unknown;
 }
@@ -20,12 +28,14 @@ interface Draft {
   locale: string; logLevel: string; traceEnabled: boolean; memoryEnabled: boolean;
   knowledgeEnabled: boolean; autoIndex: boolean; costEnabled: boolean;
   dailyBudget: string; softThreshold: string;
+  permMode: string; smartModel: string; unattendedPolicy: string; cliAutoApprove: boolean;
 }
 
 const EMPTY: Draft = {
   locale: "auto", logLevel: "INFO", traceEnabled: true, memoryEnabled: true,
   knowledgeEnabled: true, autoIndex: true, costEnabled: false,
   dailyBudget: "0", softThreshold: "0.8",
+  permMode: "smart", smartModel: "", unattendedPolicy: "deny", cliAutoApprove: true,
 };
 
 export function Config() {
@@ -47,6 +57,10 @@ export function Config() {
       costEnabled: data.cost?.enabled ?? false,
       dailyBudget: String(data.cost?.daily_budget_usd ?? 0),
       softThreshold: String(data.cost?.soft_threshold_ratio ?? 0.8),
+      permMode: data.permissions?.approval?.mode ?? "smart",
+      smartModel: data.permissions?.approval?.smart_model ?? "",
+      unattendedPolicy: data.permissions?.approval?.unattended_policy ?? "deny",
+      cliAutoApprove: data.permissions?.approval?.cli_auto_approve ?? true,
     });
   }, [data]);
 
@@ -54,8 +68,8 @@ export function Config() {
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    const ok = await runMutation(
-      () => apiFetch("/config", {
+    try {
+      const res = await apiFetch<{ restart_required?: boolean }>("/config", {
         method: "PATCH",
         body: JSON.stringify({ changes: {
           "ui.locale": draft.locale,
@@ -67,11 +81,21 @@ export function Config() {
           "cost.enabled": draft.costEnabled,
           "cost.daily_budget_usd": Number(draft.dailyBudget),
           "cost.soft_threshold_ratio": Number(draft.softThreshold),
+          "permissions.approval.mode": draft.permMode,
+          "permissions.approval.smart_model": draft.smartModel,
+          "permissions.approval.unattended_policy": draft.unattendedPolicy,
+          "permissions.approval.cli_auto_approve": draft.cliAutoApprove,
         } }),
-      }),
-      { success: t("saveSuccess"), error: t("saveFailed") },
-    );
-    if (ok) { setRestartRequired(true); refetch(); }
+      });
+      // 热载字段(如 permissions)已即时生效,只有响应要求重启才弹提示。
+      setRestartRequired(!!res.restart_required);
+      toast.success(t("saveSuccess"));
+      refetch();
+    } catch (e) {
+      toast.error(
+        `${t("saveFailed")}：${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
   };
 
   if (isAdmin === false) return <div className="bg-amber-50 text-amber-700 rounded-lg p-4 text-sm">{t("common:adminOnly")}</div>;
@@ -101,6 +125,12 @@ export function Config() {
         <Toggle label={t("fields.costEnabled")} checked={draft.costEnabled} onChange={(value) => set("costEnabled", value)} />
         <NumberField label={t("fields.dailyBudget")} value={draft.dailyBudget} min="0" step="0.01" onChange={(value) => set("dailyBudget", value)} />
         <NumberField label={t("fields.softThreshold")} value={draft.softThreshold} min="0" max="1" step="0.05" onChange={(value) => set("softThreshold", value)} />
+      </Section>
+      <Section title={t("sections.permissions")}>
+        <Select label={t("fields.permMode")} value={draft.permMode} onChange={(value) => set("permMode", value)} options={["smart", "manual", "off"]} />
+        <TextField label={t("fields.smartModel")} value={draft.smartModel} onChange={(value) => set("smartModel", value)} />
+        <Select label={t("fields.unattendedPolicy")} value={draft.unattendedPolicy} onChange={(value) => set("unattendedPolicy", value)} options={["deny", "allow_safe"]} />
+        <Toggle label={t("fields.cliAutoApprove")} checked={draft.cliAutoApprove} onChange={(value) => set("cliAutoApprove", value)} />
       </Section>
       <button type="submit" className="flex items-center gap-1.5 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700">
         <Save size={15} /> {t("save")}
@@ -133,5 +163,10 @@ function Select({ label, value, options, onChange }: { label: string; value: str
 function NumberField({ label, value, onChange, ...props }: { label: string; value: string; onChange: (value: string) => void; min?: string; max?: string; step?: string }) {
   return <label className="text-sm"><span className="block text-gray-600 mb-1">{label}</span>
     <input type="number" value={value} onChange={(event) => onChange(event.target.value)} {...props} className="border rounded px-2 py-1.5 w-full" />
+  </label>;
+}
+function TextField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
+  return <label className="text-sm"><span className="block text-gray-600 mb-1">{label}</span>
+    <input type="text" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="border rounded px-2 py-1.5 w-full" />
   </label>;
 }

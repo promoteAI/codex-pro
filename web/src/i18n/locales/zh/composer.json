@@ -14,6 +14,7 @@
   "permFullDesc": "可不受限制地访问互联网和你电脑上的任何文件",
   "permFullShort": "完全访问",
   "permTitle": "应如何批准操作？",
+  "permSaveFailed": "权限设置保存失败",
   "model": "模型",
   "modelCustom": "自定义",
   "effortLow": "低",

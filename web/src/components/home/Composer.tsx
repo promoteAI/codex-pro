@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { useChatStore } from "../../stores/chat";
 import { useProvidersStore } from "../../stores/providers";
+import { useIsAdmin } from "../../stores/capabilities";
+import { toast } from "../../stores/toast";
 import { ProjectMenu } from "../ProjectMenu";
 import { CreateProjectDialog } from "../CreateProjectDialog";
 import { BranchMenu } from "../BranchMenu";
@@ -49,6 +51,9 @@ export function Composer() {
   const setModel = useChatStore((s) => s.setModel);
   const setEffort = useChatStore((s) => s.setEffort);
   const setPerm = useChatStore((s) => s.setPerm);
+  const persistPerm = useChatStore((s) => s.persistPerm);
+  const loadPerm = useChatStore((s) => s.loadPerm);
+  const isAdmin = useIsAdmin();
   const setPlanMode = useChatStore((s) => s.setPlanMode);
   const setGoalMode = useChatStore((s) => s.setGoalMode);
   const repos = useChatStore((s) => s.repos);
@@ -74,6 +79,12 @@ export function Composer() {
   useEffect(() => {
     fetchProviders().then(() => setProvidersLoaded(true)).catch(() => setProvidersLoaded(true));
   }, []);
+
+  // admin 才有权读写权限配置(/config 受 admin 保护)。在能力探测确认 admin
+  // 后拉取当前审批 mode 反推 perm 高亮;非 admin 保持本地默认值。
+  useEffect(() => {
+    if (isAdmin) void loadPerm().catch(() => {});
+  }, [isAdmin, loadPerm]);
 
   const availableModels = useMemo(() => {
     const set = new Set<string>();
@@ -402,7 +413,11 @@ export function Composer() {
                   key={id}
                   type="button"
                   onClick={() => {
-                    setPerm(id);
+                    if (isAdmin) {
+                      persistPerm(id).catch(() => toast.error(t("permSaveFailed")));
+                    } else {
+                      setPerm(id);
+                    }
                     setMenu(null);
                   }}
                   className={`w-full text-left px-2.5 py-2 rounded-md ${

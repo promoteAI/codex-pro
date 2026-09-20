@@ -61,6 +61,33 @@ function mapHistoryMessages(sessionId: string, rows: HistoryRow[]): ChatMessage[
   });
 }
 
+// Composer 的权限三档(ask/agent/full) ↔ 后端 permissions.approval.mode
+// (manual/smart/off) 的双向映射。CLI 的 setup_permissions 写的是同一个 mode
+// 字段,前端通过 /config PATCH 复用同一份 config。
+export function permToMode(perm: "ask" | "agent" | "full"): "manual" | "smart" | "off" {
+  switch (perm) {
+    case "ask":
+      return "manual";
+    case "agent":
+      return "smart";
+    case "full":
+      return "off";
+  }
+}
+
+export function modeToPerm(mode: string | undefined): "ask" | "agent" | "full" {
+  switch (mode) {
+    case "manual":
+      return "ask";
+    case "smart":
+      return "agent";
+    case "off":
+      return "full";
+    default:
+      return "full";
+  }
+}
+
 interface ChatState {
   project: string;
   projectPath: string;
@@ -94,6 +121,8 @@ interface ChatState {
   setModel: (model: string) => Promise<void>;
   setEffort: (effort: number) => void;
   setPerm: (perm: "ask" | "agent" | "full") => void;
+  persistPerm: (perm: "ask" | "agent" | "full") => Promise<void>;
+  loadPerm: () => Promise<void>;
   setDraft: (draft: string) => void;
   setPlanMode: (on: boolean, task?: string) => void;
   setGoalMode: (on: boolean) => void;
@@ -181,6 +210,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setBranch: (branch) => set({ branch }),
   setEffort: (effort) => set({ effort }),
   setPerm: (perm) => set({ perm }),
+  persistPerm: async (perm) => {
+    await apiFetch("/config", {
+      method: "PATCH",
+      body: JSON.stringify({
+        changes: { "permissions.approval.mode": permToMode(perm) },
+      }),
+    });
+    set({ perm });
+  },
+  loadPerm: async () => {
+    const data = await apiFetch<{ permissions?: { approval?: { mode?: string } } }>("/config");
+    set({ perm: modeToPerm(data.permissions?.approval?.mode) });
+  },
   setDraft: (draft) => set({ draft }),
   setPlanMode: (on, task) =>
     set({

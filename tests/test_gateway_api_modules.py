@@ -1119,6 +1119,57 @@ class TestConfigAPI:
         assert saved["channels"]["telegram"]["enabled"] is True
         assert config.channels.telegram.enabled is True
 
+    @pytest.mark.asyncio
+    async def test_update_config_accepts_permissions_approval_mode(self, tmp_path):
+        import yaml
+
+        from codex_pro.config.schema import Config
+
+        api, config, server = self._make(config=Config())
+        server._config_path = tmp_path / "codex-pro.yaml"
+        server.web_ws.broadcast = AsyncMock()
+
+        resp = await api.update_config(
+            _Request(body={"changes": {"permissions.approval.mode": "manual"}})
+        )
+        assert resp.status == 200
+        # permissions 纯配置,写 YAML 后直接回写 live config 并标记 hot_reload,
+        # ApprovalGate 在下一个工具调用即可读到新模式(无需重启)。
+        payload = await _payload(resp)
+        assert payload["hot_reload"] is True
+        assert "restart_required" not in payload
+        assert config.permissions.approval.mode == "manual"
+        saved = yaml.safe_load(server._config_path.read_text(encoding="utf-8"))
+        assert saved["permissions"]["approval"]["mode"] == "manual"
+
+    @pytest.mark.asyncio
+    async def test_update_config_rejects_invalid_permissions_mode(self, tmp_path):
+        from codex_pro.config.schema import Config
+
+        api, _, server = self._make(config=Config())
+        server._config_path = tmp_path / "codex-pro.yaml"
+        server.web_ws.broadcast = AsyncMock()
+
+        resp = await api.update_config(
+            _Request(body={"changes": {"permissions.approval.mode": "bogus"}})
+        )
+        assert resp.status == 400
+        assert not server._config_path.exists()
+
+    @pytest.mark.asyncio
+    async def test_get_config_includes_permissions(self, tmp_path):
+        from codex_pro.config.schema import Config
+
+        api, config, server = self._make(config=Config())
+        server._config_path = tmp_path / "codex-pro.yaml"
+        config.permissions.approval.mode = "smart"
+        resp = await api.get_config(_Request())
+        assert resp.status == 200
+        data = await _payload(resp)
+        assert data["permissions"]["approval"]["mode"] == "smart"
+        assert "permissions" in data["_meta"]["editable_roots"]
+
+
 def test_sanitize_helpers():
     from codex_pro.gateway.api.config import _sanitize
 

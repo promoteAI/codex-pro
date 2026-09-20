@@ -242,3 +242,45 @@ describe("chat store", () => {
     expect(useChatStore.getState().messages).toHaveLength(0);
   });
 });
+
+describe("perm ↔ approval mode mapping", () => {
+  it("permToMode maps the three composer tiers to backend modes", async () => {
+    const { permToMode } = await import("./chat");
+    expect(permToMode("ask")).toBe("manual");
+    expect(permToMode("agent")).toBe("smart");
+    expect(permToMode("full")).toBe("off");
+  });
+
+  it("modeToPerm maps backend modes back to composer tiers", async () => {
+    const { modeToPerm } = await import("./chat");
+    expect(modeToPerm("manual")).toBe("ask");
+    expect(modeToPerm("smart")).toBe("agent");
+    expect(modeToPerm("off")).toBe("full");
+    expect(modeToPerm("")).toBe("full");
+    expect(modeToPerm(undefined)).toBe("full");
+    expect(modeToPerm("unknown")).toBe("full");
+  });
+});
+
+describe("chat store permission persistence", () => {
+  it("persistPerm PATCHes the approval mode and updates local perm", async () => {
+    const fetchSpy = vi.spyOn(api, "apiFetch").mockResolvedValue({ success: true });
+    await useChatStore.getState().persistPerm("ask");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/config",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ changes: { "permissions.approval.mode": "manual" } }),
+      }),
+    );
+    expect(useChatStore.getState().perm).toBe("ask");
+  });
+
+  it("loadPerm reads the approval mode from /config", async () => {
+    vi.spyOn(api, "apiFetch").mockResolvedValue({
+      permissions: { approval: { mode: "smart" } },
+    });
+    await useChatStore.getState().loadPerm();
+    expect(useChatStore.getState().perm).toBe("agent");
+  });
+});

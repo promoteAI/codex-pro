@@ -14,6 +14,7 @@
   "permFullDesc": "Unrestricted access to the internet and files on this machine",
   "permFullShort": "Full access",
   "permTitle": "How should actions be approved?",
+  "permSaveFailed": "Failed to save permission settings",
   "model": "Model",
   "modelCustom": "Custom",
   "effortLow": "Low",

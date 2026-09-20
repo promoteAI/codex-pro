@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { Config } from "./Config";
 import * as api from "../lib/api";
 import { useCapabilitiesStore } from "../stores/capabilities";
@@ -57,5 +57,64 @@ describe("Config 页", () => {
 
     await waitFor(() => expect(screen.getByText(/加载失败：boom/)).toBeInTheDocument());
     expect(spy).toHaveBeenCalledWith("/config", expect.anything());
+  });
+
+  it("permissions 分区展示审批设置并在保存时提交 permissions.approval 字段", async () => {
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path: string) => {
+      if (path === "/capabilities") return { admin: true } as never;
+      return {
+        permissions: {
+          approval: {
+            mode: "smart",
+            smart_model: "m1",
+            unattended_policy: "deny",
+            cli_auto_approve: true,
+          },
+        },
+      } as never;
+    });
+
+    render(<Config />);
+
+    await waitFor(() =>
+      expect(screen.getByDisplayValue("m1")).toBeInTheDocument(),
+    );
+
+    const saveSpy = vi.spyOn(api, "apiFetch");
+    vi.mocked(api.apiFetch).mockImplementation(async (path: string) => {
+      if (path === "/capabilities") return { admin: true } as never;
+      return { success: true } as never;
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /保存/ }));
+    await waitFor(() =>
+      expect(saveSpy).toHaveBeenCalledWith(
+        "/config",
+        expect.objectContaining({
+          method: "PATCH",
+          body: expect.stringContaining('"permissions.approval.mode"'),
+        }),
+      ),
+    );
+  });
+
+  it("保存返回 hot_reload 时不提示需重启(permissions 已即时生效)", async () => {
+    let patched = false;
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path: string, init?: { method?: string }) => {
+      if (path === "/capabilities") return { admin: true } as never;
+      if (init?.method === "PATCH") {
+        patched = true;
+        return { hot_reload: true } as never;
+      }
+      return { permissions: { approval: { mode: "smart", smart_model: "m1" } } } as never;
+    });
+
+    render(<Config />);
+    await waitFor(() => expect(screen.getByDisplayValue("m1")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /保存/ }));
+    await waitFor(() => expect(patched).toBe(true));
+    // hot_reload:true → permissions 已生效,不应弹出"需重启"横幅。
+    expect(screen.queryByText(/重启/)).not.toBeInTheDocument();
   });
 });

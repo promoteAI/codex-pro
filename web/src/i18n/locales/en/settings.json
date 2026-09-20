@@ -395,6 +395,7 @@
   "providerNameRequired": "Provider name is required",
   "baseUrlRequired": "Base URL is required",
   "saveSuccess": "Saved successfully",
+  "deleteSuccess": "Deleted successfully",
   "createProvider": "Add provider",
   "createProviderSub": "Configure a custom API endpoint and initial models.",
   "contextWindowDefault": "1000000",

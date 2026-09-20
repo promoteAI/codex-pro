@@ -720,14 +720,97 @@ export function BrowserSettingsPage() {
   );
 }
 
+const HOOK_EVENTS = [
+  "PreToolUse",
+  "PostToolUse",
+  "UserPromptSubmit",
+  "PermissionRequest",
+  "Stop",
+  "SessionStart",
+  "SessionEnd",
+] as const;
+
+const HOOK_SCOPES = ["用户", "codex-pro", "default"] as const;
+
+interface ApiHook {
+  id: string;
+  name: string;
+  event: string;
+  run_mode: string;
+  scope: string;
+  command: string;
+  enabled: boolean;
+}
+
 export function HooksPage() {
   const { t } = useTranslation(["settings", "common"]);
   const [q, setQ] = useState("");
   const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [scope, setScope] = useState("用户");
   const [event, setEvent] = useState("PreToolUse");
   const [runMode, setRunMode] = useState("process");
   const [command, setCommand] = useState("");
+
+  const { data, loading, error, refetch } = useApi<{
+    hooks: ApiHook[];
+    total: number;
+    enabled: number;
+  }>("/hooks");
+
+  const hooks = data?.hooks ?? [];
+
+  const filtered = hooks.filter((h) => {
+    if (scope !== "用户" && h.scope !== scope) return false;
+    if (q && !h.event.toLowerCase().includes(q.toLowerCase())
+      && !h.command.toLowerCase().includes(q.toLowerCase())) return false;
+    return true;
+  });
+
+  const enabledCount = hooks.filter((h) => h.enabled).length;
+
+  const saveHook = async () => {
+    setSaving(true);
+    try {
+      await apiFetch("/hooks", {
+        method: "POST",
+        body: JSON.stringify({ event, run_mode: runMode, scope, command }),
+      });
+      toast.success(t("saveSuccess"));
+      setCommand("");
+      setCreating(false);
+      await refetch();
+    } catch (e: unknown) {
+      toast.error(`操作失败：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleHook = async (h: ApiHook, enable: boolean) => {
+    try {
+      await apiFetch(`/hooks/${encodeURIComponent(h.id)}/toggle`, {
+        method: "POST",
+        body: JSON.stringify({ enabled: enable }),
+      });
+      toast.success(
+        enable ? `钩子「${h.event}」${t("enabled")}` : `钩子「${h.event}」${t("disabled")}`,
+      );
+      await refetch();
+    } catch (e: unknown) {
+      toast.error(`操作失败：${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  const deleteHook = async (h: ApiHook) => {
+    try {
+      await apiFetch(`/hooks/${encodeURIComponent(h.id)}`, { method: "DELETE" });
+      toast.success(t("deleteSuccess"));
+      await refetch();
+    } catch (e: unknown) {
+      toast.error(`操作失败：${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
 
   if (creating) {
     return (
@@ -743,13 +826,11 @@ export function HooksPage() {
                 onChange={(e) => setEvent(e.target.value)}
                 className="mt-1.5 w-full bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]"
               >
-                {["PreToolUse", "PostToolUse", "UserPromptSubmit", "PermissionRequest", "Stop", "SessionStart", "SessionEnd"].map(
-                  (v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ),
-                )}
+                {HOOK_EVENTS.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="block text-[12px] text-[#8a8a8a]">
@@ -770,9 +851,11 @@ export function HooksPage() {
                 onChange={(e) => setScope(e.target.value)}
                 className="mt-1.5 w-full bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]"
               >
-                <option value="用户">{t("scopeUser")}</option>
-                <option value="codex-pro">codex-pro</option>
-                <option value="default">default</option>
+                {HOOK_SCOPES.map((s) => (
+                  <option key={s} value={s}>
+                    {s === "用户" ? t("scopeUser") : s}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
@@ -788,11 +871,14 @@ export function HooksPage() {
           </div>
         </SettingsCard>
         <div className="flex justify-end gap-2 mt-4">
-          <ActionBtn onClick={() => setCreating(false)}>{t("common:cancel")}</ActionBtn>
+          <ActionBtn onClick={() => setCreating(false)} disabled={saving}>
+            {t("common:cancel")}
+          </ActionBtn>
           <button
             type="button"
-            onClick={() => setCreating(false)}
-            className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium"
+            onClick={saveHook}
+            disabled={saving || !command.trim()}
+            className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium disabled:opacity-45 disabled:cursor-not-allowed"
           >
             {t("save")}
           </button>
@@ -817,11 +903,13 @@ export function HooksPage() {
           className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]"
           aria-label={t("hookScope")}
         >
-          <option value="用户">{t("scopeUser")}</option>
-          <option value="codex-pro">codex-pro</option>
-          <option value="default">default</option>
+          {HOOK_SCOPES.map((s) => (
+            <option key={s} value={s}>
+              {s === "用户" ? t("scopeUser") : s}
+            </option>
+          ))}
         </select>
-        <span className="text-[12.5px] text-codex-muted">{t("hooksCount", { n: 0 })}</span>
+        <span className="text-[12.5px] text-codex-muted">{t("hooksCount", { n: hooks.length })}</span>
         <div className="ml-auto flex items-center gap-1.5 bg-[#1e1e1e] border border-codex-border rounded-lg px-2.5 py-1 w-[200px]">
           <Search size={14} className="text-[#555]" />
           <input
@@ -833,12 +921,13 @@ export function HooksPage() {
         </div>
       </div>
       <div className="flex items-center justify-between mb-6">
-        <span className="text-[12.5px] text-codex-muted">{t("installedN", { n: 0 })}</span>
+        <span className="text-[12.5px] text-codex-muted">{t("installedN", { n: enabledCount })}</span>
         <div className="flex items-center gap-2">
           <button
             type="button"
             title={t("refresh")}
             aria-label={t("refresh")}
+            onClick={() => void refetch()}
             className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-[#c0c0c0] hover:bg-[#333]"
           >
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -855,19 +944,77 @@ export function HooksPage() {
           </button>
         </div>
       </div>
-      <EmptyState
-        title={t("noHooks")}
-        desc={t("noHooksDesc")}
-        action={
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium"
-          >
-            + {t("newHook")}
-          </button>
-        }
-      />
+
+      {error && (
+        <div className="text-[12.5px] text-red-400 mb-3">{error}</div>
+      )}
+
+      {loading && hooks.length === 0 && (
+        <div className="text-[12.5px] text-codex-muted">{t("loading")}</div>
+      )}
+
+      {!loading && hooks.length === 0 && (
+        <EmptyState
+          title={t("noHooks")}
+          desc={t("noHooksDesc")}
+          action={
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium"
+            >
+              + {t("newHook")}
+            </button>
+          }
+        />
+      )}
+
+      {hooks.length > 0 && (
+        <SettingsCard>
+          {filtered.map((h) => (
+            <div
+              key={h.id}
+              className="flex items-center justify-between gap-4 px-4 py-3.5 border-b border-codex-border last:border-b-0"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[13.5px] font-medium text-[#e0e0e0]">{h.event}</span>
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-[#2a2a2a] border border-[#3a3a3a] text-codex-muted">
+                    {h.run_mode === "prompt" ? t("hookRunPrompt") : t("hookRunProcess")}
+                  </span>
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-[#2a2a2a] border border-[#3a3a3a] text-codex-muted">
+                    {h.scope === "用户" ? t("scopeUser") : h.scope}
+                  </span>
+                </div>
+                <div className="text-xs text-codex-muted font-mono truncate">{h.command}</div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  title={t("delete")}
+                  aria-label={`${t("delete")} ${h.event}`}
+                  onClick={() => void deleteHook(h)}
+                  className="w-7 h-7 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-[#c0c0c0] hover:bg-[#3a2a2a] hover:text-[#f87171]"
+                >
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
+                    <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  </svg>
+                </button>
+                <Toggle
+                  checked={h.enabled}
+                  onChange={(v) => void toggleHook(h, v)}
+                  label={`${t("enabled")} ${h.event}`}
+                />
+              </div>
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div className="px-4 py-8 text-center text-[12.5px] text-codex-muted">
+              {t("noHooksDesc")}
+            </div>
+          )}
+        </SettingsCard>
+      )}
     </div>
   );
 }

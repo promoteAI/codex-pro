@@ -161,11 +161,6 @@ export const MOCK_BROWSER_TABS = [
   { title: "如何 ···", suffix: "· Chrome", url: "https://www.google.com/search?q=%E5%A6%82%E4%BD..." },
 ];
 
-export const MOCK_AGENT = {
-  name: "Agnes 2.0 Flash",
-  desc: "CCSwitchMulti managed worker pinned to 'agnes-2.0-flash'.",
-};
-
 export interface CtxUsageSegment {
   key: string;
   label: string;

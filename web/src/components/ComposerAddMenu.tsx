@@ -1,26 +1,77 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router";
 import { MOCK_BROWSER_TABS } from "../mock/seeds";
 import { apiFetch } from "../lib/api";
 import { runMutation, toast } from "../stores/toast";
 import { useApi } from "../hooks/use-api";
+import { useWsSubscribe } from "../hooks/use-ws";
 import { useChatStore } from "../stores/chat";
 
-const ADD_PLUGINS = [
-  { id: "docs", box: "docs", glyph: "D", name: "Documents", desc: "Create and edit documents" },
-  { id: "pdf", box: "pdf", glyph: "P", name: "PDF", desc: "Read, create, and verify PDFs" },
-  { id: "sheets", box: "sheets", glyph: "S", name: "Spreadsheets", desc: "Create and edit spreadsheets" },
-  { id: "slides", box: "slides", glyph: "P", name: "Presentations", desc: "Create and edit presentations" },
-  {
-    id: "tpl",
-    box: "tpl",
-    glyph: "◆",
-    name: "Template Creator",
-    desc: "Create or update reusable templates from reference content",
-  },
-  { id: "viz", box: "viz", glyph: "v", name: "Visualize", desc: "Create interactive visuals" },
-] as const;
+interface ApiPlugin {
+  name: string;
+  version: string;
+  description: string;
+  source: string;
+  path: string | null;
+  status: string;
+  provides_tools: string[];
+  provides_hooks: string[];
+  depends_on: string[];
+}
+
+/** Fallback glyph for a plugin whose name has no known shorthand. */
+function PLUGIN_GLYPH(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.includes("sheet") || lower.includes("spread")) return "Sh";
+  if (lower.includes("present") || lower.includes("slide")) return "Sl";
+  if (lower.includes("doc") || lower.includes("document")) return "Do";
+  if (lower.includes("pdf")) return "PDF";
+  if (lower.includes("figma")) return "Fi";
+  if (lower.includes("notion")) return "No";
+  if (lower.includes("linear")) return "Li";
+  if (lower.includes("slack")) return "Sk";
+  if (lower.includes("jira")) return "Ji";
+  if (lower.includes("terminal") || lower.includes("term")) return ">_";
+  if (lower.includes("browser") || lower.includes("web")) return "Br";
+  if (lower.includes("github") || lower.includes("git")) return "GH";
+  if (lower.includes("computer") || lower.includes("use")) return "CU";
+  if (lower.includes("automate")) return "Au";
+  if (lower.includes("canvas")) return "Ca";
+  if (lower.includes("hook")) return "Ho";
+  if (lower.includes("rule")) return "Rl";
+  if (lower.includes("skill")) return "Sk";
+  if (lower.includes("agent") || lower.includes("subagent")) return "Ag";
+  return name.substring(0, 2).toUpperCase();
+}
+
+/** Fallback box color for a plugin that ships no icon of its own. */
+function PLUGIN_COLOR(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.includes("computer") || lower.includes("use")) return "#1b5e20";
+  if (lower.includes("sheet")) return "#0f9d58";
+  if (lower.includes("present")) return "#f4b400";
+  if (lower.includes("doc") || lower.includes("document")) return "#4285f4";
+  if (lower.includes("pdf")) return "#ea4335";
+  if (lower.includes("figma")) return "#7c4dff";
+  if (lower.includes("notion")) return "#00c853";
+  if (lower.includes("linear")) return "#ff6d00";
+  if (lower.includes("slack")) return "#0091ea";
+  if (lower.includes("jira")) return "#c2185b";
+  if (lower.includes("terminal")) return "#455a64";
+  if (lower.includes("browser")) return "#6a1b9a";
+  if (lower.includes("github") || lower.includes("git")) return "#24292f";
+  if (lower.includes("automate")) return "#5b8def";
+  if (lower.includes("canvas")) return "#7c5cff";
+  if (lower.includes("hook")) return "#fb7185";
+  if (lower.includes("rule")) return "#fbbf24";
+  if (lower.includes("skill")) return "#c084fc";
+  if (lower.includes("agent") || lower.includes("subagent")) return "#67e8f9";
+  if (lower.includes("design")) return "#a78bfa";
+  if (lower.includes("file")) return "#818cf8";
+  return "#6e6e6e";
+}
 
 const EXTRA_TABS = [
   ...MOCK_BROWSER_TABS,
@@ -153,6 +204,7 @@ export function ComposerAddMenu({
   onPlan,
 }: ComposerAddMenuProps) {
   const { t } = useTranslation("composer");
+  const navigate = useNavigate();
   const menuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -174,6 +226,20 @@ export function ComposerAddMenu({
       { success: t("agentDeleted"), error: t("agentDeleteFailed") },
     );
     if (ok) refetchAgents();
+  };
+
+  // Real plugin list from the gateway; empty/error renders a placeholder.
+  const {
+    data: pluginsData,
+    loading: pluginsLoading,
+    error: pluginsError,
+    refetch: refetchPlugins,
+  } = useApi<{ plugins: ApiPlugin[] }>(open ? "/plugins" : null);
+  useWsSubscribe(["plugins"], () => refetchPlugins(), ["plugin_changed"]);
+
+  const openPlugins = () => {
+    onClose();
+    navigate("/plugins");
   };
 
   useLayoutEffect(() => {
@@ -320,34 +386,43 @@ export function ComposerAddMenu({
       </button>
 
       <div className="add-menu-sec">{t("addPlugins")}</div>
-      {ADD_PLUGINS.map((p) => (
-        <button
-          key={p.id}
-          type="button"
-          className="add-menu-item"
-          role="menuitem"
-          onClick={() => {
-            onClose();
-            toast.info(p.name);
-          }}
-        >
-          <span className={`add-menu-ico-box ${p.box}`} aria-hidden="true">
-            {p.glyph}
-          </span>
-          <span className="add-menu-body">
-            <span className="add-menu-title">{p.name}</span>
-            <span className="add-menu-desc">{p.desc}</span>
-          </span>
-        </button>
-      ))}
+      {pluginsLoading && (
+        <div className="add-menu-hint">{t("pluginsLoading")}</div>
+      )}
+      {!pluginsLoading && pluginsError && (
+        <div className="add-menu-hint">{t("pluginsError")}</div>
+      )}
+      {!pluginsLoading && !pluginsError && (pluginsData?.plugins?.length ?? 0) === 0 && (
+        <div className="add-menu-hint">{t("pluginsEmpty")}</div>
+      )}
+      {!pluginsLoading &&
+        !pluginsError &&
+        (pluginsData?.plugins ?? []).map((p) => (
+          <button
+            key={p.name}
+            type="button"
+            className="add-menu-item"
+            role="menuitem"
+            onClick={openPlugins}
+          >
+            <span
+              className="add-menu-ico-box"
+              style={{ background: PLUGIN_COLOR(p.name) }}
+              aria-hidden="true"
+            >
+              {PLUGIN_GLYPH(p.name)}
+            </span>
+            <span className="add-menu-body">
+              <span className="add-menu-title">{p.name}</span>
+              <span className="add-menu-desc">{p.description || "—"}</span>
+            </span>
+          </button>
+        ))}
       <button
         type="button"
         className="add-menu-item"
         role="menuitem"
-        onClick={() => {
-          onClose();
-          toast.info("Superpowers");
-        }}
+        onClick={openPlugins}
       >
         <span className="add-menu-ico-box sp" aria-hidden="true">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2">

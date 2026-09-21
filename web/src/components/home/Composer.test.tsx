@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { Composer } from "./Composer";
 import * as api from "../../lib/api";
 import { useChatStore } from "../../stores/chat";
@@ -55,7 +56,11 @@ describe("Composer 权限下拉", () => {
         throw new Error(`unexpected ${path}`);
       });
 
-    render(<Composer />);
+    render(
+      <MemoryRouter>
+        <Composer />
+      </MemoryRouter>,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /完全访问/ }));
     fireEvent.click(screen.getAllByText("请求批准", { exact: true })[0]!);
@@ -77,7 +82,11 @@ describe("Composer 停止按钮", () => {
     useChatStore.setState({ typing: true, sessionId: "sess-1", pendingEventId: "evt-1" });
     const sendSpy = vi.spyOn(webWS, "send").mockReturnValue(true);
 
-    render(<Composer />);
+    render(
+      <MemoryRouter>
+        <Composer />
+      </MemoryRouter>,
+    );
 
     const stopBtn = screen.getByRole("button", { name: "停止" });
     fireEvent.click(stopBtn);
@@ -93,7 +102,11 @@ describe("Composer 停止按钮", () => {
 
   it("非 typing 时仍渲染发送按钮而非停止", () => {
     useChatStore.setState({ typing: false });
-    render(<Composer />);
+    render(
+      <MemoryRouter>
+        <Composer />
+      </MemoryRouter>,
+    );
     expect(screen.getByRole("button", { name: "发送" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "停止" })).toBeNull();
   });

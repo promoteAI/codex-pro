@@ -41,6 +41,21 @@ export interface GitBranch {
   is_remote: boolean;
 }
 
+/** A pending tool-approval (human-in-the-loop) surfaced by GET /interactions. */
+export interface ApprovalTicket {
+  id: string;
+  tool: string;
+  params: Record<string, unknown>;
+  risk?: string;
+}
+
+/** A pending clarify question surfaced by GET /interactions. */
+export interface ClarifyTicket {
+  id: string;
+  question: string;
+  options: string[];
+}
+
 type HistoryRow = {
   role: string;
   content: string;
@@ -130,6 +145,10 @@ interface ChatState {
   goalMode: boolean;
   planTask: string;
   isGit: boolean;
+  /** Pending tool approvals (decisions) fetched from /interactions. */
+  pendingApprovals: ApprovalTicket[];
+  /** The pending clarify question, if any, fetched from /interactions. */
+  pendingClarify: ClarifyTicket | null;
   setProject: (project: string, projectPath?: string) => void;
   selectProject: (repo: GitRepo) => void;
   createProject: (name: string, gitInit?: boolean) => Promise<GitRepo>;
@@ -148,13 +167,16 @@ interface ChatState {
   setGoalMode: (on: boolean) => void;
   clearPlanMode: () => void;
   clearChat: () => void;
-  sendMessage: (text?: string) => void;
+  sendMessage: (text?: string, opts?: { force?: boolean }) => void;
+  decideApproval: (id: string, level: "once" | "session" | "deny") => void;
+  answerClarify: (value: string) => void;
   stopStream: () => void;
   loadSessionHistory: (sessionId: string) => Promise<void>;
   loadRepos: () => Promise<void>;
   loadBranches: (repoPath: string) => Promise<void>;
   createBranch: (branchName: string) => Promise<void>;
   _pollForResponse: (sessionId: string, eventId: string, priorAssistantCount?: number) => void;
+  _refreshInteractions: (sessionId: string) => Promise<void>;
   _softReloadHistory: (sessionId: string) => Promise<void>;
   _wsReloadHistory: (sessionId: string) => Promise<void>;
 }
@@ -177,6 +199,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeTool: null,
   pendingEventId: null,
   pendingAttachments: [],
+  pendingApprovals: [],
+  pendingClarify: null,
   streamStopped: false,
   repos: [],
   branches: [],
@@ -291,6 +315,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       pendingEventId: null,
       streamStopped: false,
       pendingAttachments: [],
+      pendingApprovals: [],
+      pendingClarify: null,
       project: "",
       projectPath: "",
       isGit: false,
@@ -334,9 +360,43 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (text) => {
+  decideApproval: (id, level) => {
+    const cmd =
+      level === "once" ? `/approve ${id}`
+      : level === "session" ? `/approve ${id} session`
+      : `/deny ${id}`;
+    get().sendMessage(cmd, { force: true });
+    // Optimistically clear this approval; next poll reconciles.
+    set((s) => ({
+      pendingApprovals: s.pendingApprovals.filter((a) => a.id !== id),
+    }));
+  },
+
+  answerClarify: (value) => {
+    const c = get().pendingClarify;
+    if (!c) return;
+    set({ pendingClarify: null });
+    get().sendMessage(value, { force: true });
+  },
+
+  _refreshInteractions: async (sessionId: string) => {
+    try {
+      const data = await apiFetch<{
+        approvals: ApprovalTicket[];
+        clarify: ClarifyTicket | null;
+      }>(`/interactions?session_key=${encodeURIComponent(sessionId)}`);
+      if (get().sessionId !== sessionId) return;
+      set({ pendingApprovals: data.approvals ?? [], pendingClarify: data.clarify ?? null });
+    } catch {
+      // transient — leave existing state; next poll retries
+    }
+  },
+
+  sendMessage: async (text, opts) => {
     const content = (text ?? get().draft).trim();
-    if (!content || get().typing) return;
+    // 审批/澄清是控制命令：agent 正停在 wait_for_decision(typing=true)时，
+    // 必须绕过 typing 门控才能把 /approve 等送出去，否则审批会超时。
+    if (!content || (get().typing && !opts?.force)) return;
 
     // Files staged to ride along on this turn. Cleared once the turn is
     // accepted so a retry/next message does not resend them.
@@ -493,6 +553,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             return;
           }
           set({ activeTool: turn?.current_tool || null });
+          void get()._refreshInteractions(sessionId);
           await get()._softReloadHistory(sessionId);
         } else {
           const result = await apiFetch<{ messages: HistoryRow[] }>(

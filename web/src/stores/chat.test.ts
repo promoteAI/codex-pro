@@ -23,6 +23,8 @@ beforeEach(() => {
     activeTool: null,
     streamStopped: false,
     pendingAttachments: [],
+    pendingApprovals: [],
+    pendingClarify: null,
     planMode: false,
     goalMode: false,
     planTask: "",
@@ -132,6 +134,26 @@ describe("chat store", () => {
     await useChatStore.getState().sendMessage("two");
     expect(useChatStore.getState().typing).toBe(true);
     expect(useChatStore.getState().messages.filter((m) => m.role === "user")).toHaveLength(2);
+  });
+
+  it("polls /interactions and populates pending approve/clarify", async () => {
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path) => {
+      if (String(path).startsWith("/turns/")) {
+        return { turn: { status: "running", current_tool: "exec" } };
+      }
+      if (String(path).startsWith("/interactions")) {
+        return {
+          approvals: [{ id: "req-1", tool: "exec", params: { command: "ls" }, risk: "exec" }],
+          clarify: null,
+        };
+      }
+      return { messages: [] };
+    });
+    useChatStore.setState({ sessionId: "cli:abc", pendingEventId: "evt-1", typing: true });
+    useChatStore.getState()._pollForResponse("cli:abc", "evt-1", 0);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(useChatStore.getState().pendingApprovals).toHaveLength(1);
+    expect(useChatStore.getState().pendingApprovals[0].id).toBe("req-1");
   });
 
   it("setModel persists models.default_model via /config PATCH", async () => {

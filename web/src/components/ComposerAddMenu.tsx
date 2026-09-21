@@ -1,8 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { MOCK_AGENT, MOCK_BROWSER_TABS } from "../mock/seeds";
-import { toast } from "../stores/toast";
+import { MOCK_BROWSER_TABS } from "../mock/seeds";
+import { apiFetch } from "../lib/api";
+import { runMutation, toast } from "../stores/toast";
+import { useApi } from "../hooks/use-api";
 import { useChatStore } from "../stores/chat";
 
 const ADD_PLUGINS = [
@@ -30,6 +32,108 @@ const EXTRA_TABS = [
   },
 ];
 
+/** A runtime worker profile served by GET /api/v1/agents. */
+interface WorkerAgent {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  default_tools: string[];
+  model: string;
+  provider: string;
+  max_iterations: number;
+  max_tokens: number;
+  temperature: number;
+}
+
+interface AddAgentFormProps {
+  onSaved: () => void;
+  onCancel: () => void;
+}
+
+/** Inline "add agent" form shown inside the composer add menu. */
+function AddAgentForm({ onSaved, onCancel }: AddAgentFormProps) {
+  const { t } = useTranslation("composer");
+  const [id, setId] = useState("");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [model, setModel] = useState("");
+  const [tools, setTools] = useState("");
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const body = {
+      id: id.trim(),
+      name: name.trim(),
+      description: description.trim(),
+      instructions: instructions.trim(),
+      model: model.trim(),
+      default_tools: tools.split(",").map((s) => s.trim()).filter(Boolean),
+    };
+    const ok = await runMutation(
+      () => apiFetch("/agents", { method: "POST", body: JSON.stringify(body) }),
+      { success: t("agentSaved"), error: t("agentSaveFailed") },
+    );
+    if (ok) {
+      onSaved();
+      onCancel();
+    }
+  };
+
+  return (
+    <form className="add-agent-form" onSubmit={submit}>
+      <div className="add-menu-sec">{t("agentNew")}</div>
+      <input
+        className="add-agent-input"
+        placeholder={`${t("agentId")} *`}
+        value={id}
+        onChange={(e) => setId(e.target.value)}
+        required
+      />
+      <input
+        className="add-agent-input"
+        placeholder={`${t("agentName")} *`}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        required
+      />
+      <input
+        className="add-agent-input"
+        placeholder={t("agentDesc")}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+      />
+      <textarea
+        className="add-agent-input add-agent-area"
+        placeholder={t("agentInstructions")}
+        value={instructions}
+        onChange={(e) => setInstructions(e.target.value)}
+      />
+      <input
+        className="add-agent-input"
+        placeholder={t("agentModel")}
+        value={model}
+        onChange={(e) => setModel(e.target.value)}
+      />
+      <input
+        className="add-agent-input"
+        placeholder={t("agentDefaultTools")}
+        value={tools}
+        onChange={(e) => setTools(e.target.value)}
+      />
+      <div className="add-agent-actions">
+        <button type="button" className="add-agent-btn" onClick={onCancel}>
+          {t("cancel")}
+        </button>
+        <button type="submit" className="add-agent-btn primary">
+          {t("create")}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 interface ComposerAddMenuProps {
   open: boolean;
   anchorEl: HTMLElement | null;
@@ -52,6 +156,25 @@ export function ComposerAddMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [addingAgent, setAddingAgent] = useState(false);
+
+  // Runtime worker profiles from the backend; null path while menu closed so
+  // the request is not fired on every render.
+  const {
+    data: agentsData,
+    loading: agentsLoading,
+    refetch: refetchAgents,
+  } = useApi<{ agents: WorkerAgent[] }>(open ? "/agents" : null);
+
+  const agents = useMemo(() => agentsData?.agents ?? [], [agentsData]);
+
+  const deleteAgent = async (agent: WorkerAgent) => {
+    const ok = await runMutation(
+      () => apiFetch(`/agents/${encodeURIComponent(agent.id)}`, { method: "DELETE" }),
+      { success: t("agentDeleted"), error: t("agentDeleteFailed") },
+    );
+    if (ok) refetchAgents();
+  };
 
   useLayoutEffect(() => {
     if (!open || !anchorEl) return;
@@ -239,20 +362,58 @@ export function ComposerAddMenu({
       </button>
 
       <div className="add-menu-sec">{t("addAgents")}</div>
-      <button
-        type="button"
-        className="add-menu-item"
-        role="menuitem"
-        onClick={() => {
-          onClose();
-          toast.info(MOCK_AGENT.name);
-        }}
-      >
-        <span className="add-menu-body">
-          <span className="add-menu-title">{MOCK_AGENT.name}</span>
-          <span className="add-menu-desc">{MOCK_AGENT.desc}</span>
-        </span>
-      </button>
+      {addingAgent ? (
+        <AddAgentForm
+          onSaved={refetchAgents}
+          onCancel={() => setAddingAgent(false)}
+        />
+      ) : agentsLoading ? (
+        <div className="add-menu-hint">{t("loadingAgents")}</div>
+      ) : agents.length === 0 ? (
+        <div className="add-menu-hint">{t("noAgents")}</div>
+      ) : (
+        agents.map((agent) => (
+          <div key={agent.id} className="add-agent-row">
+            <button
+              type="button"
+              className="add-menu-item"
+              role="menuitem"
+              onClick={() => {
+                onClose();
+                toast.info(agent.name);
+              }}
+            >
+              <span className="add-menu-body">
+                <span className="add-menu-title">{agent.name}</span>
+                <span className="add-menu-desc">{agent.description || agent.id}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="add-agent-remove"
+              aria-label={`${t("agentDelete")}: ${agent.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                void deleteAgent(agent);
+              }}
+            >
+              ×
+            </button>
+          </div>
+        ))
+      )}
+      {!addingAgent && (
+        <button
+          type="button"
+          className="add-menu-item"
+          role="menuitem"
+          onClick={() => setAddingAgent(true)}
+        >
+          <span className="add-menu-body">
+            <span className="add-menu-title">{t("agentNew")}</span>
+          </span>
+        </button>
+      )}
 
       <div className="add-menu-sec">{t("addTabs")}</div>
       {EXTRA_TABS.map((tab) => (

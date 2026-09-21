@@ -53,6 +53,26 @@ class TestWorkerRegistry:
         registry = WorkerRegistry(profiles)
         assert set(registry.list_ids()) == {"a", "b"}
 
+    def test_reload_with_loader_sees_new_profiles(self):
+        seed = [WorkerProfile(id="coder", name="Coder")]
+
+        def loader():
+            return seed
+
+        registry = WorkerRegistry(seed, loader=loader)
+        assert registry.get("coder") is not None
+        # A runtime-added profile (e.g. created via the agents API) becomes
+        # visible after reload — no restart needed.
+        seed.append(WorkerProfile(id="researcher", name="Researcher"))
+        registry.reload()
+        assert registry.get("researcher") is not None
+        assert registry.get("coder") is not None
+
+    def test_reload_without_loader_is_noop(self):
+        registry = WorkerRegistry([WorkerProfile(id="a", name="A")])
+        registry.reload()
+        assert registry.list_ids() == ["a"]
+
 
 class TestWorkerExecutor:
     @pytest.mark.asyncio

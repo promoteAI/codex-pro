@@ -249,6 +249,11 @@ class DelegateTool(Tool):
                 error=f"Delegation depth limit reached ({self._max_depth}). Handle the task directly.",
             )
 
+        # Re-read worker profiles so profiles created at runtime through the
+        # dashboard's "Add agent" menu are visible to this delegation without a
+        # restart. No-op when the registry was built without a loader.
+        self._worker_registry.reload()
+
         tasks = self._normalize_tasks(params)
         if not tasks:
             return ToolResult(success=False, error="No tasks specified. Provide 'goal' or 'tasks' array.")

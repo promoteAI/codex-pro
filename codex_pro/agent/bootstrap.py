@@ -116,10 +116,24 @@ class LoopBootstrap:
     def setup_delegation(loop: "AgentLoop") -> None:
         if not loop.config.multi_agent.enabled:
             return
-        from codex_pro.agent.multi_agent.registry import WorkerRegistry
+        from codex_pro.agent.multi_agent.registry import WorkerRegistry, _profiles_from_config
+        from codex_pro.agent.multi_agent.store import WorkerProfileStore
         from codex_pro.agent.tools.delegate import DelegateTool
 
-        worker_registry = WorkerRegistry.from_config(loop.config.multi_agent)
+        # Config profiles are the bootstrap templates; runtime profiles added
+        # through the dashboard's "Add agent" menu (worker_profiles.json) are
+        # merged in on every delegation via the loader, so no restart is needed.
+        config = loop.config.multi_agent
+        store = WorkerProfileStore(loop.workspace)
+
+        def _load_profiles():
+            merged = {p.id: p for p in _profiles_from_config(config)}
+            for p in store.list_profiles():
+                if p.id:
+                    merged[p.id] = p
+            return list(merged.values())
+
+        worker_registry = WorkerRegistry(_load_profiles(), loader=_load_profiles)
         audit_path = Path(loop.config.multi_agent.audit_path).expanduser()
         if not audit_path.is_absolute():
             audit_path = loop.workspace / audit_path

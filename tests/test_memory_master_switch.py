@@ -62,7 +62,7 @@ def _make_stage(*, memory_enabled: bool, capture: dict):
     compressor = MagicMock()
     compressor.should_compress = MagicMock(return_value=False)
 
-    def _capture_prompt(*, memory_context, skills_context, capabilities, channel=None):
+    def _capture_prompt(*, memory_context, skills_context, capabilities, channel=None, custom_instructions=""):
         capture["memory_context"] = memory_context
         return "SYS"
 

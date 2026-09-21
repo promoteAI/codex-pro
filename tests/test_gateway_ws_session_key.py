@@ -152,6 +152,7 @@ async def gateway_with_codex_pro():
     bus = MessageBus()
     session_manager = MagicMock()
     session_manager.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
+    session_manager.get = AsyncMock(return_value=MagicMock(status="active"))
 
     async def fake_agent(event):
         # 模拟 agent：构造出站回复，metadata 拷贝入站（含 _session_key），走 bus 出站。
@@ -238,6 +239,7 @@ async def gateway_with_fresh_metadata_agent():
     bus = MessageBus()
     session_manager = MagicMock()
     session_manager.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
+    session_manager.get = AsyncMock(return_value=MagicMock(status="active"))
 
     async def fake_agent(event):
         # 关键：用全新 metadata（不含 _session_key），模拟 heartbeat 那样

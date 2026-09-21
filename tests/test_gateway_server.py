@@ -28,6 +28,10 @@ def _make_gateway():
     channel_manager = MagicMock()
     session_manager = MagicMock()
     session_manager.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
+    # ``_reset_session_if_needed`` reads ``get`` to detect a brand-new session;
+    # an existing session keeps it on the not-new path so SessionStart hooks
+    # are not fired in these unit tests.
+    session_manager.get = AsyncMock(return_value=MagicMock(status="active"))
     workspace = MagicMock()
     agent_loop = MagicMock()
 
@@ -174,6 +178,28 @@ async def test_manual_reset_unblocks_human_wait_before_lock() -> None:
 
     await gw._reset_session_if_needed("cli:local", force=True)
     assert calls[:2] == ["unblock", "lock"]
+
+
+@pytest.mark.asyncio
+async def test_reset_fires_session_start_hooks_only_for_new_session(monkeypatch) -> None:
+    """SessionStart hooks fire exactly once, on first creation, not on later messages."""
+    from codex_pro.gateway.server import GatewayServer
+
+    gw, _ = _make_gateway()
+    fired: list[object] = []
+    monkeypatch.setattr(
+        GatewayServer, "_fire_session_start", lambda self, session: fired.append(session)
+    )
+
+    # Existing session (get returns non-None): must NOT fire.
+    gw.session_manager.get = AsyncMock(return_value=MagicMock(status="active"))
+    await gw._reset_session_if_needed("cli:existing")
+    assert fired == []
+
+    # Brand-new session (get returns None): must fire exactly once.
+    gw.session_manager.get = AsyncMock(return_value=None)
+    await gw._reset_session_if_needed("cli:new")
+    assert len(fired) == 1
 
 
 @pytest.mark.asyncio

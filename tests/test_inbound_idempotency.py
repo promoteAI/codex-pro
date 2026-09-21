@@ -560,6 +560,7 @@ def _gateway(tmp_path):
     bus.publish_inbound = AsyncMock(return_value=True)
     sessions = MagicMock()
     sessions.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
+    sessions.get = AsyncMock(return_value=MagicMock(status="active"))
     gateway = GatewayServer(
         config=config,
         bus=bus,

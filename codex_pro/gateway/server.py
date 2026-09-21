@@ -188,7 +188,14 @@ class GatewayServer:
         force: bool = False,
     ) -> tuple[Any, bool]:
         """Run the one authoritative reset path under the agent session lock."""
+        # A brand-new session (never seen in cache or storage) is the moment a
+        # SessionStart lifecycle hook should fire — exactly once, on first
+        # creation, not on resets or later messages. ``get`` is the read-only
+        # path: it never fabricates a session, so None means genuinely new.
+        was_new = await self.session_manager.get(session_key) is None
         session = await self.session_manager.get_or_create(session_key)
+        if was_new:
+            self._fire_session_start(session)
         if not force and not self.session_policy.should_reset(session):
             return session, False
 
@@ -224,6 +231,22 @@ class GatewayServer:
             {"session_key": session_key},
         )
         return session, True
+
+    def _fire_session_start(self, session: Any) -> None:
+        """Schedule user-configured ``SessionStart`` hooks (fire-and-forget).
+
+        Handing the work to a background task keeps the reset path non-blocking:
+        a slow or failing hook never delays the inbound message that created the
+        session. The scheduled coroutine (``hook_exec.execute_session_start``)
+        is defensive about its own errors and never raises, so the task will not
+        surface an unhandled exception.
+        """
+        try:
+            from codex_pro.gateway.hook_exec import schedule_session_start
+
+            schedule_session_start(self, session)
+        except Exception as e:  # noqa: BLE001 — scheduling must never block the turn
+            logger.warning("Failed to schedule SessionStart hooks: {}", e)
 
     async def _accept_turn(self, event: InboundEvent, session: Any) -> None:
         command = event.text.strip().split(maxsplit=1)[0].lower() if event.text.strip() else ""

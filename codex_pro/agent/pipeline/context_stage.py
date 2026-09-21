@@ -249,11 +249,17 @@ class ContextStage:
         # Derive capabilities from the live tool registry (config, not memory).
         tool_defs = self._inference.filter_tools(self._tool_definitions_fn(channel=event.channel))
         capabilities_ctx = build_capabilities_context(tool_defs)
+        # A SessionStart ``prompt`` hook (gateway/hook_exec.py) parks its text on
+        # the session under ``session_start_prompt``; fold it into the system
+        # prompt so it genuinely reaches the model's context for the session's
+        # turns rather than lingering as inert metadata.
+        session_start_prompt = session.metadata.get("session_start_prompt", "") or ""
         system_prompt = self._context_builder.build_system_prompt(
             memory_context=memory_ctx,
             skills_context=skills_ctx,
             capabilities=capabilities_ctx,
             channel=event.channel,
+            custom_instructions=session_start_prompt,
         )
 
         history = session.get_history(self._config.session.max_history_messages)

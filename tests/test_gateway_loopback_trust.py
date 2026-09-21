@@ -169,6 +169,7 @@ async def allowlist_gateway_ws_url():
     bus = MessageBus()
     session_manager = MagicMock()
     session_manager.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
+    session_manager.get = AsyncMock(return_value=MagicMock(status="active"))
     server = GatewayServer(
         config=config,
         bus=bus,
@@ -449,6 +450,7 @@ def _allowlist_gateway():
     bus = MessageBus()
     session_manager = MagicMock()
     session_manager.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
+    session_manager.get = AsyncMock(return_value=MagicMock(status="active"))
     gw = GatewayServer(
         config=config,
         bus=bus,

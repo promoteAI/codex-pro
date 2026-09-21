@@ -31,6 +31,7 @@ async def gateway_capturing_inbound():
     bus = MessageBus()
     session_manager = MagicMock()
     session_manager.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
+    session_manager.get = AsyncMock(return_value=MagicMock(status="active"))
 
     async def capture(event):
         captured.append(event)

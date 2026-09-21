@@ -89,6 +89,10 @@ async def gateway_ws_url():
     channel_manager = MagicMock()
     session_manager = MagicMock()
     session_manager.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
+    # ``_reset_session_if_needed`` reads ``get`` to detect a brand-new session;
+    # an existing session keeps it off the new-session path so SessionStart
+    # hooks are not scheduled in these fixtures.
+    session_manager.get = AsyncMock(return_value=MagicMock(status="active"))
 
     server = GatewayServer(
         config=config,

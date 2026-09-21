@@ -23,7 +23,7 @@ export function ApprovalCard({ id, tool, params, risk, onDecide }: ApprovalCardP
 
   return (
     <div className="shell-card border-codex-border bg-codex-bg p-3 rounded-lg" data-testid={`approval-${id}`}>
-      <div className="flex items-center gap-2 text-codex-warning">
+      <div className="flex items-center gap-2 text-codex-warn">
         <AlertTriangle size={14} />
         <span className="font-medium">{t("approvalRequired", { action: tool })}</span>
         <span className="text-codex-muted text-xs ml-auto">{t("riskLevel", { level: risk })}</span>

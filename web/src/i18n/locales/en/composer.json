@@ -39,6 +39,8 @@
   "pluginsEmpty": "No plugins available",
   "addAgents": "Agents",
   "addTabs": "Tabs",
+  "addTabsLoading": "Loading tabs…",
+  "addTabsEmpty": "No tabs",
   "addFilesChats": "Files & chats",
   "addSearchHint": "Type to search files or chats",
   "loadingAgents": "Loading agents…",

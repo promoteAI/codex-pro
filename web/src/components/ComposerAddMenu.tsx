@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { MOCK_BROWSER_TABS } from "../mock/seeds";
 import { apiFetch } from "../lib/api";
 import { runMutation, toast } from "../stores/toast";
 import { useApi } from "../hooks/use-api";
@@ -73,15 +72,19 @@ function PLUGIN_COLOR(name: string): string {
   return "#6e6e6e";
 }
 
-const EXTRA_TABS = [
-  ...MOCK_BROWSER_TABS,
-  {
-    title: "www. ···",
-    suffix: "· Chrome",
-    url: "https://www.google.com.hk/goto?url=...",
-    globe: true,
-  },
-];
+interface BrowserTab {
+  id: string;
+  title: string;
+  url: string;
+  suffix?: string;
+  globe?: boolean;
+}
+
+interface BrowserTabsResponse {
+  tabs: BrowserTab[];
+}
+
+const EXTRA_TABS: BrowserTab[] = [];
 
 /** A runtime worker profile served by GET /api/v1/agents. */
 interface WorkerAgent {
@@ -240,6 +243,18 @@ export function ComposerAddMenu({
   const openPlugins = () => {
     onClose();
     navigate("/plugins");
+  };
+
+  // Real browser tabs from the gateway's persisted tab store, fetched only when
+  // the menu opens. An empty/errored list still renders the section with a hint,
+  // so the composer never breaks on a missing backend.
+  const { data: tabsData, loading: tabsLoading } = useApi<BrowserTabsResponse>(open ? "/browser/tabs" : null);
+  const tabs = tabsData?.tabs ?? EXTRA_TABS;
+
+  const openTab = (tab: BrowserTab) => {
+    onClose();
+    if (!tab.url) return;
+    window.open(tab.url, "_blank", "noopener,noreferrer");
   };
 
   useLayoutEffect(() => {
@@ -491,36 +506,39 @@ export function ComposerAddMenu({
       )}
 
       <div className="add-menu-sec">{t("addTabs")}</div>
-      {EXTRA_TABS.map((tab) => (
-        <button
-          key={tab.url}
-          type="button"
-          className="add-menu-item"
-          role="menuitem"
-          onClick={() => {
-            onClose();
-            toast.info(tab.title);
-          }}
-        >
-          {"globe" in tab && tab.globe ? (
-            <svg className="add-menu-ico" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="8.5" />
-              <path d="M3.5 12h17M12 3.5a14 14 0 0 1 0 17M12 3.5a14 14 0 0 0 0 17" />
-            </svg>
-          ) : (
-            <span className="add-menu-ico-box g" aria-hidden="true">
-              G
+      {tabsLoading ? (
+        <div className="add-menu-hint">{t("addTabsLoading")}</div>
+      ) : tabs.length === 0 ? (
+        <div className="add-menu-hint">{t("addTabsEmpty")}</div>
+      ) : (
+        tabs.map((tab) => (
+          <button
+            key={tab.id || tab.url}
+            type="button"
+            className="add-menu-item"
+            role="menuitem"
+            onClick={() => openTab(tab)}
+          >
+            {tab.globe ? (
+              <svg className="add-menu-ico" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8.5" />
+                <path d="M3.5 12h17M12 3.5a14 14 0 0 1 0 17M12 3.5a14 14 0 0 0 0 17" />
+              </svg>
+            ) : (
+              <span className="add-menu-ico-box g" aria-hidden="true">
+                G
+              </span>
+            )}
+            <span className="add-menu-body">
+              <span className="add-menu-row">
+                <span className="add-menu-title">{tab.title}</span>
+                <span className="add-menu-suffix">{tab.suffix}</span>
+              </span>
+              <span className="add-menu-desc">{tab.url}</span>
             </span>
-          )}
-          <span className="add-menu-body">
-            <span className="add-menu-row">
-              <span className="add-menu-title">{tab.title}</span>
-              <span className="add-menu-suffix">{tab.suffix}</span>
-            </span>
-            <span className="add-menu-desc">{tab.url}</span>
-          </span>
-        </button>
-      ))}
+          </button>
+        ))
+      )}
 
       <div className="add-menu-sec">{t("addFilesChats")}</div>
       <div className="add-menu-hint">{t("addSearchHint")}</div>

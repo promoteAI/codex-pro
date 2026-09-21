@@ -315,6 +315,21 @@ class MessageHandler:
                 status=400,
             )
 
+        # Browser-uploaded attachments (see gateway/api/attachments.py). The body
+        # carries only attachment ids the gateway itself minted on upload — never
+        # an arbitrary client-supplied path. Each id is resolved to the stored
+        # local file, then fed into the same content-block path as media_urls.
+        attachments = body.get("attachments", [])
+        if not isinstance(attachments, list):
+            return web.json_response({"error": "attachments must be a list"}, status=400)
+        if len(attachments) > max_urls:
+            return web.json_response(
+                {"error": f"too many attachments (max {max_urls})"},
+                status=400,
+            )
+        if attachments and not text and not media_urls:
+            return web.json_response({"error": "text or media required"}, status=400)
+
         # Rate limit pre-check (don't consume yet — idempotency may short-circuit)
         rejection = self._server._authenticate_and_check_rate_limit(
             platform, user_id, chat_id,
@@ -363,6 +378,7 @@ class MessageHandler:
                 "chat_id": chat_id,
                 "text": text,
                 "media_urls": media_urls,
+                "attachments": attachments,
                 "is_group": is_group,
                 "session_key": session_key,
                 "project": project,
@@ -545,6 +561,38 @@ class MessageHandler:
                         ContentBlock(
                             type=self._server._infer_media_content_type(str(path), url),
                             url=str(path),
+                        )
+                    )
+
+            if attachments:
+                store = getattr(self._server, "_attachment_store", None)
+                for item in attachments:
+                    if not isinstance(item, dict):
+                        return web.json_response(
+                            {"error": "each attachment must be an object with attachment_id"},
+                            status=400,
+                        )
+                    attachment_id = item.get("attachment_id", "")
+                    if not isinstance(attachment_id, str) or not attachment_id:
+                        return web.json_response(
+                            {"error": "each attachment must carry an attachment_id"},
+                            status=400,
+                        )
+                    path = store.get_path(attachment_id) if store is not None else None
+                    if path is None:
+                        return web.json_response(
+                            {"error": f"unknown attachment: {attachment_id}"},
+                            status=400,
+                        )
+                    record = store.get(attachment_id) or {}
+                    content_blocks.append(
+                        ContentBlock(
+                            type=self._server._infer_media_content_type(
+                                str(path), mime_type=record.get("mime_type", ""),
+                            ),
+                            url=str(path),
+                            mime_type=record.get("mime_type", ""),
+                            metadata={"name": record.get("name", "")},
                         )
                     )
 

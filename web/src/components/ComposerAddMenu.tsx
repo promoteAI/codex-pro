@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { MOCK_AGENT, MOCK_BROWSER_TABS } from "../mock/seeds";
 import { toast } from "../stores/toast";
+import { useChatStore } from "../stores/chat";
 
 const ADD_PLUGINS = [
   { id: "docs", box: "docs", glyph: "D", name: "Documents", desc: "Create and edit documents" },
@@ -49,6 +50,7 @@ export function ComposerAddMenu({
 }: ComposerAddMenuProps) {
   const { t } = useTranslation("composer");
   const menuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   useLayoutEffect(() => {
@@ -111,7 +113,7 @@ export function ComposerAddMenu({
         role="menuitem"
         onClick={() => {
           onClose();
-          toast.info(t("addFilesToast"));
+          fileInputRef.current?.click();
         }}
       >
         <svg className="add-menu-ico" viewBox="0 0 24 24" aria-hidden="true">
@@ -122,6 +124,20 @@ export function ComposerAddMenu({
           <span className="add-menu-title">{t("addFiles")}</span>
         </span>
       </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          const addFile = useChatStore.getState().addFile;
+          for (const file of files) void addFile(file);
+          e.target.value = "";
+        }}
+      />
       <button
         type="button"
         className="add-menu-item"

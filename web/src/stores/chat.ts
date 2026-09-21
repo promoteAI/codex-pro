@@ -1,7 +1,17 @@
 import { create } from "zustand";
-import { apiFetch } from "../lib/api";
+import { apiFetch, apiUpload } from "../lib/api";
 import { webWS } from "../lib/ws";
 import { toast } from "./toast";
+
+/** A browser-selected file that has been uploaded to the gateway via
+ *  POST /attachments and is staged to ride along on the next /message turn. */
+export interface PendingAttachment {
+  attachment_id: string;
+  url: string;
+  name: string;
+  mime_type: string;
+  size: number;
+}
 
 export interface ToolCallFn {
   id: string;
@@ -106,6 +116,8 @@ interface ChatState {
   typing: boolean;
   activeTool: string | null;
   pendingEventId: string | null;
+  /** Browser-uploaded files staged to attach to the next sent message. */
+  pendingAttachments: PendingAttachment[];
   /** True once the user stopped the current stream, so neither the poll loop
    *  nor the WS session_message handler overwrites the local messages (the
    *  tool cards already on screen) with a fresh history fetch. Cleared on the
@@ -130,6 +142,8 @@ interface ChatState {
   persistPerm: (perm: "ask" | "agent" | "full") => Promise<void>;
   loadPerm: () => Promise<void>;
   setDraft: (draft: string) => void;
+  addFile: (file: File) => Promise<void>;
+  removeAttachment: (attachmentId: string) => void;
   setPlanMode: (on: boolean, task?: string) => void;
   setGoalMode: (on: boolean) => void;
   clearPlanMode: () => void;
@@ -162,6 +176,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   typing: false,
   activeTool: null,
   pendingEventId: null,
+  pendingAttachments: [],
   streamStopped: false,
   repos: [],
   branches: [],
@@ -233,6 +248,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ perm: modeToPerm(data.permissions?.approval?.mode) });
   },
   setDraft: (draft) => set({ draft }),
+  addFile: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const uploaded = await apiUpload<PendingAttachment>("/attachments", form);
+      set((s) => ({ pendingAttachments: [...s.pendingAttachments, uploaded] }));
+      toast.success(`已添加 ${uploaded.name}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "添加文件失败");
+    }
+  },
+  removeAttachment: (attachmentId) =>
+    set((s) => ({
+      pendingAttachments: s.pendingAttachments.filter(
+        (a) => a.attachment_id !== attachmentId,
+      ),
+    })),
   setPlanMode: (on, task) =>
     set({
       planMode: on,
@@ -258,6 +290,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       historyError: null,
       pendingEventId: null,
       streamStopped: false,
+      pendingAttachments: [],
       project: "",
       projectPath: "",
       isGit: false,
@@ -305,6 +338,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const content = (text ?? get().draft).trim();
     if (!content || get().typing) return;
 
+    // Files staged to ride along on this turn. Cleared once the turn is
+    // accepted so a retry/next message does not resend them.
+    const pendingAttachments = get().pendingAttachments;
+
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
       role: "user",
@@ -349,6 +386,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           session_key: sessionId,
           platform: "api",
           ...(projectPath ? { project: projectPath } : {}),
+          ...(pendingAttachments.length
+            ? { attachments: pendingAttachments.map((a) => ({ attachment_id: a.attachment_id })) }
+            : {}),
         }),
       });
 
@@ -356,6 +396,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({
         sessionId: resolvedSessionId,
         pendingEventId: result.event_id,
+        pendingAttachments: [],
       });
       get()._pollForResponse(resolvedSessionId, result.event_id, priorAssistantCount);
     } catch (e: unknown) {

@@ -32,8 +32,10 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     from codex_pro.gateway.api.plugins import register_plugin_api_routes
     from codex_pro.gateway.api.providers import ProvidersAPI
     from codex_pro.gateway.api.connections import ConnectionsAPI
+    from codex_pro.gateway.api.attachments import AttachmentsAPI
 
     memory_api = MemoryAPI(server)
+    attachments_api = AttachmentsAPI(server)
     skills_api = SkillsAPI(server)
     channels_api = ChannelsAPI(server)
     knowledge_api = KnowledgeAPI(server)
@@ -76,6 +78,9 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_get(f"{prefix}/knowledge/jobs/{{id}}", knowledge_api.get_job)
     app.router.add_delete(f"{prefix}/knowledge/documents/{{path:.+}}", knowledge_api.delete_document)
 
+    # Chat/file attachments for Composer "add files" (browser local file upload)
+    app.router.add_post(f"{prefix}/attachments", attachments_api.upload)
+
     app.router.add_get(f"{prefix}/config", config_api.get_config)
     app.router.add_patch(f"{prefix}/config", config_api.update_config)
 
@@ -95,7 +100,6 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_put(f"{prefix}/connections/{{name}}", connections_api.update_connection)
     app.router.add_delete(f"{prefix}/connections/{{name}}", connections_api.delete_connection)
     app.router.add_post(f"{prefix}/connections/{{name}}/test", connections_api.test_connection)
-
     app.router.add_get(f"{prefix}/tasks", tasks_api.list_tasks)
     app.router.add_post(f"{prefix}/tasks", tasks_api.create_task)
     app.router.add_get(f"{prefix}/tasks/{{id}}", tasks_api.get_task)

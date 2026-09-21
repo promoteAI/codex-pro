@@ -213,6 +213,7 @@ export function ChatThread() {
   const activeTool = useChatStore((s) => s.activeTool);
   const sessionId = useChatStore((s) => s.sessionId);
   const loadSessionHistory = useChatStore((s) => s.loadSessionHistory);
+  const wsReloadHistory = useChatStore((s) => s._wsReloadHistory);
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -220,7 +221,11 @@ export function ChatThread() {
     ["sessions"],
     (ev) => {
       const payload = ev.payload as { session_key?: string; event_id?: string };
-      if (payload.session_key === sessionId && sessionId) {
+      if (payload.session_key === sessionId && sessionId && typing) {
+        // During a live turn, use _wsReloadHistory so we refresh content
+        // without resetting typing/activeTool to false.
+        void wsReloadHistory(sessionId);
+      } else if (payload.session_key === sessionId && sessionId) {
         void loadSessionHistory(sessionId);
       }
     },

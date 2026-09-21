@@ -135,6 +135,7 @@ interface ChatState {
   createBranch: (branchName: string) => Promise<void>;
   _pollForResponse: (sessionId: string, eventId: string, priorAssistantCount?: number) => void;
   _softReloadHistory: (sessionId: string) => Promise<void>;
+  _wsReloadHistory: (sessionId: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -319,12 +320,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       const projectPath = get().projectPath;
+      // Generate a per-message idempotency key so the backend sets a real
+      // event_id on the turn ledger. Without it, mark_activity writes to
+      // event_id="" (a phantom row), /turns/{eventId} never finds the turn,
+      // and current_tool stays empty for the entire lifetime of the poll.
+      const idempotencyKey = `${sessionId}:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const result = await apiFetch<{
         status: string;
         event_id: string;
         session_key: string;
       }>("/message", {
         method: "POST",
+        headers: {
+          "Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify({
           text: content,
           session_key: sessionId,
@@ -364,10 +373,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  _wsReloadHistory: async (sessionId) => {
+    // Like _softReloadHistory but does NOT reset typing/activeTool — only
+    // called from the WebSocket path where we know a turn is still running.
+    try {
+      const result = await apiFetch<{ messages: HistoryRow[] }>(
+        `/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`,
+      );
+      if (get().sessionId !== sessionId) return;
+      set({
+        messages: mapHistoryMessages(sessionId, result.messages ?? []),
+        chatting: true,
+      });
+    } catch {
+      // transient — next WS event or poll will retry
+    }
+  },
+
   _pollForResponse: (sessionId, eventId, priorAssistantCount = 0) => {
     let attempts = 0;
     const maxAttempts = 240;
-    const pollInterval = 2000;
+    const pollInterval = 1000;
     const terminal = new Set(["completed", "incomplete", "failed", "interrupted"]);
 
     const finish = async () => {
@@ -396,10 +422,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             return;
           }
           set({ activeTool: turn?.current_tool || null });
-          // Stream tool traces into the thread while the turn is still running.
-          if (attempts % 2 === 0) {
-            await get()._softReloadHistory(sessionId);
-          }
+          await get()._softReloadHistory(sessionId);
         } else {
           const result = await apiFetch<{ messages: HistoryRow[] }>(
             `/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`,

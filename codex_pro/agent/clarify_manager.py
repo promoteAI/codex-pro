@@ -135,3 +135,13 @@ class ClarifyManager:
 
     def clear_im_pending(self, session_key: str) -> None:
         self._im_pending.pop(session_key, None)
+
+    def get_im_pending(self, session_key: str) -> ClarifyRequest | None:
+        """Read the pending IM follow-up for a session without consuming it.
+
+        Like ``take_im_pending`` but does NOT pop: the /interactions endpoint
+        polls this repeatedly, and popping would drop the pending prompt before
+        the user answers (the answer path consumes it via ``take_im_pending``
+        when the next message arrives). Expiry is left to ``take_im_pending``.
+        """
+        return self._im_pending.get(session_key)

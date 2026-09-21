@@ -36,6 +36,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     from codex_pro.gateway.api.attachments import AttachmentsAPI
     from codex_pro.gateway.api.browser_tabs import BrowserTabsAPI
     from codex_pro.gateway.api.context_usage import ContextUsageAPI
+    from codex_pro.gateway.api.interactions import InteractionsAPI
 
     memory_api = MemoryAPI(server)
     attachments_api = AttachmentsAPI(server)
@@ -127,6 +128,9 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_post(f"{prefix}/sessions/{{key}}/archive", sessions_api.archive_session)
     app.router.add_post(f"{prefix}/sessions/{{key}}/unarchive", sessions_api.unarchive_session)
     app.router.add_delete(f"{prefix}/sessions/{{key}}", sessions_api.delete_session)
+
+    interactions_api = InteractionsAPI(server)
+    app.router.add_get(f"{prefix}/interactions", interactions_api.handle_interactions)
 
     app.router.add_get(f"{prefix}/cron", cron_api.list_jobs)
     app.router.add_post(f"{prefix}/cron", cron_api.create_job)

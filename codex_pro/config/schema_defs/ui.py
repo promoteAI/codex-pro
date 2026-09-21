@@ -41,6 +41,10 @@ class UIPreferences(_Base):
         default="C:/Users/cheris/Documents/Codex",
         json_schema_extra={"desc_zh": "无项目任务文件夹", "desc_en": "Default no-project task folder"},
     )
+    agent_env: Literal["windows_native", "wsl"] = Field(
+        default="windows_native",
+        json_schema_extra={"desc_zh": "Agent 运行环境", "desc_en": "Agent runtime environment"},
+    )
     open_in: str = Field(
         default="vscode",
         json_schema_extra={"desc_zh": "默认文件打开位置", "desc_en": "Default open-in editor"},

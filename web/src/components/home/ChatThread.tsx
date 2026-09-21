@@ -4,6 +4,8 @@ import { Wrench } from "lucide-react";
 import { useChatStore, type ChatMessage, type ToolCallFn } from "../../stores/chat";
 import { useWsSubscribe } from "../../hooks/use-ws";
 import { Markdown } from "./markdown";
+import { ApprovalCard } from "./ApprovalCard";
+import { ClarifyCard } from "./ClarifyCard";
 
 // SVG icons matching the prototype
 const ICO_DOC = <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="12" height="16" rx="1.5"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>;
@@ -213,6 +215,10 @@ export function ChatThread() {
   const activeTool = useChatStore((s) => s.activeTool);
   const sessionId = useChatStore((s) => s.sessionId);
   const streamStopped = useChatStore((s) => s.streamStopped);
+  const pendingApprovals = useChatStore((s) => s.pendingApprovals);
+  const pendingClarify = useChatStore((s) => s.pendingClarify);
+  const decideApproval = useChatStore((s) => s.decideApproval);
+  const answerClarify = useChatStore((s) => s.answerClarify);
   const loadSessionHistory = useChatStore((s) => s.loadSessionHistory);
   const wsReloadHistory = useChatStore((s) => s._wsReloadHistory);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -307,6 +313,24 @@ export function ChatThread() {
               <span className="chat-cursor" aria-hidden />
             </div>
           </div>
+        )}
+        {pendingApprovals.map((a) => (
+          <ApprovalCard
+            key={a.id}
+            id={a.id}
+            tool={a.tool}
+            params={a.params}
+            risk={a.risk ?? "exec"}
+            onDecide={(level) => decideApproval(a.id, level)}
+          />
+        ))}
+        {pendingClarify && (
+          <ClarifyCard
+            id={pendingClarify.id}
+            question={pendingClarify.question}
+            options={pendingClarify.options}
+            onAnswer={(v) => answerClarify(v)}
+          />
         )}
         <div ref={bottomRef} />
       </div>

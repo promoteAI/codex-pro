@@ -22,5 +22,10 @@
   "toolRunning": "Running {{name}}…",
   "unknownTool": "unknown tool",
   "emptyContent": "(empty)",
-  "actDone": "done"
+  "actDone": "done",
+  "approvalRequired": "Approval required: {{action}}",
+  "approveOnce": "This time only",
+  "approveSession": "This session",
+  "deny": "Deny",
+  "riskLevel": "Risk: {{level}}"
 }

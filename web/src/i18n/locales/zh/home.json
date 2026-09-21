@@ -22,5 +22,10 @@
   "toolRunning": "正在调用 {{name}}…",
   "unknownTool": "未知工具",
   "emptyContent": "（无内容）",
-  "actDone": "完成"
+  "actDone": "完成",
+  "approvalRequired": "需要确认执行: {{action}}",
+  "approveOnce": "仅本次",
+  "approveSession": "本会话同类",
+  "deny": "拒绝",
+  "riskLevel": "风险: {{level}}"
 }

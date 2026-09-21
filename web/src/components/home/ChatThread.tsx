@@ -241,7 +241,7 @@ export function ChatThread() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, typing, activeTool]);
+  }, [messages.length, typing, activeTool, pendingApprovals.length, pendingClarify]);
 
   return (
     <div ref={containerRef} className="flex-1 min-h-0 overflow-y-auto px-[clamp(16px,4vw,48px)] pb-[200px] pt-5 scrollbar-gutter-stable" aria-label="chat">

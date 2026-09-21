@@ -1,6 +1,7 @@
 {
   "placeholder": "Ask anything",
   "send": "Send",
+  "stop": "Stop",
   "project": "Project",
   "branch": "Branch",
   "permAsk": "Ask for approval",

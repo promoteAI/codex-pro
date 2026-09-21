@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { useChatStore } from "./chat";
 import * as api from "../lib/api";
+import { webWS } from "../lib/ws";
 
 beforeEach(() => {
   useChatStore.setState({
@@ -20,6 +21,7 @@ beforeEach(() => {
     typing: false,
     pendingEventId: null,
     activeTool: null,
+    streamStopped: false,
     planMode: false,
     goalMode: false,
     planTask: "",
@@ -259,6 +261,58 @@ describe("perm ↔ approval mode mapping", () => {
     expect(modeToPerm("")).toBe("full");
     expect(modeToPerm(undefined)).toBe("full");
     expect(modeToPerm("unknown")).toBe("full");
+  });
+});
+
+describe("chat store stopStream", () => {
+  it("sends an interrupt frame, clears pendingEventId, and preserves messages", () => {
+    useChatStore.setState({
+      sessionId: "sess-1",
+      pendingEventId: "evt-9",
+      typing: true,
+      activeTool: "bash",
+      messages: [{ id: "t-1", role: "tool", content: "done", internal: true }],
+    });
+    const sendSpy = vi.spyOn(webWS, "send").mockReturnValue(true);
+
+    useChatStore.getState().stopStream();
+
+    expect(sendSpy).toHaveBeenCalledWith({
+      type: "interrupt",
+      session_key: "sess-1",
+      event_id: "evt-9",
+    });
+    expect(useChatStore.getState().typing).toBe(false);
+    expect(useChatStore.getState().activeTool).toBe(null);
+    // The in-flight poll must not reload/overwrite the local messages, so the
+    // tool cards already on screen survive the stop.
+    expect(useChatStore.getState().pendingEventId).toBe(null);
+    expect(useChatStore.getState().streamStopped).toBe(true);
+    expect(useChatStore.getState().messages).toHaveLength(1);
+  });
+
+  it("omits session/event ids when not set and still stops the stream", () => {
+    useChatStore.setState({ sessionId: null, pendingEventId: null, typing: true });
+    const sendSpy = vi.spyOn(webWS, "send").mockReturnValue(false);
+
+    useChatStore.getState().stopStream();
+
+    expect(sendSpy).toHaveBeenCalledWith({ type: "interrupt" });
+    expect(useChatStore.getState().typing).toBe(false);
+    expect(useChatStore.getState().streamStopped).toBe(true);
+  });
+
+  it("sendMessage clears streamStopped so a new turn resumes polling", () => {
+    vi.spyOn(api, "apiFetch").mockResolvedValue({
+      status: "accepted",
+      event_id: "evt-2",
+      session_key: "cli:web-1",
+    });
+    useChatStore.setState({ streamStopped: true, draft: "hello" });
+    const { sendMessage } = useChatStore.getState();
+    // sendMessage is async; fire-and-forget like the Composer does.
+    void sendMessage();
+    expect(useChatStore.getState().streamStopped).toBe(false);
   });
 });
 

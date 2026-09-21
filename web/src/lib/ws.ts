@@ -195,6 +195,14 @@ export class WebWS {
     };
   }
 
+  /** Send a raw control frame to the server (e.g. `interrupt`). Returns false
+   *  if the socket is not open yet, so callers can decide how to fall back. */
+  send(frame: Record<string, unknown>): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+    this.ws.send(JSON.stringify(frame));
+    return true;
+  }
+
   /** Tear down the socket and any pending reconnect, keeping listeners. */
   private reset() {
     if (this.reconnectTimer !== null) {

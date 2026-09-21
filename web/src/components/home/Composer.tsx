@@ -6,11 +6,11 @@ import {
   Plus,
   ShieldAlert,
   ArrowUp,
-  Loader2,
   RotateCcw,
   Target,
   Lightbulb,
   X,
+  Square,
 } from "lucide-react";
 import { useChatStore } from "../../stores/chat";
 import { useProvidersStore } from "../../stores/providers";
@@ -37,6 +37,7 @@ export function Composer() {
   const draft = useChatStore((s) => s.draft);
   const setDraft = useChatStore((s) => s.setDraft);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const stopStream = useChatStore((s) => s.stopStream);
   const typing = useChatStore((s) => s.typing);
   const project = useChatStore((s) => s.project);
   const isGit = useChatStore((s) => s.isGit);
@@ -133,6 +134,7 @@ export function Composer() {
   const effortLabel = effortLabels[effort] ?? effortLabels[0];
   const modelLabel = model;
   const canSend = draft.trim().length > 0 && !typing;
+  const canStop = typing;
   const showGoalBtn = goalMode || planMode;
   const showCtxUsage = chatting;
 
@@ -392,17 +394,19 @@ export function Composer() {
           </button>
           <button
             type="button"
-            disabled={!canSend}
-            onClick={() => sendMessage()}
-            aria-label={t("send")}
-            title={t("send")}
+            disabled={!canSend && !canStop}
+            onClick={() => (typing ? stopStream() : sendMessage())}
+            aria-label={typing ? t("stop") : t("send")}
+            title={typing ? t("stop") : t("send")}
             className={`w-8 h-8 rounded-full inline-flex items-center justify-center ${
               canSend
                 ? "bg-codex-accent text-white hover:bg-codex-accent-hover"
-                : "bg-[#2a2a2a] text-[#666]"
+                : typing
+                  ? "bg-[#3a3a3a] text-[#e8e8e8] hover:bg-[#454545]"
+                  : "bg-[#2a2a2a] text-[#666]"
             }`}
           >
-            {typing ? <Loader2 size={16} className="animate-spin" /> : <ArrowUp size={16} />}
+            {typing ? <Square size={14} /> : <ArrowUp size={16} />}
           </button>
 
           {menu === "perm" && (

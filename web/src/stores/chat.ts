@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { apiFetch } from "../lib/api";
+import { webWS } from "../lib/ws";
 import { toast } from "./toast";
 
 export interface ToolCallFn {
@@ -105,6 +106,11 @@ interface ChatState {
   typing: boolean;
   activeTool: string | null;
   pendingEventId: string | null;
+  /** True once the user stopped the current stream, so neither the poll loop
+   *  nor the WS session_message handler overwrites the local messages (the
+   *  tool cards already on screen) with a fresh history fetch. Cleared on the
+   *  next sendMessage. */
+  streamStopped: boolean;
   repos: GitRepo[];
   branches: GitBranch[];
   loadingBranches: boolean;
@@ -129,6 +135,7 @@ interface ChatState {
   clearPlanMode: () => void;
   clearChat: () => void;
   sendMessage: (text?: string) => void;
+  stopStream: () => void;
   loadSessionHistory: (sessionId: string) => Promise<void>;
   loadRepos: () => Promise<void>;
   loadBranches: (repoPath: string) => Promise<void>;
@@ -155,6 +162,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   typing: false,
   activeTool: null,
   pendingEventId: null,
+  streamStopped: false,
   repos: [],
   branches: [],
   loadingBranches: false,
@@ -249,6 +257,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       draft: "",
       historyError: null,
       pendingEventId: null,
+      streamStopped: false,
       project: "",
       projectPath: "",
       isGit: false,
@@ -316,6 +325,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       sessionId,
       historyError: null,
       pendingEventId: null,
+      streamStopped: false,
     }));
 
     try {
@@ -356,6 +366,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
         historyError: e instanceof Error ? e.message : String(e),
       }));
     }
+  },
+
+  stopStream: () => {
+    const { sessionId, pendingEventId } = get();
+    // Send the interrupt control frame the WS server converts into a
+    // /__interrupt__ turn event. It needs both the session and the exact
+    // event_id so it stops this turn, not a later one on the same session.
+    const sent = webWS.send({
+      type: "interrupt",
+      ...(sessionId ? { session_key: sessionId } : {}),
+      ...(pendingEventId ? { event_id: pendingEventId } : {}),
+    });
+    // Stop the spinner now, and drop pendingEventId so the in-flight poll
+    // loop exits on its next tick without calling finish()/loadSessionHistory.
+    // That reload would overwrite the local messages — including the tool
+    // cards already on screen — with a fresh, possibly stale history fetch
+    // while the interrupt is still being processed server-side. Freeze the
+    // current messages instead so they don't get cleared.
+    set({ typing: false, activeTool: null, pendingEventId: null, streamStopped: true });
+    if (!sent) toast.error("停止失败：连接未就绪");
   },
 
   _softReloadHistory: async (sessionId) => {

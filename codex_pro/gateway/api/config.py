@@ -303,8 +303,16 @@ class ConfigAPI:
             return web.json_response({"error": f"save failed: {exc}"}, status=500)
 
         # Keep the authoritative in-process model coherent for status pages and
-        # channel lifecycle operations. For provider/model config changes we
-        # hot-reload the router so no restart is needed.
+        # channel lifecycle operations. The YAML file is the durable record, and
+        # `restart_required` below tells clients when a restart is needed for a
+        # subsystem to fully pick up the change — but the live config object
+        # should still reflect the new values immediately so status reads (e.g.
+        # `config.ui.locale`, `config.channels.*.enabled`) are truthful.
+        for path in changes:
+            self._set_model_path(config, path, self._get_model_path(validated, path))
+
+        # For provider/model config changes we hot-reload the router so no
+        # restart is needed.
         needs_reload = any(
             p.startswith("models.providers")
             or p.startswith("models.routes")
@@ -338,6 +346,13 @@ class ConfigAPI:
             result = await self._server.reload_config()
             if not result.get("ok", True):
                 response["error"] = result.get("error", "hot reload failed")
+        else:
+            # 非 reload 路径不会触发 reload_config 的广播,这里主动广播
+            # config_updated,让前端刷新 UI(与 reload_config 的语义一致)。
+            await self._server.web_ws.broadcast(
+                "config_updated",
+                {"paths": list(changes), "hot_reload": False},
+            )
         if non_hot:
             response["restart_required"] = True
         return web.json_response(response)

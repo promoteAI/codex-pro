@@ -201,6 +201,7 @@ def _make_gateway(tmp_path: Path):
     bus = MessageBus()
     channel_manager = MagicMock()
     session_manager = MagicMock()
+    session_manager.get = AsyncMock(return_value=MagicMock(status="active"))
     session_manager.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
     agent_loop = MagicMock()
 

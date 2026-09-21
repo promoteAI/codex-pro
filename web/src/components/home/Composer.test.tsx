@@ -131,7 +131,11 @@ describe("Composer context usage", () => {
       throw new Error(`unexpected ${path}`);
     });
 
-    render(<Composer />);
+    render(
+      <MemoryRouter>
+        <Composer />
+      </MemoryRouter>,
+    );
 
     // Gauge percentage reflects the fetched usage once the request resolves.
     await waitFor(() => expect(screen.getByText("15%")).toBeTruthy());
@@ -150,7 +154,11 @@ describe("Composer context usage", () => {
   it("非 chatting 时不请求 context-usage", () => {
     useChatStore.setState({ chatting: false });
     const fetchSpy = vi.spyOn(api, "apiFetch").mockResolvedValue({} as never);
-    render(<Composer />);
+    render(
+      <MemoryRouter>
+        <Composer />
+      </MemoryRouter>,
+    );
     expect(fetchSpy).not.toHaveBeenCalledWith(
       expect.stringContaining("/context-usage"),
       expect.anything(),

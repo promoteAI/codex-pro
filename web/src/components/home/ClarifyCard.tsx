@@ -1,5 +1,3 @@
-import { useTranslation } from "react-i18next";
-
 export interface ClarifyCardProps {
   id: string;
   question: string;
@@ -8,7 +6,6 @@ export interface ClarifyCardProps {
 }
 
 export function ClarifyCard({ id, question, options, onAnswer }: ClarifyCardProps) {
-  const { t } = useTranslation("home");
   return (
     <div className="shell-card border-codex-border bg-codex-bg p-3 rounded-lg" data-testid={`clarify-${id}`}>
       <div className="font-medium text-codex-text-secondary">❓ {question}</div>

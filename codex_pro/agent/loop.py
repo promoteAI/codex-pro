@@ -342,10 +342,10 @@ class AgentLoop:
         # registering the five skill tools and build_skills_context() returns "".
         self.skill_store = None
         if config.skills.enabled:
-            skills_dir = _resolve_builtin_skills_dir(workspace, config.skills.skills_dir)
+            skills_dirs = _resolve_builtin_skills_dir(workspace, config.skills.skills_dir)
             self.skill_store = SkillStore(
                 user_dir=workspace / "data" / "skills",
-                builtin_dir=skills_dir,
+                builtin_dirs=skills_dirs,
                 external_dirs=[Path(d) for d in config.skills.external_dirs],
                 disabled=config.skills.disabled,
             )

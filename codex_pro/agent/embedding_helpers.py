@@ -15,7 +15,18 @@ from loguru import logger
 from codex_pro.runtime_paths import bundled_skills_dir
 
 
-def _resolve_builtin_skills_dir(workspace: Path, configured_path: str) -> Path | None:
+def _resolve_builtin_skills_dir(
+    workspace: Path, configured_path: str,
+) -> list[Path]:
+    """Return every builtin skills directory that exists, in priority order.
+
+    ``skills_dir`` from config is always consulted (it may be the user's own
+    per-project skill collection). The repo-bundled *shipped* skills live under
+    ``codex_pro/_bundled/skills`` or one level up from the package root; they
+    must be appended so that a user whose workspace happens to already contain
+    a ``skills/`` directory (e.g. ``~/.codex-pro/skills``) does not shadow the
+    built-in inventory.
+    """
     raw_path = Path(configured_path).expanduser()
     candidates: list[Path] = []
     if raw_path.is_absolute():
@@ -25,10 +36,24 @@ def _resolve_builtin_skills_dir(workspace: Path, configured_path: str) -> Path |
         bundled = bundled_skills_dir()
         if bundled:
             candidates.append(bundled)
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None
+    # Only directories that actually exist are usable roots; then deduplicate by
+    # resolved path, order-preserving. When the configured skills_dir already
+    # resolves to the bundled directory (e.g. a repo checkout where
+    # ``workspace/skills`` IS ``codex_pro/../skills``), the same root would be
+    # walked twice and a user skill of the same name would be reported twice.
+    seen: set[Path] = set()
+    result: list[Path] = []
+    for c in candidates:
+        try:
+            resolved = c.resolve()
+        except OSError:
+            resolved = c.absolute()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if c.exists():
+            result.append(c)
+    return result
 
 
 _EMBED_CIRCUIT_THRESHOLD = 3

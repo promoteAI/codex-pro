@@ -55,6 +55,20 @@ def collect_session_start_hooks(store: Any) -> list[dict[str, Any]]:
     ]
 
 
+def collect_session_start_prompts(store: Any) -> list[str]:
+    """Return the ``command`` text of enabled ``prompt``-mode SessionStart hooks.
+
+    The prompt injection must be visible to the session's very first turn, so it
+    is pulled out of ``execute_session_start`` (which is fire-and-forget) and
+    applied synchronously by the gateway before the turn's context is built.
+    """
+    return [
+        str(hook.get("command", "") or "").strip()
+        for hook in collect_session_start_hooks(store)
+        if hook.get("run_mode") == "prompt" and str(hook.get("command", "") or "").strip()
+    ]
+
+
 async def _run_process_hook(command: str) -> None:
     """Run a ``process`` hook's command as a shell subprocess with a timeout.
 
@@ -129,12 +143,38 @@ async def _inject_session_start_prompt(
         logger.warning("Failed to persist session-start prompt for {}: {}", session.key, e)
 
 
+async def inject_session_start_prompts(server: Any, session: Session) -> None:
+    """Synchronously apply enabled ``prompt``-mode SessionStart hooks.
+
+    Called by the gateway *before* the new session's first turn builds its
+    context, so ``session_start_prompt`` is already on the session when
+    ``ContextStage`` reads it. Unlike ``execute_session_start`` this is awaited,
+    not fire-and-forget: prompt hooks are plain strings, and a session that never
+    sees them is a silent, confusing failure for the operator who configured
+    them. Never raises.
+    """
+    from codex_pro.gateway.api.hooks import HookStore
+
+    try:
+        store = HookStore(server._workspace)
+        prompts = collect_session_start_prompts(store)
+    except Exception:  # noqa: BLE001
+        logger.warning("SessionStart prompt hooks skipped: hook store unavailable")
+        return
+    if not prompts:
+        return
+    await _inject_session_start_prompt(server, session, prompts)
+
+
 async def execute_session_start(server: Any, session: Session) -> None:
     """Run every enabled ``SessionStart`` hook for a newly created session.
 
-    Called fire-and-forget by the gateway after the session is first created.
-    The function is intentionally self-contained and never raises, so a task
-    wrapping it cannot take down the request path even on exceptional hooks.
+    ``prompt``-mode hooks are applied synchronously by
+    :func:`inject_session_start_prompts` before the first turn, so this only
+    handles the ``process`` hooks — fire-and-forget, as the gateway schedules it
+    without awaiting. The function is intentionally self-contained and never
+    raises, so a task wrapping it cannot take down the request path even on
+    exceptional hooks.
     """
     from codex_pro.gateway.api.hooks import HookStore
 
@@ -149,18 +189,12 @@ async def execute_session_start(server: Any, session: Session) -> None:
         return
 
     process_commands: list[str] = []
-    prompts: list[str] = []
     for hook in hooks:
         command = str(hook.get("command", "") or "").strip()
         if not command:
             continue
-        if hook.get("run_mode") == "prompt":
-            prompts.append(command)
-        else:
+        if hook.get("run_mode") != "prompt":
             process_commands.append(command)
-
-    if prompts:
-        await _inject_session_start_prompt(server, session, prompts)
 
     # Run process hooks concurrently so multiple hooks do not serialize behind
     # one another; each is individually bounded by its own timeout.

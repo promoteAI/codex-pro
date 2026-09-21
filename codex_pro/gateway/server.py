@@ -195,6 +195,11 @@ class GatewayServer:
         was_new = await self.session_manager.get(session_key) is None
         session = await self.session_manager.get_or_create(session_key)
         if was_new:
+            # Prompt-mode SessionStart hooks must land on the session BEFORE the
+            # first turn reads ``session_start_prompt`` in ContextStage, so they
+            # are awaited here (they are just strings). Process-mode hooks stay
+            # fire-and-forget — a slow command must not delay the inbound message.
+            await self._inject_session_start_prompts(session)
             self._fire_session_start(session)
         if not force and not self.session_policy.should_reset(session):
             return session, False
@@ -231,6 +236,20 @@ class GatewayServer:
             {"session_key": session_key},
         )
         return session, True
+
+    async def _inject_session_start_prompts(self, session: Any) -> None:
+        """Apply ``prompt``-mode SessionStart hooks before the first turn.
+
+        Awaited (not fire-and-forget) so the session-start prompt is on the
+        session when ContextStage builds the first system prompt. The wrapped
+        coroutine never raises.
+        """
+        try:
+            from codex_pro.gateway.hook_exec import inject_session_start_prompts
+
+            await inject_session_start_prompts(self, session)
+        except Exception as e:  # noqa: BLE001 — injection must never block the turn
+            logger.warning("Failed to inject SessionStart prompt hooks: {}", e)
 
     def _fire_session_start(self, session: Any) -> None:
         """Schedule user-configured ``SessionStart`` hooks (fire-and-forget).

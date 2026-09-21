@@ -100,12 +100,18 @@ class SkillStore:
         self,
         user_dir: Path | None = None,
         builtin_dir: Path | None = None,
+        builtin_dirs: list[Path] | None = None,
         external_dirs: list[Path] | None = None,
         disabled: list[str] | None = None,
     ):
         self._user_dir = user_dir or Path.home() / ".codex-pro" / "skills"
         self._user_dir.mkdir(parents=True, exist_ok=True)
-        self._builtin_dir = builtin_dir
+        # ``builtin_dirs`` is the new API; ``builtin_dir`` is kept for backwards
+        # compatibility with callers (tests, evolution engine, etc.) that still
+        # pass the single-directory form.
+        self._builtin_dirs: list[Path] = builtin_dirs or (
+            [builtin_dir] if builtin_dir else []
+        )
         self._external_dirs = external_dirs or []
         # Disables promoted by the evolution gate are persisted here so they
         # survive restarts — the in-memory set alone evaporates with the process.
@@ -186,8 +192,9 @@ class SkillStore:
     def _all_roots(self) -> list[tuple[Path, bool]]:
         """Returns (path, is_writable) pairs for all skill directories."""
         roots: list[tuple[Path, bool]] = [(self._user_dir, True)]
-        if self._builtin_dir and self._builtin_dir.exists():
-            roots.append((self._builtin_dir, False))
+        for d in self._builtin_dirs:
+            if d.exists():
+                roots.append((d, False))
         for d in self._external_dirs:
             if d.exists():
                 roots.append((d, False))

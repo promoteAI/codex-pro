@@ -111,3 +111,49 @@ describe("Composer 停止按钮", () => {
     expect(screen.queryByRole("button", { name: "停止" })).toBeNull();
   });
 });
+
+describe("Composer context usage", () => {
+  it("拉取真实 context-usage 并渲染 gauge 与弹窗分段", async () => {
+    useChatStore.setState({ chatting: true, sessionId: "sess-1" });
+    const fetchSpy = vi.spyOn(api, "apiFetch").mockImplementation(async (path: string) => {
+      if (path === "/git/repos") return { repos: [] } as never;
+      if (path === "/providers") return { providers: [] } as never;
+      if (path === "/sessions/sess-1/context-usage") {
+        return {
+          max: 200_000,
+          used: 30_000,
+          segments: [
+            { key: "system", label: "System prompt", color: "#8a8a8a", tokens: 5_000, direct: 2.5 },
+            { key: "conversation", label: "Conversation", color: "#9f1239", tokens: 25_000, direct: 12.5 },
+          ],
+        } as never;
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+
+    render(<Composer />);
+
+    // Gauge percentage reflects the fetched usage once the request resolves.
+    await waitFor(() => expect(screen.getByText("15%")).toBeTruthy());
+
+    // Open the context dialog and confirm segments come from the API response.
+    fireEvent.click(screen.getByRole("button", { name: "Context Usage" }));
+    expect(screen.getByText("System prompt")).toBeTruthy();
+    expect(screen.getByText("Conversation")).toBeTruthy();
+    expect(screen.getByText(/30\.0K/)).toBeTruthy();
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/sessions/sess-1/context-usage",
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+  });
+
+  it("非 chatting 时不请求 context-usage", () => {
+    useChatStore.setState({ chatting: false });
+    const fetchSpy = vi.spyOn(api, "apiFetch").mockResolvedValue({} as never);
+    render(<Composer />);
+    expect(fetchSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("/context-usage"),
+      expect.anything(),
+    );
+  });
+});

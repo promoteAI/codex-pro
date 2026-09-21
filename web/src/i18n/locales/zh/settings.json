@@ -54,6 +54,8 @@
   "agentEnv": "智能体环境",
   "agentEnvDesc": "智能体执行命令与工具的运行环境",
   "windowsNative": "Windows 原生",
+  "wsl": "适用于 Linux 的 Windows 子系统",
+  "wslDesc": "在 WSL 中运行智能体",
   "integratedShell": "集成终端 Shell",
   "integratedShellDesc": "内置终端默认使用的 Shell",
   "autoDetect": "自动检测",

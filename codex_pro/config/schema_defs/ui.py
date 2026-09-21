@@ -37,6 +37,10 @@ class UIPreferences(_Base):
     )
 
     # ── General / editor ─────────────────────────────────────────────────────
+    no_project_folder: str = Field(
+        default="C:/Users/cheris/Documents/Codex",
+        json_schema_extra={"desc_zh": "无项目任务文件夹", "desc_en": "Default no-project task folder"},
+    )
     open_in: str = Field(
         default="vscode",
         json_schema_extra={"desc_zh": "默认文件打开位置", "desc_en": "Default open-in editor"},

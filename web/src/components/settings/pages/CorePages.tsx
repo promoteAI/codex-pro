@@ -13,6 +13,7 @@ import {
   Toggle,
 } from "../ui";
 import { useSettingsStore } from "../../../stores/settings";
+import type { AgentEnv } from "../../../stores/settings";
 
 const OPEN_IN_OPTIONS: Array<{ id: string; label: string; icon: ReactNode }> = [
   {
@@ -99,22 +100,48 @@ export function GeneralPage() {
   const [shellOpen, setShellOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const shellOptions = ["PowerShell", "Command Prompt", "Git Bash", "WSL"];
+  const [agentEnvOpen, setAgentEnvOpen] = useState(false);
+  const agentEnvRef = useRef<HTMLDivElement>(null);
+  const AGENT_ENV_OPTIONS: Array<{ id: AgentEnv; label: string; desc: string }> = [
+    { id: "windows_native", label: t("windowsNative"), desc: "" },
+    { id: "wsl", label: t("wsl"), desc: t("wslDesc") },
+  ];
+  // "No-project task folder" — toggle into an editable input, save on blur/Enter.
+  const [noProjEditing, setNoProjEditing] = useState(false);
+  const [noProjDraft, setNoProjDraft] = useState(prefs.noProjectFolder);
+  const noProjRef = useRef<HTMLInputElement>(null);
+
+  const startNoProjEdit = () => {
+    setNoProjDraft(prefs.noProjectFolder);
+    setNoProjEditing(true);
+  };
+  const commitNoProj = () => {
+    const next = noProjDraft.trim() || prefs.noProjectFolder;
+    setNoProjEditing(false);
+    if (next !== prefs.noProjectFolder) updatePrefs({ noProjectFolder: next });
+  };
+
+  useEffect(() => {
+    if (noProjEditing) noProjRef.current?.focus();
+  }, [noProjEditing]);
 
   useEffect(() => {
     void useSettingsStore.getState().loadPrefs();
   }, []);
 
   useEffect(() => {
-    if (!openInOpen && !shellOpen) return;
+    if (!openInOpen && !shellOpen && !agentEnvOpen) return;
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
       if (openInOpen && !openInRef.current?.contains(t)) setOpenInOpen(false);
       if (shellOpen && !shellRef.current?.contains(t)) setShellOpen(false);
+      if (agentEnvOpen && !agentEnvRef.current?.contains(t)) setAgentEnvOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setOpenInOpen(false);
         setShellOpen(false);
+        setAgentEnvOpen(false);
       }
     };
     document.addEventListener("mousedown", onDoc);
@@ -158,10 +185,30 @@ export function GeneralPage() {
       <SectionTitle>{t("secGeneral")}</SectionTitle>
       <SettingsCard>
         <SettingsRow label={t("noProjectFolder")} desc={t("noProjectFolderDesc")}>
-          <span className="text-[12.5px] text-[#a8a8a8] font-mono max-w-[280px] truncate">
-            C:\Users\cheris\Documents\Codex
-          </span>
-          <ActionBtn>{t("change")}</ActionBtn>
+          {noProjEditing ? (
+            <input
+              ref={noProjRef}
+              value={noProjDraft}
+              onChange={(e) => setNoProjDraft(e.target.value)}
+              onBlur={commitNoProj}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitNoProj();
+                if (e.key === "Escape") {
+                  setNoProjDraft(prefs.noProjectFolder);
+                  setNoProjEditing(false);
+                }
+              }}
+              className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#e0e0e0] w-[280px] max-w-[40vw] outline-none"
+              aria-label={t("noProjectFolder")}
+            />
+          ) : (
+            <>
+              <span className="text-[12.5px] text-[#a8a8a8] font-mono max-w-[280px] truncate">
+                {prefs.noProjectFolder}
+              </span>
+              <ActionBtn onClick={startNoProjEdit}>{t("change")}</ActionBtn>
+            </>
+          )}
         </SettingsRow>
         <SettingsRow label={t("defaultOpenIn")} desc={t("defaultOpenInDesc")}>
           <div className="relative" ref={openInRef}>
@@ -207,7 +254,52 @@ export function GeneralPage() {
           </div>
         </SettingsRow>
         <SettingsRow label={t("agentEnv")} desc={t("agentEnvDesc")}>
-          <DropdownBtn>{t("windowsNative")}</DropdownBtn>
+          <div className="relative" ref={agentEnvRef}>
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={agentEnvOpen}
+              onClick={() => {
+                setAgentEnvOpen((v) => !v);
+                setOpenInOpen(false);
+                setShellOpen(false);
+              }}
+              className="inline-flex items-center gap-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0] hover:bg-[#323232] whitespace-nowrap"
+            >
+              {AGENT_ENV_OPTIONS.find((o) => o.id === prefs.agentEnv)?.label}
+              <span className="text-[10px] opacity-70">▾</span>
+            </button>
+            {agentEnvOpen && (
+              <div
+                role="listbox"
+                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[260px] p-1.5 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+              >
+                {AGENT_ENV_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="option"
+                    aria-selected={opt.id === prefs.agentEnv}
+                    onClick={() => {
+                      updatePrefs({ agentEnv: opt.id });
+                      setAgentEnvOpen(false);
+                    }}
+                    className="w-full flex flex-col items-start gap-0.5 px-3 py-2 rounded-lg text-left hover:bg-[#343434]"
+                  >
+                    <span className="text-[13px] text-[#e8e8e8] flex items-center gap-2 w-full">
+                      {opt.label}
+                      {opt.id === prefs.agentEnv && (
+                        <span className="text-[12px] opacity-100">✓</span>
+                      )}
+                    </span>
+                    {opt.desc && (
+                      <span className="text-[11.5px] text-[#888]">{opt.desc}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </SettingsRow>
         <SettingsRow label={t("integratedShell")} desc={t("integratedShellDesc")}>
           <div className="relative" ref={shellRef}>

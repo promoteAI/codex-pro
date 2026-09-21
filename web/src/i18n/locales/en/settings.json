@@ -54,6 +54,8 @@
   "agentEnv": "Agent environment",
   "agentEnvDesc": "Where the agent runs commands and tools",
   "windowsNative": "Windows native",
+  "wsl": "Windows Subsystem for Linux",
+  "wslDesc": "Run agent inside WSL",
   "integratedShell": "Integrated terminal shell",
   "integratedShellDesc": "Default shell for the built-in terminal",
   "autoDetect": "Auto-detect",

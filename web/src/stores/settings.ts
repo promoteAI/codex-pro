@@ -11,6 +11,7 @@ export type TerminalPosition = "bottom" | "right";
 export type FollowUpMode = "queue" | "steer";
 export type GitMergeMethod = "merge" | "squash";
 export type GitReviewPresentation = "inline" | "separate";
+export type AgentEnv = "windows_native" | "wsl";
 
 export interface UIPreferences {
   // Appearance
@@ -18,6 +19,8 @@ export interface UIPreferences {
   contrast: number;
   translucentSidebar: boolean;
   // General / editor
+  noProjectFolder: string;
+  agentEnv: AgentEnv;
   openIn: string;
   integratedShell: string;
   terminalPosition: TerminalPosition;
@@ -69,6 +72,8 @@ const WIRE_KEYS: Record<keyof UIPreferences, string> = {
   theme: "theme",
   contrast: "contrast",
   translucentSidebar: "translucent_sidebar",
+  noProjectFolder: "no_project_folder",
+  agentEnv: "agent_env",
   openIn: "open_in",
   integratedShell: "integrated_shell",
   terminalPosition: "terminal_position",
@@ -112,6 +117,8 @@ export const DEFAULT_PREFS: UIPreferences = {
   theme: "dark",
   contrast: 45,
   translucentSidebar: true,
+  noProjectFolder: "C:/Users/cheris/Documents/Codex",
+  agentEnv: "windows_native",
   openIn: "vscode",
   integratedShell: "PowerShell",
   terminalPosition: "bottom",

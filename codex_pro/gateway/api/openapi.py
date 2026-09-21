@@ -47,6 +47,8 @@ _ROUTE_DOCS: dict[str, dict[str, dict[str, Any]]] = {
     "GET /knowledge/jobs/{id}": {"summary": "Get job status", "tags": ["Knowledge"]},
     "DELETE /knowledge/jobs/{id}": {"summary": "Cancel an indexing job", "tags": ["Knowledge"]},
     "DELETE /knowledge/documents/{path}": {"summary": "Delete a document", "tags": ["Knowledge"]},
+    # Attachments
+    "POST /attachments": {"summary": "Upload a chat attachment", "tags": ["Attachments"]},
     # Config
     "GET /config": {"summary": "Get current configuration", "tags": ["Config"]},
     "PATCH /config": {"summary": "Update configuration", "tags": ["Config"]},

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ComposerAddMenu } from "./ComposerAddMenu";
 import { useAuthStore } from "../stores/auth";
-import { toast } from "../stores/toast";
+import { useChatStore } from "../stores/chat";
 
 vi.mock("../stores/toast", () => ({
   toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
@@ -10,10 +10,12 @@ vi.mock("../stores/toast", () => ({
 
 beforeEach(() => {
   useAuthStore.setState({ token: "" });
+  useChatStore.setState({ pendingAttachments: [] });
 });
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 function renderMenu() {
@@ -23,7 +25,7 @@ function renderMenu() {
   const onOpenProject = vi.fn();
   const onGoal = vi.fn();
   const onPlan = vi.fn();
-  render(
+  const view = render(
     <ComposerAddMenu
       open
       anchorEl={anchor}
@@ -33,7 +35,7 @@ function renderMenu() {
       onPlan={onPlan}
     />,
   );
-  return { onClose, onOpenProject, onGoal, onPlan };
+  return { onClose, onOpenProject, onGoal, onPlan, ...view };
 }
 
 describe("ComposerAddMenu", () => {
@@ -67,9 +69,21 @@ describe("ComposerAddMenu", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("文件和文件夹 toast", () => {
-    renderMenu();
+  it("文件和文件夹触发文件选择并关闭菜单", () => {
+    const { onClose } = renderMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /文件和文件夹/ }));
-    expect(toast.info).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+    expect(document.body.querySelector('input[type="file"]')).toBeTruthy();
+  });
+
+  it("选择文件后调用 addFile 上传", () => {
+    const addFile = vi
+      .spyOn(useChatStore.getState(), "addFile")
+      .mockResolvedValue(undefined);
+    renderMenu();
+    const input = document.body.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["hello"], "note.txt", { type: "text/plain" });
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(addFile).toHaveBeenCalledWith(file);
   });
 });

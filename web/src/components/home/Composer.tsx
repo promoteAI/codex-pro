@@ -63,6 +63,8 @@ export function Composer() {
   const loadBranches = useChatStore((s) => s.loadBranches);
   const loadingBranches = useChatStore((s) => s.loadingBranches);
   const chatting = useChatStore((s) => s.chatting);
+  const pendingAttachments = useChatStore((s) => s.pendingAttachments);
+  const removeAttachment = useChatStore((s) => s.removeAttachment);
 
   const providers = useProvidersStore((s) => s.providers);
   const fetchProviders = useProvidersStore((s) => s.fetchProviders);
@@ -248,6 +250,27 @@ export function Composer() {
             </div>
           )}
         </div>
+
+        {pendingAttachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-3 pb-1">
+            {pendingAttachments.map((att) => (
+              <span
+                key={att.attachment_id}
+                className="inline-flex items-center gap-1 max-w-[200px] text-[12px] text-[#d0d0d0] bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2 py-1"
+              >
+                <span className="truncate">{att.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(att.attachment_id)}
+                  className="ml-0.5 w-4 h-4 inline-flex items-center justify-center rounded text-[#888] hover:text-[#eee] hover:bg-[#444]"
+                  aria-label={`${t("close")} ${att.name}`}
+                >
+                  <X size={11} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center gap-1.5 px-2.5 pb-2.5 relative">
           <button

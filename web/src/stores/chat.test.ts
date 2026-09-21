@@ -22,6 +22,7 @@ beforeEach(() => {
     pendingEventId: null,
     activeTool: null,
     streamStopped: false,
+    pendingAttachments: [],
     planMode: false,
     goalMode: false,
     planTask: "",
@@ -242,6 +243,71 @@ describe("chat store", () => {
     expect(useChatStore.getState().projectPath).toBe("/ws/abc");
     expect(useChatStore.getState().branch).toBe("dev");
     expect(useChatStore.getState().messages).toHaveLength(0);
+  });
+});
+
+describe("chat store attachments", () => {
+  it("addFile uploads via apiUpload and appends to pendingAttachments", async () => {
+    const uploadSpy = vi.spyOn(api, "apiUpload").mockResolvedValue({
+      attachment_id: "att-1",
+      url: "/data/attachments/att-1.txt",
+      name: "note.txt",
+      mime_type: "text/plain",
+      size: 5,
+    });
+    const file = new File(["hello"], "note.txt", { type: "text/plain" });
+    await useChatStore.getState().addFile(file);
+    expect(uploadSpy).toHaveBeenCalledWith("/attachments", expect.any(FormData));
+    expect(useChatStore.getState().pendingAttachments).toHaveLength(1);
+    expect(useChatStore.getState().pendingAttachments[0].attachment_id).toBe("att-1");
+  });
+
+  it("sendMessage includes attachments in the body and clears them", async () => {
+    let body: Record<string, unknown> | undefined;
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path, init) => {
+      if (path === "/message") {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return { status: "accepted", event_id: "evt-1", session_key: "cli:web-1" };
+      }
+      if (String(path).startsWith("/turns/")) {
+        return { turn: { status: "completed", response_text: "ok" } };
+      }
+      if (String(path).includes("/history")) {
+        return { messages: [] };
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+    useChatStore.setState({
+      pendingAttachments: [
+        { attachment_id: "att-1", url: "/p", name: "note.txt", mime_type: "text/plain", size: 5 },
+      ],
+    });
+    await useChatStore.getState().sendMessage("hello");
+    expect(body?.attachments).toEqual([{ attachment_id: "att-1" }]);
+    expect(useChatStore.getState().pendingAttachments).toHaveLength(0);
+  });
+
+  it("removeAttachment removes a staged attachment", () => {
+    useChatStore.setState({
+      pendingAttachments: [
+        { attachment_id: "att-1", url: "/a", name: "a.txt", mime_type: "text/plain", size: 1 },
+        { attachment_id: "att-2", url: "/b", name: "b.txt", mime_type: "text/plain", size: 1 },
+      ],
+    });
+    useChatStore.getState().removeAttachment("att-1");
+    expect(useChatStore.getState().pendingAttachments.map((a) => a.attachment_id)).toEqual([
+      "att-2",
+    ]);
+  });
+
+  it("clearChat clears staged attachments", () => {
+    useChatStore.setState({
+      pendingAttachments: [
+        { attachment_id: "att-1", url: "/a", name: "a.txt", mime_type: "text/plain", size: 1 },
+      ],
+    });
+    useChatStore.getState().clearChat();
+    expect(useChatStore.getState().pendingAttachments).toHaveLength(0);
   });
 });
 

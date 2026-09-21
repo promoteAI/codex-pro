@@ -36,6 +36,8 @@
   "addPlugins": "插件",
   "addAgents": "智能体",
   "addTabs": "标签页",
+  "addTabsLoading": "加载标签页…",
+  "addTabsEmpty": "暂无标签页",
   "addFilesChats": "文件和聊天",
   "addSearchHint": "输入内容以搜索文件或聊天",
   "goal": "目标",

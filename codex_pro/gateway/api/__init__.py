@@ -32,6 +32,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     from codex_pro.gateway.api.plugins import register_plugin_api_routes
     from codex_pro.gateway.api.providers import ProvidersAPI
     from codex_pro.gateway.api.connections import ConnectionsAPI
+    from codex_pro.gateway.api.browser_tabs import BrowserTabsAPI
 
     memory_api = MemoryAPI(server)
     skills_api = SkillsAPI(server)
@@ -48,6 +49,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     prs_api = PrsAPI(server)
     providers_api = ProvidersAPI(server)
     connections_api = ConnectionsAPI(server)
+    browser_tabs_api = BrowserTabsAPI(server)
 
     app.router.add_get(f"{prefix}/memory", memory_api.list_entries)
     app.router.add_get(f"{prefix}/memory/stats", memory_api.stats)
@@ -95,6 +97,11 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_put(f"{prefix}/connections/{{name}}", connections_api.update_connection)
     app.router.add_delete(f"{prefix}/connections/{{name}}", connections_api.delete_connection)
     app.router.add_post(f"{prefix}/connections/{{name}}/test", connections_api.test_connection)
+
+    # Browser tabs for the Composer "Tabs" segment
+    app.router.add_get(f"{prefix}/browser/tabs", browser_tabs_api.list_tabs)
+    app.router.add_post(f"{prefix}/browser/tabs", browser_tabs_api.create_tab)
+    app.router.add_delete(f"{prefix}/browser/tabs/{{id}}", browser_tabs_api.delete_tab)
 
     app.router.add_get(f"{prefix}/tasks", tasks_api.list_tasks)
     app.router.add_post(f"{prefix}/tasks", tasks_api.create_task)

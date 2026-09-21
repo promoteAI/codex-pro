@@ -104,5 +104,6 @@
   "ctxTitle": "上下文使用量",
   "ctxClose": "关闭",
   "ctxFull": "{{pct}}% 已使用",
-  "slashCommands": "命令"
+  "slashCommands": "命令",
+  "skillsSection": "技能"
 }

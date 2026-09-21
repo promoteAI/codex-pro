@@ -112,6 +112,38 @@ describe("Composer 停止按钮", () => {
   });
 });
 
+describe("Composer / 技能菜单", () => {
+  it("把启用的技能列进菜单，点按后插入技能名到输入框", async () => {
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path: string) => {
+      if (path === "/providers") return { providers: [] } as never;
+      if (path === "/git/repos") return { repos: [] } as never;
+      if (path === "/skills") {
+        return {
+          skills: [
+            { name: "web-search", description: "Search the web", enabled: true },
+            { name: "docs", description: "Disabled skill", enabled: false },
+          ],
+        } as never;
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+
+    render(
+      <MemoryRouter>
+        <Composer />
+      </MemoryRouter>,
+    );
+
+    // 输入 "/" 触发菜单，只保留启用的技能。
+    fireEvent.change(screen.getByPlaceholderText("随心输入"), { target: { value: "/" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: /web-search/ })).toBeTruthy());
+    expect(screen.queryByRole("button", { name: /docs/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /web-search/ }));
+    expect(useChatStore.getState().draft).toBe("/web-search ");
+  });
+});
+
 describe("Composer context usage", () => {
   it("拉取真实 context-usage 并渲染 gauge 与弹窗分段", async () => {
     useChatStore.setState({ chatting: true, sessionId: "sess-1" });

@@ -170,10 +170,6 @@ export interface CtxUsageSegment {
 }
 
 export const SLASH_COMMANDS = [
-  { id: "new", label: "new", hint: "新建对话" },
-  { id: "permissions", label: "permissions", hint: "批准模式" },
-  { id: "model", label: "model", hint: "选择模型与推理强度" },
-  { id: "effort", label: "effort", hint: "调整推理强度" },
   { id: "plan", label: "plan", hint: "开启计划模式" },
   { id: "goal", label: "goal", hint: "设置持续追求的目标" },
 ];

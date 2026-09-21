@@ -23,6 +23,13 @@ import { BranchMenu } from "../BranchMenu";
 import { ComposerAddMenu } from "../ComposerAddMenu";
 import { SLASH_COMMANDS, type CtxUsageSegment } from "../../mock/seeds";
 
+/** A skill from `GET /skills`; only enabled ones are offered in the slash menu. */
+interface SkillItem {
+  name: string;
+  description: string;
+  enabled: boolean;
+}
+
 type Menu = "project" | "branch" | "model" | "perm" | "add" | "ctx" | null;
 
 /** Live context-usage response from `GET /sessions/{key}/context-usage`. */
@@ -130,6 +137,22 @@ export function Composer() {
     const pct = Math.round((used / ctxData.max) * 100);
     return { used, pct, max: ctxData.max, segments: ctxData.segments };
   }, [ctxData]);
+
+  // Enabled skills offered in the slash menu. Fetched once on mount; the menu
+  // works in any conversation state, so it is not gated on `chatting`.
+  const { data: skillsData } = useApi<{ skills: SkillItem[] }>("/skills");
+  const skills = useMemo(() => {
+    const list = skillsData?.skills ?? [];
+    return list.filter((s) => s.enabled);
+  }, [skillsData]);
+  const slashMatches = useMemo(() => {
+    const prefix = draft.slice(1);
+    const commands = SLASH_COMMANDS.filter((c) => c.label.startsWith(prefix));
+    const skillItems = skills
+      .filter((s) => s.name.startsWith(prefix))
+      .map((s) => ({ id: `skill:${s.name}`, label: s.name, hint: s.description }));
+    return { commands, skillItems };
+  }, [draft, skills]);
 
   useEffect(() => {
     void loadRepos();
@@ -260,23 +283,46 @@ export function Composer() {
           {/* / slash-command menu */}
           {draft.startsWith("/") && !draft.includes(" ") && (
             <div className="absolute left-3 bottom-[calc(100%-6px)] w-[min(520px,calc(100vw-24px))] max-h-[min(420px,55vh)] overflow-auto p-2 pl-2.5 bg-[#1c1c1c] border border-[#333] rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30">
-              <div className="px-2.5 py-1.5 text-[12px] text-[#7dd3fc] font-medium">{t("slashCommands")}</div>
-              {SLASH_COMMANDS.filter((c) => c.label.startsWith(draft.slice(1))).map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => {
-                    if (c.id === "plan") setPlanMode(true);
-                    else if (c.id === "goal") setGoalMode(true);
-                    setDraft(`/${c.label} `);
-                    taRef.current?.focus();
-                  }}
-                  className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-[#2e2e2e]"
-                >
-                  <span className="text-[13px] text-[#e8e8e8] font-medium whitespace-nowrap">/{c.label}</span>
-                  <span className="flex-1 min-w-0 text-[12px] text-[#8a8a8a] truncate">{c.hint}</span>
-                </button>
-              ))}
+              {slashMatches.commands.length > 0 && (
+                <>
+                  <div className="px-2.5 py-1.5 text-[12px] text-[#7dd3fc] font-medium">{t("slashCommands")}</div>
+                  {slashMatches.commands.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        if (c.id === "plan") setPlanMode(true);
+                        else if (c.id === "goal") setGoalMode(true);
+                        setDraft(`/${c.label} `);
+                        taRef.current?.focus();
+                      }}
+                      className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-[#2e2e2e]"
+                    >
+                      <span className="text-[13px] text-[#e8e8e8] font-medium whitespace-nowrap">/{c.label}</span>
+                      <span className="flex-1 min-w-0 text-[12px] text-[#8a8a8a] truncate">{c.hint}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+              {slashMatches.skillItems.length > 0 && (
+                <>
+                  <div className="px-2.5 py-1.5 text-[12px] text-[#7dd3fc] font-medium">{t("skillsSection")}</div>
+                  {slashMatches.skillItems.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setDraft(`/${c.label} `);
+                        taRef.current?.focus();
+                      }}
+                      className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-[#2e2e2e]"
+                    >
+                      <span className="text-[13px] text-[#e8e8e8] font-medium whitespace-nowrap">/{c.label}</span>
+                      <span className="flex-1 min-w-0 text-[12px] text-[#8a8a8a] truncate">{c.hint}</span>
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>

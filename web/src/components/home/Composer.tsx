@@ -16,16 +16,21 @@ import { useChatStore } from "../../stores/chat";
 import { useProvidersStore } from "../../stores/providers";
 import { useIsAdmin } from "../../stores/capabilities";
 import { toast } from "../../stores/toast";
+import { useApi } from "../../hooks/use-api";
 import { ProjectMenu } from "../ProjectMenu";
 import { CreateProjectDialog } from "../CreateProjectDialog";
 import { BranchMenu } from "../BranchMenu";
 import { ComposerAddMenu } from "../ComposerAddMenu";
-import {
-  MOCK_CTX_USAGE,
-  SLASH_COMMANDS,
-} from "../../mock/seeds";
+import { SLASH_COMMANDS, type CtxUsageSegment } from "../../mock/seeds";
 
 type Menu = "project" | "branch" | "model" | "perm" | "add" | "ctx" | null;
+
+/** Live context-usage response from `GET /sessions/{key}/context-usage`. */
+interface CtxUsageResponse {
+  max: number;
+  used: number;
+  segments: CtxUsageSegment[];
+}
 
 function formatTokens(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
@@ -63,6 +68,8 @@ export function Composer() {
   const loadBranches = useChatStore((s) => s.loadBranches);
   const loadingBranches = useChatStore((s) => s.loadingBranches);
   const chatting = useChatStore((s) => s.chatting);
+  const sessionId = useChatStore((s) => s.sessionId);
+  const messageCount = useChatStore((s) => s.messages.length);
 
   const providers = useProvidersStore((s) => s.providers);
   const fetchProviders = useProvidersStore((s) => s.fetchProviders);
@@ -93,11 +100,34 @@ export function Composer() {
     return set.size > 0 ? Array.from(set).sort() : null;
   }, [providers]);
 
+  // Live context-window usage for the current session, fetched once the chat
+  // is running (the gauge/dialog is only shown while chatting). Falls back to
+  // zeros when no session is active or the request is still in flight, so the
+  // ring renders a neutral (empty) state rather than stale mock numbers.
+  const ctxPath =
+    chatting && sessionId
+      ? `/sessions/${encodeURIComponent(sessionId)}/context-usage`
+      : null;
+  const { data: ctxData, refetch: refetchCtx } = useApi<CtxUsageResponse>(ctxPath);
+
+  // Refresh as new turns land so the gauge tracks live consumption, not just the
+  // value captured when the dialog first opened. The first run is skipped because
+  // useApi already fetches on mount when the path becomes non-null.
+  const firstCtxRender = useRef(true);
+  useEffect(() => {
+    if (firstCtxRender.current) {
+      firstCtxRender.current = false;
+      return;
+    }
+    if (chatting && sessionId) void refetchCtx();
+  }, [messageCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const ctxUsage = useMemo(() => {
-    const used = MOCK_CTX_USAGE.segments.reduce((s, x) => s + x.tokens, 0);
-    const pct = Math.round((used / MOCK_CTX_USAGE.max) * 100);
-    return { used, pct };
-  }, []);
+    if (!ctxData) return { used: 0, pct: 0, max: 0, segments: [] as CtxUsageSegment[] };
+    const used = ctxData.used || ctxData.segments.reduce((s, x) => s + x.tokens, 0);
+    const pct = Math.round((used / ctxData.max) * 100);
+    return { used, pct, max: ctxData.max, segments: ctxData.segments };
+  }, [ctxData]);
 
   useEffect(() => {
     void loadRepos();
@@ -321,7 +351,7 @@ export function Composer() {
                 <span
                   className="w-[18px] h-[18px] rounded-full flex-none"
                   style={{
-                    background: `conic-gradient(${MOCK_CTX_USAGE.segments
+                    background: `conic-gradient(${ctxUsage.segments
                       .map((s) => `${s.color} 0 ${s.direct}%`)
                       .join(",")}, #2a2a2a ${ctxUsage.pct}% 100%)`,
                     WebkitMask:
@@ -354,11 +384,11 @@ export function Composer() {
                       {t("ctxFull", { pct: ctxUsage.pct })}
                     </span>
                     <span className="text-[12.5px] text-[#9a9a9a] tabular-nums whitespace-nowrap">
-                      ~{formatTokens(ctxUsage.used)} / {formatTokens(MOCK_CTX_USAGE.max)} Tokens
+                      ~{formatTokens(ctxUsage.used)} / {formatTokens(ctxUsage.max)} Tokens
                     </span>
                   </div>
                   <div className="flex h-2 rounded-full overflow-hidden bg-[#1e1e1e] mb-3.5">
-                    {MOCK_CTX_USAGE.segments.map((s) => (
+                    {ctxUsage.segments.map((s) => (
                       <span
                         key={s.key}
                         style={{ width: `${s.direct}%`, background: s.color }}
@@ -367,7 +397,7 @@ export function Composer() {
                     ))}
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    {MOCK_CTX_USAGE.segments.map((s) => (
+                    {ctxUsage.segments.map((s) => (
                       <div
                         key={s.key}
                         className="flex items-center gap-2.5 py-[7px] text-[13px] text-[#d8d8d8] leading-tight"

@@ -32,6 +32,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     from codex_pro.gateway.api.plugins import register_plugin_api_routes
     from codex_pro.gateway.api.providers import ProvidersAPI
     from codex_pro.gateway.api.connections import ConnectionsAPI
+    from codex_pro.gateway.api.context_usage import ContextUsageAPI
 
     memory_api = MemoryAPI(server)
     skills_api = SkillsAPI(server)
@@ -48,6 +49,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     prs_api = PrsAPI(server)
     providers_api = ProvidersAPI(server)
     connections_api = ConnectionsAPI(server)
+    context_usage_api = ContextUsageAPI(server)
 
     app.router.add_get(f"{prefix}/memory", memory_api.list_entries)
     app.router.add_get(f"{prefix}/memory/stats", memory_api.stats)
@@ -106,6 +108,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
 
     app.router.add_get(f"{prefix}/sessions", sessions_api.list_sessions)
     app.router.add_get(f"{prefix}/sessions/{{key}}/history", sessions_api.get_history)
+    app.router.add_get(f"{prefix}/sessions/{{key}}/context-usage", context_usage_api.get_context_usage)
     app.router.add_get(f"{prefix}/sessions/{{key}}/turns", sessions_api.list_turns)
     app.router.add_get(f"{prefix}/turns/{{event_id}}", sessions_api.get_turn)
     app.router.add_post(f"{prefix}/sessions/{{key}}/archive", sessions_api.archive_session)

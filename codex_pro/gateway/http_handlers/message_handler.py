@@ -8,6 +8,8 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from aiohttp import web
@@ -29,6 +31,7 @@ from codex_pro.bus.idempotency import (
     durable_fingerprint_conflicts,
     idempotency_ledger_metadata,
 )
+from codex_pro.spill.layout import session_dir_name
 
 
 class MessageHandler:
@@ -533,16 +536,28 @@ class MessageHandler:
 
             session, _ = await self._server._reset_session_if_needed(session_key)
             # 会话持久化其归属项目(workspace)。`project` 可能为空(全局/未分类会话),
-            # 此时保持 "" 以向后兼容旧记录。
-            if project:
-                session.project = project
+            # 此时使用 no_project_folder/{YYYY-MM-DD}/{session_dir_name(session_key)}/work
+            # 作为隔离的工作目录:先按运行日期分层,再按会话隔离。session_key 可能含
+            # `:`/`/` 等非法路径字符,会话目录名须经 session_dir_name 清洗(sha256 前缀)。
+            effective_workspace = project
+            if not project:
+                # 无项目工作目录来自 ui.preferences.no_project_folder(前端设置页改的
+                # 那份)。GatewayServer._config 是 GatewayConfig(不含 ui),完整 Config
+                # 从 agent_loop.config 读取,与 /config API 的惯例一致。
+                _no_proj = self._server._agent_loop.config.ui.preferences.no_project_folder
+                no_project_base = Path(_no_proj).expanduser().resolve()
+                date_dir = no_project_base / datetime.now().strftime("%Y-%m-%d")
+                no_project_dir = date_dir / session_dir_name(session_key) / "work"
+                no_project_dir.mkdir(parents=True, exist_ok=True)
+                effective_workspace = str(no_project_dir)
+                session.project = effective_workspace
             from codex_pro.gateway.session_context import set_session_vars
             # workspace 作为上报侧 contextvar 一并带上;真正驱动工具的是
             # inbound.py 在派发任务上下文里根据 event.metadata["workspace"] 设置的
             # 那份(见 agent/workspace_scope.py)。这里仅保持上报一致性。
             tokens = set_session_vars(
                 platform=platform, chat_id=chat_id, user_id=user_id,
-                session_key=session_key, workspace=project,
+                session_key=session_key, workspace=effective_workspace,
             )
 
             content_blocks = [ContentBlock(type=ContentType.TEXT, text=text)]
@@ -597,8 +612,8 @@ class MessageHandler:
                     )
 
             event_meta: dict[str, Any] = {"gateway": True, "platform": platform, "user_id": user_id}
-            if project:
-                event_meta["workspace"] = project
+            if effective_workspace:
+                event_meta["workspace"] = effective_workspace
             event = InboundEvent(
                 channel=f"gateway:{platform}",
                 sender_id=user_id,

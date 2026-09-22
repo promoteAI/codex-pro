@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n";
 import {
   ActionBtn,
   DropdownBtn,
@@ -106,6 +107,13 @@ export function GeneralPage() {
     { id: "windows_native", label: t("windowsNative"), desc: "" },
     { id: "wsl", label: t("wsl"), desc: t("wslDesc") },
   ];
+  // Language picker — mirrors i18next's built-in detector persistence.
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
+  const LANG_OPTIONS: Array<{ id: string; label: string }> = [
+    { id: "zh", label: t("langZh") },
+    { id: "en", label: t("langEn") },
+  ];
   // "No-project task folder" — toggle into an editable input, save on blur/Enter.
   const [noProjEditing, setNoProjEditing] = useState(false);
   const [noProjDraft, setNoProjDraft] = useState(prefs.noProjectFolder);
@@ -130,18 +138,20 @@ export function GeneralPage() {
   }, []);
 
   useEffect(() => {
-    if (!openInOpen && !shellOpen && !agentEnvOpen) return;
+    if (!openInOpen && !shellOpen && !agentEnvOpen && !langOpen) return;
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
       if (openInOpen && !openInRef.current?.contains(t)) setOpenInOpen(false);
       if (shellOpen && !shellRef.current?.contains(t)) setShellOpen(false);
       if (agentEnvOpen && !agentEnvRef.current?.contains(t)) setAgentEnvOpen(false);
+      if (langOpen && !langRef.current?.contains(t)) setLangOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setOpenInOpen(false);
         setShellOpen(false);
         setAgentEnvOpen(false);
+        setLangOpen(false);
       }
     };
     document.addEventListener("mousedown", onDoc);
@@ -342,7 +352,46 @@ export function GeneralPage() {
           </div>
         </SettingsRow>
         <SettingsRow label={t("language")} desc={t("languageDesc")}>
-          <DropdownBtn>{t("autoDetect")}</DropdownBtn>
+          <div className="relative" ref={langRef}>
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={langOpen}
+              onClick={() => {
+                setLangOpen((v) => !v);
+                setOpenInOpen(false);
+                setShellOpen(false);
+                setAgentEnvOpen(false);
+              }}
+              className="inline-flex items-center gap-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0] hover:bg-[#323232] whitespace-nowrap"
+            >
+              {LANG_OPTIONS.find((o) => o.id === i18n.resolvedLanguage)?.label ?? t("autoDetect")}
+              <span className="text-[10px] opacity-70">▾</span>
+            </button>
+            {langOpen && (
+              <div
+                role="listbox"
+                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[160px] p-1.5 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+              >
+                {LANG_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="option"
+                    aria-selected={opt.id === i18n.resolvedLanguage}
+                    onClick={async () => {
+                      await i18n.changeLanguage(opt.id);
+                      setLangOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-lg text-[13px] text-left text-[#e8e8e8] hover:bg-[#343434]"
+                  >
+                    {opt.label}
+                    <span className={`text-[12px] ${opt.id === i18n.resolvedLanguage ? "opacity-100" : "opacity-0"}`}>✓</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </SettingsRow>
         <SettingsRow label={t("bottomPanel")} desc={t("bottomPanelDesc")}>
           <Toggle checked={prefs.bottomPanel} onChange={(v) => updatePrefs({ bottomPanel: v })} label={t("bottomPanel")} />

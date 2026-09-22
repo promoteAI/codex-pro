@@ -59,6 +59,8 @@
   "integratedShell": "集成终端 Shell",
   "integratedShellDesc": "内置终端默认使用的 Shell",
   "autoDetect": "自动检测",
+  "langZh": "中文",
+  "langEn": "English",
   "bottomPanel": "底部面板",
   "bottomPanelDesc": "在标题栏中显示底部面板控件",
   "defaultTermPos": "默认终端位置",

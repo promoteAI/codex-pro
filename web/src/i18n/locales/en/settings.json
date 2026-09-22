@@ -59,6 +59,8 @@
   "integratedShell": "Integrated terminal shell",
   "integratedShellDesc": "Default shell for the built-in terminal",
   "autoDetect": "Auto-detect",
+  "langZh": "中文",
+  "langEn": "English",
   "bottomPanel": "Bottom panel",
   "bottomPanelDesc": "Show bottom panel controls in the title bar",
   "defaultTermPos": "Default terminal location",

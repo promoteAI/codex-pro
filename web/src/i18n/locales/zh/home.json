@@ -23,6 +23,7 @@
   "unknownTool": "未知工具",
   "emptyContent": "（无内容）",
   "actDone": "完成",
+  "thinking": "正在思考…",
   "approvalRequired": "需要确认执行: {{action}}",
   "approveOnce": "仅本次",
   "approveSession": "本会话同类",

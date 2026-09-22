@@ -23,6 +23,7 @@
   "unknownTool": "unknown tool",
   "emptyContent": "(empty)",
   "actDone": "done",
+  "thinking": "Thinking…",
   "approvalRequired": "Approval required: {{action}}",
   "approveOnce": "This time only",
   "approveSession": "This session",

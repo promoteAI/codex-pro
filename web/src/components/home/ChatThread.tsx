@@ -1,176 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Wrench } from "lucide-react";
 import { useChatStore, type ChatMessage, type ToolCallFn } from "../../stores/chat";
 import { useWsSubscribe } from "../../hooks/use-ws";
 import { Markdown } from "./markdown";
 import { ApprovalCard } from "./ApprovalCard";
 import { ClarifyCard } from "./ClarifyCard";
-
-// SVG icons matching the prototype
-const ICO_DOC = <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="12" height="16" rx="1.5"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>;
-const ICO_CHEV = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>;
-const ICO_OK = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>;
-const ICO_SPIN = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 1-7.5 5.2"/></svg>;
-
-// Chinese verb labels mapped from tool names, mirroring prototype toolVerb()
-function toolVerb(name: string): string {
-  const map: Record<string, string> = {
-    read_file: "读取了文件",
-    read_multiple_files: "读取了文件",
-    write_file: "写入了文件",
-    edit_file: "编辑了文件",
-    search_files: "搜索了文件",
-    list_dir: "列出了目录",
-    exec: "运行了命令",
-    process: "运行了命令",
-    execute_code: "运行了代码",
-    web_search: "联网搜索",
-    web_fetch: "抓取了网页",
-    memory: "使用了记忆",
-    browser: "操作了浏览器",
-    ls: "列出了目录",
-    cat: "读取了文件",
-    grep: "搜索了文件",
-    find: "搜索了文件",
-    rg: "搜索了文件",
-    sed: "编辑了文件",
-    awk: "编辑了文件",
-  };
-  return map[name] || `调用了 ${name}`;
-}
-
-function formatJsonish(raw: string): string {
-  const text = (raw ?? "").trim();
-  if (!text) return "";
-  try {
-    return JSON.stringify(JSON.parse(text), null, 2);
-  } catch {
-    return text;
-  }
-}
-
-function truncate(text: string, max = 4000): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max)}\n…`;
-}
-
-function actionSummary(text: string, max = 120): string {
-  const t = (text ?? "").trim();
-  if (!t) return "";
-  return t.length <= max ? t : `${t.slice(0, max)}…`;
-}
-
-/** Build the activity body content for a shell/JSON card, splitting cmd/out. */
-function shellSegments(text: string): { cmd: string; out: string } {
-  const raw = (text ?? "").trim();
-  const firstNewline = raw.indexOf("\n");
-  if (firstNewline === -1) return { cmd: raw, out: "" };
-  return {
-    cmd: raw.slice(0, firstNewline),
-    out: raw.slice(firstNewline + 1),
-  };
-}
-
-function ActivityItem({
-  title,
-  toolName,
-  input,
-  output,
-  running,
-  defaultOpen,
-}: {
-  title: string;
-  toolName?: string;
-  input?: string;
-  output?: string;
-  running?: boolean;
-  defaultOpen?: boolean;
-}) {
-  const { t } = useTranslation("home");
-  const [open, setOpen] = useState(defaultOpen || running);
-  const hasInput = Boolean(input?.trim());
-  const hasOutput = Boolean(output?.trim());
-  const summary = actionSummary(formatJsonish(input ?? "") || output || "");
-  const seg = shellSegments(input ?? output ?? "");
-  const showCard = (hasInput || hasOutput) && (seg.cmd || seg.out);
-  const verb = toolName ? toolVerb(toolName) : title;
-
-  return (
-    <div
-      className={`act-item ${running ? "is-running" : ""} ${open ? "is-open" : ""}`}
-      data-tool={title}
-    >
-      <div className="act-head">
-        <span className="act-ico">{ICO_DOC}</span>
-        <span className="act-verb">{verb}</span>
-      </div>
-      {summary && (
-        <button
-          type="button"
-          className="act-summary"
-          aria-expanded={open}
-          onClick={!running ? () => setOpen((v) => !v) : undefined}
-        >
-          <span className="act-summary-text">{summary}</span>
-          <span className="act-chev">{ICO_CHEV}</span>
-        </button>
-      )}
-      {(showCard || hasInput || hasOutput) && (
-        <div className={`act-body ${open ? "is-open" : ""}`}>
-          {hasInput && (
-            <div>
-              <div className="text-[11px] uppercase tracking-wide text-[#777] pt-1 pb-1">{t("toolInput")}</div>
-              <div className="shell-card">
-                <div className="shell-label">{title}</div>
-                <pre className="shell-pre">
-                  {seg.cmd && <span className="cmd">{truncate(seg.cmd, 4000)}</span>}
-                  {seg.out && (
-                    <>
-                      {seg.cmd && "\n"}
-                      <span className="out">{truncate(seg.out, 4000)}</span>
-                    </>
-                  )}
-                </pre>
-                <span className={`shell-badge ${running ? "is-run" : "is-ok"}`}>
-                  {running ? (
-                    <>
-                      <span className="animate-pulse">{ICO_SPIN}</span>
-                      <span>{t("toolRunning", { name: "" })}</span>
-                    </>
-                  ) : (
-                    <>
-                      {ICO_OK}
-                      <span>{t("actDone")}</span>
-                    </>
-                  )}
-                </span>
-              </div>
-            </div>
-          )}
-          {hasOutput && (
-            <div>
-              <div className="text-[11px] uppercase tracking-wide text-[#777] pt-1 pb-1">{t("toolOutput")}</div>
-              <div className="shell-card">
-                <div className="shell-label">{t("toolResult", { name: title })}</div>
-                <pre className="shell-pre">
-                  <span className="out">{truncate(formatJsonish(output!), 4000)}</span>
-                </pre>
-                <span className="shell-badge is-ok">
-                  {ICO_OK}
-                  <span>{t("actDone")}</span>
-                </span>
-              </div>
-            </div>
-          )}
-          {!hasInput && !hasOutput && (
-            <div className="text-[#777] py-2">{t("emptyContent")}</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+import { TaskActivityItem } from "./TaskActivityItem";
 
 /** Render a single tool/activity row. */
 function renderActivity(
@@ -184,13 +19,13 @@ function renderActivity(
   const toolName = m.name || m.tool_calls?.[0]?.function?.name;
   const isCurrentTool = toolName === activeTool && isRunning;
   if (m.role === "tool") {
-    return <ActivityItem title={title} toolName={toolName} output={m.content} running={isCurrentTool} />;
+    return <TaskActivityItem title={title} toolName={toolName} output={m.content} running={isCurrentTool} />;
   }
   if (m.tool_calls?.length) {
     return m.tool_calls.map((tc: ToolCallFn) => {
       const tcName = tc.function?.name;
       return (
-        <ActivityItem
+        <TaskActivityItem
           key={`${m.id}-${tc.id}`}
           title={tcName || title}
           toolName={tcName}
@@ -201,7 +36,7 @@ function renderActivity(
     });
   }
   if (m.internal) {
-    return <ActivityItem title={m.name || t("unknownTool")} toolName={m.name} output={m.content} running={isCurrentTool} />;
+    return <TaskActivityItem title={m.name || t("unknownTool")} toolName={m.name} output={m.content} running={isCurrentTool} />;
   }
   return null;
 }
@@ -303,10 +138,35 @@ export function ChatThread() {
 
         {typing && (
           <div className="chat-msg is-assistant">
-            {activeTool && (
-              <div className="inline-flex items-center gap-2 text-[12px] text-[#9a9a9a] px-1 mb-1">
-                <Wrench size={12} className="animate-pulse" />
-                <span>{t("toolRunning", { name: activeTool })}</span>
+            {activeTool ? (
+              <div className="inline-flex items-center gap-2 px-1 mb-1">
+                <span className="bui-pixels" aria-hidden>
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 0ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 90ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 180ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 270ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 360ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 450ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 540ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 630ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 720ms infinite" }} />
+                </span>
+                <span className="bui-shimmer text-[13px]">{t("toolRunning", { name: activeTool })}</span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2.5 px-1 mb-1">
+                <span className="bui-pixels" aria-hidden>
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 0ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 90ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 180ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 270ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 360ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 450ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 540ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 630ms infinite" }} />
+                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 720ms infinite" }} />
+                </span>
+                <span className="bui-shimmer text-[13px]">{t("thinking")}</span>
               </div>
             )}
             <div className="chat-msg-bubble">

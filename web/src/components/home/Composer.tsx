@@ -203,7 +203,7 @@ export function Composer() {
 
   return (
     <div ref={rootRef} className="shrink-0 px-[clamp(16px,4vw,32px)] pb-[clamp(14px,2vw,22px)]">
-      <div className="max-w-[720px] mx-auto bg-codex-surface border border-codex-border rounded-[14px] relative">
+      <div className="max-w-[720px] mx-auto bg-codex-surface border border-codex-border rounded-[14px] relative transition-colors duration-150 focus-within:border-codex-border-strong focus-within:shadow-[0_0_0_1px_rgba(90,130,255,0.12)]">
         {/* ctx-bar: separate top row (project / branch), hidden while chatting */}
         <div className={`flex flex-wrap items-center gap-1 px-3 pt-2.5 pb-1 border-b border-[#262626] ${chatting ? "hidden" : ""}`}>
           <button

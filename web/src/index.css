@@ -1006,27 +1006,28 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 @keyframes bui-pixel-on{0%,100%{opacity:.15}50%{opacity:.95}}
 @keyframes bui-spin{to{transform:rotate(360deg)}}
 
-/* task-rows capsules */
+/* task-rows capsules (each row is a self-contained .tr-row; the detail
+   expands via a .is-open state on the same element) */
 .taskrows{display:flex;flex-direction:column;gap:8px;width:100%}
-.taskrows .tr-row{overflow:hidden;background:var(--color-codex-surface);box-shadow:0 1px 0 rgba(0,0,0,.35);transition:border-radius .3s,background-color .3s}
-.taskrows .tr-row:hover{background:#242424}
-.taskrows .tr-head{display:flex;align-items:center;gap:10px;height:44px;width:100%;padding:0 10px;text-align:left;background:transparent;border:0;color:inherit;font:inherit;cursor:pointer}
-.taskrows .tr-badge{width:24px;height:24px;flex:0 0 auto;display:flex;align-items:center;justify-content:center}
-.taskrows .tr-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500;color:#e6e6e6}
-.taskrows .tr-amount{font-size:12.5px;color:#a0a0a0;font-variant-numeric:tabular-nums}
-.taskrows .tr-pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:500}
-.taskrows .tr-pill.is-ok{background:#16281c;color:#3fb950}
-.taskrows .tr-pill.is-err{background:#2a1616;color:#f85149}
-.taskrows .tr-chev{width:28px;height:28px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#6e6e6e}
-.taskrows .tr-chev svg{transition:transform .3s}
-.taskrows .tr-row.is-open .tr-chev svg{transform:rotate(180deg)}
-.taskrows .tr-detail{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .3s cubic-bezier(.23,1,.32,1),opacity .3s cubic-bezier(.23,1,.32,1)}
-.taskrows .tr-row.is-open .tr-detail{grid-template-rows:1fr;opacity:1}
-.taskrows .tr-detail-in{min-height:0;overflow:hidden}
-.taskrows .tr-detail-body{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:0 10px 10px}
-.taskrows .tr-detail-body .tr-line{width:inherit;height:100%;margin:0 auto;background:#2a2a2a}
-.taskrows .tr-detail-item{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#a0a0a0;padding:2px 0}
-.taskrows .tr-detail-item .meta{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;color:#6e6e6e;font-variant-numeric:tabular-nums}
+.tr-row{overflow:hidden;background:var(--color-codex-surface);box-shadow:0 1px 0 rgba(0,0,0,.35);transition:border-radius .3s,background-color .3s}
+.tr-row:hover{background:#242424}
+.tr-head{display:flex;align-items:center;gap:10px;height:44px;width:100%;padding:0 10px;text-align:left;background:transparent;border:0;color:inherit;font:inherit;cursor:pointer}
+.tr-badge{width:24px;height:24px;flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+.tr-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500;color:#e6e6e6}
+.tr-amount{font-size:12.5px;color:#a0a0a0;font-variant-numeric:tabular-nums}
+.tr-pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:500}
+.tr-pill.is-ok{background:#16281c;color:#3fb950}
+.tr-pill.is-err{background:#2a1616;color:#f85149}
+.tr-chev{width:28px;height:28px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#6e6e6e}
+.tr-chev svg{transition:transform .3s}
+.tr-row.is-open .tr-chev svg{transform:rotate(180deg)}
+.tr-detail{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .3s cubic-bezier(.23,1,.32,1),opacity .3s cubic-bezier(.23,1,.32,1)}
+.tr-row.is-open .tr-detail{grid-template-rows:1fr;opacity:1}
+.tr-detail-in{min-height:0;overflow:hidden}
+.tr-detail-body{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:0 10px 10px}
+.tr-detail-body .tr-line{width:inherit;height:100%;margin:0 auto;background:#2a2a2a}
+.tr-detail-item{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#a0a0a0;padding:2px 0}
+.tr-detail-item .meta{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;color:#6e6e6e;font-variant-numeric:tabular-nums}
 
 /* spinner ring (running step) */
 .bui-ring{position:relative;display:inline-flex;width:24px;height:24px;flex:0 0 auto;align-items:center;justify-content:center}

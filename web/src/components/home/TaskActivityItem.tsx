@@ -105,11 +105,11 @@ export function TaskActivityItem({
   const verb = toolName ? toolVerb(toolName) : title;
   const done = !running;
   const openDetail = () => {
-    if (!running) setOpen((v) => !v);
+    setOpen((v) => !v);
   };
 
   return (
-    <div className={`taskrows tr-row ${open ? "is-open" : ""}`} data-tool={title}>
+    <div className={`tr-row ${open ? "is-open" : ""}`} data-tool={title}>
       <button type="button" className="tr-head" aria-expanded={open} onClick={openDetail}>
         <span className="tr-badge">
           {running ? (

@@ -95,6 +95,8 @@
   "turnNotify": "Turn completion notifications",
   "turnNotifyDesc": "Choose when to notify you after CodexPro finishes",
   "notifyUnfocused": "Only when unfocused",
+  "notifyNever": "Never",
+  "notifyAlways": "Always",
   "permNotify": "Enable permission notifications",
   "permNotifyDesc": "Show a reminder when notification permission is needed",
   "questionNotify": "Enable question notifications",

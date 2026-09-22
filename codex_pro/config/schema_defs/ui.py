@@ -97,6 +97,13 @@ class UIPreferences(_Base):
         default=True,
         json_schema_extra={"desc_zh": "启用问题通知", "desc_en": "Enable question notifications"},
     )
+    turn_notify_mode: Literal["unfocused", "never", "always"] = Field(
+        default="unfocused",
+        json_schema_extra={
+            "desc_zh": "轮次完成通知时机",
+            "desc_en": "When to notify after a turn completes",
+        },
+    )
 
     # ── Agent ────────────────────────────────────────────────────────────────
     web_search: bool = Field(

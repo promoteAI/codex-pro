@@ -114,6 +114,14 @@ export function GeneralPage() {
     { id: "zh", label: t("langZh") },
     { id: "en", label: t("langEn") },
   ];
+  // Notification timing picker
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const notifyRef = useRef<HTMLDivElement>(null);
+  const NOTIFY_OPTIONS: Array<{ id: string; label: string }> = [
+    { id: "unfocused", label: t("notifyUnfocused") },
+    { id: "never", label: t("notifyNever") },
+    { id: "always", label: t("notifyAlways") },
+  ];
   // "No-project task folder" — toggle into an editable input, save on blur/Enter.
   const [noProjEditing, setNoProjEditing] = useState(false);
   const [noProjDraft, setNoProjDraft] = useState(prefs.noProjectFolder);
@@ -138,13 +146,14 @@ export function GeneralPage() {
   }, []);
 
   useEffect(() => {
-    if (!openInOpen && !shellOpen && !agentEnvOpen && !langOpen) return;
+    if (!openInOpen && !shellOpen && !agentEnvOpen && !langOpen && !notifyOpen) return;
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
       if (openInOpen && !openInRef.current?.contains(t)) setOpenInOpen(false);
       if (shellOpen && !shellRef.current?.contains(t)) setShellOpen(false);
       if (agentEnvOpen && !agentEnvRef.current?.contains(t)) setAgentEnvOpen(false);
       if (langOpen && !langRef.current?.contains(t)) setLangOpen(false);
+      if (notifyOpen && !notifyRef.current?.contains(t)) setNotifyOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -152,6 +161,7 @@ export function GeneralPage() {
         setShellOpen(false);
         setAgentEnvOpen(false);
         setLangOpen(false);
+        setNotifyOpen(false);
       }
     };
     document.addEventListener("mousedown", onDoc);
@@ -467,7 +477,47 @@ export function GeneralPage() {
       <SectionTitle>{t("secNotifications")}</SectionTitle>
       <SettingsCard>
         <SettingsRow label={t("turnNotify")} desc={t("turnNotifyDesc")}>
-          <DropdownBtn>{t("notifyUnfocused")}</DropdownBtn>
+          <div className="relative" ref={notifyRef}>
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={notifyOpen}
+              onClick={() => {
+                setNotifyOpen((v) => !v);
+                setOpenInOpen(false);
+                setShellOpen(false);
+                setAgentEnvOpen(false);
+                setLangOpen(false);
+              }}
+              className="inline-flex items-center gap-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0] hover:bg-[#323232] whitespace-nowrap"
+            >
+              {NOTIFY_OPTIONS.find((o) => o.id === prefs.turnNotifyMode)?.label ?? t("notifyUnfocused")}
+              <span className="text-[10px] opacity-70">▾</span>
+            </button>
+            {notifyOpen && (
+              <div
+                role="listbox"
+                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[180px] p-1.5 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+              >
+                {NOTIFY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="option"
+                    aria-selected={opt.id === prefs.turnNotifyMode}
+                    onClick={() => {
+                      updatePrefs({ turnNotifyMode: opt.id });
+                      setNotifyOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-lg text-[13px] text-left text-[#e8e8e8] hover:bg-[#343434]"
+                  >
+                    {opt.label}
+                    <span className={`text-[12px] ${opt.id === prefs.turnNotifyMode ? "opacity-100" : "opacity-0"}`}>✓</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </SettingsRow>
         <SettingsRow label={t("permNotify")} desc={t("permNotifyDesc")}>
           <Toggle checked={prefs.permissionNotify} onChange={(v) => updatePrefs({ permissionNotify: v })} label={t("permNotify")} />

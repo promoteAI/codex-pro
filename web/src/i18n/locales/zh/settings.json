@@ -95,6 +95,8 @@
   "turnNotify": "轮次完成通知",
   "turnNotifyDesc": "设置 CodexPro 完成后何时提醒你",
   "notifyUnfocused": "仅在未聚焦时",
+  "notifyNever": "从不",
+  "notifyAlways": "始终",
   "permNotify": "启用权限通知",
   "permNotifyDesc": "在需要通知权限时显示提醒",
   "questionNotify": "启用问题通知",

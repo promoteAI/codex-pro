@@ -34,6 +34,7 @@ export interface UIPreferences {
   fullAccess: boolean;
   permissionNotify: boolean;
   questionNotify: boolean;
+  turnNotifyMode: string;
   // Agent
   webSearch: boolean;
   ultraInPicker: boolean;
@@ -87,6 +88,7 @@ const WIRE_KEYS: Record<keyof UIPreferences, string> = {
   fullAccess: "full_access",
   permissionNotify: "permission_notify",
   questionNotify: "question_notify",
+  turnNotifyMode: "turn_notify_mode",
   webSearch: "web_search",
   ultraInPicker: "ultra_in_picker",
   workspaceDeps: "workspace_deps",
@@ -132,6 +134,7 @@ export const DEFAULT_PREFS: UIPreferences = {
   fullAccess: true,
   permissionNotify: true,
   questionNotify: true,
+  turnNotifyMode: "unfocused",
   webSearch: true,
   ultraInPicker: false,
   workspaceDeps: true,

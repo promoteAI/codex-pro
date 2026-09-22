@@ -119,7 +119,7 @@ export const DEFAULT_PREFS: UIPreferences = {
   theme: "dark",
   contrast: 45,
   translucentSidebar: true,
-  noProjectFolder: "C:/Users/cheris/Documents/Codex",
+  noProjectFolder: "C:/Users/cheris/Documents/codex-pro",
   agentEnv: "windows_native",
   openIn: "vscode",
   integratedShell: "PowerShell",

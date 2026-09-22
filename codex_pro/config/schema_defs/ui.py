@@ -38,7 +38,7 @@ class UIPreferences(_Base):
 
     # ── General / editor ─────────────────────────────────────────────────────
     no_project_folder: str = Field(
-        default="C:/Users/cheris/Documents/Codex",
+        default="C:/Users/cheris/Documents/codex-pro",
         json_schema_extra={"desc_zh": "无项目任务文件夹", "desc_en": "Default no-project task folder"},
     )
     agent_env: Literal["windows_native", "wsl"] = Field(

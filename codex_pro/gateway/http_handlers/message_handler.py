@@ -550,7 +550,11 @@ class MessageHandler:
                 no_project_dir = date_dir / session_dir_name(session_key) / "work"
                 no_project_dir.mkdir(parents=True, exist_ok=True)
                 effective_workspace = str(no_project_dir)
-                session.project = effective_workspace
+                # 注意:此处不设置 session.project。project 字段用于在 /sessions 中
+                # 标记会话归属的项目,前端侧边栏据此把"project 为空"的会话归入「最近」
+                # 列表(见 CodexSidebar recents filter)。无项目会话应保持 project="",
+                # 隔离工作目录只经 workspace(会话变量 + event metadata)传给 agent 工具,
+                # 而不污染 project 语义。
             from codex_pro.gateway.session_context import set_session_vars
             # workspace 作为上报侧 contextvar 一并带上;真正驱动工具的是
             # inbound.py 在派发任务上下文里根据 event.metadata["workspace"] 设置的

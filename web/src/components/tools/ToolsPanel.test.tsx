@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ToolsPanel } from "./ToolsPanel";
 import { useShellStore } from "../../stores/shell";
 import { useChatStore } from "../../stores/chat";
+import { useSidechatStore } from "../../stores/sidechat";
 import { apiFetch } from "../../lib/api";
 
 vi.mock("../../lib/api", async (importOriginal) => {
@@ -62,6 +63,20 @@ afterEach(() => {
   vi.restoreAllMocks();
   useShellStore.setState({ toolsOpen: false, sessionTabs: [], activeTabId: null });
   useChatStore.setState({ projectPath: "" });
+  useSidechatStore.setState({
+    messages: [],
+    sessionId: null,
+    typing: false,
+    activeTool: null,
+    pendingEventId: null,
+    streamStopped: false,
+    historyError: null,
+    draft: "",
+    chatting: false,
+    loadingHistory: false,
+    pendingApprovals: [],
+    pendingClarify: null,
+  });
 });
 
 describe("ToolsPanel ReviewPane", () => {
@@ -137,5 +152,33 @@ describe("ToolsPanel ReviewPane", () => {
     );
     expect(screen.queryByText("old/file.ts")).not.toBeInTheDocument();
     unmount();
+  });
+});
+
+describe("ToolsPanel SidechatPane", () => {
+  it("发送消息走 useSidechatStore 真实会话,而非本地假回复", async () => {
+    useShellStore.setState({ activeToolPane: "sidechat" });
+    mockApi.mockImplementation(async (path: string) => {
+      if (path === "/message") {
+        return { status: "accepted", event_id: "evt-side", session_key: "cli:web-side-1" };
+      }
+      if (String(path).startsWith("/turns/")) {
+        return { turn: { status: "completed", response_text: "真实回复" } };
+      }
+      if (String(path).includes("/history")) {
+        return { messages: [{ role: "user", content: "你好" }, { role: "assistant", content: "真实回复" }] };
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+
+    render(<ToolsPanel />);
+
+    const sendBtn = screen.getByRole("button", { name: "发送" });
+    fireEvent.change(screen.getByPlaceholderText("发送消息…"), { target: { value: "你好" } });
+    fireEvent.click(sendBtn);
+
+    // 用户泡立即出现,并触发了真实 /message 请求
+    await waitFor(() => expect(mockApi).toHaveBeenCalledWith("/message", expect.anything()));
+    expect(screen.getByText("你好")).toBeInTheDocument();
   });
 });

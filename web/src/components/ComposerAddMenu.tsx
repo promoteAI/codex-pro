@@ -195,6 +195,11 @@ interface ComposerAddMenuProps {
   onOpenProject: () => void;
   onGoal: () => void;
   onPlan: () => void;
+  /** Override the default `useChatStore.addFile` upload — used by the side chat,
+   *  which stages attachments on its own store. */
+  onAddFile?: (file: File) => Promise<void>;
+  /** Hide the project/goal/plan section for panels that have no such flows. */
+  showWorkflow?: boolean;
 }
 
 /** Prototype #addMenu — composer + menu with plugins / agents / tabs. */
@@ -205,6 +210,8 @@ export function ComposerAddMenu({
   onOpenProject,
   onGoal,
   onPlan,
+  onAddFile,
+  showWorkflow = true,
 }: ComposerAddMenuProps) {
   const { t } = useTranslation("composer");
   const navigate = useNavigate();
@@ -337,11 +344,13 @@ export function ComposerAddMenu({
         tabIndex={-1}
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
-          const addFile = useChatStore.getState().addFile;
+          const addFile = onAddFile ?? useChatStore.getState().addFile;
           for (const file of files) void addFile(file);
           e.target.value = "";
         }}
       />
+      {showWorkflow && (
+        <>
       <button
         type="button"
         className="add-menu-item"
@@ -399,6 +408,8 @@ export function ComposerAddMenu({
           </span>
         </span>
       </button>
+        </>
+      )}
 
       <div className="add-menu-sec">{t("addPlugins")}</div>
       {pluginsLoading && (

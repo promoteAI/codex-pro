@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ArrowUp,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -9,15 +10,27 @@ import {
   FolderTree,
   Globe,
   MessageSquare,
+  MessageSquarePlus,
   Plus,
   RefreshCw,
+  RotateCcw,
+  ShieldAlert,
+  Square,
   Terminal,
   X,
 } from "lucide-react";
 import { useShellStore, type ToolPane, type SessionTab } from "../../stores/shell";
 import { useChatStore } from "../../stores/chat";
+import { useSidechatStore } from "../../stores/sidechat";
+import { useProvidersStore } from "../../stores/providers";
+import { useIsAdmin } from "../../stores/capabilities";
+import { toast } from "../../stores/toast";
 import { apiFetch } from "../../lib/api";
+import { useApi } from "../../hooks/use-api";
 import { Markdown } from "../../components/home/markdown";
+import { ChatThread } from "../../components/home/ChatThread";
+import { ComposerAddMenu } from "../ComposerAddMenu";
+import { SLASH_COMMANDS } from "../../mock/seeds";
 
 const TAB_ICONS: Record<SessionTab["type"], typeof Terminal> = {
   review: FileCode2,
@@ -26,6 +39,13 @@ const TAB_ICONS: Record<SessionTab["type"], typeof Terminal> = {
   files: FolderTree,
   sidechat: MessageSquare,
 };
+
+/** A skill from `GET /skills`; only enabled ones are offered in the slash menu. */
+interface SkillItem {
+  name: string;
+  description: string;
+  enabled: boolean;
+}
 
 function Hub() {
   const { t } = useTranslation("tools");
@@ -478,101 +498,364 @@ function BrowserPane() {
   );
 }
 
-interface SideMsg {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-}
-
 function SidechatPane() {
   const { t } = useTranslation("tools");
-  const [messages, setMessages] = useState<SideMsg[]>([]);
-  const [draft, setDraft] = useState("");
+  const { t: tc } = useTranslation("composer");
+  const messages = useSidechatStore((s) => s.messages);
+  const typing = useSidechatStore((s) => s.typing);
+  const activeTool = useSidechatStore((s) => s.activeTool);
+  const historyError = useSidechatStore((s) => s.historyError);
+  const stopStream = useSidechatStore((s) => s.stopStream);
+  const chatting = useSidechatStore((s) => s.chatting);
+  const loadingHistory = useSidechatStore((s) => s.loadingHistory);
+  const sessionId = useSidechatStore((s) => s.sessionId);
+  const streamStopped = useSidechatStore((s) => s.streamStopped);
+  const pendingApprovals = useSidechatStore((s) => s.pendingApprovals);
+  const pendingClarify = useSidechatStore((s) => s.pendingClarify);
+  const decideApproval = useSidechatStore((s) => s.decideApproval);
+  const answerClarify = useSidechatStore((s) => s.answerClarify);
+  const loadHistory = useSidechatStore((s) => s.loadHistory);
+  const wsReloadHistory = useSidechatStore((s) => s._wsReloadHistory);
+  const setDraft = useSidechatStore((s) => s.setDraft);
+  const draft = useSidechatStore((s) => s.draft);
+  const addFile = useSidechatStore((s) => s.addFile);
+  const [menu, setMenu] = useState<"perm" | "model" | "add" | null>(null);
+  const [modelQuery, setModelQuery] = useState("");
+  const [providersLoaded, setProvidersLoaded] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const addBtnRef = useRef<HTMLButtonElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // Enabled skills offered in the slash menu, same as the main composer.
+  const { data: skillsData } = useApi<{ skills: SkillItem[] }>("/skills");
+  const skills = useMemo(() => (skillsData?.skills ?? []).filter((s) => s.enabled), [skillsData]);
+  const slashMatches = useMemo(() => {
+    const prefix = draft.slice(1);
+    const commands = SLASH_COMMANDS.filter((c) => c.label.startsWith(prefix));
+    const skillItems = skills
+      .filter((s) => s.name.startsWith(prefix))
+      .map((s) => ({ id: `skill:${s.name}`, label: s.name, hint: s.description }));
+    return { commands, skillItems };
+  }, [draft, skills]);
+
+  const model = useChatStore((s) => s.model);
+  const effort = useChatStore((s) => s.effort);
+  const perm = useChatStore((s) => s.perm);
+  const setModel = useChatStore((s) => s.setModel);
+  const setEffort = useChatStore((s) => s.setEffort);
+  const setPerm = useChatStore((s) => s.setPerm);
+  const persistPerm = useChatStore((s) => s.persistPerm);
+  const isAdmin = useIsAdmin();
+  const providers = useProvidersStore((s) => s.providers);
+  const fetchProviders = useProvidersStore((s) => s.fetchProviders);
+
+  useEffect(() => {
+    void fetchProviders()
+      .then(() => setProvidersLoaded(true))
+      .catch(() => setProvidersLoaded(true));
+  }, [fetchProviders]);
+
+  // Close any open popover on outside click.
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      setMenu(null);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  const availableModels = useMemo(() => {
+    const set = new Set<string>();
+    providers.forEach((p) => p.models?.forEach((m) => set.add(m)));
+    return set.size > 0 ? Array.from(set).sort() : null;
+  }, [providers]);
+
+  const effortLabels = [tc("effortLow"), tc("effortMed"), tc("effortHigh"), tc("effortMax")];
+  const effortLabel = effortLabels[effort] ?? effortLabels[0];
+  const permLabel =
+    perm === "ask" ? tc("permAskShort") : perm === "agent" ? tc("permAgentShort") : tc("permFullShort");
+
+  const permOptions = [
+    ["ask", "permAsk", "permAskDesc"],
+    ["agent", "permAgent", "permAgentDesc"],
+    ["full", "permFullLong", "permFullDesc"],
+  ] as const;
 
   const send = () => {
     const text = draft.trim();
-    if (!text) return;
-    const user: SideMsg = { id: `u-${Date.now()}`, role: "user", content: text };
-    setDraft("");
-    setMessages((prev) => [
-      ...prev,
-      user,
-      {
-        id: `a-${Date.now()}`,
-        role: "assistant",
-        content: "（侧边聊天预览）已收到，此对话仅保存在本地会话中。",
-      },
-    ]);
+    if (!text || typing) return;
+    useSidechatStore.getState().sendMessage();
+  };
+
+  const sideSelectors = {
+    messages,
+    loadingHistory,
+    historyError,
+    typing,
+    activeTool,
+    sessionId,
+    streamStopped,
+    pendingApprovals,
+    pendingClarify,
+    decideApproval,
+    answerClarify,
+    loadSessionHistory: loadHistory,
+    wsReloadHistory,
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex-1 overflow-auto px-4 py-4">
-        {messages.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center max-w-[280px]">
-              <div className="w-[72px] h-[72px] mx-auto mb-4 rounded-full border border-[#3a3a3a] flex items-center justify-center text-[#8a8a8a]">
-                <MessageSquare size={34} />
-              </div>
-              <h2 className="text-lg font-semibold text-[#e8e8e8] mb-2">{t("emptySidechat")}</h2>
-              <p className="text-[12.5px] text-[#6e6e6e] leading-relaxed">{t("sidechatSub")}</p>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                className={`flex flex-col gap-1 ${m.role === "user" ? "items-end" : "items-start"}`}
-              >
-                <div
-                  className={`max-w-[92%] px-3 py-2 rounded-xl text-[13px] leading-snug whitespace-pre-wrap break-words ${
-                    m.role === "user"
-                      ? "bg-[#2a2a2a] rounded-br-sm text-[#e0e0e0]"
-                      : "bg-[#222] border border-[#2e2e2e] rounded-bl-sm text-[#e0e0e0]"
-                  }`}
-                >
-                  {m.content}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="mx-3.5 mb-3.5 bg-[#1e1e1e] border border-[#2a2a2a] rounded-[14px] overflow-hidden flex flex-col">
+    <div ref={rootRef} className="flex-1 flex flex-col min-h-0 bg-codex-bg">
+      {chatting ? (
+        <ChatThread selectors={sideSelectors} />
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-4 min-h-0 overflow-auto select-none">
+          <MessageSquarePlus size={28} className="mb-3 text-[#5a5a5a] opacity-70" aria-hidden />
+          <p className="text-[15px] font-medium text-[#d4d4d4] mb-1.5">{t("emptySidechat")}</p>
+          <p className="text-[12.5px] text-[#6e6e6e] text-center leading-relaxed max-w-[260px]">{t("sidechatSub")}</p>
+        </div>
+      )}
+
+      {historyError && (
+        <div className="mx-3.5 mt-2 px-3 py-2 rounded-lg bg-[#2a1212] text-[#ff8f8f] text-[12.5px] border border-[#4a2a2a]">
+          {t("sidechatError", { error: historyError })}
+        </div>
+      )}
+
+      <div className="shrink-0 mx-3.5 mb-3.5 bg-codex-surface border border-codex-border rounded-[14px] flex flex-col transition-colors duration-150 focus-within:border-codex-border-strong">
+        <div className="relative">
         <textarea
+          ref={taRef}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            const caret = typeof e.target.selectionStart === "number" ? e.target.selectionStart : val.length;
+            const justAt =
+              caret > 0 && val.charAt(caret - 1) === "@" &&
+              (caret === 1 || /\s/.test(val.charAt(caret - 2)));
+            if (justAt) setMenu("add");
+            setDraft(val);
+          }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === "Enter" && !e.shiftKey && !typing) {
               e.preventDefault();
               send();
             }
           }}
+          disabled={typing}
           placeholder={t("sidechatPlaceholder")}
           rows={2}
-          className="w-full resize-none bg-transparent border-0 px-3.5 pt-3 pb-1 text-[13px] text-[#d4d4d4] outline-none leading-relaxed"
+          className="w-full resize-none bg-transparent border-0 px-3.5 pt-3 pb-1 text-[13px] text-codex-text placeholder:text-codex-muted outline-none leading-relaxed"
         />
-        <div className="flex items-center gap-2.5 px-2.5 pb-2.5">
+        {/* / slash-command menu */}
+        {draft.startsWith("/") && !draft.includes(" ") && (
+          <div className="absolute left-3 bottom-[calc(100%-6px)] w-[min(520px,calc(100vw-24px))] max-h-[min(420px,55vh)] overflow-auto p-2 pl-2.5 bg-[#1c1c1c] border border-[#333] rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30">
+            {slashMatches.commands.length > 0 && (
+              <>
+                <div className="px-2.5 py-1.5 text-[12px] text-[#7dd3fc] font-medium">{tc("slashCommands")}</div>
+                {slashMatches.commands.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setDraft(`/${c.label} `);
+                      taRef.current?.focus();
+                    }}
+                    className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-[#2e2e2e]"
+                  >
+                    <span className="text-[13px] text-[#e8e8e8] font-medium whitespace-nowrap">/{c.label}</span>
+                    <span className="flex-1 min-w-0 text-[12px] text-[#8a8a8a] truncate">{c.hint}</span>
+                  </button>
+                ))}
+              </>
+            )}
+            {slashMatches.skillItems.length > 0 && (
+              <>
+                <div className="px-2.5 py-1.5 text-[12px] text-[#7dd3fc] font-medium">{tc("skillsSection")}</div>
+                {slashMatches.skillItems.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setDraft(`/${c.label} `);
+                      taRef.current?.focus();
+                    }}
+                    className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-[#2e2e2e]"
+                  >
+                    <span className="text-[13px] text-[#e8e8e8] font-medium whitespace-nowrap">/{c.label}</span>
+                    <span className="flex-1 min-w-0 text-[12px] text-[#8a8a8a] truncate">{c.hint}</span>
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+        </div>
+        <div className="flex items-center gap-1.5 px-2.5 pb-2.5 relative">
+          <button
+            ref={addBtnRef}
+            type="button"
+            onClick={() => setMenu((cur) => (cur === "add" ? null : "add"))}
+            className="w-7 h-7 rounded-md inline-flex items-center justify-center text-[#aaa] hover:bg-codex-active"
+            aria-label={t("sidechatAdd")}
+            title={t("sidechatAdd")}
+            aria-haspopup="menu"
+            aria-expanded={menu === "add"}
+          >
+            <Plus size={16} />
+          </button>
           <button
             type="button"
-            className="w-7 h-7 inline-flex items-center justify-center rounded-md text-[#888] hover:bg-[#262626]"
-            aria-label="+"
+            onClick={() => setMenu((cur) => (cur === "perm" ? null : "perm"))}
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] ${
+              perm === "full" ? "text-codex-warn" : "text-[#c0c0c0]"
+            } hover:bg-codex-active`}
+            aria-label={permLabel}
+            aria-haspopup="menu"
+            aria-expanded={menu === "perm"}
           >
-            <Plus size={14} />
+            <ShieldAlert size={14} />
+            <span>{permLabel}</span>
           </button>
           <span className="flex-1" />
           <button
             type="button"
-            disabled={!draft.trim()}
-            onClick={send}
-            className={`w-7 h-7 rounded-full inline-flex items-center justify-center ${
-              draft.trim() ? "bg-codex-accent text-white" : "bg-[#3a3a3a] text-[#777]"
-            }`}
-            aria-label="Send"
+            onClick={() => setMenu((cur) => (cur === "model" ? null : "model"))}
+            className="inline-flex items-center gap-1.5 text-[12.5px] text-[#a0a0a0] px-2 py-1 rounded-md hover:bg-codex-active hover:text-[#d8d8d8]"
+            aria-label={tc("model")}
+            aria-haspopup="menu"
+            aria-expanded={menu === "model"}
           >
-            <ChevronRight size={14} />
+            <span>{model}</span>
+            <span className="text-[11px] text-[#666] bg-[#252525] px-1.5 py-0.5 rounded">{effortLabel}</span>
           </button>
+          <button
+            type="button"
+            disabled={!draft.trim() && !typing}
+            onClick={() => (typing ? stopStream() : send())}
+            aria-label={typing ? tc("stop") : tc("send")}
+            title={typing ? tc("stop") : tc("send")}
+            className={`w-8 h-8 rounded-full inline-flex items-center justify-center ${
+              !draft.trim() && !typing
+                ? "bg-codex-border text-[#666]"
+                : typing
+                  ? "bg-[#3a3a3a] text-[#e8e8e8] hover:bg-[#454545]"
+                  : "bg-codex-accent text-white hover:bg-codex-accent-hover"
+            }`}
+          >
+            {typing ? <Square size={14} /> : <ArrowUp size={16} />}
+          </button>
+
+          {menu === "perm" && (
+            <div className="absolute left-2 bottom-[calc(100%+4px)] w-[320px] p-2 bg-codex-surface border border-[#3a3a3a] rounded-[10px] shadow-xl z-30">
+              <div className="text-[12px] text-codex-muted px-2 py-1 mb-1">{tc("permTitle")}</div>
+              {permOptions.map(([id, labelKey, descKey]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    if (isAdmin) {
+                      persistPerm(id).catch(() => toast.error(tc("permSaveFailed")));
+                    } else {
+                      setPerm(id);
+                    }
+                    setMenu(null);
+                  }}
+                  className={`w-full text-left px-2.5 py-2 rounded-md ${
+                    perm === id ? "bg-[#353535]" : "hover:bg-[#353535]"
+                  }`}
+                >
+                  <div className={`text-[13px] font-medium ${id === "full" ? "text-codex-warn" : "text-codex-text"}`}>
+                    {tc(labelKey)}
+                  </div>
+                  <div className="text-[11.5px] text-codex-muted mt-0.5">{tc(descKey)}</div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {menu === "model" && (
+            <div className="absolute right-10 bottom-[calc(100%+4px)] w-[300px] p-2 bg-codex-surface border border-[#3a3a3a] rounded-[10px] shadow-xl z-30">
+              <div className="flex items-start justify-between gap-2 px-2 py-1">
+                <div>
+                  <div className="text-[12px] text-codex-muted">{effortLabel}</div>
+                  <div className="text-[13px] text-codex-text font-medium">{model}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEffort(3)}
+                  className="p-1 rounded-md text-codex-muted hover:bg-[#353535] hover:text-codex-text"
+                  aria-label={tc("resetEffort")}
+                  title={tc("resetEffort")}
+                >
+                  <RotateCcw size={14} />
+                </button>
+              </div>
+              <div className="px-2 py-2">
+                <div className="model-menu-slider">
+                  <div className="model-menu-track">
+                    <div className="model-menu-fill" style={{ width: `${(effort / 3) * 100}%` }} />
+                    <div className="model-menu-dots" aria-hidden="true">
+                      <span /><span /><span /><span />
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={3}
+                      step={1}
+                      value={effort}
+                      onChange={(e) => setEffort(Number(e.target.value))}
+                      aria-label={effortLabel}
+                      className="model-menu-range"
+                    />
+                  </div>
+                </div>
+              </div>
+              <input
+                value={modelQuery}
+                onChange={(e) => setModelQuery(e.target.value)}
+                placeholder={tc("searchModel")}
+                className="w-full bg-codex-surface border border-codex-border rounded-md px-2 py-1.5 text-[12.5px] mb-1 outline-none"
+              />
+              <div className="max-h-40 overflow-auto">
+                {providersLoaded && !availableModels ? (
+                  <div className="px-2 py-1.5 text-[12.5px] text-codex-muted">{tc("loadingModels")}</div>
+                ) : availableModels !== null ? (
+                  availableModels
+                    .filter((m) => m.toLowerCase().includes(modelQuery.toLowerCase()))
+                    .map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          void setModel(m);
+                          setMenu(null);
+                        }}
+                        className={`w-full text-left px-2 py-1.5 rounded text-[13px] ${
+                          model === m ? "bg-[#353535]" : "hover:bg-[#353535]"
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          {menu === "add" && (
+            <ComposerAddMenu
+              open
+              anchorEl={addBtnRef.current}
+              onClose={() => setMenu(null)}
+              onOpenProject={() => setMenu(null)}
+              onGoal={() => setMenu(null)}
+              onPlan={() => setMenu(null)}
+              onAddFile={addFile}
+              showWorkflow={false}
+            />
+          )}
         </div>
       </div>
     </div>

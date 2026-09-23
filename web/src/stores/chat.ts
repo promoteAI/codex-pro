@@ -56,7 +56,7 @@ export interface ClarifyTicket {
   options: string[];
 }
 
-type HistoryRow = {
+export type HistoryRow = {
   role: string;
   content: string;
   internal?: boolean;
@@ -65,7 +65,7 @@ type HistoryRow = {
   tool_calls?: ToolCallFn[];
 };
 
-function mapHistoryMessages(sessionId: string, rows: HistoryRow[]): ChatMessage[] {
+export function mapHistoryMessages(sessionId: string, rows: HistoryRow[]): ChatMessage[] {
   return (rows ?? []).map((m, i) => {
     const role: ChatMessage["role"] =
       m.role === "user"

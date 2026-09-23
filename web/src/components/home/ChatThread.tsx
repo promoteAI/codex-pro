@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useChatStore, type ChatMessage, type ToolCallFn } from "../../stores/chat";
+import { type ChatMessage, type ToolCallFn, type ApprovalTicket, type ClarifyTicket } from "../../stores/chat";
 import { useWsSubscribe } from "../../hooks/use-ws";
 import { Markdown } from "./markdown";
 import { ApprovalCard } from "./ApprovalCard";
@@ -41,21 +41,43 @@ function renderActivity(
   return null;
 }
 
-export function ChatThread() {
+export interface ChatThreadSelectors {
+  messages: ChatMessage[];
+  loadingHistory: boolean;
+  historyError: string | null;
+  typing: boolean;
+  activeTool: string | null;
+  sessionId: string | null;
+  streamStopped: boolean;
+  pendingApprovals: ApprovalTicket[];
+  pendingClarify: ClarifyTicket | null;
+  decideApproval: (id: string, level: "once" | "session" | "deny") => void;
+  answerClarify: (value: string) => void;
+  loadSessionHistory: (sid: string) => Promise<void>;
+  wsReloadHistory: (sid: string) => Promise<void>;
+}
+
+interface ChatThreadProps {
+  selectors: ChatThreadSelectors;
+}
+
+export function ChatThread({ selectors }: ChatThreadProps) {
   const { t } = useTranslation("home");
-  const messages = useChatStore((s) => s.messages);
-  const loadingHistory = useChatStore((s) => s.loadingHistory);
-  const historyError = useChatStore((s) => s.historyError);
-  const typing = useChatStore((s) => s.typing);
-  const activeTool = useChatStore((s) => s.activeTool);
-  const sessionId = useChatStore((s) => s.sessionId);
-  const streamStopped = useChatStore((s) => s.streamStopped);
-  const pendingApprovals = useChatStore((s) => s.pendingApprovals);
-  const pendingClarify = useChatStore((s) => s.pendingClarify);
-  const decideApproval = useChatStore((s) => s.decideApproval);
-  const answerClarify = useChatStore((s) => s.answerClarify);
-  const loadSessionHistory = useChatStore((s) => s.loadSessionHistory);
-  const wsReloadHistory = useChatStore((s) => s._wsReloadHistory);
+  const {
+    messages,
+    loadingHistory,
+    historyError,
+    typing,
+    activeTool,
+    sessionId,
+    streamStopped,
+    pendingApprovals,
+    pendingClarify,
+    decideApproval,
+    answerClarify,
+    loadSessionHistory,
+    wsReloadHistory,
+  } = selectors;
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -64,8 +86,6 @@ export function ChatThread() {
     (ev) => {
       const payload = ev.payload as { session_key?: string; event_id?: string };
       if (payload.session_key === sessionId && sessionId && typing) {
-        // During a live turn, use _wsReloadHistory so we refresh content
-        // without resetting typing/activeTool to false.
         void wsReloadHistory(sessionId);
       } else if (payload.session_key === sessionId && sessionId && !streamStopped) {
         void loadSessionHistory(sessionId);
@@ -90,8 +110,6 @@ export function ChatThread() {
           </div>
         )}
 
-        {/* Group: collect consecutive activity rows into a single chat-turn.
-            Activity rows are assistant-with-tool_calls / tool / internal. */}
         {(() => {
           const nodes: React.ReactNode[] = [];
           let turn: React.ReactNode[] = [];
@@ -111,7 +129,6 @@ export function ChatThread() {
               }
               return;
             }
-            // A visible message breaks the activity turn.
             if (m.role === "user" || (m.role === "assistant" && m.content?.trim())) {
               pushTurn();
               if (m.role === "user") {
@@ -131,7 +148,6 @@ export function ChatThread() {
               }
             }
           });
-          // Flush trailing activity turn (running tool).
           if (typing && turn.length > 0) pushTurn();
           return nodes;
         })()}

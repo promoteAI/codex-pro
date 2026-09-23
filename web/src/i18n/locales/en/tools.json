@@ -33,6 +33,8 @@
   "emptySidechat": "Side chat",
   "sidechatSub": "Side chats are temporary and disappear when you close the app.",
   "sidechatPlaceholder": "Send a message…",
+  "sidechatAdd": "Add",
+  "sidechatError": "Reply failed: {{error}}",
   "openTerminal": "Terminal runs in the bottom panel",
   "openBottomTerm": "Open bottom terminal",
   "termNewTab": "New terminal",

@@ -33,6 +33,8 @@
   "emptySidechat": "侧边聊天",
   "sidechatSub": "侧边聊天是临时聊天，关闭应用后会消失。",
   "sidechatPlaceholder": "发送消息…",
+  "sidechatAdd": "添加",
+  "sidechatError": "回复失败：{{error}}",
   "openTerminal": "终端在底部面板中运行",
   "openBottomTerm": "打开底部终端",
   "termNewTab": "新建终端",

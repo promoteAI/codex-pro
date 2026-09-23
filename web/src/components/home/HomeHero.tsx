@@ -62,10 +62,18 @@ const CARDS = [
   },
 ];
 
-export function HomeHero() {
+export interface HomeHeroProps {
+  project?: string;
+  setDraft?: (draft: string) => void;
+}
+
+export function HomeHero({ project, setDraft }: HomeHeroProps = {}) {
   const { t } = useTranslation("home");
-  const project = useChatStore((s) => s.project);
-  const setDraft = useChatStore((s) => s.setDraft);
+  const defaultProject = useChatStore((s) => s.project);
+  const defaultSetDraft = useChatStore((s) => s.setDraft);
+  const resolvedProject = project ?? defaultProject;
+  const resolvedSetDraft = setDraft ?? defaultSetDraft;
+  const titleText = resolvedProject ? t("heroTitle", { project: resolvedProject }) : t("heroTitleNoProject");
 
   return (
     <section className="flex-1 flex flex-col items-center justify-center px-6 pb-4 min-h-0 overflow-auto">
@@ -89,11 +97,11 @@ export function HomeHero() {
         </svg>
       </div>
       <h1 className="text-[clamp(16px,2.2vw,22px)] font-medium text-[#d4d4d4] text-center mb-6 max-w-[480px]">
-        {t("heroTitle", { project }).split(project).map((part, i, arr) =>
+        {titleText.split(resolvedProject).map((part, i, arr) =>
           i < arr.length - 1 ? (
             <span key={i}>
               {part}
-              <em className="not-italic text-[#a8a8a8]">{project}</em>
+              <em className="not-italic text-[#a8a8a8]">{resolvedProject}</em>
             </span>
           ) : (
             <span key={i}>{part}</span>
@@ -105,7 +113,7 @@ export function HomeHero() {
           <button
             key={key}
             type="button"
-            onClick={() => setDraft(t(full))}
+            onClick={() => resolvedSetDraft(t(full))}
             className="flex items-start gap-3 p-3 border border-codex-border rounded-[12px] text-left hover:border-[#3a3a3a] hover:bg-[#1e1e1e]"
           >
             <span className="text-[#8a8a8a] shrink-0 mt-0.5">{icon}</span>

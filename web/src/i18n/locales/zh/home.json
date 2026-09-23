@@ -1,5 +1,6 @@
 {
   "heroTitle": "你想让我们在 {{project}} 中构建什么？",
+  "heroTitleNoProject": "你想让我们构建什么？",
   "promptExplore": "探索并理解代码",
   "promptExploreFull": "探索并理解代码：请帮我梳理这个仓库的架构与关键入口。",
   "promptBuild": "构建新功能、应用或工具",

@@ -1,5 +1,6 @@
 {
   "heroTitle": "What should we build in {{project}}?",
+  "heroTitleNoProject": "What should we build?",
   "promptExplore": "Explore and understand the code",
   "promptExploreFull": "Explore and understand the code: map the repo architecture and key entry points.",
   "promptBuild": "Build a feature, app, or tool",

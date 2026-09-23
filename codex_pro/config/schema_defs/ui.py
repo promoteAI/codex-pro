@@ -197,7 +197,7 @@ class UIPreferences(_Base):
 
     # ── Worktrees ────────────────────────────────────────────────────────────
     worktree_root: str = Field(
-        default="C:/Users/cheris/.codex/worktrees",
+        default="C:/Users/cheris/.codex-pro/worktrees",
         json_schema_extra={"desc_zh": "工作树根目录", "desc_en": "Worktree root"},
     )
     worktree_pull_upstream: bool = Field(

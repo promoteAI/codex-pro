@@ -155,7 +155,7 @@ export const DEFAULT_PREFS: UIPreferences = {
   gitMonitorInstr: "",
   gitCommitInstr: "",
   gitPrInstr: "",
-  worktreeRoot: "C:/Users/cheris/.codex/worktrees",
+  worktreeRoot: "C:/Users/cheris/.codex-pro/worktrees",
   worktreePullUpstream: false,
   worktreeAutoDelete: true,
   worktreeDeleteLimit: 15,

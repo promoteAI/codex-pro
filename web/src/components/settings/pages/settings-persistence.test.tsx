@@ -53,7 +53,7 @@ describe("settings pages 持久化", () => {
     render(<WorktreesPage />);
     await waitFor(() => expect(useSettingsStore.getState().loaded).toBe(true));
 
-    const input = screen.getByDisplayValue("C:/Users/cheris/.codex/worktrees");
+    const input = screen.getByDisplayValue("C:/Users/cheris/.codex-pro/worktrees");
     fireEvent.change(input, { target: { value: "C:/Users/cheris/.worktrees" } });
     fireEvent.blur(input);
 

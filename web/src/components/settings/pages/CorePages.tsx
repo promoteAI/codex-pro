@@ -218,7 +218,7 @@ export function GeneralPage() {
                   setNoProjEditing(false);
                 }
               }}
-              className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#e0e0e0] w-[280px] max-w-[40vw] outline-none"
+              className="bg-codex-surface border border-codex-border-strong rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text w-[280px] max-w-[40vw] outline-none"
               aria-label={t("noProjectFolder")}
             />
           ) : (
@@ -240,7 +240,7 @@ export function GeneralPage() {
                 setOpenInOpen((v) => !v);
                 setShellOpen(false);
               }}
-              className="inline-flex items-center gap-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0] hover:bg-[#323232] whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 bg-codex-elevated border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary hover:bg-codex-active whitespace-nowrap"
             >
               {openInOpt.icon}
               {openInOpt.label}
@@ -249,7 +249,7 @@ export function GeneralPage() {
             {openInOpen && (
               <div
                 role="listbox"
-                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[196px] p-1.5 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[196px] p-1.5 rounded-xl bg-codex-elevated border-codex-border-strong shadow-[0_14px_36px_rgba(0,0,0,.5)]"
               >
                 {OPEN_IN_OPTIONS.map((opt) => (
                   <button
@@ -261,7 +261,7 @@ export function GeneralPage() {
                       updatePrefs({ openIn: opt.id });
                       setOpenInOpen(false);
                     }}
-                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-left text-[#e4e4e4] hover:bg-[#343434] ${
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-left text-[#e4e4e4] hover:bg-codex-hover ${
                       opt.id === prefs.openIn ? "bg-[#343434]" : ""
                     }`}
                   >
@@ -284,7 +284,7 @@ export function GeneralPage() {
                 setOpenInOpen(false);
                 setShellOpen(false);
               }}
-              className="inline-flex items-center gap-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0] hover:bg-[#323232] whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 bg-codex-elevated border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary hover:bg-codex-active whitespace-nowrap"
             >
               {AGENT_ENV_OPTIONS.find((o) => o.id === prefs.agentEnv)?.label}
               <span className="text-[10px] opacity-70">▾</span>
@@ -292,7 +292,7 @@ export function GeneralPage() {
             {agentEnvOpen && (
               <div
                 role="listbox"
-                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[260px] p-1.5 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[260px] p-1.5 rounded-xl bg-codex-elevated border-codex-border-strong shadow-[0_14px_36px_rgba(0,0,0,.5)]"
               >
                 {AGENT_ENV_OPTIONS.map((opt) => (
                   <button
@@ -304,9 +304,9 @@ export function GeneralPage() {
                       updatePrefs({ agentEnv: opt.id });
                       setAgentEnvOpen(false);
                     }}
-                    className="w-full flex flex-col items-start gap-0.5 px-3 py-2 rounded-lg text-left hover:bg-[#343434]"
+                    className="w-full flex flex-col items-start gap-0.5 px-3 py-2 rounded-lg text-left hover:bg-codex-hover"
                   >
-                    <span className="text-[13px] text-[#e8e8e8] flex items-center gap-2 w-full">
+                    <span className="text-[13px] text-codex-text flex items-center gap-2 w-full">
                       {opt.label}
                       {opt.id === prefs.agentEnv && (
                         <span className="text-[12px] opacity-100">✓</span>
@@ -331,7 +331,7 @@ export function GeneralPage() {
                 setShellOpen((v) => !v);
                 setOpenInOpen(false);
               }}
-              className="inline-flex items-center gap-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0] hover:bg-[#323232] whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 bg-codex-elevated border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary hover:bg-codex-active whitespace-nowrap"
             >
               {prefs.integratedShell}
               <span className="text-[10px] opacity-70">▾</span>
@@ -339,7 +339,7 @@ export function GeneralPage() {
             {shellOpen && (
               <div
                 role="listbox"
-                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[180px] p-1.5 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[180px] p-1.5 rounded-xl bg-codex-elevated border-codex-border-strong shadow-[0_14px_36px_rgba(0,0,0,.5)]"
               >
                 {shellOptions.map((opt) => (
                   <button
@@ -351,7 +351,7 @@ export function GeneralPage() {
                       updatePrefs({ integratedShell: opt });
                       setShellOpen(false);
                     }}
-                    className="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-lg text-[13px] text-left text-[#e8e8e8] hover:bg-[#343434]"
+                    className="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-lg text-[13px] text-left text-codex-text hover:bg-codex-hover"
                   >
                     {opt}
                     <span className={`text-[12px] ${opt === prefs.integratedShell ? "opacity-100" : "opacity-0"}`}>✓</span>
@@ -373,7 +373,7 @@ export function GeneralPage() {
                 setShellOpen(false);
                 setAgentEnvOpen(false);
               }}
-              className="inline-flex items-center gap-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0] hover:bg-[#323232] whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 bg-codex-elevated border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary hover:bg-codex-active whitespace-nowrap"
             >
               {LANG_OPTIONS.find((o) => o.id === i18n.resolvedLanguage)?.label ?? t("autoDetect")}
               <span className="text-[10px] opacity-70">▾</span>
@@ -381,7 +381,7 @@ export function GeneralPage() {
             {langOpen && (
               <div
                 role="listbox"
-                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[160px] p-1.5 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[160px] p-1.5 rounded-xl bg-codex-elevated border-codex-border-strong shadow-[0_14px_36px_rgba(0,0,0,.5)]"
               >
                 {LANG_OPTIONS.map((opt) => (
                   <button
@@ -393,7 +393,7 @@ export function GeneralPage() {
                       await i18n.changeLanguage(opt.id);
                       setLangOpen(false);
                     }}
-                    className="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-lg text-[13px] text-left text-[#e8e8e8] hover:bg-[#343434]"
+                    className="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-lg text-[13px] text-left text-codex-text hover:bg-codex-hover"
                   >
                     {opt.label}
                     <span className={`text-[12px] ${opt.id === i18n.resolvedLanguage ? "opacity-100" : "opacity-0"}`}>✓</span>
@@ -449,7 +449,7 @@ export function GeneralPage() {
         <SettingsRow label={t("popupHotkey")} desc={t("popupHotkeyDesc")}>
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 text-[12.5px] text-[#c8c8c8] px-1.5 py-1 rounded-md hover:bg-[#2a2a2a]"
+            className="inline-flex items-center gap-1.5 text-[12.5px] text-codex-text-secondary px-1.5 py-1 rounded-md hover:bg-codex-active"
             aria-label={t("editPopupHotkey")}
           >
             <span>{t("closed")}</span>
@@ -489,7 +489,7 @@ export function GeneralPage() {
                 setAgentEnvOpen(false);
                 setLangOpen(false);
               }}
-              className="inline-flex items-center gap-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0] hover:bg-[#323232] whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 bg-codex-elevated border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary hover:bg-codex-active whitespace-nowrap"
             >
               {NOTIFY_OPTIONS.find((o) => o.id === prefs.turnNotifyMode)?.label ?? t("notifyUnfocused")}
               <span className="text-[10px] opacity-70">▾</span>
@@ -497,7 +497,7 @@ export function GeneralPage() {
             {notifyOpen && (
               <div
                 role="listbox"
-                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[180px] p-1.5 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+                className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[180px] p-1.5 rounded-xl bg-codex-elevated border-codex-border-strong shadow-[0_14px_36px_rgba(0,0,0,.5)]"
               >
                 {NOTIFY_OPTIONS.map((opt) => (
                   <button
@@ -509,7 +509,7 @@ export function GeneralPage() {
                       updatePrefs({ turnNotifyMode: opt.id });
                       setNotifyOpen(false);
                     }}
-                    className="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-lg text-[13px] text-left text-[#e8e8e8] hover:bg-[#343434]"
+                    className="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-lg text-[13px] text-left text-codex-text hover:bg-codex-hover"
                   >
                     {opt.label}
                     <span className={`text-[12px] ${opt.id === prefs.turnNotifyMode ? "opacity-100" : "opacity-0"}`}>✓</span>
@@ -582,13 +582,13 @@ export function AppearancePage() {
             type="button"
             onClick={() => updatePrefs({ theme: th.id })}
             className={`flex-1 rounded-xl border p-2 text-left transition ${
-              prefs.theme === th.id ? "border-[#555] bg-[#222]" : "border-codex-border bg-transparent hover:border-[#3a3a3a]"
+              prefs.theme === th.id ? "border-codex-border-strong bg-codex-active" : "border-codex-border bg-transparent hover:border-codex-border-strong"
             }`}
           >
             <div className="h-16 rounded-lg mb-2 grid place-items-center" style={{ background: th.bg }}>
-              <span className="text-[#666] text-xs">UI</span>
+              <span className="text-codex-muted text-xs">UI</span>
             </div>
-            <div className="text-[12.5px] text-[#c8c8c8] px-1">{th.label}</div>
+            <div className="text-[12.5px] text-codex-text-secondary px-1">{th.label}</div>
           </button>
         ))}
       </div>
@@ -626,7 +626,7 @@ export function AppearancePage() {
           <div className="flex gap-2 items-center">
             <ActionBtn>{t("importTheme")}</ActionBtn>
             <ActionBtn>{t("copyTheme")}</ActionBtn>
-            <span className="text-[11px] text-[#666] bg-[#2a2a2a] border border-[#3a3a3a] rounded px-2 py-0.5">
+            <span className="text-[11px] text-[#666] bg-codex-elevated border-codex-border-strong rounded px-2 py-0.5">
               Codex
             </span>
           </div>
@@ -638,36 +638,36 @@ export function AppearancePage() {
         <SettingsRow label={t("bgColor")}>
           <input
             defaultValue="#ffffff"
-            className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1 text-[12.5px] text-[#e0e0e0] w-28 outline-none font-mono"
+            className="bg-codex-surface border border-codex-border-strong rounded-md px-2.5 py-1 text-[12.5px] text-codex-text w-28 outline-none font-mono"
           />
         </SettingsRow>
         <SettingsRow label={t("fgColor")}>
           <input
             defaultValue="#1a1a1a"
-            className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1 text-[12.5px] text-[#e0e0e0] w-28 outline-none font-mono"
+            className="bg-codex-surface border border-codex-border-strong rounded-md px-2.5 py-1 text-[12.5px] text-codex-text w-28 outline-none font-mono"
           />
         </SettingsRow>
         <SettingsRow label={t("uiFont")}>
-          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#c0c0c0]">
+          <select className="bg-codex-elevated border-codex-border-strong rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text-secondary">
             <option>{t("systemDefault")}</option>
           </select>
-          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#c0c0c0] min-w-[60px]">
+          <select className="bg-codex-elevated border-codex-border-strong rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text-secondary min-w-[60px]">
             <option>{t("fontRegular")}</option>
           </select>
         </SettingsRow>
         <SettingsRow label={t("contentFont")}>
-          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#c0c0c0]">
+          <select className="bg-codex-elevated border-codex-border-strong rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text-secondary">
             <option>{t("sameAsUiFont")}</option>
           </select>
-          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#c0c0c0] min-w-[60px]">
+          <select className="bg-codex-elevated border-codex-border-strong rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text-secondary min-w-[60px]">
             <option>{t("fontRegular")}</option>
           </select>
         </SettingsRow>
         <SettingsRow label={t("codeFont")}>
-          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#c0c0c0]">
+          <select className="bg-codex-elevated border-codex-border-strong rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text-secondary">
             <option>{t("systemDefault")}</option>
           </select>
-          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#c0c0c0] min-w-[60px]">
+          <select className="bg-codex-elevated border-codex-border-strong rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text-secondary min-w-[60px]">
             <option>{t("fontRegular")}</option>
           </select>
         </SettingsRow>
@@ -683,7 +683,7 @@ export function AppearancePage() {
             onChange={(e) => onContrastChange(Number(e.target.value))}
             className="contrast-slider"
           />
-          <span className="text-[12.5px] text-[#999] w-6 text-right">{contrast}</span>
+          <span className="text-[12.5px] text-codex-muted w-6 text-right">{contrast}</span>
         </SettingsRow>
       </SettingsCard>
 
@@ -693,7 +693,7 @@ export function AppearancePage() {
           <div className="flex gap-2 items-center">
             <ActionBtn>{t("importTheme")}</ActionBtn>
             <ActionBtn>{t("copyTheme")}</ActionBtn>
-            <span className="text-[11px] text-[#666] bg-[#2a2a2a] border border-[#3a3a3a] rounded px-2 py-0.5">
+            <span className="text-[11px] text-[#666] bg-codex-elevated border-codex-border-strong rounded px-2 py-0.5">
               Codex
             </span>
           </div>
@@ -714,7 +714,7 @@ export function AppearancePage() {
             onChange={(e) => onContrastChange(Number(e.target.value))}
             className="contrast-slider"
           />
-          <span className="text-[12.5px] text-[#999] w-6 text-right">{contrast}</span>
+          <span className="text-[12.5px] text-codex-muted w-6 text-right">{contrast}</span>
         </SettingsRow>
       </SettingsCard>
     </div>

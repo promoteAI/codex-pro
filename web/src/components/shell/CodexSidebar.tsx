@@ -137,7 +137,7 @@ export function CodexSidebar() {
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-2.5 h-8 px-3 mx-1 rounded-md text-[13.5px] cursor-pointer ${
-      isActive ? "bg-codex-active text-codex-text" : "text-[#b8b8b8] hover:bg-codex-hover hover:text-[#c8c8c8]"
+      isActive ? "bg-codex-active text-codex-text" : "text-codex-text-secondary hover:bg-codex-hover hover:text-codex-text"
     }`;
 
   const togglePin = (id: string) => {
@@ -155,7 +155,7 @@ export function CodexSidebar() {
       <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5">
         <button
           type="button"
-          className="flex items-center gap-1 text-sm font-semibold text-[#e0e0e0]"
+          className="flex items-center gap-1 text-sm font-semibold text-codex-text"
           onClick={() => {
             clearChat();
             navigate("/");
@@ -230,7 +230,7 @@ export function CodexSidebar() {
         <div className="flex items-center justify-between gap-2 px-2 pt-2.5 pb-1">
           <button
             type="button"
-            className="text-[11px] text-[#6f6f6f] font-medium tracking-wide shrink-0 inline-flex items-center gap-1 hover:text-[#9a9a9a]"
+            className="text-[11px] text-codex-muted font-medium tracking-wide shrink-0 inline-flex items-center gap-1 hover:text-codex-text-secondary"
           >
             {t("projects")}
             <svg className="w-[11px] h-[11px]" viewBox="0 0 24 24" aria-hidden="true">
@@ -242,7 +242,7 @@ export function CodexSidebar() {
               type="button"
               title={t("reorder")}
               aria-label={t("reorder")}
-              className="w-6 h-6 inline-flex items-center justify-center rounded-md text-[#8a8a8a] hover:bg-codex-active hover:text-[#d0d0d0]"
+              className="w-6 h-6 inline-flex items-center justify-center rounded-md text-codex-muted hover:bg-codex-active hover:text-codex-text-secondary"
             >
               <svg viewBox="0 0 16 16" className="w-3 h-3 fill-current" aria-hidden="true">
                 <circle cx="5" cy="3.5" r="1.15" />
@@ -258,7 +258,7 @@ export function CodexSidebar() {
               title={t("addProject")}
               aria-label={t("addProject")}
               onClick={() => setShowCreateProject(true)}
-              className="relative w-6 h-6 inline-flex items-center justify-center rounded-md text-[#8a8a8a] hover:bg-codex-active hover:text-[#d0d0d0]"
+              className="relative w-6 h-6 inline-flex items-center justify-center rounded-md text-codex-muted hover:bg-codex-active hover:text-codex-text-secondary"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
@@ -280,7 +280,7 @@ export function CodexSidebar() {
                     selectProject(repo);
                     navigate("/");
                   }}
-                  className="flex items-center gap-1.5 flex-1 min-w-0 text-[13.5px] text-[#c8c8c8] text-left"
+                  className="flex items-center gap-1.5 flex-1 min-w-0 text-[13.5px] text-codex-text-secondary text-left"
                 >
                   <Folder size={15} className="text-[#909090] shrink-0" />
                   <span className="truncate">{repo.name}</span>
@@ -290,7 +290,7 @@ export function CodexSidebar() {
                     type="button"
                     title={t("more")}
                     aria-label={t("more")}
-                    className="w-5 h-5 inline-flex items-center justify-center rounded text-[#8a8a8a] hover:bg-[#333] hover:text-[#d8d8d8]"
+                    className="w-5 h-5 inline-flex items-center justify-center rounded text-codex-muted hover:bg-codex-active hover:text-codex-text"
                   >
                     <svg className="w-3 h-3" viewBox="0 0 24 24" aria-hidden="true">
                       <circle cx="5" cy="12" r="1.4" fill="currentColor" />
@@ -303,7 +303,7 @@ export function CodexSidebar() {
                     title={t("viewFiles")}
                     aria-label={t("viewFiles")}
                     onClick={() => setFilesRepo(repo)}
-                    className="w-5 h-5 inline-flex items-center justify-center rounded text-[#8a8a8a] hover:bg-[#333] hover:text-[#d8d8d8]"
+                    className="w-5 h-5 inline-flex items-center justify-center rounded text-codex-muted hover:bg-codex-active hover:text-codex-text"
                   >
                     <svg className="w-3 h-3" viewBox="0 0 24 24" aria-hidden="true">
                       <path
@@ -323,7 +323,7 @@ export function CodexSidebar() {
                       selectProject(repo);
                       navigate("/");
                     }}
-                    className="w-5 h-5 inline-flex items-center justify-center rounded text-[#8a8a8a] hover:bg-[#333] hover:text-[#d8d8d8]"
+                    className="w-5 h-5 inline-flex items-center justify-center rounded text-codex-muted hover:bg-codex-active hover:text-codex-text"
                   >
                     <svg className="w-3 h-3" viewBox="0 0 24 24" aria-hidden="true">
                       <path
@@ -353,7 +353,7 @@ export function CodexSidebar() {
                     <div
                       key={s.key}
                       className={`flex items-center gap-1 px-2 py-1 rounded-md group ${
-                        active ? "bg-[#282828]" : "hover:bg-codex-hover"
+                        active ? "bg-codex-active" : "hover:bg-codex-hover"
                       }`}
                     >
                       <button
@@ -364,8 +364,8 @@ export function CodexSidebar() {
                         onClick={() => togglePin(s.key)}
                         className={`w-4 h-4 shrink-0 items-center justify-center rounded ${
                           isPinned(s.key)
-                            ? "inline-flex text-[#c8c8c8]"
-                            : "hidden group-hover:inline-flex text-[#6a6a6a] hover:text-[#b0b0b0]"
+                            ? "inline-flex text-codex-text-secondary"
+                            : "hidden group-hover:inline-flex text-codex-muted hover:text-codex-text-secondary"
                         }`}
                       >
                         <PinIcon className="w-3 h-3" />
@@ -378,13 +378,13 @@ export function CodexSidebar() {
                         }}
                         className="flex-1 min-w-0 text-left"
                       >
-                        <span className="block text-[13.5px] text-[#c8c8c8] truncate">{s.title || s.key}</span>
+                        <span className="block text-[13.5px] text-codex-text-secondary truncate">{s.title || s.key}</span>
                       </button>
                       <button
                         type="button"
                         title={t("archive")}
                         aria-label={t("archive")}
-                        className="hidden group-hover:inline-flex w-5 h-5 shrink-0 items-center justify-center rounded text-[#8a8a8a] hover:bg-[#333] hover:text-[#d8d8d8]"
+                        className="hidden group-hover:inline-flex w-5 h-5 shrink-0 items-center justify-center rounded text-codex-muted hover:bg-codex-active hover:text-codex-text"
                       >
                         <ArchiveIcon className="w-3 h-3" />
                       </button>
@@ -397,13 +397,13 @@ export function CodexSidebar() {
         })}
 
         <div className="flex items-center justify-between gap-2 px-2 pt-2.5 pb-1">
-          <span className="text-[11px] text-[#6f6f6f] font-medium tracking-wide">{t("recents")}</span>
+          <span className="text-[11px] text-codex-muted font-medium tracking-wide">{t("recents")}</span>
           <div className="inline-flex items-center gap-px shrink-0">
             <button
               type="button"
               title={t("reorder")}
               aria-label={t("reorder")}
-              className="w-6 h-6 inline-flex items-center justify-center rounded-md text-[#8a8a8a] hover:bg-codex-active hover:text-[#d0d0d0]"
+              className="w-6 h-6 inline-flex items-center justify-center rounded-md text-codex-muted hover:bg-codex-active hover:text-codex-text-secondary"
             >
               <svg viewBox="0 0 16 16" className="w-3 h-3 fill-current" aria-hidden="true">
                 <circle cx="5" cy="3.5" r="1.15" />
@@ -422,7 +422,7 @@ export function CodexSidebar() {
                 clearChat();
                 navigate("/");
               }}
-              className="w-6 h-6 inline-flex items-center justify-center rounded-md text-[#8a8a8a] hover:bg-codex-active hover:text-[#d0d0d0]"
+              className="w-6 h-6 inline-flex items-center justify-center rounded-md text-codex-muted hover:bg-codex-active hover:text-codex-text-secondary"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -447,7 +447,7 @@ export function CodexSidebar() {
             <div
               key={s.id}
               className={`mx-1 flex items-center gap-1 px-2 py-1 rounded-md group/row ${
-                active ? "bg-[#282828]" : "hover:bg-codex-hover"
+                active ? "bg-codex-active" : "hover:bg-codex-hover"
               }`}
             >
               <button
@@ -458,8 +458,8 @@ export function CodexSidebar() {
                 onClick={() => togglePin(s.id)}
                 className={`w-4 h-4 shrink-0 items-center justify-center rounded ${
                   isPinned(s.id)
-                    ? "inline-flex text-[#c8c8c8]"
-                    : "hidden group-hover/row:inline-flex text-[#6a6a6a] hover:text-[#b0b0b0]"
+                    ? "inline-flex text-codex-text-secondary"
+                    : "hidden group-hover/row:inline-flex text-codex-muted hover:text-codex-text-secondary"
                 }`}
               >
                 <PinIcon className="w-3 h-3" />
@@ -477,13 +477,13 @@ export function CodexSidebar() {
                 }}
                 className="flex-1 min-w-0 text-left"
               >
-                <span className="block text-[13.5px] text-[#c8c8c8] truncate">{s.title}</span>
+                <span className="block text-[13.5px] text-codex-text-secondary truncate">{s.title}</span>
               </button>
               <button
                 type="button"
                 title={t("archive")}
                 aria-label={t("archive")}
-                className="hidden group-hover/row:inline-flex w-5 h-5 shrink-0 items-center justify-center rounded text-[#8a8a8a] hover:bg-[#333] hover:text-[#d8d8d8]"
+                className="hidden group-hover/row:inline-flex w-5 h-5 shrink-0 items-center justify-center rounded text-codex-muted hover:bg-codex-active hover:text-codex-text"
               >
                 <ArchiveIcon className="w-3 h-3" />
               </button>
@@ -495,7 +495,7 @@ export function CodexSidebar() {
         </>
       )}
 
-      <div className="shrink-0 flex items-center justify-between px-2.5 py-2 border-t border-[#262626]">
+      <div className="shrink-0 flex items-center justify-between px-2.5 py-2 border-t border-codex-border">
         <div className="account-wrap relative" ref={accountWrapRef}>
           <button
             type="button"
@@ -506,7 +506,7 @@ export function CodexSidebar() {
             aria-controls="accountMenu"
             title={t("account")}
             aria-label={t("account")}
-            className="account flex items-center gap-2 text-[13px] text-[#a8a8a8] px-1.5 py-1 rounded hover:bg-[#262626]"
+            className="account flex items-center gap-2 text-[13px] text-codex-text-secondary px-1.5 py-1 rounded hover:bg-codex-hover"
           >
             <Settings size={18} className="text-[#888]" />
             <span>custom</span>

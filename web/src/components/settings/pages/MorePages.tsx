@@ -111,7 +111,7 @@ export function VoicePage() {
       <SectionTitle>{t("secApp")}</SectionTitle>
       <SettingsCard>
         <SettingsRow label={t("microphone")} desc={t("microphoneDesc")}>
-          <select className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]">
+          <select className="bg-codex-elevated border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary">
             <option>{t("systemDefault")}</option>
           </select>
         </SettingsRow>
@@ -126,10 +126,10 @@ export function VoicePage() {
       <SectionTitle>{t("dictation")}</SectionTitle>
       <SettingsCard>
         <SettingsRow label={t("holdDictation")} desc={t("holdDictationDesc")}>
-          <span className="text-[12.5px] text-[#888]">{t("off")}</span>
+          <span className="text-[12.5px] text-codex-muted">{t("off")}</span>
         </SettingsRow>
         <SettingsRow label={t("toggleDictation")} desc={t("toggleDictationDesc")}>
-          <span className="text-[12.5px] text-[#888]">{t("off")}</span>
+          <span className="text-[12.5px] text-codex-muted">{t("off")}</span>
         </SettingsRow>
       </SettingsCard>
       <SettingsCard>
@@ -137,7 +137,7 @@ export function VoicePage() {
           <ActionBtn>+ {t("addEntry")}</ActionBtn>
         </SettingsRow>
         <div className="flex items-center justify-between px-4 py-3 border-t border-codex-border">
-          <div className="text-[13px] text-[#c8c8c8] bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-1.5 flex-1 mr-3">
+          <div className="text-[13px] text-codex-text-secondary bg-codex-surface border border-[#333] rounded-md px-3 py-1.5 flex-1 mr-3">
             Jane Doe
           </div>
           <button type="button" className="text-[#666] hover:text-codex-danger text-sm">
@@ -169,10 +169,10 @@ export function PersonalizationPage() {
     <div className="max-w-[720px]">
       <PageTitle>{t("personalization")}</PageTitle>
 
-      <div className="bg-[#222] border border-[#2e2e2e] rounded-xl p-4 mb-5">
+      <div className="bg-codex-surface border border-codex-border rounded-xl p-4 mb-5">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
-            <div className="text-[14px] font-medium text-[#e8e8e8] mb-1">{t("codexInstructions")}</div>
+            <div className="text-[14px] font-medium text-codex-text mb-1">{t("codexInstructions")}</div>
             <div className="text-xs text-codex-muted">{t("codexInstructionsDesc")}</div>
           </div>
           <ActionBtn onClick={saveInstructions}>{t("save")}</ActionBtn>
@@ -182,13 +182,13 @@ export function PersonalizationPage() {
           onChange={(e) => setText(e.target.value)}
           onBlur={saveInstructions}
           rows={5}
-          className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-[13px] text-[#e0e0e0] outline-none focus:border-[#555] resize-y min-h-[100px]"
+          className="w-full bg-codex-surface border border-[#333] rounded-lg px-3 py-2 text-[13px] text-codex-text outline-none focus:border-[#555] resize-y min-h-[100px]"
           placeholder={t("instructionsPlaceholder")}
         />
       </div>
 
-      <div className="bg-[#222] border border-[#2e2e2e] rounded-xl p-4 mb-5">
-        <div className="text-[14px] font-medium text-[#e8e8e8] mb-1">{t("memory")}</div>
+      <div className="bg-codex-surface border border-codex-border rounded-xl p-4 mb-5">
+        <div className="text-[14px] font-medium text-codex-text mb-1">{t("memory")}</div>
         <div className="text-xs text-codex-muted mb-3">{t("memorySettingsDesc")}</div>
         <SettingsCard className="mb-0 border-0 bg-[#1e1e1e]">
           <SettingsRow label={t("localMemory")} desc={t("localMemoryDesc")}>
@@ -238,7 +238,7 @@ export function PetsPage() {
           <div
             key={pet.id}
             className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl border ${
-              selected === pet.id ? "bg-[#222] border-[#3a3a3a]" : "bg-[#1e1e1e] border-[#262626]"
+              selected === pet.id ? "bg-codex-active border-codex-border-strong" : "bg-codex-surface border-codex-border"
             }`}
           >
             <div
@@ -247,7 +247,7 @@ export function PetsPage() {
               aria-hidden
             />
             <div className="flex-1 min-w-0">
-              <div className="text-[13.5px] font-medium text-[#e0e0e0]">{pet.name}</div>
+              <div className="text-[13.5px] font-medium text-codex-text">{pet.name}</div>
               <div className="text-xs text-codex-muted">{pet.desc}</div>
             </div>
             <button
@@ -256,7 +256,7 @@ export function PetsPage() {
               className={`px-3 py-1 rounded-md text-[12.5px] border ${
                 selected === pet.id
                   ? "bg-[#2a3a2a] border-[#3a5a3a] text-codex-success"
-                  : "bg-[#2a2a2a] border-[#3a3a3a] text-[#c0c0c0] hover:bg-[#323232]"
+                  : "bg-[#2a2a2a] border-[#3a3a3a] text-codex-text-secondary hover:bg-[#323232]"
               }`}
             >
               {selected === pet.id ? t("selected") : t("select")}
@@ -311,17 +311,17 @@ export function ShortcutsPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={t("searchShortcuts")}
-          className="bg-transparent outline-none text-[13px] text-[#c0c0c0] placeholder:text-[#6a6a6a] w-full"
+          className="bg-transparent outline-none text-[13px] text-codex-text-secondary placeholder:text-codex-muted w-full"
         />
       </div>
       <div className="space-y-1">
         {list.map((s) => (
           <div
             key={s.id}
-            className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-[#222]"
+            className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-codex-hover"
             role="listitem"
           >
-            <span className="text-[13.5px] text-[#d4d4d4]">{s.action}</span>
+            <span className="text-[13.5px] text-codex-text-secondary">{s.action}</span>
             <div className="flex gap-1 shrink-0">
               {s.keys.length === 0 ? (
                 <span className="text-[11.5px] text-[#666]">{t("shortcutUnset")}</span>
@@ -329,7 +329,7 @@ export function ShortcutsPage() {
                 s.keys.map((k) => (
                   <kbd
                     key={k}
-                    className="text-[11.5px] text-[#999] bg-[#2a2a2a] border border-[#3a3a3a] rounded px-1.5 py-0.5"
+                    className="text-[11.5px] text-codex-muted bg-codex-elevated border-codex-border-strong rounded px-1.5 py-0.5"
                   >
                     {k}
                   </kbd>
@@ -348,13 +348,13 @@ export function AccountPage() {
   return (
     <div className="max-w-[720px]">
       <PageTitle>{t("account")}</PageTitle>
-      <div className="flex items-center gap-4 bg-[#222] border border-[#2e2e2e] rounded-xl px-4 py-4 mb-5">
+      <div className="flex items-center gap-4 bg-codex-surface border border-codex-border rounded-xl px-4 py-4 mb-5">
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#4a6cf7] to-[#7c5cff] grid place-items-center text-lg font-semibold text-white shrink-0">
           C
         </div>
         <div>
-          <div className="text-[15px] font-semibold text-[#f0f0f0]">custom</div>
-          <div className="text-[12.5px] text-[#7a7a7a]">custom@example.com</div>
+          <div className="text-[15px] font-semibold text-codex-text">custom</div>
+          <div className="text-[12.5px] text-codex-muted">custom@example.com</div>
           <div className="inline-flex mt-2 px-2.5 py-0.5 rounded-full bg-[#2a3548] border border-[#3a4a66] text-[11.5px] text-[#9eb6ff]">
             CodexPro
           </div>
@@ -411,7 +411,7 @@ export function ComputerPage() {
         <div className="flex items-center gap-3.5 px-4 py-3.5 border-b border-codex-border">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#5b8def] to-[#7c5cff] shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-[13.5px] font-medium text-[#e0e0e0]">{t("anyScreen")}</div>
+            <div className="text-[13.5px] font-medium text-codex-text">{t("anyScreen")}</div>
             <div className="text-xs text-codex-muted">{t("anyScreenDesc")}</div>
           </div>
           <Toggle checked={prefs.allowAnyScreen} onChange={(v) => updatePrefs({ allowAnyScreen: v })} label={t("anyScreen")} />
@@ -421,7 +421,7 @@ export function ComputerPage() {
             G
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[13.5px] font-medium text-[#e0e0e0]">Google Chrome</div>
+            <div className="text-[13.5px] font-medium text-codex-text">Google Chrome</div>
             <div className="text-xs text-codex-muted">{t("chromeConnected")}</div>
           </div>
           <ActionBtn>{t("manage")}</ActionBtn>
@@ -432,7 +432,7 @@ export function ComputerPage() {
             E
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[13.5px] font-medium text-[#e0e0e0]">Microsoft Edge</div>
+            <div className="text-[13.5px] font-medium text-codex-text">Microsoft Edge</div>
             <div className="text-xs text-codex-muted">{t("edgeDisconnected")}</div>
           </div>
           <ActionBtn>{t("install")}</ActionBtn>
@@ -442,14 +442,14 @@ export function ComputerPage() {
             X
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[13.5px] font-medium text-[#e0e0e0]">Microsoft Excel</div>
+            <div className="text-[13.5px] font-medium text-codex-text">Microsoft Excel</div>
             <div className="text-xs text-codex-muted">{t("excelDesc")}</div>
           </div>
           <Toggle checked={prefs.excelEnabled} onChange={(v) => updatePrefs({ excelEnabled: v })} label="Excel" />
         </div>
       </SettingsCard>
       <SectionTitle>{t("alwaysAllowApps")}</SectionTitle>
-      <div className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-xl px-4 py-6 text-center text-[13px] text-[#6e6e6e]">
+      <div className="bg-codex-panel border border-codex-border rounded-xl px-4 py-6 text-center text-[13px] text-codex-muted">
         {t("alwaysAllowEmpty")}
       </div>
     </div>
@@ -637,7 +637,7 @@ export function SettingsPluginsPage() {
             {addMenuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[200px] p-1.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[10px] shadow-[0_12px_32px_rgba(0,0,0,.45)]"
+                className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[200px] p-1.5 bg-codex-elevated border-codex-border-strong rounded-[10px] shadow-[0_12px_32px_rgba(0,0,0,.45)]"
               >
                 <button
                   type="button"
@@ -646,9 +646,9 @@ export function SettingsPluginsPage() {
                     setAddMenuOpen(false);
                     toast.info(t("createPlugin") + "（即将推出）");
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#e0e0e0] hover:bg-[#353535]"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-codex-text hover:bg-[#353535]"
                 >
-                  <span className="w-4 h-4 inline-flex items-center justify-center text-[#888]">
+                  <span className="w-4 h-4 inline-flex items-center justify-center text-codex-muted">
                     <Plus size={14} />
                   </span>
                   {t("createPlugin")}
@@ -660,9 +660,9 @@ export function SettingsPluginsPage() {
                     setAddMenuOpen(false);
                     setMarketOpen(true);
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#e0e0e0] hover:bg-[#353535]"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-codex-text hover:bg-[#353535]"
                 >
-                  <span className="w-4 h-4 inline-flex items-center justify-center text-[#888]">
+                  <span className="w-4 h-4 inline-flex items-center justify-center text-codex-muted">
                     <Plus size={14} />
                   </span>
                   {t("addMarketplace")}
@@ -674,9 +674,9 @@ export function SettingsPluginsPage() {
                     setAddMenuOpen(false);
                     setCreatingMcp(true);
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-[#e0e0e0] hover:bg-[#353535]"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-codex-text hover:bg-[#353535]"
                 >
-                  <span className="w-4 h-4 inline-flex items-center justify-center text-[#888]">
+                  <span className="w-4 h-4 inline-flex items-center justify-center text-codex-muted">
                     <Plus size={14} />
                   </span>
                   {t("addMcp")}
@@ -701,8 +701,8 @@ export function SettingsPluginsPage() {
             onClick={() => setTab(id)}
             className={`text-[13px] pb-1 border-b-[1.5px] -mb-px ${
               tab === id
-                ? "text-[#e0e0e0] border-[#e0e0e0]"
-                : "text-codex-muted border-transparent hover:text-[#a0a0a0]"
+                ? "text-codex-text border-[#e0e0e0]"
+                : "text-codex-muted border-transparent hover:text-codex-text-secondary"
             }`}
           >
             {label}
@@ -714,7 +714,7 @@ export function SettingsPluginsPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={t("searchSkills")}
-            className="bg-transparent outline-none text-[12.5px] text-[#c0c0c0] w-full placeholder:text-[#6a6a6a]"
+            className="bg-transparent outline-none text-[12.5px] text-codex-text-secondary w-full placeholder:text-codex-muted"
           />
         </div>
       </div>
@@ -741,11 +741,11 @@ export function SettingsPluginsPage() {
               key={p.id}
               className="flex items-center gap-3.5 px-4 py-3.5 bg-[#1e1e1e] border border-[#262626] rounded-[10px] hover:border-[#333]"
             >
-              <div className="w-9 h-9 rounded-lg bg-[#252525] grid place-items-center text-[#888] shrink-0 text-xs">
+              <div className="w-9 h-9 rounded-lg bg-[#252525] grid place-items-center text-codex-muted shrink-0 text-xs">
                 ◆
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[13.5px] font-medium text-[#d4d4d4] mb-0.5">{p.name}</div>
+                <div className="text-[13.5px] font-medium text-codex-text-secondary mb-0.5">{p.name}</div>
                 <div className="text-xs text-codex-muted line-clamp-2">{p.desc}</div>
               </div>
               <span className="text-xs text-[#666] px-2 py-0.5 bg-[#252525] rounded shrink-0">{p.tag}</span>
@@ -756,7 +756,7 @@ export function SettingsPluginsPage() {
                 className={`px-3 py-1 rounded-md text-[12px] font-medium border ${
                   enabled[p.id]
                     ? "bg-[#2a3a2a] border-[#3a5a3a] text-codex-success hover:bg-[#324a32]"
-                    : "bg-[#2a2a2a] border-[#3a3a3a] text-[#c0c0c0] hover:bg-[#323232]"
+                    : "bg-[#2a2a2a] border-[#3a3a3a] text-codex-text-secondary hover:bg-[#323232]"
                 }`}
               >
                 {toggling === p.id ? "…" : enabled[p.id] ? "已启用" : "启用"}
@@ -907,12 +907,12 @@ export function HooksPage() {
         <PageSub>{t("newHookDesc")}</PageSub>
         <SettingsCard>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-4 py-3.5 border-b border-codex-border">
-            <label className="block text-[12px] text-[#8a8a8a]">
+            <label className="block text-[12px] text-codex-muted">
               {t("hookEvent")}
               <select
                 value={event}
                 onChange={(e) => setEvent(e.target.value)}
-                className="mt-1.5 w-full bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]"
+                className="mt-1.5 w-full bg-codex-elevated border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary"
               >
                 {HOOK_EVENTS.map((v) => (
                   <option key={v} value={v}>
@@ -921,23 +921,23 @@ export function HooksPage() {
                 ))}
               </select>
             </label>
-            <label className="block text-[12px] text-[#8a8a8a]">
+            <label className="block text-[12px] text-codex-muted">
               {t("hookRunMode")}
               <select
                 value={runMode}
                 onChange={(e) => setRunMode(e.target.value)}
-                className="mt-1.5 w-full bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]"
+                className="mt-1.5 w-full bg-codex-elevated border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary"
               >
                 <option value="process">{t("hookRunProcess")}</option>
                 <option value="prompt">{t("hookRunPrompt")}</option>
               </select>
             </label>
-            <label className="block text-[12px] text-[#8a8a8a]">
+            <label className="block text-[12px] text-codex-muted">
               {t("hookScope")}
               <select
                 value={scope}
                 onChange={(e) => setScope(e.target.value)}
-                className="mt-1.5 w-full bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]"
+                className="mt-1.5 w-full bg-codex-elevated border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary"
               >
                 {HOOK_SCOPES.map((s) => (
                   <option key={s} value={s}>
@@ -948,13 +948,13 @@ export function HooksPage() {
             </label>
           </div>
           <div className="px-4 py-3.5">
-            <label className="block text-[12px] text-[#8a8a8a] mb-1.5">{t("hookCommand")}</label>
+            <label className="block text-[12px] text-codex-muted mb-1.5">{t("hookCommand")}</label>
             <textarea
               value={command}
               onChange={(e) => setCommand(e.target.value)}
               rows={4}
               placeholder={t("hookCommandPlaceholder")}
-              className="w-full bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-[#e0e0e0] outline-none resize-y font-mono"
+              className="w-full bg-codex-surface border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-codex-text outline-none resize-y font-mono"
             />
           </div>
         </SettingsCard>
@@ -988,7 +988,7 @@ export function HooksPage() {
         <select
           value={scope}
           onChange={(e) => setScope(e.target.value)}
-          className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-1.5 text-[12.5px] text-[#c0c0c0]"
+          className="bg-codex-elevated border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary"
           aria-label={t("hookScope")}
         >
           {HOOK_SCOPES.map((s) => (
@@ -1004,7 +1004,7 @@ export function HooksPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={t("searchHooks")}
-            className="bg-transparent outline-none text-[12.5px] text-[#c0c0c0] w-full"
+            className="bg-transparent outline-none text-[12.5px] text-codex-text-secondary w-full"
           />
         </div>
       </div>
@@ -1016,7 +1016,7 @@ export function HooksPage() {
             title={t("refresh")}
             aria-label={t("refresh")}
             onClick={() => void refetch()}
-            className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-[#c0c0c0] hover:bg-[#333]"
+            className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-codex-text-secondary hover:bg-[#333]"
           >
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
               <path d="M21 12a9 9 0 1 1-2.6-6.3" />
@@ -1066,11 +1066,11 @@ export function HooksPage() {
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[13.5px] font-medium text-[#e0e0e0]">{h.event}</span>
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-[#2a2a2a] border border-[#3a3a3a] text-codex-muted">
+                  <span className="text-[13.5px] font-medium text-codex-text">{h.event}</span>
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-codex-elevated border-codex-border-strong text-codex-muted">
                     {h.run_mode === "prompt" ? t("hookRunPrompt") : t("hookRunProcess")}
                   </span>
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-[#2a2a2a] border border-[#3a3a3a] text-codex-muted">
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-codex-elevated border-codex-border-strong text-codex-muted">
                     {h.scope === "用户" ? t("scopeUser") : h.scope}
                   </span>
                 </div>
@@ -1082,7 +1082,7 @@ export function HooksPage() {
                   title={t("delete")}
                   aria-label={`${t("delete")} ${h.event}`}
                   onClick={() => void deleteHook(h)}
-                  className="w-7 h-7 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-[#c0c0c0] hover:bg-[#3a2a2a] hover:text-[#f87171]"
+                  className="w-7 h-7 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-codex-text-secondary hover:bg-[#3a2a2a] hover:text-[#f87171]"
                 >
                   <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
                     <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
@@ -1285,7 +1285,7 @@ export function ConnectionsPage() {
             title={t("refresh")}
             aria-label={t("refresh")}
             onClick={() => void loadConnections()}
-            className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-[#c0c0c0] hover:bg-[#333]"
+            className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-codex-text-secondary hover:bg-[#333]"
           >
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
               <path d="M21 12a9 9 0 1 1-2.6-6.3" />
@@ -1321,7 +1321,7 @@ export function ConnectionsPage() {
           }
         />
       ) : (
-        <div className="bg-[#222] border border-[#2e2e2e] rounded-xl overflow-hidden">
+        <div className="bg-codex-surface border border-codex-border rounded-xl overflow-hidden">
           {connections.map((c, i) => {
             const result = testResults[c.name];
             return (
@@ -1333,7 +1333,7 @@ export function ConnectionsPage() {
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[13.5px] font-medium text-[#e0e0e0]">{c.name}</span>
+                    <span className="text-[13.5px] font-medium text-codex-text">{c.name}</span>
                     {result && (
                       <span
                         className={`text-[11px] px-1.5 py-0.5 rounded ${
@@ -1392,12 +1392,12 @@ export function ConnectionsPage() {
                         selectedHost === h.host ? "bg-[#2c2c2c]" : "hover:bg-[#262626]"
                       }`}
                     >
-                      <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#8a8a8a] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6">
+                      <svg viewBox="0 0 24 24" className="w-4 h-4 text-codex-muted shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6">
                         <rect x="3" y="4" width="18" height="12" rx="2" />
                         <path d="M8 20h8M12 16v4" />
                       </svg>
                       <span className="flex-1 min-w-0">
-                        <span className="block text-[13px] text-[#e0e0e0] truncate">{h.host}</span>
+                        <span className="block text-[13px] text-codex-text truncate">{h.host}</span>
                         <span className="block text-[11.5px] text-codex-muted truncate">{h.host}</span>
                       </span>
                       {selectedHost === h.host && (
@@ -1416,7 +1416,7 @@ export function ConnectionsPage() {
                     title={t("refresh")}
                     aria-label={t("refresh")}
                     onClick={() => void refreshDiscover()}
-                    className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#252525] text-[#c0c0c0] hover:bg-[#2e2e2e]"
+                    className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#252525] text-codex-text-secondary hover:bg-codex-active"
                   >
                     <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
                       <path d="M21 12a9 9 0 1 1-2.6-6.3" />
@@ -1426,7 +1426,7 @@ export function ConnectionsPage() {
                   <button
                     type="button"
                     onClick={() => setPane("manual")}
-                    className="px-3 py-1.5 rounded-md border border-[#3a3a3a] bg-[#252525] text-[#c0c0c0] text-[12.5px] hover:bg-[#2e2e2e]"
+                    className="px-3 py-1.5 rounded-md border border-[#3a3a3a] bg-[#252525] text-codex-text-secondary text-[12.5px] hover:bg-codex-active"
                   >
                     {t("sshManualAdd")}
                   </button>
@@ -1584,7 +1584,7 @@ export function GitPage() {
             value={prefix}
             onChange={(e) => setPrefix(e.target.value)}
             onBlur={() => updatePrefs({ gitBranchPrefix: prefix })}
-            className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#e0e0e0] w-36 outline-none"
+            className="bg-codex-surface border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text w-36 outline-none"
           />
         </SettingsRow>
         <SettingsRow label={t("prMergeMethod")} desc={t("prMergeMethodDesc")}>
@@ -1620,8 +1620,8 @@ export function GitPage() {
         <div className="px-4 py-3.5 space-y-3">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <div className="text-[13.5px] font-medium text-[#e4e4e4]">{t("autoMergeWhenReady")}</div>
-              <div className="text-[12px] text-[#6e6e6e] mt-1">{t("autoMergeWhenReadyDesc")}</div>
+              <div className="text-[13.5px] font-medium text-codex-text-secondary">{t("autoMergeWhenReady")}</div>
+              <div className="text-[12px] text-codex-muted mt-1">{t("autoMergeWhenReadyDesc")}</div>
             </div>
             <Toggle checked={prefs.gitAutoMerge} onChange={(v) => updatePrefs({ gitAutoMerge: v })} label={t("autoMergeWhenReady")} />
           </div>
@@ -1631,7 +1631,7 @@ export function GitPage() {
             onBlur={() => updatePrefs({ gitMonitorInstr: monitorInstr })}
             rows={3}
             placeholder={t("monitorInstrPlaceholder")}
-            className="w-full bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-[#e0e0e0] outline-none resize-y"
+            className="w-full bg-codex-surface border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-codex-text outline-none resize-y"
             aria-label={t("monitorInstrPlaceholder")}
           />
         </div>
@@ -1640,14 +1640,14 @@ export function GitPage() {
       <SectionTitle>{t("commitInstr")}</SectionTitle>
       <SettingsCard>
         <div className="px-4 py-3.5 space-y-2">
-          <div className="text-[12px] text-[#6e6e6e]">{t("commitInstrDesc")}</div>
+          <div className="text-[12px] text-codex-muted">{t("commitInstrDesc")}</div>
           <textarea
             value={commitInstr}
             onChange={(e) => setCommitInstr(e.target.value)}
             onBlur={() => updatePrefs({ gitCommitInstr: commitInstr })}
             rows={3}
             placeholder={t("commitInstrPlaceholder")}
-            className="w-full bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-[#e0e0e0] outline-none resize-y"
+            className="w-full bg-codex-surface border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-codex-text outline-none resize-y"
           />
         </div>
       </SettingsCard>
@@ -1655,14 +1655,14 @@ export function GitPage() {
       <SectionTitle>{t("prInstr")}</SectionTitle>
       <SettingsCard>
         <div className="px-4 py-3.5 space-y-2">
-          <div className="text-[12px] text-[#6e6e6e]">{t("prInstrDesc")}</div>
+          <div className="text-[12px] text-codex-muted">{t("prInstrDesc")}</div>
           <textarea
             value={prInstr}
             onChange={(e) => setPrInstr(e.target.value)}
             onBlur={() => updatePrefs({ gitPrInstr: prInstr })}
             rows={3}
             placeholder={t("prInstrPlaceholder")}
-            className="w-full bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-[#e0e0e0] outline-none resize-y"
+            className="w-full bg-codex-surface border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-codex-text outline-none resize-y"
           />
         </div>
       </SettingsCard>
@@ -1684,7 +1684,7 @@ export function EnvironmentPage() {
       <PageTitle>{t("environment")}</PageTitle>
       <PageSub>{t("environmentDesc")}</PageSub>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[12.5px] text-[#b8b8b8]">{t("chooseProject")}</span>
+        <span className="text-[12.5px] text-codex-text-secondary">{t("chooseProject")}</span>
         <ActionBtn>{t("addProject")}</ActionBtn>
       </div>
       <div className="space-y-1.5">
@@ -1695,8 +1695,8 @@ export function EnvironmentPage() {
             onClick={() => setSelected(p.id)}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left ${
               selected === p.id
-                ? "bg-[#222] border-[#3a3a3a]"
-                : "bg-[#1e1e1e] border-[#262626] hover:border-[#333]"
+                ? "bg-codex-active border-codex-border-strong"
+                : "bg-codex-surface border-codex-border hover:border-codex-border-strong"
             }`}
           >
             <span
@@ -1707,7 +1707,7 @@ export function EnvironmentPage() {
               {selected === p.id ? "✓" : ""}
             </span>
             <div className="flex-1 min-w-0">
-              <div className="text-[13.5px] text-[#e0e0e0]">{p.name}</div>
+              <div className="text-[13.5px] text-codex-text">{p.name}</div>
               <div className="text-xs text-codex-muted">{p.sub}</div>
             </div>
             <span className="text-[#666] text-lg leading-none">+</span>
@@ -1744,7 +1744,7 @@ export function WorktreesPage() {
             value={root}
             onChange={(e) => setRoot(e.target.value)}
             onBlur={() => updatePrefs({ worktreeRoot: root })}
-            className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#e0e0e0] w-[280px] max-w-[40vw] outline-none"
+            className="bg-codex-surface border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text w-[280px] max-w-[40vw] outline-none"
           />
         </SettingsRow>
         <SettingsRow label={t("pullUpstream")} desc={t("pullUpstreamDesc")}>
@@ -1761,18 +1761,18 @@ export function WorktreesPage() {
             value={deleteLimit}
             onChange={(e) => setDeleteLimit(Number(e.target.value) || 1)}
             onBlur={() => updatePrefs({ worktreeDeleteLimit: deleteLimit })}
-            className="bg-[#1a1a1a] border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-[#e0e0e0] w-20 outline-none"
+            className="bg-codex-surface border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text w-20 outline-none"
             aria-label={t("autoDeleteLimit")}
           />
         </SettingsRow>
       </SettingsCard>
       <div className="flex items-center justify-between mt-5 mb-2">
-        <span className="text-[12.5px] text-[#b8b8b8]">{t("noWorktreesYet")}</span>
+        <span className="text-[12.5px] text-codex-text-secondary">{t("noWorktreesYet")}</span>
         <button
           type="button"
           title={t("refresh")}
           aria-label={t("refresh")}
-          className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-[#c0c0c0] hover:bg-[#333]"
+          className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-codex-text-secondary hover:bg-[#333]"
         >
           <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
             <path d="M21 12a9 9 0 1 1-2.6-6.3" />
@@ -1780,7 +1780,7 @@ export function WorktreesPage() {
           </svg>
         </button>
       </div>
-      <div className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-xl px-4 py-8 text-center text-[13px] text-[#6e6e6e]">
+      <div className="bg-codex-panel border border-codex-border rounded-xl px-4 py-8 text-center text-[13px] text-codex-muted">
         {t("worktreesEmpty")}
       </div>
     </div>
@@ -1916,7 +1916,7 @@ export function ArchivedPage() {
   return (
     <div className="max-w-[760px]">
       <div className="flex items-center justify-between gap-3 mb-4">
-        <h2 className="text-[22px] font-semibold text-[#f0f0f0] tracking-tight m-0">{t("archived")}</h2>
+        <h2 className="text-[22px] font-semibold text-codex-text tracking-tight m-0">{t("archived")}</h2>
         <button
           type="button"
           className="text-[12.5px] text-[#f87171] hover:underline disabled:opacity-50"
@@ -1934,14 +1934,14 @@ export function ArchivedPage() {
             onChange={(e) => setQ(e.target.value)}
             placeholder={t("searchArchived")}
             aria-label={t("searchArchived")}
-            className="bg-transparent outline-none text-[13px] text-[#c0c0c0] placeholder:text-[#6a6a6a] w-full"
+            className="bg-transparent outline-none text-[13px] text-codex-text-secondary placeholder:text-codex-muted w-full"
           />
         </div>
         <select
           value={chatFilter}
           onChange={(e) => setChatFilter(e.target.value)}
           aria-label={t("chatTypeFilter")}
-          className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-2 text-[12.5px] text-[#c0c0c0]"
+          className="bg-codex-elevated border-codex-border-strong rounded-md px-3 py-2 text-[12.5px] text-codex-text-secondary"
         >
           <option value="all">{t("allChats")}</option>
           <option value="temp">{t("tempChats")}</option>
@@ -1951,7 +1951,7 @@ export function ArchivedPage() {
           value={projectFilter}
           onChange={(e) => setProjectFilter(e.target.value)}
           aria-label={t("projectFilter")}
-          className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-3 py-2 text-[12.5px] text-[#c0c0c0]"
+          className="bg-codex-elevated border-codex-border-strong rounded-md px-3 py-2 text-[12.5px] text-codex-text-secondary"
         >
           <option value="all">{t("allProjects")}</option>
           {projects.map((p) => (
@@ -1963,7 +1963,7 @@ export function ArchivedPage() {
       </div>
 
       {loading && (
-        <div className="text-center text-[13px] text-[#6e6e6e] py-10">{t("loading")}</div>
+        <div className="text-center text-[13px] text-codex-muted py-10">{t("loading")}</div>
       )}
       {!loading && error && (
         <div className="text-center text-[13px] text-[#e85d5d] py-10">{t("archivedLoadFailed", { error })}</div>
@@ -1972,7 +1972,7 @@ export function ArchivedPage() {
       {!loading && !error && (
         <>
           {visible.length === 0 ? (
-            <div className="ac-empty text-center text-[13px] text-[#6e6e6e] py-10">
+            <div className="ac-empty text-center text-[13px] text-codex-muted py-10">
               {groups.length === 0 ? t("noArchived") : t("noArchivedMatch")}
             </div>
           ) : (
@@ -1982,11 +1982,11 @@ export function ArchivedPage() {
                 return (
                   <div
                     key={g.project}
-                    className={`ac-group bg-[#222] border border-[#2e2e2e] rounded-xl overflow-hidden${isCollapsed ? " is-collapsed" : ""}`}
+                    className={`ac-group bg-codex-surface border border-codex-border rounded-xl overflow-hidden${isCollapsed ? " is-collapsed" : ""}`}
                   >
                     <button
                       type="button"
-                      className="ac-group-head flex items-center gap-2.5 w-full px-3.5 py-3 bg-transparent border-0 text-[#e0e0e0] text-left hover:bg-[#262626]"
+                      className="ac-group-head flex items-center gap-2.5 w-full px-3.5 py-3 bg-transparent border-0 text-codex-text text-left hover:bg-[#262626]"
                       onClick={() =>
                         setCollapsed((c) => ({ ...c, [g.project]: !c[g.project] }))
                       }
@@ -2002,7 +2002,7 @@ export function ArchivedPage() {
                         <path d="M3.5 8a2 2 0 0 1 2-2h4l2 2.3h7a2 2 0 0 1 2 2V16a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
                       </svg>
                       <span className="text-[13.5px] font-medium flex-1">{projectLabel(g.project)}</span>
-                      <span className="text-[12px] text-[#6e6e6e]">
+                      <span className="text-[12px] text-codex-muted">
                         {t("archivedCount", { n: g.chats.length })}
                       </span>
                       <svg
@@ -2024,8 +2024,8 @@ export function ArchivedPage() {
                             className="flex items-center gap-3 px-3.5 py-2.5 border-t border-[#2a2a2a]"
                           >
                             <div className="flex-1 min-w-0">
-                              <div className="text-[13px] text-[#e8e8e8] truncate">{c.title}</div>
-                              <div className="text-[11.5px] text-[#6e6e6e] mt-0.5">{c.time}</div>
+                              <div className="text-[13px] text-codex-text truncate">{c.title}</div>
+                              <div className="text-[11.5px] text-codex-muted mt-0.5">{c.time}</div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               <button
@@ -2034,7 +2034,7 @@ export function ArchivedPage() {
                                 aria-label={t("delete")}
                                 disabled={busyKey === c.key}
                                 onClick={() => void deleteChat(c.key)}
-                                className="w-7 h-7 inline-flex items-center justify-center rounded-md text-[#888] hover:bg-[#333] hover:text-[#f87171] disabled:opacity-40"
+                                className="w-7 h-7 inline-flex items-center justify-center rounded-md text-codex-muted hover:bg-[#333] hover:text-[#f87171] disabled:opacity-40"
                               >
                                 <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
                                   <path d="M3 6h18" />

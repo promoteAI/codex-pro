@@ -187,23 +187,23 @@ export function SettingsOverlay() {
       aria-modal="true"
       aria-label={t("title")}
     >
-      <aside className="settings-sidebar w-[220px] shrink-0 border-r border-codex-border flex flex-col bg-[#1a1a1a]">
+      <aside className="settings-sidebar w-[220px] shrink-0 border-r border-codex-border flex flex-col bg-codex-sidebar">
         <button
           type="button"
           onClick={close}
-          className="flex items-center gap-1.5 px-4 py-3 text-[13px] text-[#888] border-b border-[#262626] hover:bg-codex-hover hover:text-[#c0c0c0]"
+          className="flex items-center gap-1.5 px-4 py-3 text-[13px] text-codex-muted border-b border-codex-border hover:bg-codex-hover hover:text-codex-text-secondary"
         >
           <BackChevron />
           {t("back")}
         </button>
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#262626]">
+        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-codex-border">
           <SearchIcon />
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder={t("search")}
             aria-label={t("search")}
-            className="bg-transparent outline-none text-[12.5px] text-[#c0c0c0] placeholder:text-[#6a6a6a] w-full py-0.5"
+            className="bg-transparent outline-none text-[12.5px] text-codex-text-secondary placeholder:text-codex-muted w-full py-0.5"
           />
         </div>
         <nav className="settings-nav flex-1 overflow-y-auto py-2">
@@ -212,7 +212,7 @@ export function SettingsOverlay() {
             if (items.length === 0) return null;
             return (
               <div key={group}>
-                <div className="px-4 pt-2 pb-1 text-[11px] text-[#6f6f6f] font-medium tracking-[0.04em]">
+                <div className="px-4 pt-2 pb-1 text-[11px] text-codex-muted font-medium tracking-[0.04em]">
                   {t(`group.${group}`)}
                 </div>
                 {items.map(({ id }) => (
@@ -222,8 +222,8 @@ export function SettingsOverlay() {
                     onClick={() => setSettingsSection(id)}
                     className={`w-[calc(100%-8px)] mx-1 flex items-center gap-2.5 pl-4 pr-3 py-[7px] rounded-[5px] text-[13px] relative my-px ${
                       section === id
-                        ? "bg-codex-active text-[#e8e8e8] font-medium before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-sm before:bg-[#e8e8e8]"
-                        : "text-[#909090] hover:bg-codex-hover hover:text-[#c0c0c0]"
+                        ? "bg-codex-active text-codex-text font-medium before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-sm before:bg-codex-text"
+                        : "text-codex-text-secondary hover:bg-codex-hover hover:text-codex-text"
                     }`}
                   >
                     {SETTINGS_ICONS[id]}
@@ -245,7 +245,7 @@ export function SettingsOverlay() {
           <div className="flex-1 min-h-0 overflow-auto p-7 px-[clamp(16px,4vw,40px)] pb-12">
             {showAdminChrome || !NAV_IDS.has(section) ? (
               <>
-                <h2 className="text-[22px] font-semibold text-[#f0f0f0] tracking-tight m-0 mb-1.5">{t(section)}</h2>
+                <h2 className="text-[22px] font-semibold text-codex-text tracking-tight m-0 mb-1.5">{t(section)}</h2>
                 {adminSubKey && (
                   <p className="text-[12.5px] text-codex-muted leading-relaxed m-0 mb-5 max-w-[560px]">{t(adminSubKey)}</p>
                 )}

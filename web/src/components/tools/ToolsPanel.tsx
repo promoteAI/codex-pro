@@ -64,11 +64,11 @@ function Hub() {
             key={type}
             type="button"
             onClick={() => openTool(type)}
-            className="flex items-center gap-3 px-3.5 py-3 bg-[#222] border border-codex-border rounded-[10px] text-[#d8d8d8] hover:bg-codex-active hover:border-[#343434] text-left"
+            className="flex items-center gap-3 px-3.5 py-3 bg-codex-elevated border border-codex-border rounded-[10px] text-codex-text-secondary hover:bg-codex-active hover:border-codex-border-strong text-left"
           >
             <Icon size={18} className="shrink-0 opacity-90" />
             <span className="flex-1 text-[13.5px] font-medium">{label}</span>
-            <kbd className="text-[11.5px] text-[#8a8a8a] bg-[#1a1a1a] border border-[#333] rounded-md px-2 py-0.5 font-mono">
+            <kbd className="text-[11.5px] text-codex-muted bg-codex-surface border border-codex-border rounded-md px-2 py-0.5 font-mono">
               {kbd}
             </kbd>
           </button>
@@ -79,10 +79,10 @@ function Hub() {
 }
 
 function colorDiffLine(line: string) {
-  if (line.startsWith("+") && !line.startsWith("+++")) return "text-[#3fb950]";
-  if (line.startsWith("-") && !line.startsWith("---")) return "text-[#f85149]";
-  if (line.startsWith("@@")) return "text-[#79c0ff]";
-  return "text-[#c8c8c8]";
+  if (line.startsWith("+") && !line.startsWith("+++")) return "text-[#2f7d3d]";
+  if (line.startsWith("-") && !line.startsWith("---")) return "text-[#c0392b]";
+  if (line.startsWith("@@")) return "text-[#2c5aa0]";
+  return "text-codex-text-secondary";
 }
 
 interface ReviewDiffFile {
@@ -154,10 +154,10 @@ function ReviewPane() {
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex items-center gap-2.5 px-3 py-2 border-b border-codex-border flex-wrap">
         <span className="text-[12px] text-codex-muted">
-          {t("reviewBranch")} <span className="text-[#d8d8d8] font-medium">{data?.branch ?? "—"}</span>
+          {t("reviewBranch")} <span className="text-codex-text font-medium">{data?.branch ?? "—"}</span>
         </span>
         <span className="text-[12px] text-codex-muted">
-          {t("reviewBase")} <span className="text-[#d8d8d8] font-medium">{data?.base ?? "—"}</span>
+          {t("reviewBase")} <span className="text-codex-text font-medium">{data?.base ?? "—"}</span>
         </span>
         <span className="ml-auto text-[12px] font-mono">
           <span className="text-[#3fb950]">+{totalAdd.toLocaleString()}</span>{" "}
@@ -166,7 +166,7 @@ function ReviewPane() {
         <button
           type="button"
           onClick={() => void load()}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[12px] text-[#a8a8a8] hover:bg-[#252525]"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[12px] text-codex-text-secondary hover:bg-codex-active"
           aria-label={t("reviewRefresh")}
         >
           <RefreshCw size={12} />
@@ -174,9 +174,9 @@ function ReviewPane() {
       </div>
       <div className="flex-1 min-h-0 flex">
         <div className="flex-1 min-w-0 flex flex-col border-r border-codex-border">
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-[#262626] text-[12.5px]">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-codex-border text-[12.5px]">
             <FileCode2 size={14} className="text-codex-muted shrink-0" />
-            <span className="truncate text-[#e0e0e0] font-medium">{active?.path ?? "—"}</span>
+            <span className="truncate text-codex-text font-medium">{active?.path ?? "—"}</span>
             {active && (
               <span className="ml-auto font-mono text-[11.5px] shrink-0">
                 <span className="text-[#3fb950]">+{active.additions}</span>{" "}
@@ -185,11 +185,11 @@ function ReviewPane() {
             )}
           </div>
           {loading ? (
-            <div className="flex-1 flex items-center justify-center text-[#666] text-[13px]">
+            <div className="flex-1 flex items-center justify-center text-codex-muted text-[13px]">
               {t("reviewLoading")}
             </div>
           ) : error ? (
-            <div className="flex-1 flex items-center justify-center text-[#666] text-[13px]">
+            <div className="flex-1 flex items-center justify-center text-codex-muted text-[13px]">
               {t("reviewError")}
             </div>
           ) : !active ? (
@@ -206,13 +206,13 @@ function ReviewPane() {
             </pre>
           )}
         </div>
-        <aside className="w-[min(200px,38%)] flex flex-col min-h-0 bg-[#1a1a1a]">
-          <div className="m-2.5 mb-2 flex items-center gap-2 px-2.5 py-1.5 bg-[#222] border border-[#2e2e2e] rounded-lg">
+        <aside className="w-[min(200px,38%)] flex flex-col min-h-0">
+          <div className="m-2.5 mb-2 flex items-center gap-2 px-2.5 py-1.5 bg-codex-elevated border border-codex-border rounded-lg">
             <input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder={t("reviewFilter")}
-              className="w-full bg-transparent outline-none text-[12px] text-[#c8c8c8]"
+              className="w-full bg-transparent outline-none text-[12px] text-codex-text"
               aria-label={t("reviewFilter")}
             />
           </div>
@@ -226,7 +226,7 @@ function ReviewPane() {
                 type="button"
                 onClick={() => setActivePath(f.path)}
                 className={`w-full text-left px-2 py-1.5 rounded-md text-[12px] mb-0.5 ${
-                  activePath === f.path ? "bg-[#2e2e2e] text-[#f0f0f0]" : "text-[#c4c4c4] hover:bg-[#252525]"
+                  activePath === f.path ? "bg-codex-active text-codex-text" : "text-codex-text-secondary hover:bg-codex-hover"
                 }`}
               >
                 <div className="truncate">{f.path.split("/").pop()}</div>
@@ -316,10 +316,10 @@ function FilesPane() {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Breadcrumb bar: project / file + more (⋯) menu + open external */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#262626] bg-codex-panel">
-        <span className="text-[12.5px] text-[#8a8a8a]">{t("filesProject")}</span>
-        <span className="text-[#555]" aria-hidden>›</span>
-        <span className="inline-flex items-center gap-1.5 text-[12.5px] text-[#e0e0e0] font-medium min-w-0">
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-codex-border bg-codex-panel">
+        <span className="text-[12.5px] text-codex-muted">{t("filesProject")}</span>
+        <span className="text-codex-muted" aria-hidden>›</span>
+        <span className="inline-flex items-center gap-1.5 text-[12.5px] text-codex-text font-medium min-w-0">
           <FileCode2 size={13} className="shrink-0 opacity-80" />
           <span className="truncate">{resolvedName || "—"}</span>
         </span>
@@ -331,7 +331,7 @@ function FilesPane() {
             aria-expanded={moreOpen}
             aria-label={t("filesMore")}
             title={t("filesMore")}
-            className="w-7 h-7 inline-flex items-center justify-center rounded text-[#888] hover:bg-[#2a2a2a] hover:text-[#ddd]"
+            className="w-7 h-7 inline-flex items-center justify-center rounded text-codex-muted hover:bg-codex-active hover:text-codex-text"
           >
             <span className="flex items-center gap-0.5">
               <span className="w-1 h-1 rounded-full bg-current" />
@@ -341,7 +341,7 @@ function FilesPane() {
           </button>
           {moreOpen && (
             <div
-              className="fixed z-[120] w-[180px] p-1 bg-[#2c2c2c] border border-[#3a3a3a] rounded-lg shadow-[0_10px_28px_rgba(0,0,0,.5)]"
+              className="fixed z-[120] w-[180px] p-1 bg-codex-elevated border border-codex-border-strong rounded-lg shadow-[0_10px_28px_rgba(0,0,0,.5)]"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="px-2.5 py-1.5 text-[11px] text-codex-muted">
@@ -350,29 +350,29 @@ function FilesPane() {
               <button
                 type="button"
                 onClick={() => { setView("preview"); setMoreOpen(false); }}
-                className={`block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] ${view === "preview" ? "bg-[#3a3a3a] text-[#f0f0f0]" : "text-[#e8e8e8] hover:bg-[#3a3a3a]"}`}
+                className={`block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] ${view === "preview" ? "bg-codex-active text-codex-text" : "text-codex-text hover:bg-codex-active"}`}
               >
                 {t("filesPreview")}
               </button>
               <button
                 type="button"
                 onClick={() => { setView("source"); setMoreOpen(false); }}
-                className={`block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] ${view === "source" ? "bg-[#3a3a3a] text-[#f0f0f0]" : "text-[#e8e8e8] hover:bg-[#3a3a3a]"}`}
+                className={`block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] ${view === "source" ? "bg-codex-active text-codex-text" : "text-codex-text hover:bg-codex-active"}`}
               >
                 {t("filesSource")}
               </button>
-              <div className="h-px bg-[#3a3a3a] my-1" />
+              <div className="h-px bg-codex-active my-1" />
               <button
                 type="button"
                 onClick={handleCopyAbs}
-                className="block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
+                className="block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] text-codex-text hover:bg-codex-active"
               >
                 {t("filesCopyAbs")}
               </button>
               <button
                 type="button"
                 onClick={handleCopyRel}
-                className="block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
+                className="block w-full px-2.5 py-1.5 rounded-md text-left text-[12.5px] text-codex-text hover:bg-codex-active"
               >
                 {t("filesCopyRel")}
               </button>
@@ -381,7 +381,7 @@ function FilesPane() {
         </div>
         <button
           type="button"
-          className="w-7 h-7 inline-flex items-center justify-center rounded text-[#888] hover:bg-[#2a2a2a] hover:text-[#ddd]"
+          className="w-7 h-7 inline-flex items-center justify-center rounded text-codex-muted hover:bg-codex-active hover:text-codex-text"
           title={t("filesOpen")}
           aria-label={t("filesOpen")}
           onClick={handleOpenExt}
@@ -390,19 +390,19 @@ function FilesPane() {
         </button>
       </div>
       {loading ? (
-        <div className="flex-1 flex items-center justify-center text-[#666] text-[13px]">
+        <div className="flex-1 flex items-center justify-center text-codex-muted text-[13px]">
           {t("emptyFiles")}…
         </div>
       ) : error ? (
-        <div className="flex-1 flex items-center justify-center text-[#666] text-[13px]">
+        <div className="flex-1 flex items-center justify-center text-codex-muted text-[13px]">
           {error}
         </div>
       ) : view === "preview" && isMd && fileContent ? (
-        <div className="flex-1 overflow-auto min-h-0 px-5 py-5 text-[14px] leading-relaxed text-[#d8d8d8]">
+        <div className="flex-1 overflow-auto min-h-0 px-5 py-5 text-[14px] leading-relaxed text-codex-text">
           <Markdown>{fileContent.content}</Markdown>
         </div>
       ) : view === "preview" && !isMd && fileContent ? (
-        <div className="flex-1 overflow-auto min-h-0 px-4 py-3 text-[13.5px] leading-relaxed text-[#d8d8d8]">
+        <div className="flex-1 overflow-auto min-h-0 px-4 py-3 text-[13.5px] leading-relaxed text-codex-text">
           <pre className="whitespace-pre-wrap font-sans">{fileContent.content}</pre>
         </div>
       ) : (
@@ -434,11 +434,11 @@ function BrowserPane() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-codex-border bg-[#1a1a1a]">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-codex-border bg-codex-panel">
         <button
           type="button"
           disabled
-          className="w-7 h-7 inline-flex items-center justify-center rounded-md text-[#666]"
+          className="w-7 h-7 inline-flex items-center justify-center rounded-md text-codex-muted"
           aria-label={t("browserBack")}
         >
           <ChevronLeft size={16} />
@@ -446,7 +446,7 @@ function BrowserPane() {
         <button
           type="button"
           disabled
-          className="w-7 h-7 inline-flex items-center justify-center rounded-md text-[#666]"
+          className="w-7 h-7 inline-flex items-center justify-center rounded-md text-codex-muted"
           aria-label={t("browserForward")}
         >
           <ChevronRight size={16} />
@@ -454,7 +454,7 @@ function BrowserPane() {
         <button
           type="button"
           onClick={() => pageUrl && navigate()}
-          className="w-7 h-7 inline-flex items-center justify-center rounded-md text-[#888] hover:bg-[#2a2a2a]"
+          className="w-7 h-7 inline-flex items-center justify-center rounded-md text-codex-muted hover:bg-codex-active"
           aria-label={t("browserReload")}
         >
           <RefreshCw size={14} />
@@ -470,7 +470,7 @@ function BrowserPane() {
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
             placeholder={t("browserUrlPlaceholder")}
-            className="w-full bg-[#222] border border-[#2e2e2e] rounded-lg px-3 py-1.5 text-[12.5px] outline-none focus:border-[#3a3a3a]"
+            className="w-full bg-codex-elevated border border-codex-border rounded-lg px-3 py-1.5 text-[12.5px] outline-none focus:border-codex-border-strong"
             aria-label={t("browserUrlPlaceholder")}
             autoComplete="off"
             spellCheck={false}
@@ -480,16 +480,16 @@ function BrowserPane() {
       <div className="flex-1 overflow-auto flex">
         {!pageUrl ? (
           <div className="m-auto text-center max-w-[320px] px-6 py-8">
-            <Globe size={40} className="mx-auto mb-3 text-[#8a8a8a] opacity-80" />
-            <p className="text-[18px] font-semibold text-[#e8e8e8] mb-2">{t("browserEmptyTitle")}</p>
-            <p className="text-[12.5px] text-[#6e6e6e] leading-relaxed">{t("browserEmptySub")}</p>
+            <Globe size={40} className="mx-auto mb-3 text-codex-muted opacity-80" />
+            <p className="text-[18px] font-semibold text-codex-text mb-2">{t("browserEmptyTitle")}</p>
+            <p className="text-[12.5px] text-codex-muted leading-relaxed">{t("browserEmptySub")}</p>
           </div>
         ) : (
           <div className="m-auto w-full max-w-[640px] px-6 py-8">
-            <div className="bg-[#222] border border-[#2e2e2e] rounded-xl p-5">
+            <div className="bg-codex-elevated border border-codex-border rounded-xl p-5">
               <p className="text-[12px] text-[#6eb6ff] mb-2.5 break-all">{pageUrl}</p>
-              <h2 className="text-xl font-semibold text-[#f0f0f0] mb-2.5">{t("browserPageTitle")}</h2>
-              <p className="text-[13.5px] leading-relaxed text-[#b8b8b8]">{t("browserPageBody")}</p>
+              <h2 className="text-xl font-semibold text-codex-text mb-2.5">{t("browserPageTitle")}</h2>
+              <p className="text-[13.5px] leading-relaxed text-codex-text-secondary">{t("browserPageBody")}</p>
             </div>
           </div>
         )}
@@ -611,14 +611,14 @@ function SidechatPane() {
         <ChatThread selectors={sideSelectors} />
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-4 min-h-0 overflow-auto select-none">
-          <MessageSquarePlus size={28} className="mb-3 text-[#5a5a5a] opacity-70" aria-hidden />
-          <p className="text-[15px] font-medium text-[#d4d4d4] mb-1.5">{t("emptySidechat")}</p>
-          <p className="text-[12.5px] text-[#6e6e6e] text-center leading-relaxed max-w-[260px]">{t("sidechatSub")}</p>
+          <MessageSquarePlus size={28} className="mb-3 text-codex-muted opacity-70" aria-hidden />
+          <p className="text-[15px] font-medium text-codex-text mb-1.5">{t("emptySidechat")}</p>
+          <p className="text-[12.5px] text-codex-muted text-center leading-relaxed max-w-[260px]">{t("sidechatSub")}</p>
         </div>
       )}
 
       {historyError && (
-        <div className="mx-3.5 mt-2 px-3 py-2 rounded-lg bg-[#2a1212] text-[#ff8f8f] text-[12.5px] border border-[#4a2a2a]">
+        <div className="mx-3.5 mt-2 px-3 py-2 rounded-lg bg-codex-danger/10 text-codex-danger text-[12.5px] border border-codex-danger/20">
           {t("sidechatError", { error: historyError })}
         </div>
       )}
@@ -650,7 +650,7 @@ function SidechatPane() {
         />
         {/* / slash-command menu */}
         {draft.startsWith("/") && !draft.includes(" ") && (
-          <div className="absolute left-3 bottom-[calc(100%-6px)] w-[min(520px,calc(100vw-24px))] max-h-[min(420px,55vh)] overflow-auto p-2 pl-2.5 bg-[#1c1c1c] border border-[#333] rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30">
+          <div className="absolute left-3 bottom-[calc(100%-6px)] w-[min(520px,calc(100vw-24px))] max-h-[min(420px,55vh)] overflow-auto p-2 pl-2.5 bg-codex-elevated border border-codex-border-strong rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30">
             {slashMatches.commands.length > 0 && (
               <>
                 <div className="px-2.5 py-1.5 text-[12px] text-[#7dd3fc] font-medium">{tc("slashCommands")}</div>
@@ -662,10 +662,10 @@ function SidechatPane() {
                       setDraft(`/${c.label} `);
                       taRef.current?.focus();
                     }}
-                    className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-[#2e2e2e]"
+                    className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-codex-active"
                   >
-                    <span className="text-[13px] text-[#e8e8e8] font-medium whitespace-nowrap">/{c.label}</span>
-                    <span className="flex-1 min-w-0 text-[12px] text-[#8a8a8a] truncate">{c.hint}</span>
+                    <span className="text-[13px] text-codex-text font-medium whitespace-nowrap">/{c.label}</span>
+                    <span className="flex-1 min-w-0 text-[12px] text-codex-muted truncate">{c.hint}</span>
                   </button>
                 ))}
               </>
@@ -681,10 +681,10 @@ function SidechatPane() {
                       setDraft(`/${c.label} `);
                       taRef.current?.focus();
                     }}
-                    className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-[#2e2e2e]"
+                    className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-codex-active"
                   >
-                    <span className="text-[13px] text-[#e8e8e8] font-medium whitespace-nowrap">/{c.label}</span>
-                    <span className="flex-1 min-w-0 text-[12px] text-[#8a8a8a] truncate">{c.hint}</span>
+                    <span className="text-[13px] text-codex-text font-medium whitespace-nowrap">/{c.label}</span>
+                    <span className="flex-1 min-w-0 text-[12px] text-codex-muted truncate">{c.hint}</span>
                   </button>
                 ))}
               </>
@@ -697,7 +697,7 @@ function SidechatPane() {
             ref={addBtnRef}
             type="button"
             onClick={() => setMenu((cur) => (cur === "add" ? null : "add"))}
-            className="w-7 h-7 rounded-md inline-flex items-center justify-center text-[#aaa] hover:bg-codex-active"
+            className="w-7 h-7 rounded-md inline-flex items-center justify-center text-codex-muted hover:bg-codex-active"
             aria-label={t("sidechatAdd")}
             title={t("sidechatAdd")}
             aria-haspopup="menu"
@@ -709,7 +709,7 @@ function SidechatPane() {
             type="button"
             onClick={() => setMenu((cur) => (cur === "perm" ? null : "perm"))}
             className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] ${
-              perm === "full" ? "text-codex-warn" : "text-[#c0c0c0]"
+              perm === "full" ? "text-codex-warn" : "text-codex-muted"
             } hover:bg-codex-active`}
             aria-label={permLabel}
             aria-haspopup="menu"
@@ -722,13 +722,13 @@ function SidechatPane() {
           <button
             type="button"
             onClick={() => setMenu((cur) => (cur === "model" ? null : "model"))}
-            className="inline-flex items-center gap-1.5 text-[12.5px] text-[#a0a0a0] px-2 py-1 rounded-md hover:bg-codex-active hover:text-[#d8d8d8]"
+            className="inline-flex items-center gap-1.5 text-[12.5px] text-codex-muted px-2 py-1 rounded-md hover:bg-codex-active hover:text-codex-text-secondary"
             aria-label={tc("model")}
             aria-haspopup="menu"
             aria-expanded={menu === "model"}
           >
             <span>{model}</span>
-            <span className="text-[11px] text-[#666] bg-[#252525] px-1.5 py-0.5 rounded">{effortLabel}</span>
+            <span className="text-[11px] text-codex-muted bg-codex-active px-1.5 py-0.5 rounded">{effortLabel}</span>
           </button>
           <button
             type="button"
@@ -738,9 +738,9 @@ function SidechatPane() {
             title={typing ? tc("stop") : tc("send")}
             className={`w-8 h-8 rounded-full inline-flex items-center justify-center ${
               !draft.trim() && !typing
-                ? "bg-codex-border text-[#666]"
+                ? "bg-codex-border text-codex-muted"
                 : typing
-                  ? "bg-[#3a3a3a] text-[#e8e8e8] hover:bg-[#454545]"
+                  ? "bg-codex-active text-codex-text hover:bg-codex-hover"
                   : "bg-codex-accent text-white hover:bg-codex-accent-hover"
             }`}
           >
@@ -748,7 +748,7 @@ function SidechatPane() {
           </button>
 
           {menu === "perm" && (
-            <div className="absolute left-2 bottom-[calc(100%+4px)] w-[320px] p-2 bg-codex-surface border border-[#3a3a3a] rounded-[10px] shadow-xl z-30">
+            <div className="absolute left-2 bottom-[calc(100%+4px)] w-[320px] p-2 bg-codex-surface border border-codex-border-strong rounded-[10px] shadow-xl z-30">
               <div className="text-[12px] text-codex-muted px-2 py-1 mb-1">{tc("permTitle")}</div>
               {permOptions.map(([id, labelKey, descKey]) => (
                 <button
@@ -763,7 +763,7 @@ function SidechatPane() {
                     setMenu(null);
                   }}
                   className={`w-full text-left px-2.5 py-2 rounded-md ${
-                    perm === id ? "bg-[#353535]" : "hover:bg-[#353535]"
+                    perm === id ? "bg-codex-active" : "hover:bg-codex-active"
                   }`}
                 >
                   <div className={`text-[13px] font-medium ${id === "full" ? "text-codex-warn" : "text-codex-text"}`}>
@@ -776,7 +776,7 @@ function SidechatPane() {
           )}
 
           {menu === "model" && (
-            <div className="absolute right-10 bottom-[calc(100%+4px)] w-[300px] p-2 bg-codex-surface border border-[#3a3a3a] rounded-[10px] shadow-xl z-30">
+            <div className="absolute right-10 bottom-[calc(100%+4px)] w-[300px] p-2 bg-codex-surface border border-codex-border-strong rounded-[10px] shadow-xl z-30">
               <div className="flex items-start justify-between gap-2 px-2 py-1">
                 <div>
                   <div className="text-[12px] text-codex-muted">{effortLabel}</div>
@@ -785,7 +785,7 @@ function SidechatPane() {
                 <button
                   type="button"
                   onClick={() => setEffort(3)}
-                  className="p-1 rounded-md text-codex-muted hover:bg-[#353535] hover:text-codex-text"
+                  className="p-1 rounded-md text-codex-muted hover:bg-codex-active hover:text-codex-text"
                   aria-label={tc("resetEffort")}
                   title={tc("resetEffort")}
                 >
@@ -833,7 +833,7 @@ function SidechatPane() {
                           setMenu(null);
                         }}
                         className={`w-full text-left px-2 py-1.5 rounded text-[13px] ${
-                          model === m ? "bg-[#353535]" : "hover:bg-[#353535]"
+                          model === m ? "bg-codex-active" : "hover:bg-codex-active"
                         }`}
                       >
                         {m}
@@ -872,15 +872,15 @@ function TabPicker({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed z-[130] w-[min(320px,calc(100vw-24px))] max-h-[min(420px,70vh)] flex flex-col bg-[#2a2a2a] border border-[#3a3a3a] rounded-xl shadow-[0_14px_36px_rgba(0,0,0,.55)] overflow-hidden"
+      className="fixed z-[130] w-[min(320px,calc(100vw-24px))] max-h-[min(420px,70vh)] flex flex-col bg-codex-elevated border border-codex-border-strong rounded-xl shadow-[0_14px_36px_rgba(0,0,0,.55)] overflow-hidden"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="px-3 py-2 border-b border-[#353535] text-[12px] text-[#8a8a8a]">
+      <div className="px-3 py-2 border-b border-codex-border text-[12px] text-codex-muted">
         {t("picker")}
       </div>
       <div className="flex-1 min-h-0 overflow-auto p-1.5">
         {sessionTabs.length === 0 && (
-          <div className="px-3 py-4 text-center text-[12.5px] text-[#777]">{t("emptyTabs")}</div>
+          <div className="px-3 py-4 text-center text-[12.5px] text-codex-muted">{t("emptyTabs")}</div>
         )}
         {sessionTabs.map((tab) => {
           const Icon = TAB_ICONS[tab.type];
@@ -888,7 +888,7 @@ function TabPicker({ onClose }: { onClose: () => void }) {
             <div
               key={tab.id}
               className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-[13px] ${
-                activeTabId === tab.id ? "bg-[#3a3a3a] text-[#f0f0f0]" : "text-[#e0e0e0] hover:bg-[#3a3a3a]"
+                activeTabId === tab.id ? "bg-codex-active text-codex-text" : "text-codex-text-secondary hover:bg-codex-active"
               }`}
             >
               <Icon size={15} className="shrink-0 opacity-90" />
@@ -905,7 +905,7 @@ function TabPicker({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 onClick={() => closeTab(tab.id)}
-                className="w-5 h-5 inline-flex items-center justify-center rounded text-[#777] hover:bg-[#4a4a4a] hover:text-[#ddd] shrink-0"
+                className="w-5 h-5 inline-flex items-center justify-center rounded text-codex-muted hover:bg-codex-active hover:text-codex-text shrink-0"
                 aria-label={t("close")}
               >
                 <X size={11} />
@@ -972,7 +972,7 @@ export function ToolsPanel() {
                 aria-expanded={pickerOpen}
                 aria-label={t("picker")}
                 title={t("picker")}
-                className="w-6 h-6 m-1.5 inline-flex items-center justify-center rounded text-[#777] hover:bg-[#333] hover:text-[#ddd]"
+                className="w-6 h-6 m-1.5 inline-flex items-center justify-center rounded text-codex-muted hover:bg-codex-active hover:text-codex-text"
               >
                 <ChevronDown size={14} />
               </button>
@@ -984,7 +984,7 @@ export function ToolsPanel() {
               <button
                 type="button"
                 onClick={showHub}
-                className="px-2.5 py-1.5 text-[12.5px] text-[#8a8a8a] hover:text-[#dedede] shrink-0"
+                className="px-2.5 py-1.5 text-[12.5px] text-codex-muted hover:text-codex-text-secondary shrink-0"
               >
                 {t("hubTitle")}
               </button>
@@ -1000,8 +1000,8 @@ export function ToolsPanel() {
                   onContextMenu={(e) => openTabMenu(tab.id, e)}
                   className={`inline-flex items-center gap-1 max-w-[200px] min-w-0 px-2 py-1.5 text-[12.5px] border-t-2 ${
                     isActive
-                      ? "bg-[#2e2e2e] text-[#f0f0f0] border-t-[#4c8dff]"
-                      : "border-t-transparent text-[#9a9a9a] hover:bg-[#252525] hover:text-[#d0d0d0]"
+                      ? "bg-codex-active text-codex-text border-t-codex-accent"
+                      : "border-t-transparent text-codex-muted hover:bg-codex-hover hover:text-codex-text-secondary"
                   }`}
                 >
                   <Icon size={14} className="shrink-0" />
@@ -1034,13 +1034,13 @@ export function ToolsPanel() {
               aria-expanded={hubMenuOpen}
               title={t("newTool")}
               aria-label={t("newTool")}
-              className="w-7 h-7 m-1.5 inline-flex items-center justify-center rounded text-[#777] hover:bg-[#333] hover:text-[#ddd] shrink-0"
+              className="w-7 h-7 m-1.5 inline-flex items-center justify-center rounded text-codex-muted hover:bg-codex-active hover:text-codex-text shrink-0"
             >
               <Plus size={14} />
             </button>
             {hubMenuOpen && (
               <div
-                className="fixed z-[120] min-w-[168px] p-1 bg-[#2c2c2c] border border-[#3a3a3a] rounded-lg shadow-[0_10px_28px_rgba(0,0,0,.5)]"
+                className="fixed z-[120] min-w-[168px] p-1 bg-codex-elevated border border-codex-border-strong rounded-lg shadow-[0_10px_28px_rgba(0,0,0,.5)]"
                 onClick={(e) => e.stopPropagation()}
               >
                 {(["review", "terminal", "browser", "sidechat"] as const).map((type) => {
@@ -1052,7 +1052,7 @@ export function ToolsPanel() {
                         openTool(type);
                         setHubMenuOpen(false);
                       }}
-                      className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
+                      className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-codex-text hover:bg-codex-active"
                     >
                       {t(type)}
                     </button>
@@ -1066,7 +1066,7 @@ export function ToolsPanel() {
 
           {menuTabId && sessionTabs.length > 0 && (
             <div
-              className="fixed z-[120] min-w-[168px] p-1 bg-[#2c2c2c] border border-[#3a3a3a] rounded-lg shadow-[0_10px_28px_rgba(0,0,0,.5)]"
+              className="fixed z-[120] min-w-[168px] p-1 bg-codex-elevated border border-codex-border-strong rounded-lg shadow-[0_10px_28px_rgba(0,0,0,.5)]"
               style={menuPos}
               onClick={(e) => e.stopPropagation()}
             >
@@ -1076,7 +1076,7 @@ export function ToolsPanel() {
                   closeOtherTabs(menuTabId);
                   setMenuTabId(null);
                 }}
-                className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
+                className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-codex-text hover:bg-codex-active"
               >
                 {t("closeOthers")}
               </button>
@@ -1086,7 +1086,7 @@ export function ToolsPanel() {
                   closeRightTabs(menuTabId);
                   setMenuTabId(null);
                 }}
-                className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
+                className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-codex-text hover:bg-codex-active"
               >
                 {t("closeRight")}
               </button>
@@ -1096,7 +1096,7 @@ export function ToolsPanel() {
                   closeTab(menuTabId);
                   setMenuTabId(null);
                 }}
-                className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-[#e8e8e8] hover:bg-[#3a3a3a]"
+                className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-codex-text hover:bg-codex-active"
               >
                 {t("close")}
               </button>

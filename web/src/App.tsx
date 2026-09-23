@@ -5,6 +5,7 @@ import { Layout } from "./components/Layout";
 import { Toaster } from "./components/Toaster";
 import { ConfirmProvider } from "./components/ConfirmDialog";
 import { useShellStore } from "./stores/shell";
+import { watchTheme } from "./lib/theme";
 
 const HomeView = lazy(() => import("./pages/HomeView").then((m) => ({ default: m.HomeView })));
 const PrView = lazy(() => import("./pages/PrView").then((m) => ({ default: m.PrView })));
@@ -54,6 +55,12 @@ function SettingsQuerySync() {
 }
 
 export function App() {
+  useEffect(() => {
+    // Live theme: re-apply whenever prefs.theme changes (e.g. on the
+    // Appearance settings page) and follow the OS scheme in "system" mode.
+    return watchTheme();
+  }, []);
+
   return (
     <BrowserRouter>
       <ConfirmProvider>

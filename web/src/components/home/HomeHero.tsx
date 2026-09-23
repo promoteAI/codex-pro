@@ -96,12 +96,12 @@ export function HomeHero({ project, setDraft }: HomeHeroProps = {}) {
           <rect fill="#5a5a5a" x="48" y="66" width="14" height="5" rx="1.5" />
         </svg>
       </div>
-      <h1 className="text-[clamp(16px,2.2vw,22px)] font-medium text-[#d4d4d4] text-center mb-6 max-w-[480px]">
+      <h1 className="text-[clamp(16px,2.2vw,22px)] font-medium text-codex-text text-center mb-6 max-w-[480px]">
         {titleText.split(resolvedProject).map((part, i, arr) =>
           i < arr.length - 1 ? (
             <span key={i}>
               {part}
-              <em className="not-italic text-[#a8a8a8]">{resolvedProject}</em>
+              <em className="not-italic text-codex-muted">{resolvedProject}</em>
             </span>
           ) : (
             <span key={i}>{part}</span>
@@ -114,10 +114,10 @@ export function HomeHero({ project, setDraft }: HomeHeroProps = {}) {
             key={key}
             type="button"
             onClick={() => resolvedSetDraft(t(full))}
-            className="flex items-start gap-3 p-3 border border-codex-border rounded-[12px] text-left hover:border-[#3a3a3a] hover:bg-[#1e1e1e]"
+            className="flex items-start gap-3 p-3 border border-codex-border rounded-[12px] text-left hover:border-codex-border-strong hover:bg-codex-hover"
           >
-            <span className="text-[#8a8a8a] shrink-0 mt-0.5">{icon}</span>
-            <p className="text-[13px] text-[#d4d4d4] leading-snug line-clamp-2 overflow-hidden">{t(key)}</p>
+            <span className="text-codex-muted shrink-0 mt-0.5">{icon}</span>
+            <p className="text-[13px] text-codex-text-secondary leading-snug line-clamp-2 overflow-hidden">{t(key)}</p>
           </button>
         ))}
       </div>

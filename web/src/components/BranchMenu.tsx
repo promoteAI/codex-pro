@@ -232,7 +232,7 @@ export function BranchMenu({
               }
             }}
             placeholder={t("createBranchPrompt")}
-            className="flex-1 bg-[#1e1e1e] border border-[#333] rounded-md px-2 py-1.5 text-[12.5px] outline-none text-[#e0e0e0]"
+            className="flex-1 bg-codex-surface border border-codex-border rounded-md px-2 py-1.5 text-[12.5px] outline-none text-codex-text"
             aria-label={t("createBranchPrompt")}
           />
           <button

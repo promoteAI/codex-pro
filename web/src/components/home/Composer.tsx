@@ -210,7 +210,7 @@ export function Composer() {
             ref={projectBtnRef}
             type="button"
             onClick={() => toggle("project")}
-            className="inline-flex items-center gap-1.5 text-[12.5px] text-[#c0c0c0] px-2 py-1 rounded-md hover:bg-[#2a2a2a]"
+            className="inline-flex items-center gap-1.5 text-[12.5px] text-codex-text-secondary px-2 py-1 rounded-md hover:bg-codex-hover"
             aria-label={t("project")}
             aria-haspopup="menu"
             aria-expanded={menu === "project"}
@@ -225,7 +225,7 @@ export function Composer() {
               ref={branchBtnRef}
               type="button"
               onClick={() => toggle("branch")}
-              className="inline-flex items-center gap-1.5 text-[12.5px] text-[#c0c0c0] px-2 py-1 rounded-md hover:bg-[#2a2a2a]"
+              className="inline-flex items-center gap-1.5 text-[12.5px] text-codex-text-secondary px-2 py-1 rounded-md hover:bg-codex-hover"
               aria-label={t("branch")}
               aria-haspopup="menu"
               aria-expanded={menu === "branch"}
@@ -282,7 +282,7 @@ export function Composer() {
           />
           {/* / slash-command menu */}
           {draft.startsWith("/") && !draft.includes(" ") && (
-            <div className="absolute left-3 bottom-[calc(100%-6px)] w-[min(520px,calc(100vw-24px))] max-h-[min(420px,55vh)] overflow-auto p-2 pl-2.5 bg-[#1c1c1c] border border-[#333] rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30">
+            <div className="absolute left-3 bottom-[calc(100%-6px)] w-[min(520px,calc(100vw-24px))] max-h-[min(420px,55vh)] overflow-auto p-2 pl-2.5 bg-codex-elevated border border-codex-border-strong rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30">
               {slashMatches.commands.length > 0 && (
                 <>
                   <div className="px-2.5 py-1.5 text-[12px] text-[#7dd3fc] font-medium">{t("slashCommands")}</div>
@@ -296,10 +296,10 @@ export function Composer() {
                         setDraft(`/${c.label} `);
                         taRef.current?.focus();
                       }}
-                      className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-[#2e2e2e]"
+                      className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-codex-active"
                     >
-                      <span className="text-[13px] text-[#e8e8e8] font-medium whitespace-nowrap">/{c.label}</span>
-                      <span className="flex-1 min-w-0 text-[12px] text-[#8a8a8a] truncate">{c.hint}</span>
+                      <span className="text-[13px] text-codex-text font-medium whitespace-nowrap">/{c.label}</span>
+                      <span className="flex-1 min-w-0 text-[12px] text-codex-muted truncate">{c.hint}</span>
                     </button>
                   ))}
                 </>
@@ -315,10 +315,10 @@ export function Composer() {
                         setDraft(`/${c.label} `);
                         taRef.current?.focus();
                       }}
-                      className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-[#2e2e2e]"
+                      className="w-full flex items-baseline gap-3 px-2.5 py-2 rounded-[10px] text-left hover:bg-codex-active"
                     >
-                      <span className="text-[13px] text-[#e8e8e8] font-medium whitespace-nowrap">/{c.label}</span>
-                      <span className="flex-1 min-w-0 text-[12px] text-[#8a8a8a] truncate">{c.hint}</span>
+                      <span className="text-[13px] text-codex-text font-medium whitespace-nowrap">/{c.label}</span>
+                      <span className="flex-1 min-w-0 text-[12px] text-codex-muted truncate">{c.hint}</span>
                     </button>
                   ))}
                 </>
@@ -332,13 +332,13 @@ export function Composer() {
             {pendingAttachments.map((att) => (
               <span
                 key={att.attachment_id}
-                className="inline-flex items-center gap-1 max-w-[200px] text-[12px] text-[#d0d0d0] bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-2 py-1"
+                className="inline-flex items-center gap-1 max-w-[200px] text-[12px] text-codex-text-secondary bg-codex-elevated border-codex-border-strong rounded-md px-2 py-1"
               >
                 <span className="truncate">{att.name}</span>
                 <button
                   type="button"
                   onClick={() => removeAttachment(att.attachment_id)}
-                  className="ml-0.5 w-4 h-4 inline-flex items-center justify-center rounded text-[#888] hover:text-[#eee] hover:bg-[#444]"
+                  className="ml-0.5 w-4 h-4 inline-flex items-center justify-center rounded text-codex-muted hover:text-codex-text hover:bg-[#444]"
                   aria-label={`${t("close")} ${att.name}`}
                 >
                   <X size={11} />
@@ -353,7 +353,7 @@ export function Composer() {
             ref={addBtnRef}
             type="button"
             onClick={() => toggle("add")}
-            className="w-7 h-7 rounded-md inline-flex items-center justify-center text-[#aaa] hover:bg-[#2a2a2a]"
+            className="w-7 h-7 rounded-md inline-flex items-center justify-center text-codex-muted hover:bg-codex-hover"
             aria-label={t("add")}
             title={t("add")}
             aria-haspopup="menu"
@@ -366,8 +366,8 @@ export function Composer() {
             type="button"
             onClick={() => toggle("perm")}
             className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] ${
-              perm === "full" ? "text-codex-warn" : "text-[#c0c0c0]"
-            } hover:bg-[#2a2a2a]`}
+              perm === "full" ? "text-codex-warn" : "text-codex-text-secondary"
+            } hover:bg-codex-hover`}
             aria-label={permLabel}
           >
             {perm === "full" ? (
@@ -390,8 +390,8 @@ export function Composer() {
           {showGoalBtn && (
             <button
               type="button"
-              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] hover:bg-[#2a2a2a] ${
-                planMode ? "text-[#c8c8c8]" : "text-[#a0a0a0]"
+              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] hover:bg-codex-hover ${
+                planMode ? "text-codex-text" : "text-codex-text-secondary"
               }`}
               aria-label={planMode ? t("planMode") : t("goal")}
               onClick={() => {
@@ -413,7 +413,7 @@ export function Composer() {
                 onClick={() => toggle("ctx")}
                 aria-haspopup="dialog"
                 aria-expanded={menu === "ctx"}
-                className="h-[26px] px-2 inline-flex items-center gap-1.5 rounded-md text-[12.5px] text-[#9a9a9a] hover:bg-[#262626] hover:text-[#d8d8d8]"
+                className="h-[26px] px-2 inline-flex items-center gap-1.5 rounded-md text-[12.5px] text-codex-muted hover:bg-codex-active hover:text-codex-text-secondary"
                 title="Context Usage"
                 aria-label="Context Usage"
               >
@@ -433,30 +433,30 @@ export function Composer() {
               </button>
               {menu === "ctx" && (
                 <div
-                  className="absolute right-0 bottom-[calc(100%+6px)] w-[300px] p-3.5 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30"
+                  className="absolute right-0 bottom-[calc(100%+6px)] w-[300px] p-3.5 bg-codex-elevated border-codex-border-strong rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30"
                   role="dialog"
                   aria-label="Context Usage"
                 >
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-[14px] font-medium text-[#e8e8e8]">{t("ctxTitle")}</span>
+                    <span className="text-[14px] font-medium text-codex-text">{t("ctxTitle")}</span>
                     <button
                       type="button"
                       onClick={() => setMenu(null)}
-                      className="w-6 h-6 inline-flex items-center justify-center rounded-md text-[#888] hover:bg-[#353535] hover:text-[#eee]"
+                      className="w-6 h-6 inline-flex items-center justify-center rounded-md text-codex-muted hover:bg-codex-active hover:text-codex-text"
                       aria-label={t("ctxClose")}
                     >
                       <X size={14} />
                     </button>
                   </div>
                   <div className="flex items-baseline justify-between gap-3 mb-2.5">
-                    <span className="text-[13.5px] text-[#e0e0e0] font-medium">
+                    <span className="text-[13.5px] text-codex-text font-medium">
                       {t("ctxFull", { pct: ctxUsage.pct })}
                     </span>
-                    <span className="text-[12.5px] text-[#9a9a9a] tabular-nums whitespace-nowrap">
+                    <span className="text-[12.5px] text-codex-muted tabular-nums whitespace-nowrap">
                       ~{formatTokens(ctxUsage.used)} / {formatTokens(ctxUsage.max)} Tokens
                     </span>
                   </div>
-                  <div className="flex h-2 rounded-full overflow-hidden bg-[#1e1e1e] mb-3.5">
+                  <div className="flex h-2 rounded-full overflow-hidden bg-codex-border mb-3.5">
                     {ctxUsage.segments.map((s) => (
                       <span
                         key={s.key}
@@ -469,11 +469,11 @@ export function Composer() {
                     {ctxUsage.segments.map((s) => (
                       <div
                         key={s.key}
-                        className="flex items-center gap-2.5 py-[7px] text-[13px] text-[#d8d8d8] leading-tight"
+                        className="flex items-center gap-2.5 py-[7px] text-[13px] text-codex-text-secondary leading-tight"
                       >
                         <span className="w-2.5 h-2.5 rounded-[2.5px] flex-none" style={{ background: s.color }} />
                         <span className="flex-1 min-w-0">{s.label}</span>
-                        <span className="flex-none text-[#b0b0b0] tabular-nums">{formatTokens(s.tokens)}</span>
+                        <span className="flex-none text-codex-muted tabular-nums">{formatTokens(s.tokens)}</span>
                       </div>
                     ))}
                   </div>
@@ -485,11 +485,11 @@ export function Composer() {
           <button
             type="button"
             onClick={() => toggle("model")}
-            className="inline-flex items-center gap-1.5 text-[12.5px] text-[#a0a0a0] px-2 py-1 rounded-md hover:bg-[#2a2a2a] hover:text-[#d8d8d8]"
+            className="inline-flex items-center gap-1.5 text-[12.5px] text-codex-text-secondary px-2 py-1 rounded-md hover:bg-codex-hover hover:text-codex-text-secondary"
             aria-label={t("model")}
           >
             <span>{modelLabel}</span>
-            <span className="text-[11px] text-[#666] bg-[#252525] px-1.5 py-0.5 rounded">{effortLabel}</span>
+            <span className="text-[11px] text-codex-muted bg-codex-active px-1.5 py-0.5 rounded">{effortLabel}</span>
           </button>
           <button
             type="button"
@@ -501,15 +501,15 @@ export function Composer() {
               canSend
                 ? "bg-codex-accent text-white hover:bg-codex-accent-hover"
                 : typing
-                  ? "bg-[#3a3a3a] text-[#e8e8e8] hover:bg-[#454545]"
-                  : "bg-[#2a2a2a] text-[#666]"
+                  ? "bg-codex-active text-codex-text hover:bg-codex-hover"
+                  : "bg-codex-active text-codex-muted"
             }`}
           >
             {typing ? <Square size={14} /> : <ArrowUp size={16} />}
           </button>
 
           {menu === "perm" && (
-            <div className="absolute left-2 bottom-[calc(100%+4px)] w-[320px] p-2 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[10px] shadow-xl z-30">
+            <div className="absolute left-2 bottom-[calc(100%+4px)] w-[320px] p-2 bg-codex-elevated border-codex-border-strong rounded-[10px] shadow-xl z-30">
               <div className="text-[12px] text-codex-muted px-2 py-1 mb-1">{t("permTitle")}</div>
               {permOptions.map(([id, labelKey, descKey]) => (
                 <button
@@ -524,11 +524,11 @@ export function Composer() {
                     setMenu(null);
                   }}
                   className={`w-full text-left px-2.5 py-2 rounded-md ${
-                    perm === id ? "bg-[#353535]" : "hover:bg-[#353535]"
+                    perm === id ? "bg-codex-active" : "hover:bg-codex-active"
                   }`}
                 >
                   <div
-                    className={`text-[13px] font-medium ${id === "full" ? "text-codex-warn" : "text-[#e0e0e0]"}`}
+                    className={`text-[13px] font-medium ${id === "full" ? "text-codex-warn" : "text-codex-text"}`}
                   >
                     {t(labelKey)}
                   </div>
@@ -539,16 +539,16 @@ export function Composer() {
           )}
 
           {menu === "model" && (
-            <div className="absolute right-10 bottom-[calc(100%+4px)] w-[300px] p-2 bg-[#2a2a2a] border border-[#3a3a3a] rounded-[10px] shadow-xl z-30">
+            <div className="absolute right-10 bottom-[calc(100%+4px)] w-[300px] p-2 bg-codex-elevated border-codex-border-strong rounded-[10px] shadow-xl z-30">
               <div className="flex items-start justify-between gap-2 px-2 py-1">
                 <div>
                   <div className="text-[12px] text-codex-muted">{effortLabel}</div>
-                  <div className="text-[13px] text-[#e0e0e0] font-medium">{modelLabel}</div>
+                  <div className="text-[13px] text-codex-text font-medium">{modelLabel}</div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setEffort(3)}
-                  className="p-1 rounded-md text-codex-muted hover:bg-[#353535] hover:text-[#e0e0e0]"
+                  className="p-1 rounded-md text-codex-muted hover:bg-codex-active hover:text-codex-text"
                   aria-label={t("resetEffort")}
                   title={t("resetEffort")}
                 >
@@ -579,7 +579,7 @@ export function Composer() {
                 value={modelQuery}
                 onChange={(e) => setModelQuery(e.target.value)}
                 placeholder={t("searchModel")}
-                className="w-full bg-[#1e1e1e] border border-[#333] rounded-md px-2 py-1.5 text-[12.5px] mb-1 outline-none"
+                className="w-full bg-codex-surface border border-codex-border rounded-md px-2 py-1.5 text-[12.5px] mb-1 outline-none"
               />
               <div className="max-h-40 overflow-auto">
                 {providersLoaded && !availableModels ? (
@@ -596,7 +596,7 @@ export function Composer() {
                           setMenu(null);
                         }}
                         className={`w-full text-left px-2 py-1.5 rounded text-[13px] ${
-                          model === m ? "bg-[#353535]" : "hover:bg-[#353535]"
+                          model === m ? "bg-codex-active" : "hover:bg-codex-active"
                         }`}
                       >
                         {m}

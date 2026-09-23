@@ -124,7 +124,7 @@ function ConfirmDialog({
           <button
             ref={cancelRef}
             onClick={() => onSettle(false)}
-            className="px-3 py-1.5 rounded text-sm bg-[#2a2a2a] hover:bg-[#353535] text-codex-text"
+            className="px-3 py-1.5 rounded text-sm bg-codex-active hover:bg-codex-hover text-codex-text"
           >
             {t("cancel")}
           </button>

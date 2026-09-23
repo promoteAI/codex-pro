@@ -8,6 +8,7 @@ with live data from the agent's current environment.
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -21,18 +22,150 @@ from codex_pro.agent.proc_lifecycle import run_owned
 
 
 def _run_git(cwd: Path, args: list[str]) -> tuple[int, str]:
-    """Run a git command and return (returncode, stdout)."""
+    """Run a git command and return (returncode, stdout).
+
+    stdout is decoded as UTF-8 explicitly: git emits UTF-8, but ``run_owned``
+    with ``text=True`` decodes with the locale codec, which on a non-UTF-8
+    Windows (e.g. GBK) chokes on non-ASCII diff content and yields ``None``.
+    """
     try:
         result = run_owned(
             ["git", *args],
             cwd=str(cwd),
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
         )
-        return result.returncode, result.stdout
-    except (OSError, TimeoutError):
+        return result.returncode, result.stdout or ""
+    except (OSError, subprocess.SubprocessError):
+        # run_owned raises subprocess.TimeoutExpired on timeout (a
+        # SubprocessError, not OSError/TimeoutError), so it must be caught here
+        # to honour the graceful-degradation contract of (1, "").
         return 1, ""
+
+
+def _detect_default_branch(repo: Path) -> str:
+    """Return the repo's real default branch.
+
+    ``rev-parse --abbrev-ref HEAD`` yields the checked-out branch, which is what
+    the review pane compares against. Fall back to ``main`` only for an unborn
+    branch (no commits yet), where HEAD does not resolve to a name.
+    """
+    rc, stdout = _run_git(repo, ["rev-parse", "--abbrev-ref", "HEAD"])
+    branch = stdout.strip() if rc == 0 else ""
+    if branch and branch != "HEAD":
+        return branch
+    return "main"
+
+
+def _decode_git_path(raw: str) -> str:
+    """Decode a path taken from git's quoted/escaped diff header.
+
+    With the default ``core.quotepath=true``, git C-escapes non-ASCII and
+    special bytes as octal ``\\ooo`` and wraps the whole value in double quotes.
+    Unquoted (pure-ASCII) paths are returned unchanged. The caller strips any
+    ``b/`` prefix.
+    """
+    p = raw.strip()
+    if not (p.startswith('"') and p.endswith('"')):
+        return p
+    p = p[1:-1]
+    out = bytearray()
+    i = 0
+    while i < len(p):
+        ch = p[i]
+        if ch == "\\" and i + 1 < len(p):
+            nxt = p[i + 1]
+            if nxt == "\\":
+                out.append(ord("\\"))
+                i += 2
+            elif nxt == '"':
+                out.append(ord('"'))
+                i += 2
+            elif nxt in "01234567":
+                j = i + 1
+                oct_str = ""
+                while j < len(p) and j < i + 4 and p[j] in "01234567":
+                    oct_str += p[j]
+                    j += 1
+                out.append(int(oct_str, 8))
+                i = j
+            else:
+                # Unknown escape — keep the backslash literally.
+                out.append(ord("\\"))
+                i += 1
+        else:
+            out.extend(ch.encode("utf-8"))
+            i += 1
+    return out.decode("utf-8", errors="replace")
+
+
+def _split_diff(diff_text: str) -> list[dict]:
+    """Split a full unified diff into per-file blocks.
+
+    A ``git diff`` output groups each file behind a ``diff --git a/<p> b/<p>``
+    line. Each block carries the file path, an added/deleted line count computed
+    from the diff body, and the diff text itself, so the review pane can render
+    one file at a time. Paths are read from the ``+++ b/``/``--- a/`` headers
+    (whose value is a single token to end-of-line, so it survives spaces and
+    git's ``core.quotepath`` escaping), with ``rename to``/``---`` fallbacks for
+    merges that lack ``+++`` (deletions and pure renames). Files with no
+    parseable path are dropped.
+    """
+    blocks: list[dict] = []
+    if not diff_text.strip():
+        return blocks
+
+    current: dict | None = None
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git "):
+            if current is not None:
+                blocks.append(current)
+            current = {
+                "path": "",
+                "diff": [line],
+                "additions": 0,
+                "deletions": 0,
+                "deleted": False,
+            }
+            continue
+        if current is None:
+            continue
+        current["diff"].append(line)
+
+        if line.startswith("deleted file mode"):
+            current["deleted"] = True
+        elif line.startswith("+++ "):
+            # `+++ b/<path>` for modified/renamed files; `+++ /dev/null` marks a
+            # deletion (git prints the target name only in the diff --git header,
+            # so keep the path already set from `---` below).
+            rest = _decode_git_path(line[4:])
+            if rest != "/dev/null":
+                current["path"] = rest.removeprefix("b/")
+        elif line.startswith("--- ") and current["deleted"] and not current["path"]:
+            # Deleted files have no `+++` target; the source (`--- a/<path>`) is
+            # the file that was removed.
+            src = _decode_git_path(line[4:])
+            current["path"] = src.removeprefix("a/")
+        elif line.startswith("rename to "):
+            current["path"] = _decode_git_path(line[len("rename to "):])
+        elif line.startswith("+") and not line.startswith("+++"):
+            current["additions"] += 1
+        elif line.startswith("-") and not line.startswith("---"):
+            current["deletions"] += 1
+
+    if current is not None:
+        blocks.append(current)
+
+    result: list[dict] = []
+    for block in blocks:
+        if not block["path"]:
+            continue
+        block["diff"] = "\n".join(block["diff"])
+        result.append(block)
+    return result
 
 
 class GitAPI:
@@ -262,6 +395,56 @@ class GitAPI:
             })
 
         return web.json_response({"branches": branches, "current_branch": current_branch})
+
+    async def list_diff(self, request: web.Request) -> web.Response:
+        """Return the working-tree diff, one block per changed file.
+
+        Query params: ``path`` (repo path, defaults to the projects root) and the
+        optional ``base`` compare target (defaults to the repo's default branch).
+        ``git diff --numstat`` and unified diff are run against the base; untracked
+        files are excluded. The response is ``{base, branch, files: [{path,
+        additions, deletions, diff}]}`` so the review pane can render one file at a
+        time without re-fetching per file.
+        """
+        guard = self._guard(request, "git_diff")
+        if guard is not None:
+            return guard
+
+        repo_path = request.query.get("path", str(self._projects))
+        repo = Path(repo_path).resolve()
+        if not repo.is_dir():
+            return web.json_response({"error": "repo path not found"}, status=400)
+
+        base = request.query.get("base", "") or _detect_default_branch(repo)
+
+        # Resolve the compare target so a branch name or a full ref works. If the
+        # requested base neither exists locally nor as a remote-tracking ref, fall
+        # back to the default branch.
+        rc, _ = _run_git(repo, ["rev-parse", "--verify", base])
+        if rc != 0:
+            fallback = _detect_default_branch(repo)
+            if base != fallback:
+                rc, _ = _run_git(repo, ["rev-parse", "--verify", fallback])
+                if rc == 0:
+                    base = fallback
+            else:
+                rc = 1
+        if rc != 0:
+            return web.json_response({"error": "no comparable base branch"}, status=400)
+
+        # Current branch (may be empty for a detached HEAD or unborn branch).
+        rc, stdout = _run_git(repo, ["branch", "--show-current"])
+        branch = stdout.strip() if rc == 0 else ""
+
+        rc, diff_text = _run_git(repo, ["diff", "--no-color", "--unified=3", base])
+        if rc != 0:
+            return web.json_response({"error": "failed to compute diff"}, status=500)
+
+        return web.json_response({
+            "base": base,
+            "branch": branch or base,
+            "files": _split_diff(diff_text),
+        })
 
     async def create_branch(self, request: web.Request) -> web.Response:
         """Create and checkout a new branch in a repo."""

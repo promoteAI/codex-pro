@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
@@ -15,10 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useShellStore, type ToolPane, type SessionTab } from "../../stores/shell";
-import {
-  MOCK_DIFF,
-  MOCK_REVIEW_FILES,
-} from "../../mock/seeds";
+import { useChatStore } from "../../stores/chat";
 import { apiFetch } from "../../lib/api";
 import { Markdown } from "../../components/home/markdown";
 
@@ -68,38 +65,91 @@ function colorDiffLine(line: string) {
   return "text-[#c8c8c8]";
 }
 
+interface ReviewDiffFile {
+  path: string;
+  additions: number;
+  deletions: number;
+  diff: string;
+}
+
+interface ReviewDiffResponse {
+  base: string;
+  branch: string;
+  files: ReviewDiffFile[];
+}
+
+/** Review pane: shows the real working-tree git diff for the active project.
+ *  Files are listed in the side tree; selecting one renders its unified diff. */
 function ReviewPane() {
   const { t } = useTranslation("tools");
+  const projectPath = useChatStore((s) => s.projectPath);
   const [filter, setFilter] = useState("");
-  const [activePath, setActivePath] = useState(MOCK_REVIEW_FILES[0]?.path ?? "");
+  const [data, setData] = useState<ReviewDiffResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activePath, setActivePath] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
+
+  const load = useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setLoading(true);
+    setError(null);
+    const path = projectPath
+      ? `?path=${encodeURIComponent(projectPath)}`
+      : "";
+    try {
+      const res = await apiFetch<ReviewDiffResponse>(`/git/diff${path}`, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      setData(res);
+      setActivePath((prev) =>
+        prev && res.files.some((f) => f.path === prev) ? prev : res.files[0]?.path ?? "",
+      );
+    } catch (e) {
+      if (controller.signal.aborted) return;
+      setError(e instanceof Error ? e.message : String(e));
+      setData(null);
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [projectPath]);
+
+  useEffect(() => {
+    void load();
+    return () => { abortRef.current?.abort(); };
+  }, [load]);
 
   const files = useMemo(
-    () =>
-      MOCK_REVIEW_FILES.filter((f) => f.path.toLowerCase().includes(filter.toLowerCase())),
-    [filter],
+    () => (data?.files ?? []).filter((f) => f.path.toLowerCase().includes(filter.toLowerCase())),
+    [data, filter],
   );
-  const active = MOCK_REVIEW_FILES.find((f) => f.path === activePath) ?? files[0];
-  const totalAdd = MOCK_REVIEW_FILES.reduce((s, f) => s + f.add, 0);
-  const totalDel = MOCK_REVIEW_FILES.reduce((s, f) => s + f.del, 0);
+  const active = files.find((f) => f.path === activePath) ?? files[0] ?? null;
+  const totalAdd = (data?.files ?? []).reduce((s, f) => s + f.additions, 0);
+  const totalDel = (data?.files ?? []).reduce((s, f) => s + f.deletions, 0);
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex items-center gap-2.5 px-3 py-2 border-b border-codex-border flex-wrap">
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#2a2a2a] border border-[#3a3a3a] text-[12px] text-[#c0c0c0]"
-        >
-          {t("reviewBranch")} <ChevronDown size={12} />
-        </button>
-        <div className="text-[12px] font-mono">
+        <span className="text-[12px] text-codex-muted">
+          {t("reviewBranch")} <span className="text-[#d8d8d8] font-medium">{data?.branch ?? "—"}</span>
+        </span>
+        <span className="text-[12px] text-codex-muted">
+          {t("reviewBase")} <span className="text-[#d8d8d8] font-medium">{data?.base ?? "—"}</span>
+        </span>
+        <span className="ml-auto text-[12px] font-mono">
           <span className="text-[#3fb950]">+{totalAdd.toLocaleString()}</span>{" "}
           <span className="text-[#f85149]">-{totalDel.toLocaleString()}</span>
-        </div>
+        </span>
         <button
           type="button"
+          onClick={() => void load()}
           className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[12px] text-[#a8a8a8] hover:bg-[#252525]"
+          aria-label={t("reviewRefresh")}
         >
-          {t("reviewCompare")} <ChevronDown size={12} />
+          <RefreshCw size={12} />
         </button>
       </div>
       <div className="flex-1 min-h-0 flex">
@@ -109,18 +159,32 @@ function ReviewPane() {
             <span className="truncate text-[#e0e0e0] font-medium">{active?.path ?? "—"}</span>
             {active && (
               <span className="ml-auto font-mono text-[11.5px] shrink-0">
-                <span className="text-[#3fb950]">+{active.add}</span>{" "}
-                <span className="text-[#f85149]">-{active.del}</span>
+                <span className="text-[#3fb950]">+{active.additions}</span>{" "}
+                <span className="text-[#f85149]">-{active.deletions}</span>
               </span>
             )}
           </div>
-          <pre className="flex-1 overflow-auto px-0 py-2 text-[12px] font-mono leading-relaxed">
-            {MOCK_DIFF.split("\n").map((line, i) => (
-              <div key={i} className={`px-3 whitespace-pre ${colorDiffLine(line)}`}>
-                {line || " "}
-              </div>
-            ))}
-          </pre>
+          {loading ? (
+            <div className="flex-1 flex items-center justify-center text-[#666] text-[13px]">
+              {t("reviewLoading")}
+            </div>
+          ) : error ? (
+            <div className="flex-1 flex items-center justify-center text-[#666] text-[13px]">
+              {t("reviewError")}
+            </div>
+          ) : !active ? (
+            <div className="flex-1 flex items-center justify-center text-codex-muted text-[13px]">
+              {t("reviewEmpty")}
+            </div>
+          ) : (
+            <pre className="flex-1 overflow-auto px-0 py-2 text-[12px] font-mono leading-relaxed">
+              {active.diff.split("\n").map((line, i) => (
+                <div key={i} className={`px-3 whitespace-pre ${colorDiffLine(line)}`}>
+                  {line || " "}
+                </div>
+              ))}
+            </pre>
+          )}
         </div>
         <aside className="w-[min(200px,38%)] flex flex-col min-h-0 bg-[#1a1a1a]">
           <div className="m-2.5 mb-2 flex items-center gap-2 px-2.5 py-1.5 bg-[#222] border border-[#2e2e2e] rounded-lg">
@@ -147,8 +211,8 @@ function ReviewPane() {
               >
                 <div className="truncate">{f.path.split("/").pop()}</div>
                 <div className="font-mono text-[10.5px] text-codex-muted">
-                  <span className="text-[#3fb950]">+{f.add}</span>{" "}
-                  <span className="text-[#f85149]">-{f.del}</span>
+                  <span className="text-[#3fb950]">+{f.additions}</span>{" "}
+                  <span className="text-[#f85149]">-{f.deletions}</span>
                 </div>
               </button>
             ))}

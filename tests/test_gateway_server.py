@@ -263,3 +263,41 @@ async def test_handle_outbound_non_gateway_channel_ignored() -> None:
     await gw._handle_outbound(event)
 
     assert not future.done()  # not resolved for non-gateway channel
+
+
+@pytest.mark.asyncio
+async def test_message_persists_project_on_session() -> None:
+    """A message carrying an explicit project must stamp it on the session so the
+    sidebar can group the session under its project row (regression: the project
+    assignment was dropped, leaving every session project=="" and breaking the
+    per-project grouping)."""
+    from codex_pro.session.manager import Session
+
+    session = Session(key="cli:local")
+    gw, bus = _make_gateway()
+    gw._reset_session_if_needed = AsyncMock(return_value=(session, False))
+    bus.publish_inbound = AsyncMock(return_value=True)
+
+    response = await gw._handle_message(_JsonRequest({
+        "platform": "api",
+        "user_id": "user-1",
+        "chat_id": "chat-1",
+        "session_key": "cli:local",
+        "project": "e:\\workspace\\codex-pro",
+        "text": "hello",
+    }))
+
+    assert response.status == 200
+    assert session.project == "e:\\workspace\\codex-pro"
+    # A no-project message must NOT set project (it stays "" for the recents list).
+    session2 = Session(key="cli:other")
+    gw._reset_session_if_needed = AsyncMock(return_value=(session2, False))
+    response2 = await gw._handle_message(_JsonRequest({
+        "platform": "api",
+        "user_id": "user-1",
+        "chat_id": "chat-1",
+        "session_key": "cli:other",
+        "text": "hello",
+    }))
+    assert response2.status == 200
+    assert session2.project == ""

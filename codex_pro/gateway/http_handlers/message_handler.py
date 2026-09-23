@@ -540,7 +540,11 @@ class MessageHandler:
             # 作为隔离的工作目录:先按运行日期分层,再按会话隔离。session_key 可能含
             # `:`/`/` 等非法路径字符,会话目录名须经 session_dir_name 清洗(sha256 前缀)。
             effective_workspace = project
-            if not project:
+            if project:
+                # 有项目会话把归属项目打到 session.project,前端侧边栏据此把会话归到
+                # 对应项目行下(见 CodexSidebar projectSessions filter)。
+                session.project = project
+            else:
                 # 无项目工作目录来自 ui.preferences.no_project_folder(前端设置页改的
                 # 那份)。GatewayServer._config 是 GatewayConfig(不含 ui),完整 Config
                 # 从 agent_loop.config 读取,与 /config API 的惯例一致。

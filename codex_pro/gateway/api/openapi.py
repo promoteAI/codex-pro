@@ -84,6 +84,8 @@ _ROUTE_DOCS: dict[str, dict[str, dict[str, Any]]] = {
     # Files
     "GET /files": {"summary": "List a directory in the workspace", "tags": ["Files"]},
     "GET /files/content": {"summary": "Read a file's content within a project", "tags": ["Files"]},
+    # Git
+    "GET /git/diff": {"summary": "Return the working-tree diff for a repo", "tags": ["Git"]},
     # Agents (runtime worker profiles)
     "GET /agents": {"summary": "List runtime worker profiles", "tags": ["Agents"]},
     "POST /agents": {"summary": "Create a runtime worker profile", "tags": ["Agents"]},

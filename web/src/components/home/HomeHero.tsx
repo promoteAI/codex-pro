@@ -79,21 +79,26 @@ export function HomeHero({ project, setDraft }: HomeHeroProps = {}) {
     <section className="flex-1 flex flex-col items-center justify-center px-6 pb-4 min-h-0 overflow-auto">
       <div className="w-14 h-14 mb-5 opacity-70" aria-hidden>
         <svg viewBox="0 0 100 100" className="w-full h-full">
+          {/* 代码框架：C 形外壳，开口朝右 */}
           <path
             fill="none"
             stroke="#5a5a5a"
-            strokeWidth="4.5"
-            d="M50 12C38 12 28 19 26 29H22A14 14 0 0 0 8 43a22.5 22.5 0 0 0 22 44h40a20.4 20.4 0 0 0 3.5-40.5A16 16 0 0 0 82 38c0-1.2-.1-2.4-.4-3.5C79.5 21 67 12 50 12Z"
-          />
-          <path
-            fill="none"
-            stroke="#5a5a5a"
-            strokeWidth="4.5"
+            strokeWidth="5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M42 36L30 52l12 16"
+            d="M64 28H38q-8 0-8 8v28q0 8 8 8h26"
           />
-          <rect fill="#5a5a5a" x="48" y="66" width="14" height="5" rx="1.5" />
+          {/* 执行提示符 `>`：agent 在框架内运行 */}
+          <path
+            fill="none"
+            stroke="#5a5a5a"
+            strokeWidth="5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M42 42 58 50 42 58"
+          />
+          {/* 开口处的信号点：输出 / 活跃状态 */}
+          <circle fill="#5a5a5a" cx="70" cy="50" r="4" />
         </svg>
       </div>
       <h1 className="text-[clamp(16px,2.2vw,22px)] font-medium text-codex-text text-center mb-6 max-w-[480px]">

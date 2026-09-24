@@ -261,7 +261,7 @@ export function GeneralPage() {
                       updatePrefs({ openIn: opt.id });
                       setOpenInOpen(false);
                     }}
-                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-left text-[#e4e4e4] hover:bg-codex-hover ${
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-left text-codex-text hover:bg-codex-hover ${
                       opt.id === prefs.openIn ? "bg-[#343434]" : ""
                     }`}
                   >
@@ -313,7 +313,7 @@ export function GeneralPage() {
                       )}
                     </span>
                     {opt.desc && (
-                      <span className="text-[11.5px] text-[#888]">{opt.desc}</span>
+                      <span className="text-[11.5px] text-codex-text-secondary">{opt.desc}</span>
                     )}
                   </button>
                 ))}

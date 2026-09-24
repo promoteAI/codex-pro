@@ -179,6 +179,10 @@ body {
 [data-theme="light"] .bg-\[\#2e2e2e\]{background:#e7e7e9 !important;color:#1c1c1e !important}
 [data-theme="light"] .text-\[\#f0f0f0\]{color:#1c1c1e !important}
 
+/* Settings search/toolbar surfaces (HooksPage etc.) still hard-coded to
+   dark #1e1e1e behind the ml-auto search container */
+[data-theme="light"] .bg-\[\#1e1e1e\]{background:#f7f7f8 !important}
+
 .codex-admin-pane .hover\:bg-gray-100:hover,
 .codex-admin-pane .hover\:bg-gray-50:hover {
   background-color: #242424 !important;
@@ -1173,6 +1177,19 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 [data-theme="light"] .chat-md th,.chat-md td{border-bottom-color:#d8d8db;color:#3a3a3c}
 [data-theme="light"] .chat-md th{color:#8a8a8f}
 
+/* Task-activity rows (TaskActivityItem.tsx) — capsule + status pill */
+[data-theme="light"] .tr-row{background:#f7f7f8}
+[data-theme="light"] .tr-row:hover{background:#e9e9eb}
+[data-theme="light"] .tr-label{color:#1c1c1e}
+[data-theme="light"] .tr-amount{color:#626267}
+[data-theme="light"] .tr-pill.is-ok{background:#d8f0df;color:#157347}
+[data-theme="light"] .tr-pill.is-err{background:#f6d9db;color:#a61b1b}
+[data-theme="light"] .tr-chev{color:#626267}
+[data-theme="light"] .bui-badge{color:#fff}
+[data-theme="light"] .bui-badge.is-ok{background:#3fb950}
+[data-theme="light"] .bui-badge.is-err{background:#f85149}
+[data-theme="light"] .bui-ring .num{color:#1c1c1e}
+
 /* Sidebar / tree / menus */
 [data-theme="light"] .sf-search{background:#f1f1f2;border-color:#d8d8db}
 [data-theme="light"] .sf-search input{color:#2a2a2c}
@@ -1536,7 +1553,6 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 
 /* ── Analytics page light overrides ── */
 [data-theme="light"] .bg-\[\#1c1c1c\]{background:#f7f7f8 !important;border-color:#d8d8db !important}
-[data-theme="light"] .bg-\[\#2a2a2a\]{background:#f1f1f2 !important;border-color:#d8d8db !important}
 [data-theme="light"] .bg-\[\#222\]{background:#f1f1f2 !important}
 [data-theme="light"] .bg-\[\#3a1a1a\]{background:#fde8e8 !important;border-color:#e0b0b0 !important}
 [data-theme="light"] .text-\[\#8a8a8a\]{color:#626267 !important}
@@ -1566,8 +1582,138 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 /* Theme preview diff pane */
 [data-theme="light"] .mb-4.grid.grid-cols-2.overflow-hidden.rounded-\[10px\]{background:#f7f7f8 !important;border-color:#d8d8db !important}
 
-/* Settings overlay inputs/cards */
-[data-theme="light"] .bg-\[\#1e1e1e\]{background:#f7f7f8 !important;border-color:#d8d8db !important}
-[data-theme="light"] .border-\[\#262626\]{border-color:#d8d8db !important}
+/* ═══ Light-theme overrides for remaining hard-coded component colors ═══
+ * These arbitrary-value classes are used in components that render outside
+ * .codex-admin-pane (chat thread, toasts, sidebar, plan banner, tools panel)
+ * or where the earlier global grok didn't reach. Brand-color icon chips
+ * (Google/Slack/Teams) are left as-is — they read intentionally in both themes. */
+
+/* Toaster toast surfaces (Toaster.tsx) */
+[data-theme="light"] .bg-\[\#1a2f1a\]{background:#d8f0df !important}
+[data-theme="light"] .bg-\[\#2f1a1a\]{background:#f6d9db !important}
+[data-theme="light"] .bg-\[\#1a2744\]{background:#d4e4ff !important}
+[data-theme="light"] .text-\[\#7aa2ff\]{color:#2c55d4 !important}
+
+/* Toggle knob: off state (settings/ui.tsx) */
+[data-theme="light"] .after\:bg-\[\#888\]:after{background:#a1a1aa !important}
+
+/* 404 page label (App.tsx) */
+[data-theme="light"] .text-\[\#2a2a2a\]{color:#1c1c1e !important}
+
+/* Sidebar model tag + mobile remote hover (CodexSidebar.tsx) */
+[data-theme="light"] .bg-\[\#f0f0f0\]{background:#e9e9eb !important}
+[data-theme="light"] .text-\[\#181818\]{color:#1c1c1e !important}
+[data-theme="light"] .hover\:bg-\[\#f2f2f2\]:hover{background:#e7e7e9 !important}
+
+/* Plan banner (HomeView.tsx) */
+[data-theme="light"] .bg-\[\#1e2a3a\]{background:#d4e4ff !important}
+[data-theme="light"] .border-\[\#2a4a6a\]{border-color:#a0b8e0 !important}
+[data-theme="light"] .text-\[\#8eb6ff\]{color:#2c55d4 !important}
+[data-theme="light"] .text-\[\#a8d4ff\]{color:#1d46b0 !important}
+[data-theme="light"] .hover\:bg-\[\#253545\]:hover{background:#dbeafe !important}
+[data-theme="light"] .text-\[\#668\]{color:#47474c !important}
+[data-theme="light"] .hover\:text-\[\#a8d4ff\]:hover{color:#1d46b0 !important}
+
+/* Term panel tab hover (TermPanel.tsx) */
+[data-theme="light"] .hover\:bg-\[\#252525\]:hover{background:#f1f1f2 !important}
+
+/* ModelsImport disabled-provider dot */
+[data-theme="light"] .bg-\[\#444\]{background:#a1a1aa !important}
+
+/* TaskActivityItem tool input/output header labels (chat thread) */
+[data-theme="light"] .text-\[\#777\]{color:#8a8a8f !important}
+
+/* Composer ctx-bar divider */
+[data-theme="light"] .border-\[\#262626\]{border-color:#e9e9eb !important}
+
+/* Branch/Project menu empty-state text */
+[data-theme="light"] .text-\[\#888\]{color:#626267 !important}
+
+/* ToolsPanel inline diff + file-line gutter */
+[data-theme="light"] .text-\[\#555\]{color:#8a8a8f !important}
+[data-theme="light"] .text-\[\#2f7d3d\]{color:#157347 !important}
+[data-theme="light"] .text-\[\#c0392b\]{color:#a61b1b !important}
+[data-theme="light"] .text-\[\#2c5aa0\]{color:#1d46b0 !important}
+[data-theme="light"] .text-\[\#3fb950\]{color:#157347 !important}
+[data-theme="light"] .text-\[\#f85149\]{color:#a61b1b !important}
+[data-theme="light"] .text-\[\#6eb6ff\]{color:#2c55d4 !important}
+
+/* settings/ui.tsx ActionBtn danger hover */
+[data-theme="light"] .hover\:bg-\[\#4a2020\]:hover{background:#f6d9db !important}
+
+/* ── Settings overlay (CorePages / MorePages, inside .codex-admin-pane) ── */
+[data-theme="light"] .bg-\[\#252525\]{background:#f1f1f2 !important}
+[data-theme="light"] .bg-\[\#2c2c2c\]{background:#e9e9eb !important}
+[data-theme="light"] .bg-\[\#2a3a2a\]{background:#d8f0df !important}
+[data-theme="light"] .bg-\[\#1f2f1f\]{background:#d8f0df !important}
+[data-theme="light"] .border-\[\#3a5a3a\]{border-color:#8dd89a !important}
+[data-theme="light"] .hover\:bg-\[\#262626\]:hover{background:#f1f1f2 !important}
+[data-theme="light"] .hover\:bg-\[\#323232\]:hover{background:#f1f1f2 !important}
+[data-theme="light"] .hover\:bg-\[\#333\]:hover{background:#e7e7e9 !important}
+[data-theme="light"] .bg-\[\#2a2a2a\]{background:#f7f7f8 !important}
 [data-theme="light"] .border-\[\#3a3a3a\]{border-color:#c5c5ca !important}
+[data-theme="light"] .hover\:bg-\[\#353535\]:hover{background:#e7e7e9 !important}
+[data-theme="light"] .hover\:bg-\[\#324a32\]:hover{background:#d8f0df !important}
+[data-theme="light"] .hover\:bg-\[\#3a2a2a\]:hover{background:#f6d9db !important}
+[data-theme="light"] .hover\:border-\[\#333\]:hover{border-color:#c5c5ca !important}
+[data-theme="light"] .hover\:text-\[\#f87171\]:hover{color:#a61b1b !important}
+[data-theme="light"] .focus\:border-\[\#555\]:focus{border-color:#a0a0a5 !important}
+[data-theme="light"] .text-\[\#9a9a9a\]{color:#626267 !important}
+[data-theme="light"] .text-\[\#a8a8a8\]{color:#626267 !important}
+[data-theme="light"] .text-\[\#909090\]{color:#626267 !important}
+[data-theme="light"] .text-\[\#666\]{color:#626267 !important}
+[data-theme="light"] .text-\[\#7cd47c\]{color:#157347 !important}
+[data-theme="light"] .text-\[\#e85d5d\]{color:#a61b1b !important}
+[data-theme="light"] .text-\[\#4c8dff\]{color:#2c55d4 !important}
+[data-theme="light"] .text-\[\#6ea8fe\]{color:#2c55d4 !important}
+
+/* Syntax-highlighting tokens in ThemeDiff pre (CorePages.tsx) */
+[data-theme="light"] .text-\[\#7c9cff\]{color:#1d46b0 !important}
+[data-theme="light"] .text-\[\#e8b86d\]{color:#9a4400 !important}
+[data-theme="light"] .text-\[\#c4b5fd\]{color:#6d28d9 !important}
+[data-theme="light"] .text-\[\#86efac\]{color:#157347 !important}
+[data-theme="light"] .text-\[\#7dd3fc\]{color:#0891b2 !important}
+
+/* Gradient stops used in settings model chips (MorePages.tsx) */
+[data-theme="light"] .from-\[\#4a6cf7\],
+[data-theme="light"] .from-\[\#5b8def\]{--tw-gradient-from:#3866f0 !important}
+[data-theme="light"] .to-\[\#7c5cff\]{--tw-gradient-to:#6d28d9 !important}
+
+/* ── Second-pass gaps found in context review ── */
+
+/* Slash-command / skills section labels in composer + tools menus
+   (same #7dd3fc as string tokens in ThemeDiff — consistent mapping) */
+[data-theme="light"] .text-\[\#7dd3fc\]{color:#0891b2 !important}
+
+/* Analytics warning / status text (e3b341 amber too light on near-white) */
+[data-theme="light"] .text-\[\#e3b341\]{color:#9a4400 !important}
+
+/* Settings inputs/labels drawn as bordered divs use border-[#333]/#2a2a2a/#444 —
+   dark borders read wrong on a light surface. Non-input elements only;
+   inputs are already handled by the .codex-admin-pane input rule. */
+[data-theme="light"] .border-\[\#333\]{border-color:#c5c5ca !important}
+[data-theme="light"] .border-\[\#2a2a2a\]{border-color:#d8d8db !important}
+[data-theme="light"] .border-\[\#444\]{border-color:#c5c5ca !important}
+
+/* CorePages: selected "open in" option row (bg #343434) */
+[data-theme="light"] .bg-\[\#343434\]{background:#e7e7e9 !important}
+
+/* settings/ui.tsx Toggle track (off state uses bg-[#3a3a3a]) */
+[data-theme="light"] .bg-\[\#3a3a3a\]{background:#dcdce0 !important}
+
+/* Composer close-icon hover (hover:bg-[#444]) */
+[data-theme="light"] .hover\:bg-\[\#444\]:hover{background:#e7e7e9 !important}
+
+/* MorePages: icon-toolbar buttons (refresh/delete) use bg-[#2a2a2a] +
+   border-[#3a3a3a]; mapped above to #f7f7f8 / #c5c5ca. */
+
+/* MorePages: CodexPro account badge (blue pill) */
+[data-theme="light"] .bg-\[\#3a4a66\],
+[data-theme="light"] .border-\[\#3a4a66\]{background:#d4e4ff !important;border-color:#a0b8e0 !important}
+
+/* MorePages: SSH unreachable red badge (bg #3a1a1a) */
+[data-theme="light"] .bg-\[\#3a1a1a\]{background:#f6d9db !important}
+
+/* Primary light buttons (bg #e8e8e8 + text #1a1a1a) are already legible on a
+   light surface, so they're intentionally left unchanged across both themes. */
 

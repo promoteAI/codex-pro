@@ -942,6 +942,7 @@ export function ToolsPanel() {
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [hubMenuOpen, setHubMenuOpen] = useState(false);
+  const [hubMenuPos, setHubMenuPos] = useState({ top: 0, left: 0 });
   const [menuTabId, setMenuTabId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
@@ -986,7 +987,7 @@ export function ToolsPanel() {
               {pickerOpen && <TabPicker onClose={() => setPickerOpen(false)} />}
             </div>
           )}
-          <div className="flex-1 flex items-center gap-0.5 min-w-0 overflow-x-hidden">
+          <div className="flex-1 flex items-center gap-0.5 min-w-0 overflow-x-hidden mr-[100px]">
             {sessionTabs.length === 0 && (
               <button
                 type="button"
@@ -1034,10 +1035,13 @@ export function ToolsPanel() {
                 </button>
               );
             })}
-          </div>
+            {/* 新建工具：吸附在 tab 列表右侧，与 tabs 连成一体 */}
             <button
               type="button"
-              onClick={() => setHubMenuOpen((v) => !v)}
+              onClick={(e) => {
+                setHubMenuPos({ top: e.clientY, left: e.clientX });
+                setHubMenuOpen((v) => !v);
+              }}
               aria-expanded={hubMenuOpen}
               title={t("newTool")}
               aria-label={t("newTool")}
@@ -1045,31 +1049,33 @@ export function ToolsPanel() {
             >
               <Plus size={14} />
             </button>
-            {hubMenuOpen && (
-              <div
-                className="fixed z-[120] min-w-[168px] p-1 bg-codex-elevated border border-codex-border-strong rounded-lg shadow-[0_10px_28px_rgba(0,0,0,.5)]"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {(["review", "terminal", "browser", "sidechat"] as const).map((type) => {
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => {
-                        openTool(type);
-                        setHubMenuOpen(false);
-                      }}
-                      className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-codex-text hover:bg-codex-active"
-                    >
-                      {t(type)}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+          </div>
           </div>
           {/* Reserved room for the floating layout toolbar (全屏 / 底部 / 侧栏) */}
           <div className="w-[110px] min-w-[110px] shrink-0 pointer-events-none" aria-hidden />
+          {hubMenuOpen && (
+            <div
+              className="fixed z-[120] min-w-[168px] p-1 bg-codex-elevated border border-codex-border-strong rounded-lg shadow-[0_10px_28px_rgba(0,0,0,.5)]"
+              style={{ top: hubMenuPos.top, left: hubMenuPos.left }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {(["review", "terminal", "browser", "sidechat"] as const).map((type) => {
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      openTool(type);
+                      setHubMenuOpen(false);
+                    }}
+                    className="block w-full px-3 py-2 rounded-md text-left text-[13px] text-codex-text hover:bg-codex-active"
+                  >
+                    {t(type)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {menuTabId && sessionTabs.length > 0 && (
             <div

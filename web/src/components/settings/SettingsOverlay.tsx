@@ -235,14 +235,14 @@ export function SettingsOverlay() {
           })}
         </nav>
       </aside>
-      <div className="settings-content flex-1 min-w-0 min-h-0 overflow-auto flex flex-col">
+      <div className="settings-content w-full flex-1 min-w-0 min-h-0 overflow-auto flex flex-col">
         {ProtoPage && (
-          <div className="flex-1 min-h-0 overflow-auto p-7 px-[clamp(16px,4vw,40px)] pb-12">
+          <div className="overflow-auto p-7 px-[clamp(16px,4vw,40px)]" style={{ maxHeight: '100%' }}>
             <ProtoPage />
           </div>
         )}
         {AdminPage && (
-          <div className="flex-1 min-h-0 overflow-auto p-7 px-[clamp(16px,4vw,40px)] pb-12">
+          <div className="overflow-auto p-7 px-[clamp(16px,4vw,40px)]" style={{ maxHeight: '100%' }}>
             {showAdminChrome || !NAV_IDS.has(section) ? (
               <>
                 <h2 className="text-[22px] font-semibold text-codex-text tracking-tight m-0 mb-1.5">{t(section)}</h2>
@@ -251,7 +251,7 @@ export function SettingsOverlay() {
                 )}
               </>
             ) : null}
-            <div className="codex-admin-pane min-h-[50vh]">
+            <div className="codex-admin-pane w-full">
               <Suspense fallback={<div className="text-codex-muted text-sm p-2">{t("loading")}</div>}>
                 <AdminPage />
               </Suspense>

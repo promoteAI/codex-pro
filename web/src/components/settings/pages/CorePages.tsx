@@ -173,7 +173,7 @@ export function GeneralPage() {
   }, [openInOpen, shellOpen]);
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <SectionTitle>{t("secPermissions")}</SectionTitle>
       <SettingsCard>
         <SettingsRow label={t("defaultPermissions")} desc={t("defaultPermissionsDesc")}>
@@ -570,7 +570,7 @@ export function AppearancePage() {
   ];
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("appearance")}</PageTitle>
       <PageSub>{t("appearanceDesc")}</PageSub>
 
@@ -731,7 +731,7 @@ export function AgentConfigPage() {
   }, []);
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("agent")}</PageTitle>
       <PageSub>{t("agentDesc")}</PageSub>
 

@@ -105,7 +105,7 @@ function SshModal({
 export function VoicePage() {
   const { t } = useTranslation("settings");
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("voice")}</PageTitle>
       <PageSub>{t("voiceDesc")}</PageSub>
       <SectionTitle>{t("secApp")}</SectionTitle>
@@ -166,7 +166,7 @@ export function PersonalizationPage() {
   const saveInstructions = () => updatePrefs({ codexInstructions: text });
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("personalization")}</PageTitle>
 
       <div className="bg-codex-surface border border-codex-border rounded-xl p-4 mb-5">
@@ -217,7 +217,7 @@ export function PetsPage() {
   const [selected, setSelected] = useState("codex");
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("pets")}</PageTitle>
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
@@ -303,7 +303,7 @@ export function ShortcutsPage() {
   }, [q]);
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("shortcuts")}</PageTitle>
       <div className="flex items-center gap-2 bg-[#1e1e1e] border border-codex-border rounded-lg px-3 py-2 mb-4">
         <Search size={14} className="text-[#555] shrink-0" />
@@ -346,7 +346,7 @@ export function ShortcutsPage() {
 export function AccountPage() {
   const { t } = useTranslation("settings");
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("account")}</PageTitle>
       <div className="flex items-center gap-4 bg-codex-surface border border-codex-border rounded-xl px-4 py-4 mb-5">
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#4a6cf7] to-[#7c5cff] grid place-items-center text-lg font-semibold text-white shrink-0">
@@ -403,7 +403,7 @@ export function ComputerPage() {
   }, []);
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("computer")}</PageTitle>
       <PageSub>{t("computerDesc")}</PageSub>
       <SectionTitle>{t("control")}</SectionTitle>
@@ -616,7 +616,7 @@ export function SettingsPluginsPage() {
   }
 
   return (
-    <div className="max-w-[800px]">
+    <div className="min-w-0">
       <div className="flex items-start justify-between gap-4 mb-2">
         <div>
           <PageTitle>{t("plugins")}</PageTitle>
@@ -782,7 +782,7 @@ export function BrowserSettingsPage() {
   }, []);
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("browser")}</PageTitle>
       <SettingsCard>
         <SettingsRow label={t("embeddedBrowser")} desc={t("embeddedBrowserDesc")}>
@@ -902,7 +902,7 @@ export function HooksPage() {
 
   if (creating) {
     return (
-      <div className="max-w-[720px]">
+      <div className="min-w-0">
         <PageTitle>{t("newHook")}</PageTitle>
         <PageSub>{t("newHookDesc")}</PageSub>
         <SettingsCard>
@@ -976,7 +976,7 @@ export function HooksPage() {
   }
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("hooks")}</PageTitle>
       <PageSub>
         {t("hooksDesc")}{" "}
@@ -1271,7 +1271,7 @@ export function ConnectionsPage() {
   };
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("connections")}</PageTitle>
       <PageSub>{t("connectionsDesc")}</PageSub>
 
@@ -1576,7 +1576,7 @@ export function GitPage() {
   ]);
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("git")}</PageTitle>
       <SettingsCard>
         <SettingsRow label={t("branchPrefix")} desc={t("branchPrefixDesc")}>
@@ -1680,7 +1680,7 @@ export function EnvironmentPage() {
   ];
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("environment")}</PageTitle>
       <PageSub>{t("environmentDesc")}</PageSub>
       <div className="flex items-center justify-between mb-2">
@@ -1736,7 +1736,7 @@ export function WorktreesPage() {
   }, [prefs.worktreeRoot, prefs.worktreeDeleteLimit]);
 
   return (
-    <div className="max-w-[720px]">
+    <div className="min-w-0">
       <PageTitle>{t("worktrees")}</PageTitle>
       <SettingsCard>
         <SettingsRow label={t("worktreeRoot")} desc={t("worktreeRootDesc")}>
@@ -1914,7 +1914,7 @@ export function ArchivedPage() {
   };
 
   return (
-    <div className="max-w-[760px]">
+    <div className="min-w-0">
       <div className="flex items-center justify-between gap-3 mb-4">
         <h2 className="text-[22px] font-semibold text-codex-text tracking-tight m-0">{t("archived")}</h2>
         <button

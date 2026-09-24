@@ -166,7 +166,7 @@ export function ModelsPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <PageTitle>{t("modelsTitle")}</PageTitle>
         <div className="mt-4 p-3 rounded-lg bg-codex-danger/10 text-codex-danger text-sm">{error}</div>
       </div>
@@ -174,7 +174,7 @@ export function ModelsPage() {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 max-w-[960px]">
+    <div className="flex flex-col min-h-0 min-w-0">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-4 shrink-0">
         <div>
@@ -198,7 +198,7 @@ export function ModelsPage() {
           {t("loading")}
         </div>
       ) : (
-        <div className="flex flex-1 min-h-[420px] bg-codex-surface border border-codex-border rounded-xl overflow-hidden">
+        <div className="flex flex-1 min-h-0 bg-codex-surface border border-codex-border rounded-xl overflow-hidden">
           {/* Sidebar */}
           <aside className="w-[200px] shrink-0 border-r border-codex-border bg-codex-bg flex flex-col">
             <div className="flex-1 overflow-y-auto px-2 py-3">
@@ -753,7 +753,7 @@ function AddProviderModal({ onClose, onCreated }: AddProviderModalProps) {
 export function ImportPage() {
   const { t } = useTranslation("settings");
   return (
-    <div className="max-w-[720px]">
+    <div>
       <PageTitle>{t("import")}</PageTitle>
       <PageSub>{t("importDesc")}</PageSub>
       <div className="text-[13px] font-medium text-codex-muted mb-2.5">{t("autoSync")}</div>

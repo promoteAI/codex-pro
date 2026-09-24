@@ -23,6 +23,7 @@ interface SkillItem {
   name: string;
   description: string;
   enabled: boolean;
+  source?: string;
 }
 
 type SkillScope = "personal" | "system" | "recommended";
@@ -105,6 +106,12 @@ function skillGradient(name: string): string {
 }
 
 function skillScopeOf(s: SkillItem): SkillScope {
+  // Backend /skills now reports `source`: user → 个人, builtin → 系统,
+  // external → 推荐. Fall back to the legacy name-list heuristics only when
+  // the field is missing (older gateway responses).
+  if (s.source === "user") return "personal";
+  if (s.source === "builtin") return "system";
+  if (s.source === "external") return "recommended";
   const n = s.name.toLowerCase();
   if (SYSTEM_SKILL_NAMES.has(n) || n.startsWith("review-") || n.includes("frontend")) {
     return "system";

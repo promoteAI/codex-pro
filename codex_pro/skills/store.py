@@ -43,6 +43,7 @@ class SkillMeta:
             "category": self.category,
             "version": self.version,
             "tags": self.tags,
+            "path": self.path,
         }
 
 
@@ -199,6 +200,25 @@ class SkillStore:
             if d.exists():
                 roots.append((d, False))
         return roots
+
+    def source_for(self, skill_dir: Path | str) -> str:
+        """Classify a skill directory as "user", "builtin", or "external".
+
+        Uses the directory's location relative to the configured roots, so the
+        gateway can label a skill by origin without storing an extra field on
+        SkillMeta. Builtin roots are checked first so a path that overlaps both
+        resolves to the more specific builtin source.
+        """
+        resolved = Path(skill_dir).resolve()
+        for d in self._builtin_dirs:
+            rd = d.resolve()
+            if resolved == rd or rd in resolved.parents:
+                return "builtin"
+        for d in self._external_dirs:
+            rd = d.resolve()
+            if resolved == rd or rd in resolved.parents:
+                return "external"
+        return "user"
 
     def _find_skill_dir(self, name: str, *, include_disabled: bool = False) -> Path | None:
         """Locate a skill's directory by name.

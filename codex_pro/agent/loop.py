@@ -58,12 +58,12 @@ from codex_pro.agent.bootstrap import LoopBootstrap
 from codex_pro.agent.embedding_helpers import (
     _ProviderEmbedFn,
     _embed_model_identity,
-    _resolve_builtin_skills_dir,
     _should_publish_reply,
     pick_embed_candidate,
     probe_embed_provider,
     resolve_embed_fallback,
 )
+from codex_pro.runtime_paths import bundled_skills_dir
 
 
 
@@ -342,10 +342,18 @@ class AgentLoop:
         # registering the five skill tools and build_skills_context() returns "".
         self.skill_store = None
         if config.skills.enabled:
-            skills_dirs = _resolve_builtin_skills_dir(workspace, config.skills.skills_dir)
+            # ``skills_dir`` is the user's own skill collection (default
+            # ~/.codex-pro/skills, resolved against the workspace) and is the
+            # USER skill root — it must render with the "个人" tag. Only the
+            # repo-bundled inventory (the code's own skills) belongs in
+            # builtin_dirs, which is what drives the "系统" tag.
+            user_skills = Path(config.skills.skills_dir).expanduser()
+            if not user_skills.is_absolute():
+                user_skills = workspace / user_skills
+            bundled = bundled_skills_dir()
             self.skill_store = SkillStore(
-                user_dir=workspace / "data" / "skills",
-                builtin_dirs=skills_dirs,
+                user_dir=user_skills,
+                builtin_dirs=[bundled] if bundled else [],
                 external_dirs=[Path(d) for d in config.skills.external_dirs],
                 disabled=config.skills.disabled,
             )

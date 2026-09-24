@@ -62,6 +62,7 @@ class SkillsAPI:
         for meta in store.list_all(include_disabled=True):
             d = meta.to_dict()
             d["enabled"] = not store.is_disabled(meta.name)
+            d["source"] = store.source_for(meta.path) if meta.path else ""
             results.append(d)
         results.sort(key=lambda m: m["name"])
         return results

@@ -480,6 +480,12 @@ function pluginTag(p: ApiPlugin): string {
   return "插件";
 }
 
+function skillTag(source: string): string {
+  if (source === "builtin") return "系统";
+  if (source === "external") return "外部推荐";
+  return "个人";
+}
+
 export function SettingsPluginsPage() {
   const { t } = useTranslation("settings");
   const navigate = useNavigate();
@@ -496,7 +502,9 @@ export function SettingsPluginsPage() {
   const [toggling, setToggling] = useState<string | null>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
 
-  const { data: skillsApiData } = useApi<{ skills: { name: string; description: string; enabled: boolean }[] }>("/skills");
+  const { data: skillsApiData } = useApi<{
+    skills: { name: string; description: string; enabled: boolean; source?: string }[];
+  }>("/skills");
 
   const loadPlugins = async () => {
     setLoading(true);
@@ -570,13 +578,14 @@ export function SettingsPluginsPage() {
       if (found) {
         found.kind = "skills";
         found.on = s.enabled;
+        found.tag = skillTag(s.source ?? "");
       } else {
         items.push({
           id: s.name,
           name: s.name,
           desc: s.description || "",
           kind: "skills",
-          tag: "技能",
+          tag: skillTag(s.source ?? ""),
           on: s.enabled,
         });
       }

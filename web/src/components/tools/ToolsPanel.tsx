@@ -421,6 +421,7 @@ function FilesPane() {
 
 function BrowserPane() {
   const { t } = useTranslation("tools");
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
   const [urlInput, setUrlInput] = useState("");
   const [pageUrl, setPageUrl] = useState<string | null>(null);
 
@@ -432,28 +433,34 @@ function BrowserPane() {
     setUrlInput(normalized);
   };
 
+  // Drive the embedded page's history so back/forward/reload behave on the
+  // actual document, not just the outer address box.
+  const goBack = () => frameRef.current?.contentWindow?.history.back();
+  const goForward = () => frameRef.current?.contentWindow?.history.forward();
+  const reload = () => frameRef.current?.contentWindow?.location.reload();
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-codex-border bg-codex-panel">
         <button
           type="button"
-          disabled
-          className="w-7 h-7 inline-flex items-center justify-center rounded-md text-codex-muted"
+          onClick={goBack}
+          className="w-7 h-7 inline-flex items-center justify-center rounded-md text-codex-muted hover:bg-codex-active"
           aria-label={t("browserBack")}
         >
           <ChevronLeft size={16} />
         </button>
         <button
           type="button"
-          disabled
-          className="w-7 h-7 inline-flex items-center justify-center rounded-md text-codex-muted"
+          onClick={goForward}
+          className="w-7 h-7 inline-flex items-center justify-center rounded-md text-codex-muted hover:bg-codex-active"
           aria-label={t("browserForward")}
         >
           <ChevronRight size={16} />
         </button>
         <button
           type="button"
-          onClick={() => pageUrl && navigate()}
+          onClick={reload}
           className="w-7 h-7 inline-flex items-center justify-center rounded-md text-codex-muted hover:bg-codex-active"
           aria-label={t("browserReload")}
         >
@@ -485,13 +492,13 @@ function BrowserPane() {
             <p className="text-[12.5px] text-codex-muted leading-relaxed">{t("browserEmptySub")}</p>
           </div>
         ) : (
-          <div className="m-auto w-full max-w-[640px] px-6 py-8">
-            <div className="bg-codex-elevated border border-codex-border rounded-xl p-5">
-              <p className="text-[12px] text-[#6eb6ff] mb-2.5 break-all">{pageUrl}</p>
-              <h2 className="text-xl font-semibold text-codex-text mb-2.5">{t("browserPageTitle")}</h2>
-              <p className="text-[13.5px] leading-relaxed text-codex-text-secondary">{t("browserPageBody")}</p>
-            </div>
-          </div>
+          <iframe
+            ref={frameRef}
+            src={pageUrl}
+            title={t("browserPageTitle")}
+            className="flex-1 w-full h-full border-0 bg-white"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          />
         )}
       </div>
     </div>

@@ -2,11 +2,12 @@
 
 *::-webkit-scrollbar{width:6px;height:6px}
 *::-webkit-scrollbar-track{background:transparent}
-*::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
-*::-webkit-scrollbar-thumb:hover{background:#3f3f3f}
+*::-webkit-scrollbar-thumb{background:transparent;border-radius:3px;transition:background .15s}
+*:hover::-webkit-scrollbar-thumb{background:#333}
+*:hover::-webkit-scrollbar-thumb:hover{background:#3f3f3f}
 *::-webkit-scrollbar-corner{background:transparent}
-[data-theme="light"] *::-webkit-scrollbar-thumb{background:#c5c5ca}
-[data-theme="light"] *::-webkit-scrollbar-thumb:hover{background:#b0b0b6}
+[data-theme="light"] *:hover::-webkit-scrollbar-thumb{background:#c5c5ca}
+[data-theme="light"] *:hover::-webkit-scrollbar-thumb:hover{background:#b0b0b6}
 
 @theme {
   --color-codex-bg: var(--codex-bg);
@@ -280,7 +281,7 @@ body {
 .sch-create-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;border-radius:7px;background:transparent;color:#d4d4d4;font-size:13px;cursor:pointer;text-align:left}
 .sch-create-item:hover{background:#2e2e2e}
 .sch-create-item svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto;opacity:.85}
-.sch-inner{max-width:720px;margin:0 auto}
+.sch-inner{max-width:none;margin:0 200px}
 .sch-title{font-size:22px;font-weight:600;color:#f0f0f0;margin:0 0 6px;letter-spacing:-.01em}
 .sch-sub{font-size:13px;color:#6e6e6e;margin:0 0 20px;line-height:1.5}
 .sch-search{display:flex;align-items:center;gap:10px;background:#1c1c1c;border:1px solid #2e2e2e;border-radius:10px;padding:10px 14px;margin-bottom:14px}
@@ -1396,6 +1397,7 @@ input[type=checkbox]:focus-visible+.toggle-slider{outline:2px solid #d6d6d6;outl
 [data-theme="light"] .pl-modal-cancel:hover{background:#e7e7e9}
 [data-theme="light"] .pl-modal-submit{background:#e9e9eb;border-color:#c5c5ca;color:#1c1c1e}
 [data-theme="light"] .pl-modal-submit:hover{background:#dcdce0}
+.pl-modal-textarea{background:#1e1e1e!important}
 
 /* ── MCP create (mcp-*) ── */
 [data-theme="light"] .mcp-create-title{color:#1c1c1e}

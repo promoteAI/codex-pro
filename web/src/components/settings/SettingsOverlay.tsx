@@ -237,12 +237,12 @@ export function SettingsOverlay() {
       </aside>
       <div className="settings-content w-full flex-1 min-w-0 min-h-0 overflow-auto flex flex-col">
         {ProtoPage && (
-          <div className="overflow-auto p-7 px-[clamp(16px,4vw,40px)]" style={{ maxHeight: '100%' }}>
+          <div className="overflow-auto" style={{ margin: "50px 100px 20px", maxHeight: '100%' }}>
             <ProtoPage />
           </div>
         )}
         {AdminPage && (
-          <div className="overflow-auto p-7 px-[clamp(16px,4vw,40px)]" style={{ maxHeight: '100%' }}>
+          <div className="overflow-auto" style={{ margin: "50px 100px 20px", maxHeight: '100%' }}>
             {showAdminChrome || !NAV_IDS.has(section) ? (
               <>
                 <h2 className="text-[22px] font-semibold text-codex-text tracking-tight m-0 mb-1.5">{t(section)}</h2>

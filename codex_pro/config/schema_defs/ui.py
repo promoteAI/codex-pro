@@ -106,6 +106,14 @@ class UIPreferences(_Base):
     )
 
     # ── Agent ────────────────────────────────────────────────────────────────
+    sandbox: Literal["read_only", "workspace_write", "full_access"] = Field(
+        default="full_access",
+        json_schema_extra={"desc_zh": "运行命令时的权限范围", "desc_en": "Permission scope when running commands"},
+    )
+    verbosity: Literal["low", "medium", "high"] = Field(
+        default="medium",
+        json_schema_extra={"desc_zh": "回复包含细节的详细程度", "desc_en": "How detailed agent replies should be"},
+    )
     web_search: bool = Field(
         default=True,
         json_schema_extra={"desc_zh": "允许网页搜索", "desc_en": "Allow web search"},
@@ -113,6 +121,18 @@ class UIPreferences(_Base):
     ultra_in_picker: bool = Field(
         default=False,
         json_schema_extra={"desc_zh": "模型选择器中的 Ultra", "desc_en": "Ultra in model picker"},
+    )
+    effort_levels: list[str] = Field(
+        default=["轻度", "中", "高", "极高", "最高", "Ultra"],
+        json_schema_extra={"desc_zh": "模型选择器中显示的推理强度级别", "desc_en": "Effort levels shown in the model picker"},
+    )
+    reasoning_summary: Literal["auto", "concise", "detailed", "none"] = Field(
+        default="auto",
+        json_schema_extra={"desc_zh": "推理摘要方式", "desc_en": "Reasoning summary mode"},
+    )
+    approval_policy: Literal["ask_on_escalation", "never_ask"] = Field(
+        default="never_ask",
+        json_schema_extra={"desc_zh": "批准策略", "desc_en": "Approval policy"},
     )
     workspace_deps: bool = Field(
         default=True,

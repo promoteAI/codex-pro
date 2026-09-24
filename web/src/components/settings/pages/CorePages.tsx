@@ -730,6 +730,110 @@ export function AgentConfigPage() {
     void useSettingsStore.getState().loadPrefs();
   }, []);
 
+  // Approval policy picker
+  const [approvalOpen, setApprovalOpen] = useState(false);
+  const approvalRef = useRef<HTMLDivElement>(null);
+  const APPROVAL_OPTIONS: Array<{ id: "ask_on_escalation" | "never_ask"; label: string; desc: string }> = [
+    { id: "ask_on_escalation", label: t("askOnEscalation"), desc: t("askOnEscalationDesc") },
+    { id: "never_ask", label: t("neverAsk"), desc: t("neverAskDesc") },
+  ];
+
+  // Sandbox picker
+  const [sandboxOpen, setSandboxOpen] = useState(false);
+  const sandboxRef = useRef<HTMLDivElement>(null);
+  const SANDBOX_OPTIONS: Array<{ id: "read_only" | "workspace_write" | "full_access"; label: string; desc: string }> = [
+    { id: "read_only", label: t("sandboxReadOnly"), desc: t("sandboxReadOnlyDesc") },
+    { id: "workspace_write", label: t("sandboxWorkspaceWrite"), desc: t("sandboxWorkspaceWriteDesc") },
+    { id: "full_access", label: t("sandboxFullAccess"), desc: t("sandboxFullAccessDesc") },
+  ];
+
+  // Verbosity picker
+  const [verbosityOpen, setVerbosityOpen] = useState(false);
+  const verbosityRef = useRef<HTMLDivElement>(null);
+  const VERBOSITY_OPTIONS: Array<{ id: "low" | "medium" | "high"; label: string; desc: string }> = [
+    { id: "low", label: t("verbosityLow"), desc: t("verbosityLowDesc") },
+    { id: "medium", label: t("verbosityMedium"), desc: t("verbosityMediumDesc") },
+    { id: "high", label: t("verbosityHigh"), desc: t("verbosityHighDesc") },
+  ];
+
+  // Reasoning summary picker
+  const [reasoningOpen, setReasoningOpen] = useState(false);
+  const reasoningRef = useRef<HTMLDivElement>(null);
+  const REASONING_OPTIONS: Array<{ id: "auto" | "concise" | "detailed" | "none"; label: string; desc: string }> = [
+    { id: "auto", label: t("auto"), desc: t("autoDesc") },
+    { id: "concise", label: t("concise"), desc: t("conciseDesc") },
+    { id: "detailed", label: t("detailed"), desc: t("detailedDesc") },
+    { id: "none", label: t("none"), desc: t("noneDesc") },
+  ];
+
+  // Effort levels multi-picker
+  const [effortOpen, setEffortOpen] = useState(false);
+  const effortRef = useRef<HTMLDivElement>(null);
+
+  // Shared effect: close dropdown when clicking outside or pressing Escape
+  useEffect(() => {
+    const hasOpen = approvalOpen || sandboxOpen || verbosityOpen || reasoningOpen || effortOpen;
+    if (!hasOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (approvalOpen && !approvalRef.current?.contains(target)) setApprovalOpen(false);
+      if (sandboxOpen && !sandboxRef.current?.contains(target)) setSandboxOpen(false);
+      if (verbosityOpen && !verbosityRef.current?.contains(target)) setVerbosityOpen(false);
+      if (reasoningOpen && !reasoningRef.current?.contains(target)) setReasoningOpen(false);
+      if (effortOpen && !effortRef.current?.contains(target)) setEffortOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setApprovalOpen(false);
+        setSandboxOpen(false);
+        setVerbosityOpen(false);
+        setReasoningOpen(false);
+        setEffortOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [approvalOpen, sandboxOpen, verbosityOpen, reasoningOpen, effortOpen]);
+
+  // Dropdown positioning: track fixed position for each open dropdown
+  const [dropdownPositions, setDropdownPositions] = useState<Record<string, { top: number; right: number }>>({});
+  const updatePosition = (key: string, container: HTMLDivElement | null) => {
+    if (!container) return;
+    const btn = container.querySelector<HTMLButtonElement>("button");
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    setDropdownPositions((prev) => ({
+      ...prev,
+      [key]: { top: rect.bottom + 6, right: window.innerWidth - rect.right },
+    }));
+  };
+
+  // Update position when dropdowns open
+  useEffect(() => {
+    if (approvalOpen) updatePosition("approval", approvalRef.current);
+    else setDropdownPositions((prev) => { const n = { ...prev }; delete n.approval; return n; });
+  }, [approvalOpen]);
+  useEffect(() => {
+    if (sandboxOpen) updatePosition("sandbox", sandboxRef.current);
+    else setDropdownPositions((prev) => { const n = { ...prev }; delete n.sandbox; return n; });
+  }, [sandboxOpen]);
+  useEffect(() => {
+    if (verbosityOpen) updatePosition("verbosity", verbosityRef.current);
+    else setDropdownPositions((prev) => { const n = { ...prev }; delete n.verbosity; return n; });
+  }, [verbosityOpen]);
+  useEffect(() => {
+    if (reasoningOpen) updatePosition("reasoning", reasoningRef.current);
+    else setDropdownPositions((prev) => { const n = { ...prev }; delete n.reasoning; return n; });
+  }, [reasoningOpen]);
+  useEffect(() => {
+    if (effortOpen) updatePosition("effort", effortRef.current);
+    else setDropdownPositions((prev) => { const n = { ...prev }; delete n.effort; return n; });
+  }, [effortOpen]);
+
   return (
     <div className="min-w-0">
       <PageTitle>{t("agent")}</PageTitle>
@@ -745,19 +849,187 @@ export function AgentConfigPage() {
           </button>
         </div>
         <SettingsRow label={t("approvalPolicy")} desc={t("approvalPolicyDesc")}>
-          <DropdownBtn>{t("neverAsk")}</DropdownBtn>
+          <div className="relative" ref={approvalRef}>
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={approvalOpen}
+              onClick={() => {
+                setApprovalOpen((v) => !v);
+              }}
+              className="inline-flex items-center gap-1.5 bg-codex-elevated border border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary hover:bg-codex-active whitespace-nowrap"
+            >
+              {APPROVAL_OPTIONS.find((o) => o.id === prefs.approvalPolicy)?.label ?? t("neverAsk")}
+              <span className="text-[10px] opacity-70">▾</span>
+            </button>
+            {approvalOpen && (
+              <div
+                role="listbox"
+                className="fixed z-20 min-w-[220px] p-1.5 rounded-xl bg-codex-elevated border border-codex-border-strong shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+                style={dropdownPositions.approval ? { top: dropdownPositions.approval.top, right: dropdownPositions.approval.right } : undefined}
+              >
+                {APPROVAL_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="option"
+                    aria-selected={opt.id === prefs.approvalPolicy}
+                    onClick={() => {
+                      updatePrefs({ approvalPolicy: opt.id });
+                      setApprovalOpen(false);
+                    }}
+                    className="w-full flex flex-col items-start gap-0.5 px-3 py-2 rounded-lg text-left hover:bg-codex-hover"
+                  >
+                    <span className="text-[13px] text-codex-text flex items-center gap-2 w-full">
+                      {opt.label}
+                      {opt.id === prefs.approvalPolicy && (
+                        <span className="text-[12px] opacity-100">✓</span>
+                      )}
+                    </span>
+                    <span className="text-[11.5px] text-codex-text-secondary">{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </SettingsRow>
         <SettingsRow label={t("sandbox")} desc={t("sandboxDesc")}>
-          <DropdownBtn>{t("fullAccess")}</DropdownBtn>
+          <div className="relative" ref={sandboxRef}>
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={sandboxOpen}
+              onClick={() => {
+                setSandboxOpen((v) => !v);
+                setApprovalOpen(false);
+              }}
+              className="inline-flex items-center gap-1.5 bg-codex-elevated border border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary hover:bg-codex-active whitespace-nowrap"
+            >
+              {SANDBOX_OPTIONS.find((o) => o.id === prefs.sandbox)?.label ?? t("sandboxFullAccess")}
+              <span className="text-[10px] opacity-70">▾</span>
+            </button>
+            {sandboxOpen && (
+              <div
+                role="listbox"
+                className="fixed z-20 min-w-[240px] p-1.5 rounded-xl bg-codex-elevated border border-codex-border-strong shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+                style={dropdownPositions.sandbox ? { top: dropdownPositions.sandbox.top, right: dropdownPositions.sandbox.right } : undefined}
+              >
+                {SANDBOX_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="option"
+                    aria-selected={opt.id === prefs.sandbox}
+                    onClick={() => {
+                      updatePrefs({ sandbox: opt.id });
+                      setSandboxOpen(false);
+                    }}
+                    className="w-full flex flex-col items-start gap-0.5 px-3 py-2 rounded-lg text-left hover:bg-codex-hover"
+                  >
+                    <span className="text-[13px] text-codex-text flex items-center gap-2 w-full">
+                      {opt.label}
+                      {opt.id === prefs.sandbox && <span className="text-[12px] opacity-100">✓</span>}
+                    </span>
+                    <span className="text-[11.5px] text-codex-text-secondary">{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </SettingsRow>
         <SettingsRow label={t("webSearch")} desc={t("webSearchDesc")}>
           <Toggle checked={prefs.webSearch} onChange={(v) => updatePrefs({ webSearch: v })} label={t("webSearch")} />
         </SettingsRow>
         <SettingsRow label={t("verbosity")} desc={t("verbosityDesc")}>
-          <DropdownBtn>{t("modelDefault")}</DropdownBtn>
+          <div className="relative" ref={verbosityRef}>
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={verbosityOpen}
+              onClick={() => {
+                setVerbosityOpen((v) => !v);
+                setApprovalOpen(false);
+                setSandboxOpen(false);
+              }}
+              className="inline-flex items-center gap-1.5 bg-codex-elevated border border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary hover:bg-codex-active whitespace-nowrap"
+            >
+              {VERBOSITY_OPTIONS.find((o) => o.id === prefs.verbosity)?.label ?? t("verbosityMedium")}
+              <span className="text-[10px] opacity-70">▾</span>
+            </button>
+            {verbosityOpen && (
+              <div
+                role="listbox"
+                className="fixed z-20 min-w-[220px] p-1.5 rounded-xl bg-codex-elevated border border-codex-border-strong shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+                style={dropdownPositions.verbosity ? { top: dropdownPositions.verbosity.top, right: dropdownPositions.verbosity.right } : undefined}
+              >
+                {VERBOSITY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="option"
+                    aria-selected={opt.id === prefs.verbosity}
+                    onClick={() => {
+                      updatePrefs({ verbosity: opt.id });
+                      setVerbosityOpen(false);
+                    }}
+                    className="w-full flex flex-col items-start gap-0.5 px-3 py-2 rounded-lg text-left hover:bg-codex-hover"
+                  >
+                    <span className="text-[13px] text-codex-text flex items-center gap-2 w-full">
+                      {opt.label}
+                      {opt.id === prefs.verbosity && <span className="text-[12px] opacity-100">✓</span>}
+                    </span>
+                    <span className="text-[11.5px] text-codex-text-secondary">{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </SettingsRow>
         <SettingsRow label={t("reasoningSummary")} desc={t("reasoningSummaryDesc")}>
-          <DropdownBtn>{t("auto")}</DropdownBtn>
+          <div className="relative" ref={reasoningRef}>
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={reasoningOpen}
+              onClick={() => {
+                setReasoningOpen((v) => !v);
+                setApprovalOpen(false);
+                setSandboxOpen(false);
+                setVerbosityOpen(false);
+              }}
+              className="inline-flex items-center gap-1.5 bg-codex-elevated border border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary hover:bg-codex-active whitespace-nowrap"
+            >
+              {REASONING_OPTIONS.find((o) => o.id === prefs.reasoningSummary)?.label ?? t("auto")}
+              <span className="text-[10px] opacity-70">▾</span>
+            </button>
+            {reasoningOpen && (
+              <div
+                role="listbox"
+                className="fixed z-20 min-w-[220px] p-1.5 rounded-xl bg-codex-elevated border border-codex-border-strong shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+                style={dropdownPositions.reasoning ? { top: dropdownPositions.reasoning.top, right: dropdownPositions.reasoning.right } : undefined}
+              >
+                {REASONING_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="option"
+                    aria-selected={opt.id === prefs.reasoningSummary}
+                    onClick={() => {
+                      updatePrefs({ reasoningSummary: opt.id });
+                      setReasoningOpen(false);
+                    }}
+                    className="w-full flex flex-col items-start gap-0.5 px-3 py-2 rounded-lg text-left hover:bg-codex-hover"
+                  >
+                    <span className="text-[13px] text-codex-text flex items-center gap-2 w-full">
+                      {opt.label}
+                      {opt.id === prefs.reasoningSummary && <span className="text-[12px] opacity-100">✓</span>}
+                    </span>
+                    <span className="text-[11.5px] text-codex-text-secondary">{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </SettingsRow>
       </SettingsCard>
 
@@ -766,9 +1038,57 @@ export function AgentConfigPage() {
           <SectionTitle>{t("modelFeatures")}</SectionTitle>
         </div>
         <SettingsRow label={t("effortLevels")} desc={t("effortLevelsDesc")}>
-          <span className="text-[12px] text-[#9eb6ff] bg-[#2a3548] border border-[#3a4a66] rounded-full px-2.5 py-0.5">
-            {t("selectedN", { n: 6 })}
-          </span>
+          <div className="relative" ref={effortRef}>
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={effortOpen}
+              onClick={() => {
+                setEffortOpen((v) => !v);
+                setApprovalOpen(false);
+                setSandboxOpen(false);
+                setVerbosityOpen(false);
+                setReasoningOpen(false);
+              }}
+              className="inline-flex items-center gap-1.5 bg-codex-elevated border border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary hover:bg-codex-active whitespace-nowrap"
+            >
+              {t("selectedN", { n: prefs.effortLevels.length })}
+              <span className="text-[10px] opacity-70">▾</span>
+            </button>
+            {effortOpen && (
+              <div
+                role="listbox"
+                className="fixed z-20 min-w-[200px] p-1.5 rounded-xl bg-codex-elevated border border-codex-border-strong shadow-[0_14px_36px_rgba(0,0,0,.5)]"
+                style={dropdownPositions.effort ? { top: dropdownPositions.effort.top, right: dropdownPositions.effort.right } : undefined}
+              >
+                {[
+                  "轻度",
+                  "中",
+                  "高",
+                  "极高",
+                  "最高",
+                  "Ultra",
+                ].map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    role="option"
+                    aria-selected={prefs.effortLevels.includes(level)}
+                    onClick={() => {
+                      const next = prefs.effortLevels.includes(level)
+                        ? prefs.effortLevels.filter((l) => l !== level)
+                        : [...prefs.effortLevels, level];
+                      updatePrefs({ effortLevels: next });
+                    }}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-[13px] text-left text-codex-text hover:bg-codex-hover"
+                  >
+                    <span>{level}</span>
+                    <span className={`text-[12px] ${prefs.effortLevels.includes(level) ? "opacity-100" : "opacity-0"}`}>✓</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </SettingsRow>
         <SettingsRow label={t("ultraInPicker")} desc={t("ultraInPickerDesc")}>
           <Toggle checked={prefs.ultraInPicker} onChange={(v) => updatePrefs({ ultraInPicker: v })} label={t("ultraInPicker")} />
@@ -845,3 +1165,4 @@ function Str({ children }: { children: ReactNode }) {
 function Num({ children }: { children: ReactNode }) {
   return <span className="text-[#7dd3fc]">{children}</span>;
 }
+

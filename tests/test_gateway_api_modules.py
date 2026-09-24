@@ -1051,6 +1051,25 @@ class TestConfigAPI:
         server.web_ws.broadcast.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_update_ui_preferences_approval_policy(self, tmp_path):
+        import yaml
+
+        from codex_pro.config.schema import Config
+
+        target = tmp_path / "codex-pro.yaml"
+        api, config, server = self._make(config=Config())
+        server._config_path = target
+        server.web_ws.broadcast = AsyncMock()
+
+        resp = await api.update_config(
+            _Request(body={"changes": {"ui.preferences.approval_policy": "ask_on_escalation"}})
+        )
+        assert resp.status == 200
+        assert config.ui.preferences.approval_policy == "ask_on_escalation"
+        saved = yaml.safe_load(target.read_text(encoding="utf-8"))
+        assert saved["ui"]["preferences"]["approval_policy"] == "ask_on_escalation"
+
+    @pytest.mark.asyncio
     async def test_update_models_default_model_persists_and_hot_reloads(self, tmp_path):
         import yaml
 

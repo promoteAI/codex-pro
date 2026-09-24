@@ -36,8 +36,13 @@ export interface UIPreferences {
   questionNotify: boolean;
   turnNotifyMode: string;
   // Agent
+  sandbox: "read_only" | "workspace_write" | "full_access";
+  verbosity: "low" | "medium" | "high";
   webSearch: boolean;
   ultraInPicker: boolean;
+  effortLevels: string[];
+  reasoningSummary: "auto" | "concise" | "detailed" | "none";
+  approvalPolicy: "ask_on_escalation" | "never_ask";
   workspaceDeps: boolean;
   // Personalization
   codexInstructions: string;
@@ -89,8 +94,13 @@ const WIRE_KEYS: Record<keyof UIPreferences, string> = {
   permissionNotify: "permission_notify",
   questionNotify: "question_notify",
   turnNotifyMode: "turn_notify_mode",
+  sandbox: "sandbox",
+  verbosity: "verbosity",
   webSearch: "web_search",
   ultraInPicker: "ultra_in_picker",
+  effortLevels: "effort_levels",
+  reasoningSummary: "reasoning_summary",
+  approvalPolicy: "approval_policy",
   workspaceDeps: "workspace_deps",
   codexInstructions: "codex_instructions",
   localMemory: "local_memory",
@@ -135,8 +145,13 @@ export const DEFAULT_PREFS: UIPreferences = {
   permissionNotify: true,
   questionNotify: true,
   turnNotifyMode: "unfocused",
+  sandbox: "full_access",
+  verbosity: "medium",
   webSearch: true,
   ultraInPicker: false,
+  effortLevels: ["轻度", "中", "高", "极高", "最高", "Ultra"],
+  reasoningSummary: "auto",
+  approvalPolicy: "never_ask",
   workspaceDeps: true,
   codexInstructions: "",
   localMemory: false,

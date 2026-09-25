@@ -535,30 +535,43 @@ class MessageHandler:
                 return web.json_response({"error": "rate limited"}, status=429)
 
             session, _ = await self._server._reset_session_if_needed(session_key)
-            # 会话持久化其归属项目(workspace)。`project` 可能为空(全局/未分类会话),
-            # 此时使用 no_project_folder/{YYYY-MM-DD}/{session_dir_name(session_key)}/work
-            # 作为隔离的工作目录:先按运行日期分层,再按会话隔离。session_key 可能含
-            # `:`/`/` 等非法路径字符,会话目录名须经 session_dir_name 清洗(sha256 前缀)。
-            effective_workspace = project
+            # 会话工作区(cwd)在会话创建时决定并持久化,后续每轮复用(参考 Codex 的
+            # cwd 会话级模型)——而不是按每条消息的项目字段重算,也不是依赖前端反复
+            # 发送 `project`。`project` 可能为空(全局/未分类会话),此时使用
+            # no_project_folder/{YYYY-MM-DD}/{session_dir_name(session_key)} 作为隔离
+            # 工作目录:先按运行日期分层,再按会话隔离。session_key 可能含 `:`/`/`
+            # 等非法路径字符,会话目录名须经 session_dir_name 清洗(sha256 前缀)。
             if project:
-                # 有项目会话把归属项目打到 session.project,前端侧边栏据此把会话归到
-                # 对应项目行下(见 CodexSidebar projectSessions filter)。
+                # 有项目会话把归属项目打到 session.project(侧边栏分组标签),并把真实
+                # 工作区写入 session.workspace;二者一致,但语义分离。
+                effective_workspace = project
                 session.project = project
+                session.workspace = project
             else:
-                # 无项目工作目录来自 ui.preferences.no_project_folder(前端设置页改的
-                # 那份)。GatewayServer._config 是 GatewayConfig(不含 ui),完整 Config
-                # 从 agent_loop.config 读取,与 /config API 的惯例一致。
-                _no_proj = self._server._agent_loop.config.ui.preferences.no_project_folder
-                no_project_base = Path(_no_proj).expanduser().resolve()
-                date_dir = no_project_base / datetime.now().strftime("%Y-%m-%d")
-                no_project_dir = date_dir / session_dir_name(session_key)
-                no_project_dir.mkdir(parents=True, exist_ok=True)
-                effective_workspace = str(no_project_dir)
+                # 无项目:优先复用会话已持久化的工作区(跨天不漂移);首次创建时按
+                # ui.preferences.no_project_folder 规则计算并写回 session.workspace。
                 # 注意:此处不设置 session.project。project 字段用于在 /sessions 中
                 # 标记会话归属的项目,前端侧边栏据此把"project 为空"的会话归入「最近」
                 # 列表(见 CodexSidebar recents filter)。无项目会话应保持 project="",
                 # 隔离工作目录只经 workspace(会话变量 + event metadata)传给 agent 工具,
                 # 而不污染 project 语义。
+                if session.workspace:
+                    effective_workspace = session.workspace
+                else:
+                    _no_proj = self._server._agent_loop.config.ui.preferences.no_project_folder
+                    no_project_base = Path(_no_proj).expanduser().resolve()
+                    date_dir = no_project_base / datetime.now().strftime("%Y-%m-%d")
+                    no_project_dir = date_dir / session_dir_name(session_key)
+                    no_project_dir.mkdir(parents=True, exist_ok=True)
+                    effective_workspace = str(no_project_dir)
+                    session.workspace = effective_workspace
+            # 持久化工作区到 session,供下一轮/重开会话复用。
+            save = getattr(self._server, "session_manager", None)
+            if save is not None and hasattr(save, "save"):
+                try:
+                    await save.save(session)
+                except Exception as e:  # noqa: BLE001 — 持久化失败不应阻断本轮
+                    logger.warning("Failed to persist session workspace for {}: {}", session_key, e)
             from codex_pro.gateway.session_context import set_session_vars
             # workspace 作为上报侧 contextvar 一并带上;真正驱动工具的是
             # inbound.py 在派发任务上下文里根据 event.metadata["workspace"] 设置的

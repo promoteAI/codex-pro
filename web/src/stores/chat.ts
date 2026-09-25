@@ -584,16 +584,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadSessionHistory: async (sessionId) => {
     set({ loadingHistory: true, historyError: null, sessionId, chatting: true });
     try {
-      const result = await apiFetch<{ messages: HistoryRow[] }>(
-        `/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`,
-      );
+      const result = await apiFetch<{
+        messages: HistoryRow[];
+        project?: string;
+        workspace?: string;
+      }>(`/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`);
       const messages = mapHistoryMessages(sessionId, result.messages ?? []);
+      // 会话工作区由后端持久化(参考 Codex 的 cwd 会话级模型):重开会话时回填
+      // projectPath,使后续消息沿用原工作区,而不是依赖前端重新选择项目。
+      // 但只对"真正归属某项目"的会话回填:无项目会话(project 为空)必须保持
+      // projectPath="" —— 否则 sendMessage 会在下一条消息里把隔离工作目录当作
+      // project 发回,后端 if project: 分支会把它误判成有项目会话,把 session.project
+      // 打成该目录,使会话从侧边栏「最近」列表消失并污染 project 语义。
+      const project = result.project ?? "";
+      const workspace = result.workspace ?? "";
       set({
         messages,
         loadingHistory: false,
         chatting: messages.length > 0,
         typing: false,
         activeTool: null,
+        ...(project ? { projectPath: workspace || project, project } : { projectPath: "", project: "" }),
       });
     } catch (e: unknown) {
       set({

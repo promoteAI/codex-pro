@@ -159,6 +159,10 @@ class SessionsAPI:
                 "offset": offset,
                 "limit": limit,
                 "has_more": start > 0,
+                # 会话工作区(cwd),供前端恢复时回填 projectPath,使重开的会话沿用原
+                # 工作区(参考 Codex 的 cwd 会话级模型)。
+                "project": session.project,
+                "workspace": session.workspace,
             }
         )
 

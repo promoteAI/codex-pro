@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
@@ -18,6 +20,7 @@ from codex_pro.bus.idempotency import (
     IDEMPOTENCY_NAMESPACE_METADATA,
     durable_fingerprint_conflicts,
 )
+from codex_pro.spill.layout import session_dir_name
 
 if TYPE_CHECKING:
     from codex_pro.gateway.server import GatewayServer
@@ -289,10 +292,44 @@ class WebSocketHandler:
 
                             published = False
                             publish_outcome_unknown = False
+                            # 会话工作区与 HTTP 路径对称：有 project 用之并写回
+                            # session.workspace；无 project 复用会话已持久化的工作区，
+                            # 首次则按 no_project_folder 规则计算并写回(参考 Codex 的
+                            # cwd 会话级模型)。event.metadata["workspace"] 由此值喂给
+                            # inbound.py 的会话 contextvar。
+                            session, _ = await self._server._reset_session_if_needed(session_key)
+                            effective_workspace = project
+                            if project:
+                                session.workspace = project
+                            else:
+                                _no_proj = self._server._agent_loop.config.ui.preferences.no_project_folder
+                                no_project_base = Path(_no_proj).expanduser().resolve()
+                                date_dir = no_project_base / datetime.now().strftime("%Y-%m-%d")
+                                no_project_dir = date_dir / session_dir_name(session_key)
+                                no_project_dir.mkdir(parents=True, exist_ok=True)
+                                session.workspace = str(no_project_dir)
+                            effective_workspace = session.workspace or project
+                            logger.warning(
+                                "[WS-DIAG] project={!r} session.workspace={!r} effective_workspace={!r} session_key={!r} no_proj={!r}",
+                                project, session.workspace, effective_workspace, session_key,
+                                getattr(getattr(self._server, "_agent_loop", None), "config", None) and
+                                self._server._agent_loop.config.ui.preferences.no_project_folder,
+                            )
+                            # 与 HTTP 路径对称:把工作区持久化到 session,供下一轮/重开
+                            # 会话复用 — 否则下次消息仍拿不到已决定的工作区。
+                            save = getattr(self._server, "session_manager", None)
+                            if save is not None and hasattr(save, "save"):
+                                try:
+                                    await save.save(session)
+                                except Exception as e:  # noqa: BLE001 — 持久化失败不应阻断本轮
+                                    logger.warning(
+                                        "Failed to persist session workspace for {}: {}",
+                                        session_key, e,
+                                    )
                             tokens = set_session_vars(
                                 platform=platform, chat_id=chat_id,
                                 user_id=user_id, session_key=session_key,
-                                workspace=project,
+                                workspace=effective_workspace,
                             )
                             try:
                                 event = InboundEvent.text_message(
@@ -307,8 +344,8 @@ class WebSocketHandler:
                                     event.event_id = event_id
                                 event.metadata["gateway"] = True
                                 event.metadata["platform"] = platform
-                                if project:
-                                    event.metadata["workspace"] = project
+                                if effective_workspace:
+                                    event.metadata["workspace"] = effective_workspace
                                 if operation_fingerprint:
                                     event.metadata[IDEMPOTENCY_NAMESPACE_METADATA] = "gateway-message"
                                     event.metadata[IDEMPOTENCY_FINGERPRINT_METADATA] = operation_fingerprint

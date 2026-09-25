@@ -28,7 +28,8 @@ class Session:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     title: str = ""  # human-readable label derived from the first user turn
-    project: str = ""  # workspace path this session is scoped to; "" = none
+    project: str = ""  # sidebar grouping label (project path); "" = grouped under "Recent"
+    workspace: str = ""  # session working directory (cwd); "" = fall back to global workspace
     metadata: dict[str, Any] = field(default_factory=dict)
     last_consolidated: int = 0
     status: str = "active"  # active | expired | archived
@@ -420,6 +421,9 @@ class SessionManager:
         project = data.get("project", "")
         if not isinstance(project, str):
             project = ""
+        workspace = data.get("workspace", "")
+        if not isinstance(workspace, str):
+            workspace = ""
         return Session(
             key=key,
             messages=messages,
@@ -427,6 +431,7 @@ class SessionManager:
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(),
             title=title,
             project=project,
+            workspace=workspace,
             metadata=metadata,
             last_consolidated=data.get("last_consolidated", 0),
             status=data.get("status", "active"),
@@ -448,6 +453,7 @@ class SessionManager:
                 status = "active"
                 title = ""
                 project = ""
+                workspace = ""
 
                 with open(path, encoding="utf-8") as f:
                     for line in f:
@@ -459,6 +465,7 @@ class SessionManager:
                             metadata = data.get("metadata", {})
                             title = data.get("title", "")
                             project = data.get("project", "")
+                            workspace = data.get("workspace", "")
                             created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None
                             updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
                             last_consolidated = data.get("last_consolidated", 0)
@@ -472,6 +479,7 @@ class SessionManager:
                     "metadata": metadata,
                     "title": title,
                     "project": project,
+                    "workspace": workspace,
                     "last_consolidated": last_consolidated,
                     "status": status,
                 })
@@ -497,6 +505,7 @@ class SessionManager:
             "updated_at": session.updated_at.isoformat(),
             "title": session.title,
             "project": session.project,
+            "workspace": session.workspace,
             "metadata": self._persisted_metadata(session),
             "last_consolidated": session.last_consolidated,
             "status": session.status,
@@ -534,6 +543,7 @@ class SessionManager:
             "updated_at": session.updated_at.isoformat(),
             "title": session.title,
             "project": session.project,
+            "workspace": session.workspace,
             "metadata": self._persisted_metadata(session),
             "last_consolidated": session.last_consolidated,
             "status": session.status,
@@ -730,6 +740,7 @@ class SessionManager:
                         "metadata": session.metadata,
                         "title": session.resolved_title(),
                         "project": session.project,
+                        "workspace": session.workspace,
                         "message_count": len(session.messages),
                     }
                     for session in self._cache.values()
@@ -779,6 +790,7 @@ class SessionManager:
                         "updated_at": data.get("updated_at"),
                         "title": title,
                         "project": data.get("project", "") or "",
+                        "workspace": data.get("workspace", "") or "",
                     })
             except Exception as e:
                 logger.debug("Failed to read session file {}: {}", path.name, e)

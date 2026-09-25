@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -12,7 +13,7 @@ from codex_pro.bus.events import OutboundEvent, ContentBlock, ContentType
 from codex_pro.bus.queue import MessageBus
 
 
-def _make_gateway():
+def _make_gateway(no_project_folder: str | None = None):
     """Create a minimal GatewayServer for testing."""
     from codex_pro.gateway.server import GatewayServer
     from codex_pro.config.schema import GatewayConfig, GatewayAuthConfig, GatewaySessionPolicyConfig
@@ -32,8 +33,12 @@ def _make_gateway():
     # an existing session keeps it on the not-new path so SessionStart hooks
     # are not fired in these unit tests.
     session_manager.get = AsyncMock(return_value=MagicMock(status="active"))
+    # ``save`` is awaited when the handler persists the session workspace.
+    session_manager.save = AsyncMock()
     workspace = MagicMock()
     agent_loop = MagicMock()
+    if no_project_folder is not None:
+        agent_loop.config.ui.preferences.no_project_folder = no_project_folder
 
     gw = GatewayServer(
         config=config,
@@ -289,6 +294,9 @@ async def test_message_persists_project_on_session() -> None:
 
     assert response.status == 200
     assert session.project == "e:\\workspace\\codex-pro"
+    # The real cwd is persisted independently of the grouping label.
+    assert session.workspace == "e:\\workspace\\codex-pro"
+
     # A no-project message must NOT set project (it stays "" for the recents list).
     session2 = Session(key="cli:other")
     gw._reset_session_if_needed = AsyncMock(return_value=(session2, False))
@@ -301,3 +309,46 @@ async def test_message_persists_project_on_session() -> None:
     }))
     assert response2.status == 200
     assert session2.project == ""
+
+
+@pytest.mark.asyncio
+async def test_no_project_message_persists_and_reuses_workspace(tmp_path: Path) -> None:
+    """A no-project session gets a no_project_folder/{date}/{session_dir} workspace on
+    its first message and reuses it verbatim on later messages — it must not widen the
+    grouping label (project stays "") nor recompute the dir per message (no drift)."""
+    from codex_pro.session.manager import Session
+    from codex_pro.spill.layout import session_dir_name
+
+    gw, _ = _make_gateway(no_project_folder=str(tmp_path))
+    session = Session(key="cli:np")
+    gw._reset_session_if_needed = AsyncMock(return_value=(session, False))
+
+    message = {
+        "platform": "api",
+        "user_id": "user-1",
+        "chat_id": "chat-1",
+        "session_key": "cli:np",
+        "text": "hello",
+    }
+
+    first = await gw._handle_message(_JsonRequest(message))
+    assert first.status == 200
+
+    # First message decides the isolated cwd and writes it to session.workspace.
+    expected = (
+        tmp_path /
+        datetime.now().strftime("%Y-%m-%d") /
+        session_dir_name("cli:np")
+    )
+    assert session.project == ""
+    assert session.workspace == str(expected)
+    gw.session_manager.save.assert_awaited_once()
+    # The toolbox var handed to the message matches the persisted cwd.
+    assert gw.session_manager.save.await_args.args[0] is session
+
+    # A second no-project message reuses the persisted workspace, no recompute/mkdir.
+    session.workspace = str(expected)  # simulate the persisted value
+    gw._reset_session_if_needed = AsyncMock(return_value=(session, False))
+    second = await gw._handle_message(_JsonRequest(message))
+    assert second.status == 200
+    assert session.workspace == str(expected)

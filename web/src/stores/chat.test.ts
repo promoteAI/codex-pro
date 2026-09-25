@@ -266,6 +266,43 @@ describe("chat store", () => {
     expect(useChatStore.getState().branch).toBe("dev");
     expect(useChatStore.getState().messages).toHaveLength(0);
   });
+
+  it("loadSessionHistory backfills projectPath only for project sessions", async () => {
+    // 无项目会话(project 空,但后端持久化了 workspace):回填不得把隔离工作目录
+    // 当作 projectPath,否则下一条消息会把它作为 project 发回、被后端误判成有项目
+    // 会话。projectPath 必须保持空,由后端 session.workspace 复用工作区。
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path) => {
+      if (String(path).includes("/history")) {
+        return {
+          messages: [{ role: "user", content: "hi" }],
+          project: "",
+          workspace: "C:\\no-proj-base\\2026-09-25\\session-abc",
+        };
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+    await useChatStore.getState().loadSessionHistory("cli:np");
+    const s = useChatStore.getState();
+    expect(s.project).toBe("");
+    expect(s.projectPath).toBe("");
+  });
+
+  it("loadSessionHistory backfills projectPath for a real project session", async () => {
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path) => {
+      if (String(path).includes("/history")) {
+        return {
+          messages: [{ role: "user", content: "hi" }],
+          project: "e:\\workspace\\codex-pro",
+          workspace: "e:\\workspace\\codex-pro",
+        };
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+    await useChatStore.getState().loadSessionHistory("cli:proj");
+    const s = useChatStore.getState();
+    expect(s.project).toBe("e:\\workspace\\codex-pro");
+    expect(s.projectPath).toBe("e:\\workspace\\codex-pro");
+  });
 });
 
 describe("chat store attachments", () => {

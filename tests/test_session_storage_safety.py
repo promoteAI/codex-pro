@@ -86,6 +86,40 @@ async def test_storage_unavailable_does_not_read_stale_file(tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_workspace_round_trips_through_file_mode(tmp_path: Path):
+    """Session.workspace (the persist cwd) survives save -> invalidate -> load."""
+    mgr = SessionManager(sessions_dir=tmp_path / "sessions", expiry_hours=1)
+    session = Session(key="chan:ws")
+    session.project = "e:\\workspace\\codex-pro"
+    session.workspace = "e:\\workspace\\codex-pro\\scratch"
+    await mgr.save(session)
+    await mgr.invalidate("chan:ws")
+
+    reloaded = await mgr.get_or_create("chan:ws")
+    assert reloaded is not None
+    assert reloaded.workspace == "e:\\workspace\\codex-pro\\scratch"
+
+
+@pytest.mark.asyncio
+async def test_workspace_round_trips_through_storage(tmp_path: Path):
+    """Same guarantee for the SQLite path: workspace is a persisted top-level field."""
+    from codex_pro.storage.sqlite import SQLiteBackend
+
+    storage = SQLiteBackend(tmp_path / "ws.db")
+    await storage.initialize()
+    mgr = SessionManager(sessions_dir=tmp_path / "sessions", storage=storage)
+    session = Session(key="chan:ws2")
+    session.project = "e:\\workspace\\codex-pro"
+    session.workspace = "e:\\workspace\\codex-pro\\scratch"
+    await mgr.save(session)
+
+    reloaded = await mgr.get_or_create("chan:ws2")
+    assert reloaded is not None
+    assert reloaded.workspace == "e:\\workspace\\codex-pro\\scratch"
+    await storage.close()
+
+
+@pytest.mark.asyncio
 async def test_cleanup_expired_persists_status_in_file_mode(tmp_path: Path):
     mgr = SessionManager(sessions_dir=tmp_path / "sessions", expiry_hours=1)
 

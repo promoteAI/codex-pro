@@ -14,7 +14,7 @@ const chatDefaults = {
   env: "local",
   branch: "dev",
   model: "m",
-  effort: 2,
+  reasoning: 2,
   perm: "full" as const,
   draft: "",
   messages: [],

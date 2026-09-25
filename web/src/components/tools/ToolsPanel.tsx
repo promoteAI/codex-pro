@@ -546,10 +546,10 @@ function SidechatPane() {
   }, [draft, skills]);
 
   const model = useChatStore((s) => s.model);
-  const effort = useChatStore((s) => s.effort);
+  const reasoning = useChatStore((s) => s.reasoning);
   const perm = useChatStore((s) => s.perm);
   const setModel = useChatStore((s) => s.setModel);
-  const setEffort = useChatStore((s) => s.setEffort);
+  const setReasoning = useChatStore((s) => s.setReasoning);
   const setPerm = useChatStore((s) => s.setPerm);
   const persistPerm = useChatStore((s) => s.persistPerm);
   const isAdmin = useIsAdmin();
@@ -579,8 +579,8 @@ function SidechatPane() {
     return set.size > 0 ? Array.from(set).sort() : null;
   }, [providers]);
 
-  const effortLabels = [tc("effortLow"), tc("effortMed"), tc("effortHigh"), tc("effortMax")];
-  const effortLabel = effortLabels[effort] ?? effortLabels[0];
+  const effortLabels = [tc("reasoningLow"), tc("reasoningMed"), tc("reasoningHigh"), tc("reasoningMax")];
+  const effortLabel = effortLabels[reasoning] ?? effortLabels[0];
   const permLabel =
     perm === "ask" ? tc("permAskShort") : perm === "agent" ? tc("permAgentShort") : tc("permFullShort");
 
@@ -791,10 +791,10 @@ function SidechatPane() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setEffort(3)}
+                  onClick={() => setReasoning(3)}
                   className="p-1 rounded-md text-codex-muted hover:bg-codex-active hover:text-codex-text"
-                  aria-label={tc("resetEffort")}
-                  title={tc("resetEffort")}
+                  aria-label={tc("resetReasoning")}
+                  title={tc("resetReasoning")}
                 >
                   <RotateCcw size={14} />
                 </button>
@@ -802,7 +802,7 @@ function SidechatPane() {
               <div className="px-2 py-2">
                 <div className="model-menu-slider">
                   <div className="model-menu-track">
-                    <div className="model-menu-fill" style={{ width: `${(effort / 3) * 100}%` }} />
+                    <div className="model-menu-fill" style={{ width: `${(reasoning / 3) * 100}%` }} />
                     <div className="model-menu-dots" aria-hidden="true">
                       <span /><span /><span /><span />
                     </div>
@@ -811,8 +811,8 @@ function SidechatPane() {
                       min={0}
                       max={3}
                       step={1}
-                      value={effort}
-                      onChange={(e) => setEffort(Number(e.target.value))}
+                      value={reasoning}
+                      onChange={(e) => setReasoning(Number(e.target.value))}
                       aria-label={effortLabel}
                       className="model-menu-range"
                     />

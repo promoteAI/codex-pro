@@ -122,9 +122,9 @@ class UIPreferences(_Base):
         default=False,
         json_schema_extra={"desc_zh": "模型选择器中的 Ultra", "desc_en": "Ultra in model picker"},
     )
-    effort_levels: list[str] = Field(
-        default=["轻度", "中", "高", "极高", "最高", "Ultra"],
-        json_schema_extra={"desc_zh": "模型选择器中显示的推理强度级别", "desc_en": "Effort levels shown in the model picker"},
+    reasoning_levels: list[str] = Field(
+        default=["low", "medium", "high", "xhigh", "max", "Ultra"],
+        json_schema_extra={"desc_zh": "模型选择器中显示的推理强度级别", "desc_en": "Reasoning levels shown in the model picker"},
     )
     reasoning_summary: Literal["auto", "concise", "detailed", "none"] = Field(
         default="auto",

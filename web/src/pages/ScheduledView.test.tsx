@@ -67,7 +67,7 @@ describe("scheduledFreq helpers", () => {
       notify: "所有运行",
       project: "codex-pro",
       model: "x",
-      reasoning: "轻度",
+      reasoning: "low",
     })).toBe("0 8 * * 1-5");
   });
 

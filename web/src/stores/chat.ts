@@ -120,7 +120,7 @@ interface ChatState {
   env: string;
   branch: string;
   model: string;
-  effort: number;
+  reasoning: number;
   perm: "ask" | "agent" | "full";
   draft: string;
   messages: ChatMessage[];
@@ -156,7 +156,7 @@ interface ChatState {
   setEnv: (env: string) => void;
   setBranch: (branch: string) => void;
   setModel: (model: string) => Promise<void>;
-  setEffort: (effort: number) => void;
+  setReasoning: (reasoning: number) => void;
   setPerm: (perm: "ask" | "agent" | "full") => void;
   persistPerm: (perm: "ask" | "agent" | "full") => Promise<void>;
   loadPerm: () => Promise<void>;
@@ -187,7 +187,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   env: "local",
   branch: "dev",
   model: "agnes-2.5-flash",
-  effort: 3,
+  reasoning: 3,
   perm: "full",
   draft: "",
   messages: [],
@@ -256,7 +256,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
   setEnv: (env) => set({ env }),
   setBranch: (branch) => set({ branch }),
-  setEffort: (effort) => set({ effort }),
+  setReasoning: (reasoning) => set({ reasoning }),
   setPerm: (perm) => set({ perm }),
   persistPerm: async (perm) => {
     await apiFetch("/config", {

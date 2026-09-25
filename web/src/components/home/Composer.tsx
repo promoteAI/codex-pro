@@ -55,14 +55,14 @@ export function Composer() {
   const isGit = useChatStore((s) => s.isGit);
   const branch = useChatStore((s) => s.branch);
   const model = useChatStore((s) => s.model);
-  const effort = useChatStore((s) => s.effort);
+  const reasoning = useChatStore((s) => s.reasoning);
   const perm = useChatStore((s) => s.perm);
   const planMode = useChatStore((s) => s.planMode);
   const goalMode = useChatStore((s) => s.goalMode);
   const selectProject = useChatStore((s) => s.selectProject);
   const setBranch = useChatStore((s) => s.setBranch);
   const setModel = useChatStore((s) => s.setModel);
-  const setEffort = useChatStore((s) => s.setEffort);
+  const setReasoning = useChatStore((s) => s.setReasoning);
   const setPerm = useChatStore((s) => s.setPerm);
   const persistPerm = useChatStore((s) => s.persistPerm);
   const loadPerm = useChatStore((s) => s.loadPerm);
@@ -185,8 +185,8 @@ export function Composer() {
 
   const permLabel =
     perm === "ask" ? t("permAsk") : perm === "agent" ? t("permAgent") : t("permFull");
-  const effortLabels = [t("effortLow"), t("effortMed"), t("effortHigh"), t("effortMax")];
-  const effortLabel = effortLabels[effort] ?? effortLabels[0];
+  const effortLabels = [t("reasoningLow"), t("reasoningMed"), t("reasoningHigh"), t("reasoningMax")];
+  const effortLabel = effortLabels[reasoning] ?? effortLabels[0];
   const modelLabel = model;
   const canSend = draft.trim().length > 0 && !typing;
   const canStop = typing;
@@ -547,10 +547,10 @@ export function Composer() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setEffort(3)}
+                  onClick={() => setReasoning(3)}
                   className="p-1 rounded-md text-codex-muted hover:bg-codex-active hover:text-codex-text"
-                  aria-label={t("resetEffort")}
-                  title={t("resetEffort")}
+                  aria-label={t("resetReasoning")}
+                  title={t("resetReasoning")}
                 >
                   <RotateCcw size={14} />
                 </button>
@@ -558,7 +558,7 @@ export function Composer() {
               <div className="px-2 py-2">
                 <div className="model-menu-slider">
                   <div className="model-menu-track">
-                    <div className="model-menu-fill" style={{ width: `${(effort / 3) * 100}%` }} />
+                    <div className="model-menu-fill" style={{ width: `${(reasoning / 3) * 100}%` }} />
                     <div className="model-menu-dots" aria-hidden="true">
                       <span /><span /><span /><span />
                     </div>
@@ -567,8 +567,8 @@ export function Composer() {
                       min={0}
                       max={3}
                       step={1}
-                      value={effort}
-                      onChange={(e) => setEffort(Number(e.target.value))}
+                      value={reasoning}
+                      onChange={(e) => setReasoning(Number(e.target.value))}
                       aria-label={effortLabel}
                       className="model-menu-range"
                     />

@@ -4,6 +4,20 @@ export type SchFilter = "all" | "on" | "paused" | "done";
 
 export type SchStatus = "on" | "paused" | "done";
 
+/** Reasoning levels; stored as English ids matching `ui.preferences.reasoning_levels`.
+ *  `reasoning` in FreqState shares this field with the settings picker. */
+export const REASONING_LEVELS = ["low", "medium", "high", "xhigh", "max", "Ultra"] as const;
+
+/** Display labels for reasoning levels (ScheduledView is a zh-only page). */
+export const REASONING_LABELS: Record<string, string> = {
+  low: "轻度",
+  medium: "中",
+  high: "高",
+  xhigh: "极高",
+  max: "最高",
+  Ultra: "Ultra",
+};
+
 export interface FreqState {
   repeat: string;
   unit: string;
@@ -25,7 +39,7 @@ export const DEFAULT_FREQ: FreqState = {
   notify: "所有运行",
   project: "codex-pro",
   model: "agnes-2.5-flash",
-  reasoning: "轻度",
+  reasoning: "low",
 };
 
 export const FREQ_OPTIONS: Record<keyof FreqState, string[]> = {
@@ -45,7 +59,7 @@ export const FREQ_OPTIONS: Record<keyof FreqState, string[]> = {
   notify: ["所有运行", "仅失败", "从不"],
   project: ["codex-pro", "无项目"],
   model: ["agnes-2.5-flash", "agnes-2.0-flash", "5.6 Luna", "5.4 Instant", "o3", "o4-mini"],
-  reasoning: ["轻度", "中", "高", "极高"],
+  reasoning: [...REASONING_LEVELS],
 };
 
 const WEEKDAY_CRON: Record<string, string> = {

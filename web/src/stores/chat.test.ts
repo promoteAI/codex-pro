@@ -10,7 +10,7 @@ beforeEach(() => {
     env: "local",
     branch: "dev",
     model: "agnes-2.5-flash",
-    effort: 3,
+    reasoning: 3,
     perm: "full",
     draft: "",
     messages: [],

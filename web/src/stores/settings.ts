@@ -40,7 +40,7 @@ export interface UIPreferences {
   verbosity: "low" | "medium" | "high";
   webSearch: boolean;
   ultraInPicker: boolean;
-  effortLevels: string[];
+  reasoningLevels: string[];
   reasoningSummary: "auto" | "concise" | "detailed" | "none";
   approvalPolicy: "ask_on_escalation" | "never_ask";
   workspaceDeps: boolean;
@@ -98,7 +98,7 @@ const WIRE_KEYS: Record<keyof UIPreferences, string> = {
   verbosity: "verbosity",
   webSearch: "web_search",
   ultraInPicker: "ultra_in_picker",
-  effortLevels: "effort_levels",
+  reasoningLevels: "reasoning_levels",
   reasoningSummary: "reasoning_summary",
   approvalPolicy: "approval_policy",
   workspaceDeps: "workspace_deps",
@@ -149,7 +149,7 @@ export const DEFAULT_PREFS: UIPreferences = {
   verbosity: "medium",
   webSearch: true,
   ultraInPicker: false,
-  effortLevels: ["轻度", "中", "高", "极高", "最高", "Ultra"],
+  reasoningLevels: ["low", "medium", "high", "xhigh", "max", "Ultra"],
   reasoningSummary: "auto",
   approvalPolicy: "never_ask",
   workspaceDeps: true,

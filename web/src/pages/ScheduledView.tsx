@@ -15,6 +15,7 @@ import {
   freqToCron,
   intervalsForUnit,
   jobSchStatus,
+  REASONING_LABELS,
   STATUS_LABEL,
   SUGGESTIONS,
   type FreqState,
@@ -739,7 +740,9 @@ export function ScheduledView() {
                         openMenu("freq", e.currentTarget, { key });
                       }}
                     >
-                      <span className="sch-freq-ctrl-label">{freq[key]}</span>
+                      <span className="sch-freq-ctrl-label">
+                        {key === "reasoning" ? REASONING_LABELS[freq[key]] ?? freq[key] : freq[key]}
+                      </span>
                       <Chevron />
                     </button>
                   </div>
@@ -1098,7 +1101,7 @@ export function ScheduledView() {
                 void applyFreq({ [key]: opt });
               }}
             >
-              <span>{opt}</span>
+              <span>{menu.key === "reasoning" ? REASONING_LABELS[opt] ?? opt : opt}</span>
               <svg className="sch-freq-menu-check" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m5 12 5 5 9-10" />
               </svg>

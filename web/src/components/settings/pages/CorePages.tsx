@@ -766,13 +766,21 @@ export function AgentConfigPage() {
     { id: "none", label: t("none"), desc: t("noneDesc") },
   ];
 
-  // Effort levels multi-picker
-  const [effortOpen, setEffortOpen] = useState(false);
-  const effortRef = useRef<HTMLDivElement>(null);
+  // Reasoning levels multi-picker
+  const [reasoningLevelsOpen, setReasoningLevelsOpen] = useState(false);
+  const reasoningLevelsRef = useRef<HTMLDivElement>(null);
+  const REASONING_LEVEL_OPTIONS: Array<{ id: string; label: string }> = [
+    { id: "low", label: t("reasoningLow") },
+    { id: "medium", label: t("reasoningMedium") },
+    { id: "high", label: t("reasoningHigh") },
+    { id: "xhigh", label: t("reasoningXHigh") },
+    { id: "max", label: t("reasoningMax") },
+    { id: "Ultra", label: t("reasoningUltra") },
+  ];
 
   // Shared effect: close dropdown when clicking outside or pressing Escape
   useEffect(() => {
-    const hasOpen = approvalOpen || sandboxOpen || verbosityOpen || reasoningOpen || effortOpen;
+    const hasOpen = approvalOpen || sandboxOpen || verbosityOpen || reasoningOpen || reasoningLevelsOpen;
     if (!hasOpen) return;
     const onDoc = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -780,7 +788,7 @@ export function AgentConfigPage() {
       if (sandboxOpen && !sandboxRef.current?.contains(target)) setSandboxOpen(false);
       if (verbosityOpen && !verbosityRef.current?.contains(target)) setVerbosityOpen(false);
       if (reasoningOpen && !reasoningRef.current?.contains(target)) setReasoningOpen(false);
-      if (effortOpen && !effortRef.current?.contains(target)) setEffortOpen(false);
+      if (reasoningLevelsOpen && !reasoningLevelsRef.current?.contains(target)) setReasoningLevelsOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -788,7 +796,7 @@ export function AgentConfigPage() {
         setSandboxOpen(false);
         setVerbosityOpen(false);
         setReasoningOpen(false);
-        setEffortOpen(false);
+        setReasoningLevelsOpen(false);
       }
     };
     document.addEventListener("mousedown", onDoc);
@@ -797,7 +805,7 @@ export function AgentConfigPage() {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
     };
-  }, [approvalOpen, sandboxOpen, verbosityOpen, reasoningOpen, effortOpen]);
+  }, [approvalOpen, sandboxOpen, verbosityOpen, reasoningOpen, reasoningLevelsOpen]);
 
   // Dropdown positioning: track fixed position for each open dropdown
   const [dropdownPositions, setDropdownPositions] = useState<Record<string, { top: number; right: number }>>({});
@@ -830,9 +838,9 @@ export function AgentConfigPage() {
     else setDropdownPositions((prev) => { const n = { ...prev }; delete n.reasoning; return n; });
   }, [reasoningOpen]);
   useEffect(() => {
-    if (effortOpen) updatePosition("effort", effortRef.current);
-    else setDropdownPositions((prev) => { const n = { ...prev }; delete n.effort; return n; });
-  }, [effortOpen]);
+    if (reasoningLevelsOpen) updatePosition("reasoningLevels", reasoningLevelsRef.current);
+    else setDropdownPositions((prev) => { const n = { ...prev }; delete n.reasoningLevels; return n; });
+  }, [reasoningLevelsOpen]);
 
   return (
     <div className="min-w-0">
@@ -1037,14 +1045,14 @@ export function AgentConfigPage() {
         <div className="px-4 pt-4">
           <SectionTitle>{t("modelFeatures")}</SectionTitle>
         </div>
-        <SettingsRow label={t("effortLevels")} desc={t("effortLevelsDesc")}>
-          <div className="relative" ref={effortRef}>
+        <SettingsRow label={t("reasoningLevels")} desc={t("reasoningLevelsDesc")}>
+          <div className="relative" ref={reasoningLevelsRef}>
             <button
               type="button"
               aria-haspopup="listbox"
-              aria-expanded={effortOpen}
+              aria-expanded={reasoningLevelsOpen}
               onClick={() => {
-                setEffortOpen((v) => !v);
+                setReasoningLevelsOpen((v) => !v);
                 setApprovalOpen(false);
                 setSandboxOpen(false);
                 setVerbosityOpen(false);
@@ -1052,38 +1060,31 @@ export function AgentConfigPage() {
               }}
               className="inline-flex items-center gap-1.5 bg-codex-elevated border border-codex-border-strong rounded-md px-3 py-1.5 text-[12.5px] text-codex-text-secondary hover:bg-codex-active whitespace-nowrap"
             >
-              {t("selectedN", { n: prefs.effortLevels.length })}
+              {t("selectedN", { n: prefs.reasoningLevels.length })}
               <span className="text-[10px] opacity-70">▾</span>
             </button>
-            {effortOpen && (
+            {reasoningLevelsOpen && (
               <div
                 role="listbox"
                 className="fixed z-20 min-w-[200px] p-1.5 rounded-xl bg-codex-elevated border border-codex-border-strong shadow-[0_14px_36px_rgba(0,0,0,.5)]"
-                style={dropdownPositions.effort ? { top: dropdownPositions.effort.top, right: dropdownPositions.effort.right } : undefined}
+                style={dropdownPositions.reasoningLevels ? { top: dropdownPositions.reasoningLevels.top, right: dropdownPositions.reasoningLevels.right } : undefined}
               >
-                {[
-                  "轻度",
-                  "中",
-                  "高",
-                  "极高",
-                  "最高",
-                  "Ultra",
-                ].map((level) => (
+                {REASONING_LEVEL_OPTIONS.map((level) => (
                   <button
-                    key={level}
+                    key={level.id}
                     type="button"
                     role="option"
-                    aria-selected={prefs.effortLevels.includes(level)}
+                    aria-selected={prefs.reasoningLevels.includes(level.id)}
                     onClick={() => {
-                      const next = prefs.effortLevels.includes(level)
-                        ? prefs.effortLevels.filter((l) => l !== level)
-                        : [...prefs.effortLevels, level];
-                      updatePrefs({ effortLevels: next });
+                      const next = prefs.reasoningLevels.includes(level.id)
+                        ? prefs.reasoningLevels.filter((l) => l !== level.id)
+                        : [...prefs.reasoningLevels, level.id];
+                      updatePrefs({ reasoningLevels: next });
                     }}
                     className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-[13px] text-left text-codex-text hover:bg-codex-hover"
                   >
-                    <span>{level}</span>
-                    <span className={`text-[12px] ${prefs.effortLevels.includes(level) ? "opacity-100" : "opacity-0"}`}>✓</span>
+                    <span>{level.label}</span>
+                    <span className={`text-[12px] ${prefs.reasoningLevels.includes(level.id) ? "opacity-100" : "opacity-0"}`}>✓</span>
                   </button>
                 ))}
               </div>

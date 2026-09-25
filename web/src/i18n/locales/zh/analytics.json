@@ -25,5 +25,13 @@
   "kpiSkillCallsHint": "{{n}} 个技能",
   "kpiErrorRate": "失败率",
   "kpiErrorOk": "正常范围",
-  "kpiErrorWatch": "偏高，建议排查"
+  "kpiErrorWatch": "偏高，建议排查",
+  "channelNames": {
+    "api": "Web / API",
+    "cli": "CLI",
+    "cron": "定时任务",
+    "task": "后台任务",
+    "websocket": "WebSocket",
+    "ws": "WebSocket"
+  }
 }

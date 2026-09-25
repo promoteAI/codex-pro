@@ -44,6 +44,17 @@ class AnalyticsAPI:
             return web.json_response({"error": "invalid 'days' parameter"}, status=400)
         tracker = self._server._agent_loop.cost_tracker
         skills = await tracker.get_skill_usage(days=days)
+        # 只保留当前仍存在的技能,避免已删除技能的历史失败记录污染统计。
+        loop = self._server._agent_loop
+        store = getattr(loop, "skill_store", None)
+        if store is not None and skills:
+            try:
+                existing = {m.name for m in store.list_all()}
+            except Exception:
+                existing = None
+            if existing is not None:
+                norm = {s.replace(" ", "") for s in existing}
+                skills = [s for s in skills if s["skill"].replace(" ", "") in norm]
         # The built-in tracker persists this dimension. Custom trackers may not
         # have a storage backend, so expose availability separately from a
         # legitimate zero-call result.

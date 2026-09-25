@@ -8,7 +8,7 @@ import { TermSession } from "../../lib/term";
 interface TermTab {
   id: string;
   label: string;
-  term: { write(data: string | Uint8Array): void; open(el: HTMLElement): void; element: HTMLElement | null; cols: number; rows: number; onData(cb: (d: string) => void): void; onResize(cb: (s: { cols: number; rows: number }) => void): void };
+  term: { write(data: string | Uint8Array): void; open(el: HTMLElement): void; element: HTMLElement | null | undefined; cols: number; rows: number; onData(cb: (d: string) => void): void; onResize(cb: (s: { cols: number; rows: number }) => void): void };
   session: TermSession;
   fit: { fit(): void };
 }

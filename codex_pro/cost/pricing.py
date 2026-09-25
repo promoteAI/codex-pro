@@ -67,6 +67,9 @@ _PRICING_SNAPSHOT: dict[str, ModelPrice] = {
     "claude-3-opus": ModelPrice(15.00, 75.00, 1.50, 18.75),
     "gemini-1.5-pro": ModelPrice(1.25, 5.00),
     "gemini-1.5-flash": ModelPrice(0.075, 0.30),
+    # agnes-2.5-flash: 自定义代理模型(apihub.agnes-ai.com),无公开定价。以下为
+    # flash 级估值(USD/1M)。如需精确成本,请用 cost.pricingOverrides 覆盖。
+    "agnes-2.5-flash": ModelPrice(0.20, 0.80, 0.30, 0.30),
 }
 
 _missing_price_warned: set[str] = set()

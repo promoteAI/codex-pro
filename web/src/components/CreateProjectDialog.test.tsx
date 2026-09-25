@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { CreateProjectDialog } from "./CreateProjectDialog";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
-import { toast } from "../stores/toast";
 
 vi.mock("../stores/toast", () => ({
   toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
@@ -34,7 +33,7 @@ describe("CreateProjectDialog", () => {
   });
 
   it("opens create project via menu action", () => {
-    const { container } = render(<CreateProjectDialog open={false} onClose={() => {}} />);
+    render(<CreateProjectDialog open={false} onClose={() => {}} />);
     // When opened by menu, the dialog should appear.
     render(<CreateProjectDialog open onClose={() => {}} />);
     expect(screen.getByRole("dialog")).toBeInTheDocument();

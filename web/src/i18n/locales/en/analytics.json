@@ -25,5 +25,13 @@
   "kpiSkillCallsHint": "{{n}} skills",
   "kpiErrorRate": "Failure rate",
   "kpiErrorOk": "Within range",
-  "kpiErrorWatch": "Elevated — investigate"
+  "kpiErrorWatch": "Elevated — investigate",
+  "channelNames": {
+    "api": "Web / API",
+    "cli": "CLI",
+    "cron": "Scheduled",
+    "task": "Background",
+    "websocket": "WebSocket",
+    "ws": "WebSocket"
+  }
 }

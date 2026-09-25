@@ -81,7 +81,6 @@ export function CodexSidebar() {
   const clearChat = useChatStore((s) => s.clearChat);
   const loadSessionHistory = useChatStore((s) => s.loadSessionHistory);
   const sessionId = useChatStore((s) => s.sessionId);
-  const project = useChatStore((s) => s.project);
   const repos = useChatStore((s) => s.repos);
   const loadRepos = useChatStore((s) => s.loadRepos);
   const selectProject = useChatStore((s) => s.selectProject);

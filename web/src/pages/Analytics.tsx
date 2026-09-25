@@ -52,6 +52,22 @@ function formatCompact(n: number): string {
   return String(Math.round(n));
 }
 
+const CHANNEL_MAP: Record<string, string> = {
+  api: "api",
+  cli: "cli",
+  cron: "cron",
+  task: "task",
+  websocket: "websocket",
+  ws: "ws",
+};
+
+function friendlyChannel(raw: string, t: (k: string) => string): string {
+  if (!raw.startsWith("gateway:")) return raw;
+  const platform = raw.slice(8);
+  const mapped = CHANNEL_MAP[platform];
+  return mapped ? t(`channelNames.${mapped}`) : raw;
+}
+
 const CHART_TICK = { fontSize: 12, fill: "#8a8a8a" };
 const GRID = "#2a2a2a";
 const TOOLTIP_STYLE = {
@@ -99,10 +115,9 @@ export function Analytics() {
     (sum, d) => sum + (d.input_tokens ?? 0) + (d.output_tokens ?? 0),
     0,
   );
-  const todayTokens =
-    usage.length > 0
-      ? (usage[usage.length - 1].input_tokens ?? 0) + (usage[usage.length - 1].output_tokens ?? 0)
-      : 0;
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayRow = usage.find((d) => d.date === todayKey);
+  const todayTokens = (todayRow?.input_tokens ?? 0) + (todayRow?.output_tokens ?? 0);
   const skillCalls = skillRows.reduce((s, r) => s + r.calls, 0);
   const skillFails = skillRows.reduce((s, r) => s + r.failures, 0);
   const errorRate = skillCalls > 0 ? (skillFails / skillCalls) * 100 : 0;
@@ -113,11 +128,12 @@ export function Analytics() {
     return channelRows
       .map((r) => ({
         name: r.channel,
+        friendly: friendlyChannel(r.channel, t),
         pct: Math.round(((r.cost_usd ?? 0) / total) * 100),
       }))
       .sort((a, b) => b.pct - a.pct)
       .slice(0, 3);
-  }, [channelRows]);
+  }, [channelRows, t]);
 
   const barHeights = useMemo(() => {
     if (!usage.length) return [];
@@ -130,10 +146,10 @@ export function Analytics() {
       return {
         label: d.date.slice(5),
         pct: Math.max(8, Math.round((v / max) * 100)),
-        highlight: d === usage[usage.length - 1],
+        highlight: d.date === todayKey,
       };
     });
-  }, [usage]);
+  }, [usage, todayKey]);
 
   const refresh = () => {
     refetchTokens();
@@ -179,7 +195,7 @@ export function Analytics() {
         <Kpi
           value={channelRows.length ? String(channelRows.length) : "—"}
           label={t("kpiChannels")}
-          hint={selectedChannel ? selectedChannel : t("kpiChannelsHint")}
+          hint={selectedChannel ? friendlyChannel(selectedChannel, t) : t("kpiChannelsHint")}
           hintTone="info"
         />
         <Kpi
@@ -244,7 +260,7 @@ export function Analytics() {
                   return (
                     <div key={row.name}>
                       <div className="flex justify-between text-[12px] text-[#c8c8c8] mb-1">
-                        <span>{row.name}</span>
+                        <span>{row.friendly}</span>
                         <span>{row.pct}%</span>
                       </div>
                       <div className="bg-[#2a2a2a] rounded h-1.5 overflow-hidden">
@@ -306,7 +322,12 @@ export function Analytics() {
               <ResponsiveContainer width="100%" height="85%">
                 <BarChart data={channelRows}>
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
-                  <XAxis dataKey="channel" tick={CHART_TICK} stroke="#333" />
+                  <XAxis
+                    dataKey="channel"
+                    tick={CHART_TICK}
+                    stroke="#333"
+                    tickFormatter={(v: string) => friendlyChannel(v, t)}
+                  />
                   <YAxis tick={CHART_TICK} stroke="#333" unit="$" />
                   <Tooltip formatter={formatUsd} contentStyle={TOOLTIP_STYLE} />
                   <Bar

@@ -30,6 +30,8 @@
   "filesCopyRel": "Copy relative path",
   "filesCopy": "Copy",
   "filesOpen": "Open in external editor",
+  "filesOpenFailed": "Failed to open the file",
+  "filesOpenCopyPath": "Path copied to clipboard: {{path}}",
   "emptySidechat": "Side chat",
   "sidechatSub": "Side chats are temporary and disappear when you close the app.",
   "sidechatPlaceholder": "Send a message…",

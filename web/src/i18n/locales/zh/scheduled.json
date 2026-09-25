@@ -1,0 +1,174 @@
+{
+  "title": "已安排的任务",
+  "subtitle": "让 CodexPro 安排任务、设置提醒或监测更新",
+  "filter": {
+    "all": "全部",
+    "on": "已开启",
+    "paused": "已暂停",
+    "done": "已完成"
+  },
+  "searchPlaceholder": "搜索已安排任务",
+  "loading": "加载中…",
+  "loadFailed": "加载失败：{{error}}",
+  "empty": "暂无已安排任务",
+  "create": "创建",
+  "createMenu": "创建任务",
+  "createFromCodex": "使用 Codex 创建",
+  "createFromCodexDraft": "Codex 创建的任务",
+  "createFromCodexPrompt": "已根据「使用 Codex 创建」创建任务草稿，可确认或稍后编辑。",
+  "createManual": "手动设置",
+  "createManualName": "手动安排的任务",
+  "createManualPrompt": "由「手动设置」创建的任务。请补充目标、频率与验收标准。",
+  "status": {
+    "on": "已开启",
+    "paused": "已暂停",
+    "done": "已完成"
+  },
+  "detail": {
+    "title": "任务详情",
+    "prompt": "任务提示词",
+    "details": "详情",
+    "runIn": "运行于",
+    "project": "项目",
+    "model": "模型",
+    "reasoning": "推理",
+    "frequency": "频率",
+    "advancedFreq": "高级频率设置",
+    "delivery": "投递目标",
+    "channel": "渠道",
+    "channelPlaceholder": "如: telegram, slack, gateway",
+    "chatId": "会话/群 ID",
+    "chatIdPlaceholder": "如: 123456789",
+    "sessionKey": "Session Key",
+    "sessionKeyPlaceholder": "可选，填了可自动解析渠道",
+    "authorizedNote": "已授权无人值守执行写入/命令类工具",
+    "history": "运行历史记录",
+    "historyLoading": "加载中…",
+    "historyEmpty": "暂无运行记录",
+    "retentionNote": "每个任务保留最近 100 次执行结果",
+    "togglePause": "暂停任务",
+    "toggleStart": "开启任务"
+  },
+  "menu": {
+    "more": "更多",
+    "triggerNow": "立即运行",
+    "delete": "删除",
+    "togglePause": "暂停任务",
+    "toggleResume": "继续任务"
+  },
+  "menuDetail": {
+    "triggerNow": "立即运行",
+    "delete": "删除"
+  },
+  "frequency": {
+    "label": "频率选项",
+    "repeat": "重复",
+    "customUnit": "重复",
+    "interval": "每隔",
+    "weekdayLabel": "开启",
+    "time": "时间",
+    "notify": "通知"
+  },
+  "runin": {
+    "title": "选择运行聊天",
+    "search": "搜索聊天",
+    "newChat": "每次运行时新建聊天",
+    "noMatch": "未找到匹配的聊天"
+  },
+  "delete": {
+    "title": "删除 {{name}}?",
+    "body": "这将永久删除已安排的任务，并停止今后的运行",
+    "cancel": "取消",
+    "confirm": "删除已安排任务"
+  },
+  "toast": {
+    "saveSuccess": "已保存",
+    "saveFailed": "保存失败",
+    "createSuccess": "已创建",
+    "createFailed": "创建失败",
+    "triggerSuccess": "已立即运行「{{name}}」",
+    "triggerFailed": "触发失败",
+    "deleteSuccess": "已删除「{{name}}」",
+    "deleteFailed": "删除失败"
+  },
+  "cronManual": "手动",
+  "cronExpression": "{{expr}}",
+  "repeatHourly": "每小时",
+  "repeatWorkdayWithTime": "工作日 {{time}}",
+  "repeatDailyWithTime": "每天 {{time}}",
+  "repeatWeeklyWithTime": "{{weekday}} {{time}}",
+  "suggest": {
+    "title": "建议",
+    "dailyBrief": "每日简报",
+    "dailyBriefWhen": "工作日 8:00",
+    "dailyBriefDesc": "以日历、未读电子邮件和优先事项摘要开启每个工作日",
+    "dailyBriefPrompt": "汇总今天的日历、未读邮件与优先事项，生成一份简明的每日简报。",
+    "weeklyReview": "每周回顾",
+    "weeklyReviewWhen": "星期五（时间：16:00）",
+    "weeklyReviewDesc": "每周五将你最近的工作整理成简明的状态更新",
+    "weeklyReviewPrompt": "整理本周完成的工作与未完成事项，生成一份周五状态更新。",
+    "followUp": "跟进监控",
+    "followUpWhen": "工作日 9:00",
+    "followUpDesc": "查看最近的电子邮箱和日历活动，并标记需要你关注的事项",
+    "followUpPrompt": "查看最近的邮箱与日历活动，列出需要跟进的事项并按优先级排序。"
+  },
+  "reasoning": {
+    "low": "轻度",
+    "medium": "中",
+    "high": "高",
+    "xhigh": "极高",
+    "max": "最高",
+    "ultra": "Ultra"
+  },
+  "repeat": {
+    "hourly": "每小时",
+    "daily": "每天",
+    "workday": "工作日",
+    "weekly": "每周",
+    "custom": "自定义"
+  },
+  "unit": {
+    "daily": "每天",
+    "weekly": "每周",
+    "monthly": "每月"
+  },
+  "interval": {
+    "week1": "1 周",
+    "week2": "2 周",
+    "week3": "3 周",
+    "week4": "4 周",
+    "day1": "1 天",
+    "day2": "2 天",
+    "day3": "3 天",
+    "month1": "1 月",
+    "month2": "2 月",
+    "month3": "3 月"
+  },
+  "weekday": {
+    "mon": "星期一",
+    "tue": "星期二",
+    "wed": "星期三",
+    "thu": "星期四",
+    "fri": "星期五",
+    "sat": "星期六",
+    "sun": "星期日"
+  },
+  "notify": {
+    "all": "所有运行",
+    "failOnly": "仅失败",
+    "never": "从不"
+  },
+  "project": {
+    "codexPro": "codex-pro",
+    "none": "无项目"
+  },
+  "auth": {
+    "unattended": "允许无人值守执行写入/命令类工具",
+    "hint": "不勾选时任务仍会按时运行，但写入与命令类工具会被拒绝。",
+    "confirmTitle": "确认授权无人值守执行？",
+    "confirmMessage": "该任务将在无人查看的情况下执行下列指令，并可调用写入与命令类工具。\n\n指令：{{command}}\n频率：{{expr}}\n投递：{{target}}",
+    "confirmLabel": "我已确认，授权",
+    "unset": "(未填写)",
+    "noTarget": "(无投递目标)"
+  }
+}

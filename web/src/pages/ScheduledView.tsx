@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useApi } from "../hooks/use-api";
 import { useWsSubscribe } from "../hooks/use-ws";
 import { apiFetch } from "../lib/api";
@@ -6,17 +7,18 @@ import { dateTime } from "../lib/datetime";
 import { runMutation } from "../stores/toast";
 import { useIsAdmin } from "../stores/capabilities";
 import { useConfirm } from "../components/ConfirmDialog";
+import { useProvidersStore } from "../stores/providers";
 import type { CronJob } from "./Cron";
 import {
   cronToFreq,
-  cronToLabel,
+  cronToLabelMeta,
   DEFAULT_FREQ,
   FREQ_OPTIONS,
+  FREQ_VALUE_KEYS,
   freqToCron,
   intervalsForUnit,
   jobSchStatus,
-  REASONING_LABELS,
-  STATUS_LABEL,
+  STATUS_KEYS,
   SUGGESTIONS,
   type FreqState,
   type SchFilter,
@@ -39,6 +41,9 @@ interface MenuState {
   jobId?: string;
   anchor: DOMRect | null;
 }
+
+/** The "new chat each run" option is the only value runInLabel takes; store its i18n key. */
+const RUNIN_NEW_KEY = "runin.newChat";
 
 function Chevron() {
   return (
@@ -107,9 +112,24 @@ function SuggestIcon({ kind }: { kind: SuggestItem["icon"] }) {
 
 /** Codex-styled scheduled / automations view (prototype sch-view). */
 export function ScheduledView() {
+  const { t } = useTranslation(["scheduled", "common"]);
   const { data, loading, error, refetch } = useApi<{ jobs: CronJob[] }>("/cron");
   const isAdmin = useIsAdmin();
   const canWrite = isAdmin !== false;
+
+  const providers = useProvidersStore((s) => s.providers);
+  const fetchProviders = useProvidersStore((s) => s.fetchProviders);
+
+  useEffect(() => {
+    // Model list comes from live providers; best-effort so a missing store doesn't break the view.
+    void fetchProviders().catch(() => {});
+  }, [fetchProviders]);
+
+  const modelOptions = useMemo(() => {
+    const set = new Set<string>();
+    providers.forEach((p) => p.models?.forEach((m) => set.add(m)));
+    return set.size > 0 ? Array.from(set).sort() : [...FREQ_OPTIONS.model];
+  }, [providers]);
 
   const [filter, setFilter] = useState<SchFilter>("all");
   const [query, setQuery] = useState("");
@@ -122,7 +142,7 @@ export function ScheduledView() {
   const [deleteTarget, setDeleteTarget] = useState<CronJob | null>(null);
   const [promptDraft, setPromptDraft] = useState("");
   const [freq, setFreq] = useState<FreqState>(DEFAULT_FREQ);
-  const [runInLabel, setRunInLabel] = useState("每次运行时新建聊天");
+  const [runInLabel, setRunInLabel] = useState(RUNIN_NEW_KEY);
   const [runInQuery, setRunInQuery] = useState("");
   const [saving, setSaving] = useState(false);
   // Delivery slots — mirrors Cron.tsx's DELIVERY_KEYS; these are just UI state.
@@ -209,7 +229,7 @@ export function ScheduledView() {
     setDeliverChatId(ciVal ?? "");
     setSourceSessionKey(skVal ?? "");
     setPayloadKeys({ channel: chKey, chatId: ciKey, sessionKey: skKey });
-    setRunInLabel("每次运行时新建聊天");
+    setRunInLabel(RUNIN_NEW_KEY);
     // Authorization state is server-tracked; never pre-check the box.
     setAuthorizeUnattended(false);
     setAuthorizedSnapshot("");
@@ -279,13 +299,13 @@ export function ScheduledView() {
       setSaving(true);
       const ok = await runMutation(
         () => apiFetch(`/cron/${job.id}`, { method: "PUT", body: JSON.stringify(body) }),
-        { success: "已保存", error: "保存失败" },
+        { success: t("toast.saveSuccess"), error: t("toast.saveFailed") },
       );
       setSaving(false);
       if (ok) refetch();
       return ok;
     },
-    [canWrite, refetch, jobPrompt, jobCommandKey, deliverChannel, deliverChatId, sourceSessionKey, payloadKeys, authorizedSnapshot],
+    [canWrite, refetch, jobPrompt, jobCommandKey, deliverChannel, deliverChatId, sourceSessionKey, payloadKeys, authorizedSnapshot, t],
   );
 
   const createAndSelect = useCallback(
@@ -306,7 +326,7 @@ export function ScheduledView() {
           }),
         })) as { id: string };
         createdId = res.id;
-      }, { success: "已创建", error: "创建失败" });
+      }, { success: t("toast.createSuccess"), error: t("toast.createFailed") });
       setSaving(false);
       if (!ok || !createdId) return;
       await refetch();
@@ -321,7 +341,7 @@ export function ScheduledView() {
         payload: { command: opts.prompt },
       });
     },
-    [canWrite, closeMenus, openDetail, refetch],
+    [canWrite, closeMenus, openDetail, refetch, t],
   );
 
   const schedulePromptSave = useCallback(
@@ -356,7 +376,7 @@ export function ScheduledView() {
     closeMenus();
     const ok = await runMutation(
       () => apiFetch(`/cron/${job.id}/trigger`, { method: "POST" }),
-      { success: `已立即运行「${job.name || job.id}」`, error: "触发失败" },
+      { success: t("toast.triggerSuccess", { name: job.name || job.id }), error: t("toast.triggerFailed") },
     );
     if (ok) refetch();
   };
@@ -373,7 +393,7 @@ export function ScheduledView() {
     setDeleteTarget(null);
     const ok = await runMutation(
       () => apiFetch(`/cron/${job.id}`, { method: "DELETE" }),
-      { success: `已删除「${job.name || job.id}」`, error: "删除失败" },
+      { success: t("toast.deleteSuccess", { name: job.name || job.id }), error: t("toast.deleteFailed") },
     );
     if (ok) {
       if (selectedId === job.id) closeDetail();
@@ -395,10 +415,34 @@ export function ScheduledView() {
 
   const hasDetail = !!selected;
 
+  /** Translate a canonical frequency value (stored as the zh string the cron
+   *  logic reads) into the current language; falls back to the value itself for
+   *  fields without a mapping (e.g. models, time). */
+  const trFreqValue = useCallback(
+    (key: keyof FreqState, value: string): string => {
+      const map = FREQ_VALUE_KEYS[key];
+      const k = map?.[value];
+      return k ? t(k) : value;
+    },
+    [t],
+  );
+
+  /** Render a cron-pill label, translating the weekday param for weekly exprs. */
+  const cronLabelText = useCallback(
+    (expr: string): string => {
+      const meta = cronToLabelMeta(expr);
+      if (meta.params.weekday) {
+        return t(meta.key, { ...meta.params, weekday: trFreqValue("weekday", meta.params.weekday) });
+      }
+      return t(meta.key, meta.params);
+    },
+    [t, trFreqValue],
+  );
+
   return (
     <section
       className={`sch-view${hasDetail ? " has-detail" : ""}`}
-      aria-label="已安排的任务"
+      aria-label={t("title")}
     >
       <div className="sch-list-pane">
         <div className={`sch-create-wrap${createOpen ? " open" : ""}`} ref={createWrapRef} id="schCreateWrap">
@@ -414,17 +458,17 @@ export function ScheduledView() {
               setCreateOpen((o) => !o);
             }}
           >
-            创建 <Chevron />
+            {t("create")} <Chevron />
           </button>
-          <div className="sch-create-menu" role="menu" aria-label="创建任务">
+          <div className="sch-create-menu" role="menu" aria-label={t("createMenu")}>
             <button
               className="sch-create-item"
               type="button"
               role="menuitem"
               onClick={() =>
                 void createAndSelect({
-                  name: "Codex 创建的任务",
-                  prompt: "已根据「使用 Codex 创建」创建任务草稿，可确认或稍后编辑。",
+                  name: t("createFromCodexDraft"),
+                  prompt: t("createFromCodexPrompt"),
                   cron: "0 * * * *",
                 })
               }
@@ -432,7 +476,7 @@ export function ScheduledView() {
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
-              使用 Codex 创建
+              {t("createFromCodex")}
             </button>
             <button
               className="sch-create-item"
@@ -440,8 +484,8 @@ export function ScheduledView() {
               role="menuitem"
               onClick={() =>
                 void createAndSelect({
-                  name: "手动安排的任务",
-                  prompt: "由「手动设置」创建的任务。请补充目标、频率与验收标准。",
+                  name: t("createManualName"),
+                  prompt: t("createManualPrompt"),
                   cron: "0 * * * *",
                   freqPatch: { repeat: "自定义" },
                 })
@@ -451,31 +495,31 @@ export function ScheduledView() {
                 <path d="M12 20h9" />
                 <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
               </svg>
-              手动设置
+              {t("createManual")}
             </button>
           </div>
         </div>
 
         <div className="sch-inner">
-          <h1 className="sch-title">已安排的任务</h1>
-          <p className="sch-sub">让 CodexPro 安排任务、设置提醒或监测更新</p>
+          <h1 className="sch-title">{t("title")}</h1>
+          <p className="sch-sub">{t("subtitle")}</p>
 
-          <div className="sch-filters" role="tablist" aria-label="任务状态筛选">
+          <div className="sch-filters" role="tablist" aria-label={t("filter.all")}>
             {(
               [
-                ["all", "全部"],
-                ["on", "已开启"],
-                ["paused", "已暂停"],
-                ["done", "已完成"],
+                ["all", "filter.all"],
+                ["on", "filter.on"],
+                ["paused", "filter.paused"],
+                ["done", "filter.done"],
               ] as const
-            ).map(([id, label]) => (
+            ).map(([id, key]) => (
               <button
                 key={id}
                 type="button"
                 className={`sch-filter${filter === id ? " active" : ""}`}
                 onClick={() => setFilter(id)}
               >
-                {label}
+                {t(key)}
               </button>
             ))}
           </div>
@@ -487,22 +531,22 @@ export function ScheduledView() {
             </svg>
             <input
               type="search"
-              placeholder="搜索已安排任务"
-              aria-label="搜索已安排任务"
+              placeholder={t("searchPlaceholder")}
+              aria-label={t("searchPlaceholder")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
 
           <div className="sch-task-list" id="schTaskList">
-            {loading && <div className="sch-task-meta" style={{ padding: "12px 10px" }}>加载中…</div>}
+            {loading && <div className="sch-task-meta" style={{ padding: "12px 10px" }}>{t("loading")}</div>}
             {!loading && error && (
               <div className="sch-task-meta" style={{ padding: "12px 10px", color: "#e85d5d" }}>
-                加载失败：{error}
+                {t("loadFailed", { error })}
               </div>
             )}
             {!loading && !error && filtered.length === 0 && (
-              <div className="sch-task-meta" style={{ padding: "12px 10px" }}>暂无已安排任务</div>
+              <div className="sch-task-meta" style={{ padding: "12px 10px" }}>{t("empty")}</div>
             )}
             {filtered.map((job) => {
               const st = statusOf(job);
@@ -528,13 +572,13 @@ export function ScheduledView() {
                   </div>
                   <div className="sch-task-info">
                     <div className="sch-task-name">{job.name || job.id}</div>
-                    <div className="sch-task-meta">{cronToLabel(job.cron_expr)}</div>
+                    <div className="sch-task-meta">{cronLabelText(job.cron_expr)}</div>
                   </div>
                   <button
                     type="button"
                     className={`sch-task-more${menu.kind === "more" && menu.jobId === job.id ? " is-active" : ""}`}
-                    title="更多"
-                    aria-label="更多"
+                    title={t("menu.more")}
+                    aria-label={t("menu.more")}
                     aria-haspopup="menu"
                     aria-expanded={menu.kind === "more" && menu.jobId === job.id}
                     onClick={(e) => {
@@ -551,7 +595,7 @@ export function ScheduledView() {
 
           {!hasDetail && (
             <>
-              <div className="sch-suggest-title">建议</div>
+              <div className="sch-suggest-title">{t("suggest.title")}</div>
               <div className="sch-suggest-list">
                 {SUGGESTIONS.map((s) => (
                   <div
@@ -561,8 +605,8 @@ export function ScheduledView() {
                     tabIndex={0}
                     onClick={() =>
                       void createAndSelect({
-                        name: s.name,
-                        prompt: s.prompt,
+                        name: t(s.nameKey),
+                        prompt: t(s.promptKey),
                         cron: s.cron,
                         freqPatch: s.freq,
                       })
@@ -571,8 +615,8 @@ export function ScheduledView() {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         void createAndSelect({
-                          name: s.name,
-                          prompt: s.prompt,
+                          name: t(s.nameKey),
+                          prompt: t(s.promptKey),
                           cron: s.cron,
                           freqPatch: s.freq,
                         });
@@ -583,9 +627,9 @@ export function ScheduledView() {
                       <SuggestIcon kind={s.icon} />
                     </div>
                     <div className="sch-suggest-info">
-                      <div className="sch-suggest-name">{s.name}</div>
-                      <div className="sch-suggest-when">{s.when}</div>
-                      <div className="sch-suggest-desc">{s.desc}</div>
+                      <div className="sch-suggest-name">{t(s.nameKey)}</div>
+                      <div className="sch-suggest-when">{t(s.whenKey)}</div>
+                      <div className="sch-suggest-desc">{t(s.descKey)}</div>
                     </div>
                   </div>
                 ))}
@@ -596,11 +640,11 @@ export function ScheduledView() {
       </div>
 
       {selected && (
-        <aside className="sch-detail open" aria-label="任务详情">
+        <aside className="sch-detail open" aria-label={t("detail.title")}>
           <div className="sch-detail-head">
             <div className="sch-detail-head-main">
               <span className={`sch-detail-status is-${statusOf(selected)}`}>
-                {STATUS_LABEL[statusOf(selected)]}
+                {t(STATUS_KEYS[statusOf(selected)])}
               </span>
               <h2 className="sch-detail-title">{selected.name || selected.id}</h2>
             </div>
@@ -608,8 +652,8 @@ export function ScheduledView() {
               <button
                 type="button"
                 className={`sch-detail-icon-btn${menu.kind === "detailMore" ? " is-active" : ""}`}
-                title="更多"
-                aria-label="更多"
+                title={t("menu.more")}
+                aria-label={t("menu.more")}
                 aria-haspopup="menu"
                 aria-expanded={menu.kind === "detailMore"}
                 onClick={(e) => {
@@ -622,8 +666,8 @@ export function ScheduledView() {
               <button
                 type="button"
                 className="sch-detail-icon-btn"
-                title="立即运行"
-                aria-label="立即运行"
+                title={t("menu.triggerNow")}
+                aria-label={t("menu.triggerNow")}
                 disabled={!canWrite || !selected.enabled}
                 onClick={() => void trigger(selected)}
               >
@@ -635,8 +679,8 @@ export function ScheduledView() {
               <button
                 type="button"
                 className="sch-detail-icon-btn"
-                title="关闭"
-                aria-label="关闭"
+                title={t("common:close")}
+                aria-label={t("common:close")}
                 onClick={closeDetail}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -649,7 +693,7 @@ export function ScheduledView() {
           <div className="sch-detail-body">
             <textarea
               className="sch-detail-prompt"
-              aria-label="任务提示词"
+              aria-label={t("detail.prompt")}
               spellCheck={false}
               value={promptDraft}
               disabled={!canWrite}
@@ -678,9 +722,13 @@ export function ScheduledView() {
                         [deliverChannel.trim(), deliverChatId.trim()].filter(Boolean).join(":") || sourceSessionKey.trim(),
                       ]);
                       void confirm({
-                        title: "确认授权无人值守执行？",
-                        message: `该任务将在无人查看的情况下执行下列指令，并可调用写入与命令类工具。\n\n指令：${promptDraft.trim() || "(未填写)"}\n频率：${selected.cron_expr}\n投递：${[deliverChannel.trim(), deliverChatId.trim()].filter(Boolean).join(":") || sourceSessionKey.trim() || "(无投递目标)"}`,
-                        confirmLabel: "我已确认，授权",
+                        title: t("auth.confirmTitle"),
+                        message: t("auth.confirmMessage", {
+                          command: promptDraft.trim() || t("auth.unset"),
+                          expr: selected.cron_expr,
+                          target: [deliverChannel.trim(), deliverChatId.trim()].filter(Boolean).join(":") || sourceSessionKey.trim() || t("auth.noTarget"),
+                        }),
+                        confirmLabel: t("auth.confirmLabel"),
                         destructive: true,
                       }).then((ok) => {
                         if (ok) setAuthorizedSnapshot(digest);
@@ -690,9 +738,9 @@ export function ScheduledView() {
                     className="mt-0.5"
                   />
                   <label htmlFor="sch-authorize-unattended" className="text-sm flex-1">
-                    允许无人值守执行写入/命令类工具
+                    {t("auth.unattended")}
                     <span className="block text-xs text-gray-500">
-                      不勾选时任务仍会按时运行，但写入与命令类工具会被拒绝。
+                      {t("auth.hint")}
                     </span>
                   </label>
                 </div>
@@ -700,14 +748,14 @@ export function ScheduledView() {
             )}
 
             <section className="sch-detail-section" aria-labelledby="schDetailSectionDetails">
-              <h3 className="sch-detail-section-title" id="schDetailSectionDetails">详情</h3>
+              <h3 className="sch-detail-section-title" id="schDetailSectionDetails">{t("detail.details")}</h3>
               <div className="sch-freq-card">
                 <div className="sch-freq-row">
-                  <span className="sch-detail-label">运行于</span>
+                  <span className="sch-detail-label">{t("detail.runIn")}</span>
                   <button
                     type="button"
                     className={`sch-freq-ctrl is-pill${menu.kind === "runin" ? " is-open" : ""}`}
-                    aria-label="运行于"
+                    aria-label={t("detail.runIn")}
                     aria-haspopup="dialog"
                     aria-expanded={menu.kind === "runin"}
                     onClick={(e) => {
@@ -716,19 +764,19 @@ export function ScheduledView() {
                       setRunInQuery("");
                     }}
                   >
-                    <span className="sch-freq-ctrl-label">{runInLabel}</span>
+                    <span className="sch-freq-ctrl-label">{t(runInLabel)}</span>
                     <Chevron />
                   </button>
                 </div>
                 {(
                   [
-                    ["project", "项目"],
-                    ["model", "模型"],
-                    ["reasoning", "推理"],
+                    ["project", "detail.project"],
+                    ["model", "detail.model"],
+                    ["reasoning", "detail.reasoning"],
                   ] as const
-                ).map(([key, label]) => (
+                ).map(([key, labelKey]) => (
                   <div className="sch-freq-row" key={key}>
-                    <span className="sch-detail-label">{label}</span>
+                    <span className="sch-detail-label">{t(labelKey)}</span>
                     <button
                       type="button"
                       className={`sch-freq-ctrl${menu.kind === "freq" && menu.key === key ? " is-open" : ""}`}
@@ -741,7 +789,9 @@ export function ScheduledView() {
                       }}
                     >
                       <span className="sch-freq-ctrl-label">
-                        {key === "reasoning" ? REASONING_LABELS[freq[key]] ?? freq[key] : freq[key]}
+                        {key === "reasoning" || key === "project"
+                          ? trFreqValue(key, freq[key])
+                          : freq[key]}
                       </span>
                       <Chevron />
                     </button>
@@ -755,12 +805,12 @@ export function ScheduledView() {
               aria-labelledby="schDetailSectionFreq"
             >
               <div className="sch-detail-section-head">
-                <h3 className="sch-detail-section-title" id="schDetailSectionFreq">频率</h3>
+                <h3 className="sch-detail-section-title" id="schDetailSectionFreq">{t("detail.frequency")}</h3>
                 <button
                   type="button"
                   className="sch-freq-gear"
-                  title="高级频率设置"
-                  aria-label="高级频率设置"
+                  title={t("detail.advancedFreq")}
+                  aria-label={t("detail.advancedFreq")}
                   onClick={() =>
                     void applyFreq({ repeat: "自定义" })
                   }
@@ -773,7 +823,7 @@ export function ScheduledView() {
               </div>
               <div className="sch-freq-card">
                 <div className="sch-freq-row" data-freq-row="repeat" hidden={freq.repeat === "自定义"}>
-                  <span className="sch-detail-label">重复</span>
+                  <span className="sch-detail-label">{t("frequency.repeat")}</span>
                   <button
                     type="button"
                     className={`sch-freq-ctrl is-pill${menu.kind === "freq" && menu.key === "repeat" ? " is-open" : ""}`}
@@ -785,12 +835,12 @@ export function ScheduledView() {
                       openMenu("freq", e.currentTarget, { key: "repeat" });
                     }}
                   >
-                    <span className="sch-freq-ctrl-label">{freq.repeat}</span>
+                    <span className="sch-freq-ctrl-label">{trFreqValue("repeat", freq.repeat)}</span>
                     <Chevron />
                   </button>
                 </div>
                 <div className="sch-freq-row" data-freq-row="custom-unit" hidden={freq.repeat !== "自定义"}>
-                  <span className="sch-detail-label">重复</span>
+                  <span className="sch-detail-label">{t("frequency.customUnit")}</span>
                   <button
                     type="button"
                     className={`sch-freq-ctrl${menu.kind === "freq" && menu.key === "unit" ? " is-open" : ""}`}
@@ -799,12 +849,12 @@ export function ScheduledView() {
                       openMenu("freq", e.currentTarget, { key: "unit" });
                     }}
                   >
-                    <span className="sch-freq-ctrl-label">{freq.unit}</span>
+                    <span className="sch-freq-ctrl-label">{trFreqValue("unit", freq.unit)}</span>
                     <Chevron />
                   </button>
                 </div>
                 <div className="sch-freq-row" data-freq-row="interval" hidden={freq.repeat !== "自定义"}>
-                  <span className="sch-detail-label">每隔</span>
+                  <span className="sch-detail-label">{t("frequency.interval")}</span>
                   <button
                     type="button"
                     className={`sch-freq-ctrl${menu.kind === "freq" && menu.key === "interval" ? " is-open" : ""}`}
@@ -813,7 +863,7 @@ export function ScheduledView() {
                       openMenu("freq", e.currentTarget, { key: "interval" });
                     }}
                   >
-                    <span className="sch-freq-ctrl-label">{freq.interval}</span>
+                    <span className="sch-freq-ctrl-label">{trFreqValue("interval", freq.interval)}</span>
                     <Chevron />
                   </button>
                 </div>
@@ -822,7 +872,7 @@ export function ScheduledView() {
                   data-freq-row="weekday"
                   hidden={!(freq.repeat === "每周" || freq.repeat === "自定义")}
                 >
-                  <span className="sch-detail-label">开启</span>
+                  <span className="sch-detail-label">{t("frequency.weekdayLabel")}</span>
                   <button
                     type="button"
                     className={`sch-freq-ctrl${menu.kind === "freq" && menu.key === "weekday" ? " is-open" : ""}`}
@@ -831,7 +881,7 @@ export function ScheduledView() {
                       openMenu("freq", e.currentTarget, { key: "weekday" });
                     }}
                   >
-                    <span className="sch-freq-ctrl-label">{freq.weekday}</span>
+                    <span className="sch-freq-ctrl-label">{trFreqValue("weekday", freq.weekday)}</span>
                     <Chevron />
                   </button>
                 </div>
@@ -847,7 +897,7 @@ export function ScheduledView() {
                     )
                   }
                 >
-                  <span className="sch-detail-label">时间</span>
+                  <span className="sch-detail-label">{t("frequency.time")}</span>
                   <button
                     type="button"
                     className={`sch-freq-ctrl${menu.kind === "freq" && menu.key === "time" ? " is-open" : ""}`}
@@ -861,7 +911,7 @@ export function ScheduledView() {
                   </button>
                 </div>
                 <div className="sch-freq-row" data-freq-row="notify">
-                  <span className="sch-detail-label">通知</span>
+                  <span className="sch-detail-label">{t("frequency.notify")}</span>
                   <button
                     type="button"
                     className={`sch-freq-ctrl${menu.kind === "freq" && menu.key === "notify" ? " is-open" : ""}`}
@@ -870,7 +920,7 @@ export function ScheduledView() {
                       openMenu("freq", e.currentTarget, { key: "notify" });
                     }}
                   >
-                    <span className="sch-freq-ctrl-label">{freq.notify}</span>
+                    <span className="sch-freq-ctrl-label">{trFreqValue("notify", freq.notify)}</span>
                     <Chevron />
                   </button>
                 </div>
@@ -879,36 +929,36 @@ export function ScheduledView() {
 
             {canWrite && (
               <section className="sch-detail-section" aria-labelledby="schDetailSectionDelivery">
-                <h3 className="sch-detail-section-title" id="schDetailSectionDelivery">投递目标</h3>
+                <h3 className="sch-detail-section-title" id="schDetailSectionDelivery">{t("detail.delivery")}</h3>
                 <div className="sch-freq-card">
                   <div className="sch-freq-row">
-                    <span className="sch-detail-label">渠道</span>
+                    <span className="sch-detail-label">{t("detail.channel")}</span>
                     <input
                       type="text"
                       className="sch-detail-delivery-input"
-                      placeholder="如: telegram, slack, gateway"
+                      placeholder={t("detail.channelPlaceholder")}
                       value={deliverChannel}
                       disabled={!canWrite}
                       onChange={(e) => setDeliverChannel(e.target.value)}
                     />
                   </div>
                   <div className="sch-freq-row">
-                    <span className="sch-detail-label">会话/群 ID</span>
+                    <span className="sch-detail-label">{t("detail.chatId")}</span>
                     <input
                       type="text"
                       className="sch-detail-delivery-input"
-                      placeholder="如: 123456789"
+                      placeholder={t("detail.chatIdPlaceholder")}
                       value={deliverChatId}
                       disabled={!canWrite}
                       onChange={(e) => setDeliverChatId(e.target.value)}
                     />
                   </div>
                   <div className="sch-freq-row">
-                    <span className="sch-detail-label">Session Key</span>
+                    <span className="sch-detail-label">{t("detail.sessionKey")}</span>
                     <input
                       type="text"
                       className="sch-detail-delivery-input"
-                      placeholder="可选，填了可自动解析渠道"
+                      placeholder={t("detail.sessionKeyPlaceholder")}
                       value={sourceSessionKey}
                       disabled={!canWrite}
                       onChange={(e) => setSourceSessionKey(e.target.value)}
@@ -920,16 +970,16 @@ export function ScheduledView() {
 
             {authorizedSnapshot && (
               <div className="sch-detail-auth-note" style={{ fontSize: "12px", color: "#1a7f37", padding: "4px 0" }}>
-                已授权无人值守执行写入/命令类工具
+                {t("detail.authorizedNote")}
               </div>
             )}
 
             <section className="sch-detail-section" aria-labelledby="schDetailSectionHistory">
-              <h3 className="sch-detail-section-title" id="schDetailSectionHistory">运行历史记录</h3>
+              <h3 className="sch-detail-section-title" id="schDetailSectionHistory">{t("detail.history")}</h3>
               <div className="sch-detail-history">
-                {runsLoading && <div className="sch-run-meta" style={{ padding: "4px 2px" }}>加载中…</div>}
+                {runsLoading && <div className="sch-run-meta" style={{ padding: "4px 2px" }}>{t("detail.historyLoading")}</div>}
                 {!runsLoading && (runsData?.runs?.length ?? 0) === 0 && (
-                  <div className="sch-run-meta" style={{ padding: "4px 2px" }}>暂无运行记录</div>
+                  <div className="sch-run-meta" style={{ padding: "4px 2px" }}>{t("detail.historyEmpty")}</div>
                 )}
                 {(runsData?.runs ?? []).map((run) => (
                   <div className="sch-run" key={`${run.ts}-${run.status}`} role="button" tabIndex={0}>
@@ -958,10 +1008,10 @@ export function ScheduledView() {
                   style={{ alignSelf: "flex-start" }}
                   onClick={() => void toggleEnabled(selected)}
                 >
-                  {selected.enabled ? "暂停任务" : "开启任务"}
+                  {selected.enabled ? t("detail.togglePause") : t("detail.toggleStart")}
                 </button>
                 <div className="sch-detail-retention-note" style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}>
-                  每个任务保留最近 100 次执行结果
+                  {t("detail.retentionNote")}
                 </div>
               </section>
             )}
@@ -974,7 +1024,7 @@ export function ScheduledView() {
         <div
           className="sch-more-menu open"
           role="menu"
-          aria-label="任务操作"
+          aria-label={t("menu.more")}
           style={{
             left: Math.min(window.innerWidth - 140, Math.max(8, menu.anchor.right - 132)),
             top: Math.min(window.innerHeight - 120, menu.anchor.bottom + 6),
@@ -993,7 +1043,7 @@ export function ScheduledView() {
               <circle cx="12" cy="12" r="9" />
               <path d="M10 8.5v7l6-3.5z" />
             </svg>
-            立即运行
+            {t("menu.triggerNow")}
           </button>
           <button
             type="button"
@@ -1008,7 +1058,7 @@ export function ScheduledView() {
               <rect x="6" y="4" width="4" height="16" />
               <rect x="14" y="4" width="4" height="16" />
             </svg>
-            {(jobs.find((j) => j.id === menu.jobId)?.enabled ?? true) ? "暂停任务" : "继续任务"}
+            {(jobs.find((j) => j.id === menu.jobId)?.enabled ?? true) ? t("menu.togglePause") : t("menu.toggleResume")}
           </button>
           <button
             type="button"
@@ -1025,7 +1075,7 @@ export function ScheduledView() {
               <path d="M8 6V4h8v2" />
               <path d="M19 6l-1 14H6L5 6" />
             </svg>
-            删除
+            {t("menu.delete")}
           </button>
         </div>
       )}
@@ -1035,7 +1085,7 @@ export function ScheduledView() {
         <div
           className="sch-more-menu open"
           role="menu"
-          aria-label="任务详情操作"
+          aria-label={t("menu.more")}
           style={{
             left: Math.min(window.innerWidth - 140, Math.max(8, menu.anchor.right - 132)),
             top: Math.min(window.innerHeight - 100, menu.anchor.bottom + 6),
@@ -1051,7 +1101,7 @@ export function ScheduledView() {
               <circle cx="12" cy="12" r="9" />
               <path d="M10 8.5v7l6-3.5z" />
             </svg>
-            立即运行
+            {t("menuDetail.triggerNow")}
           </button>
           <button
             type="button"
@@ -1067,7 +1117,7 @@ export function ScheduledView() {
               <path d="M8 6V4h8v2" />
               <path d="M19 6l-1 14H6L5 6" />
             </svg>
-            删除
+            {t("menuDetail.delete")}
           </button>
         </div>
       )}
@@ -1077,7 +1127,7 @@ export function ScheduledView() {
         <div
           className="sch-freq-menu open"
           role="menu"
-          aria-label="频率选项"
+          aria-label={t("frequency.label")}
           style={{
             left: Math.min(
               window.innerWidth - 160,
@@ -1088,7 +1138,9 @@ export function ScheduledView() {
         >
           {(menu.key === "interval"
             ? intervalsForUnit(freq.unit)
-            : FREQ_OPTIONS[menu.key]
+            : menu.key === "model"
+              ? modelOptions
+              : FREQ_OPTIONS[menu.key]
           ).map((opt) => (
             <button
               key={opt}
@@ -1101,7 +1153,7 @@ export function ScheduledView() {
                 void applyFreq({ [key]: opt });
               }}
             >
-              <span>{menu.key === "reasoning" ? REASONING_LABELS[opt] ?? opt : opt}</span>
+              <span>{trFreqValue(menu.key!, opt)}</span>
               <svg className="sch-freq-menu-check" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m5 12 5 5 9-10" />
               </svg>
@@ -1115,7 +1167,7 @@ export function ScheduledView() {
         <div
           className="sch-runin-panel open"
           role="dialog"
-          aria-label="选择运行聊天"
+          aria-label={t("runin.title")}
           style={{
             width: Math.min(420, window.innerWidth - 24),
             left: Math.min(
@@ -1132,8 +1184,8 @@ export function ScheduledView() {
             </svg>
             <input
               type="search"
-              placeholder="搜索聊天"
-              aria-label="搜索聊天"
+              placeholder={t("runin.search")}
+              aria-label={t("runin.search")}
               value={runInQuery}
               onChange={(e) => setRunInQuery(e.target.value)}
               onClick={(e) => e.stopPropagation()}
@@ -1142,20 +1194,20 @@ export function ScheduledView() {
           <div className="sch-runin-list">
             <button
               type="button"
-              className={`sch-runin-new${runInLabel === "每次运行时新建聊天" ? " is-active" : ""}`}
+              className={`sch-runin-new${runInLabel === RUNIN_NEW_KEY ? " is-active" : ""}`}
               onClick={() => {
-                setRunInLabel("每次运行时新建聊天");
+                setRunInLabel(RUNIN_NEW_KEY);
                 closeMenus();
               }}
             >
               <span className="sch-runin-new-plus">+</span>
-              <span className="sch-runin-new-label">每次运行时新建聊天</span>
+              <span className="sch-runin-new-label">{t("runin.newChat")}</span>
               <svg className="sch-runin-check" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m5 12 5 5 9-10" />
               </svg>
             </button>
             {runInQuery.trim() && (
-              <div className="sch-runin-empty">未找到匹配的聊天</div>
+              <div className="sch-runin-empty">{t("runin.noMatch")}</div>
             )}
           </div>
         </div>
@@ -1173,12 +1225,12 @@ export function ScheduledView() {
           <div className="sch-del-modal" onClick={(e) => e.stopPropagation()}>
             <div className="sch-del-head">
               <h3 className="sch-del-title" id="schDeleteTitle">
-                删除 {deleteTarget.name || deleteTarget.id}?
+                {t("delete.title", { name: deleteTarget.name || deleteTarget.id })}
               </h3>
               <button
                 type="button"
                 className="sch-del-close"
-                aria-label="关闭"
+                aria-label={t("common:close")}
                 onClick={() => setDeleteTarget(null)}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1186,13 +1238,13 @@ export function ScheduledView() {
                 </svg>
               </button>
             </div>
-            <p className="sch-del-body">这将永久删除已安排的任务，并停止今后的运行</p>
+            <p className="sch-del-body">{t("delete.body")}</p>
             <div className="sch-del-foot">
               <button type="button" className="sch-del-cancel" onClick={() => setDeleteTarget(null)}>
-                取消
+                {t("delete.cancel")}
               </button>
               <button type="button" className="sch-del-confirm" onClick={() => void confirmDelete()}>
-                删除已安排任务
+                {t("delete.confirm")}
               </button>
             </div>
           </div>

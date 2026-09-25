@@ -1,0 +1,23 @@
+{
+  "filter": {
+    "all": "All",
+    "review": "In Review",
+    "mine": "Created by Me"
+  },
+  "search": "Search Pull Requests",
+  "filterBtn": "Filter",
+  "loading": "Loading…",
+  "loadFailed": "Load failed: {{error}}",
+  "empty": "No Pull Requests found",
+  "selectEmpty": "Select a Pull Request to view",
+  "branch": "Branch {{branch}}",
+  "target": "Target {{branch}}",
+  "viewOnGithub": "View on GitHub→",
+  "badge": {
+    "open": "Open",
+    "merged": "Merged",
+    "review": "Review",
+    "draft": "Draft",
+    "closed": "Closed"
+  }
+}

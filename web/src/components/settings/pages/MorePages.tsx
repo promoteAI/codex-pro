@@ -437,7 +437,7 @@ function skillTag(source: string): string {
 }
 
 export function SettingsPluginsPage() {
-  const { t } = useTranslation("settings");
+  const { t } = useTranslation(["settings", "modal"]);
   const navigate = useNavigate();
   const closeSettings = useShellStore((s) => s.closeSettings);
   const isAdmin = useIsAdmin();
@@ -553,7 +553,7 @@ export function SettingsPluginsPage() {
         setSelectedSkill(_id);
         return;
       }
-      toast.info("详情页面待实现");
+      toast.info(t("modal:more.detailComingSoon"));
     }
   };
 
@@ -681,7 +681,7 @@ export function SettingsPluginsPage() {
                   role="menuitem"
                   onClick={() => {
                     setAddMenuOpen(false);
-                    toast.info(t("createPlugin") + "（即将推出）");
+                    toast.info(t("modal:more.pluginComingSoon"));
                   }}
                   className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-codex-text hover:bg-[#353535]"
                 >
@@ -1252,7 +1252,7 @@ export function ConnectionsPage() {
       } else {
         await apiFetch("/connections", { method: "POST", body: JSON.stringify(payload) });
       }
-      toast.success(t("connectionSaved"));
+      toast.success(t("sshSaved"));
       closeCreate();
       await loadConnections();
     } catch (e) {
@@ -1263,10 +1263,10 @@ export function ConnectionsPage() {
   };
 
   const deleteConnection = async (name: string) => {
-    if (!window.confirm(t("deleteConfirm", { name }))) return;
+    if (!window.confirm(t("sshDeleteConfirm", { name }))) return;
     try {
       await apiFetch(`/connections/${encodeURIComponent(name)}`, { method: "DELETE" });
-      toast.success(t("connectionDeleted"));
+      toast.success(t("sshDeleted"));
       await loadConnections();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
@@ -1277,7 +1277,7 @@ export function ConnectionsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[22px] font-semibold text-codex-text">{t("sshConnections")}</h1>
+          <h1 className="text-[22px] font-semibold text-codex-text">{t("sshEmpty")}</h1>
           <p className="text-[12px] text-codex-muted mt-0.5">{t("connectionsDesc")}</p>
         </div>
         <button
@@ -1286,7 +1286,7 @@ export function ConnectionsPage() {
           className="pl-btn-primary flex items-center gap-1.5"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
-          {t("addConnection")}
+          {t("sshAddTitle")}
         </button>
       </div>
 
@@ -1295,7 +1295,7 @@ export function ConnectionsPage() {
       {!loading && !error && connections.length === 0 && (
         <div className="text-center py-12 text-codex-muted">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 opacity-30"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-          <div className="text-sm">{t("noConnections")}</div>
+          <div className="text-sm">{t("sshNoConnections")}</div>
         </div>
       )}
 
@@ -1313,7 +1313,7 @@ export function ConnectionsPage() {
               </div>
             </div>
             <span className={`pl-conn-badge ${conn.auth_method === "password" ? "pl-conn-badge--ok" : "pl-conn-badge--warn"}`}>
-              {conn.auth_method === "password" ? (t("connected") as string) : (t("unknown") as string)}
+              {conn.auth_method === "password" ? (t("sshReachable") as string) : (t("sshAuthNone") as string)}
             </span>
           </div>
           <div className="pl-conn-card__foot">
@@ -1331,55 +1331,55 @@ export function ConnectionsPage() {
         <div className="pl-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeCreate(); }}>
           <div className="pl-modal">
             <div className="pl-modal-head">
-              <h3 className="pl-modal-title">{editing ? t("editConnection") : t("addConnection")}</h3>
+              <h3 className="pl-modal-title">{editing ? t("sshEditTitle") : t("sshAddTitle")}</h3>
               <button type="button" className="pl-modal-close" onClick={closeCreate} aria-label={t("close")}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
               </button>
             </div>
             <div className="pl-modal-body">
               <label className="pl-modal-label">
-                {t("displayName")}
-                <input className="pl-modal-input" value={name} onChange={(e) => setName(e.target.value)} disabled={!!editing} placeholder={t("displayNamePlaceholder")} spellCheck={false} autoComplete="off" />
+                {t("sshDisplayName")}
+                <input className="pl-modal-input" value={name} onChange={(e) => setName(e.target.value)} disabled={!!editing} placeholder={t("sshDisplayName")} spellCheck={false} autoComplete="off" />
               </label>
               <label className="pl-modal-label">
-                {t("host")}
-                <input className="pl-modal-input" value={host} onChange={(e) => setHost(e.target.value)} placeholder={t("hostPlaceholder")} spellCheck={false} autoComplete="off" />
+                {t("sshHost")}
+                <input className="pl-modal-input" value={host} onChange={(e) => setHost(e.target.value)} placeholder={t("sshHostPlaceholder")} spellCheck={false} autoComplete="off" />
               </label>
               <div className="pl-modal-row">
                 <label className="pl-modal-label pl-modal-label--half">
-                  {t("port")}
+                  {t("sshPort")}
                   <input className="pl-modal-input" value={port} onChange={(e) => setPort(e.target.value)} inputMode="numeric" spellCheck={false} autoComplete="off" />
                 </label>
                 <label className="pl-modal-label pl-modal-label--half">
-                  {t("user")}
+                  {t("sshUser")}
                   <input className="pl-modal-input" value={user} onChange={(e) => setUser(e.target.value)} spellCheck={false} autoComplete="off" />
                 </label>
               </div>
               <label className="pl-modal-label">
-                {t("authMethod")}
+                {t("sshAuth")}
                 <select className="pl-modal-input" value={authMethod} onChange={(e) => setAuthMethod(e.target.value as "none" | "identity" | "password")}>
-                  <option value="none">{t("authNone")}</option>
-                  <option value="identity">{t("authIdentity")}</option>
-                  <option value="password">{t("authPassword")}</option>
+                  <option value="none">{t("sshAuthNone")}</option>
+                  <option value="identity">{t("sshAuthIdentity")}</option>
+                  <option value="password">{t("sshAuthPassword")}</option>
                 </select>
               </label>
               {authMethod === "identity" && (
                 <label className="pl-modal-label">
-                  {t("identityFile")}
-                  <input className="pl-modal-input" value={identityFile} onChange={(e) => setIdentityFile(e.target.value)} placeholder={t("identityPlaceholder")} spellCheck={false} autoComplete="off" />
+                  {t("sshIdentityPath")}
+                  <input className="pl-modal-input" value={identityFile} onChange={(e) => setIdentityFile(e.target.value)} placeholder={t("sshIdentityPlaceholder")} spellCheck={false} autoComplete="off" />
                 </label>
               )}
               {authMethod === "password" && (
                 <label className="pl-modal-label">
-                  {t("password")}
-                  <input className="pl-modal-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("passwordPlaceholder")} autoComplete="new-password" />
+                  {t("sshPassword")}
+                  <input className="pl-modal-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("sshPasswordPlaceholder")} autoComplete="new-password" />
                 </label>
               )}
             </div>
             <div className="pl-modal-foot">
               <button type="button" className="pl-modal-cancel" onClick={closeCreate}>{t("cancel")}</button>
               <button type="button" className="pl-btn-primary" onClick={saveConnection} disabled={saving || !name.trim() || !host.trim()}>
-                {saving ? t("saving") : editing ? t("save") : t("add")}
+                {saving ? t("sshTesting") : editing ? t("save") : t("add")}
               </button>
             </div>
           </div>

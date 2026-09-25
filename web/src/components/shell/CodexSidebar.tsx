@@ -13,7 +13,6 @@ import { useShellStore } from "../../stores/shell";
 import { useChatStore } from "../../stores/chat";
 import { useApi } from "../../hooks/use-api";
 import { CreateProjectDialog } from "../CreateProjectDialog";
-import { MOCK_RECENTS } from "../../mock/seeds";
 import { SideFilesPanel } from "./SideFilesPanel";
 import type { GitRepo } from "../../stores/chat";
 
@@ -117,13 +116,12 @@ export function CodexSidebar() {
   const apiRecents = data?.sessions ?? [];
 
   // 带 project 的会话归到对应项目行下；project 为空的会话显示在「最近」列表。
+  // API 返回空列表时不注入假会话，直接渲染「最近」空态（recents.length === 0）。
   const recents = useMemo(() => {
-    if (apiRecents.length > 0) {
-      return apiRecents
-        .filter((s) => !s.project)
-        .map((s) => ({ id: s.key, title: s.title || s.key }));
-    }
-    return MOCK_RECENTS;
+    if (apiRecents.length === 0) return [];
+    return apiRecents
+      .filter((s) => !s.project)
+      .map((s) => ({ id: s.key, title: s.title || s.key }));
   }, [apiRecents]);
 
   const goAnalytics = () => {

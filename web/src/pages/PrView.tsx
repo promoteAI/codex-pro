@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useApi } from "../hooks/use-api";
 
 interface PrItem {
@@ -22,6 +23,7 @@ const badgeClass = (s: string) =>
       : "pr-item-badge";
 
 export function PrView() {
+  const { t } = useTranslation(["prs", "common"]);
   const [tab, setTab] = useState<"all" | "review" | "mine">("all");
   const [activeId, setActiveId] = useState<string>("");
   const [query, setQuery] = useState("");
@@ -46,41 +48,41 @@ export function PrView() {
   const active = filtered.find((p) => p.id === activeId) ?? filtered[0];
 
   const badges: Record<string, string> = {
-    open: "Open",
-    merged: "Merged",
-    review: "Review",
-    draft: "Draft",
-    closed: "Closed",
+    open: "badge.open",
+    merged: "badge.merged",
+    review: "badge.review",
+    draft: "badge.draft",
+    closed: "badge.closed",
   };
 
   return (
     <section className="pr-view" aria-label="Pull Request">
       <div className="pr-list-pane">
-        <div className="pr-tabs" role="tablist" aria-label="Pull Request 筛选">
-          {([["all", "全部"], ["review", "正在审查"], ["mine", "由我创建"]] as const).map(([id, label]) => (
+        <div className="pr-tabs" role="tablist" aria-label={t("filter.all")}>
+          {([["all", "filter.all"], ["review", "filter.review"], ["mine", "filter.mine"]] as const).map(([id, key]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id}
               className={`pr-tab ${tab === id ? "active" : ""}`}
-              onClick={() => setTab(id)}>{label}</button>
+              onClick={() => setTab(id)}>{t(key)}</button>
           ))}
         </div>
         <div className="pr-search-row">
           <div className="pr-search">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg>
-            <input type="search" placeholder="搜索 Pull Request" aria-label="搜索 Pull Request" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input type="search" placeholder={t("search")} aria-label={t("search")} value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
-          <button type="button" className="pr-filter-btn" title="筛选" aria-label="筛选">
+          <button type="button" className="pr-filter-btn" title={t("filterBtn")} aria-label={t("filterBtn")}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 2v-8.5L4 5z"/></svg>
           </button>
         </div>
         <div className="pr-list-body" id="prListBody">
-          {loading && <div className="pr-list-empty">加载中…</div>}
-          {!loading && error && <div className="pr-list-empty">加载失败：{error}</div>}
-          {!loading && !error && filtered.length === 0 && <div className="pr-list-empty" id="prListEmpty">未找到 Pull Request</div>}
+          {loading && <div className="pr-list-empty">{t("loading")}</div>}
+          {!loading && error && <div className="pr-list-empty">{t("loadFailed", { error })}</div>}
+          {!loading && !error && filtered.length === 0 && <div className="pr-list-empty" id="prListEmpty">{t("empty")}</div>}
           {!loading && filtered.map((p) => (
             <button key={p.id} type="button" className={`pr-item ${active?.id === p.id ? "is-active" : ""}`} onClick={() => setActiveId(p.id)}>
               <span className="pr-item-title">{p.title}</span>
               <span className="pr-item-meta">
-                <span className={badgeClass(p.status)}>{badges[p.status] ?? p.status}</span>
+                <span className={badgeClass(p.status)}>{t(badges[p.status] ?? p.status)}</span>
                 <span>{p.meta}</span>
               </span>
             </button>
@@ -93,9 +95,9 @@ export function PrView() {
             <div className="pr-detail-kicker" id="prDetailKicker">{active.meta}</div>
             <h2 className="pr-detail-title" id="prDetailTitle">{active.title}</h2>
             <div className="pr-detail-meta" id="prDetailMeta">
-              <span>{badges[active.status] ?? active.status}</span>
-              {active.branch && <span>分支 {active.branch}</span>}
-              {active.branch && active.default_branch && <span>目标 {active.default_branch}</span>}
+              <span>{t(badges[active.status] ?? active.status)}</span>
+              {active.branch && <span>{t("branch", { branch: active.branch })}</span>}
+              {active.branch && active.default_branch && <span>{t("target", { branch: active.default_branch })}</span>}
             </div>
             <div className="pr-detail-body" id="prDetailBody"><p>{active.body}</p></div>
             {active.files && active.files.length > 0 && (
@@ -113,12 +115,12 @@ export function PrView() {
             )}
             {active.url && (
               <div className="pr-detail-actions">
-                <a href={active.url} target="_blank" rel="noreferrer" style={{ color: "#8b9cff", fontSize: 13 }}>在 GitHub 查看→</a>
+                <a href={active.url} target="_blank" rel="noreferrer" style={{ color: "#8b9cff", fontSize: 13 }}>{t("viewOnGithub")}</a>
               </div>
             )}
           </div>
         ) : (
-          <div className="pr-detail-empty" id="prDetailEmpty">选择要查看的 Pull Request</div>
+          <div className="pr-detail-empty" id="prDetailEmpty">{t("selectEmpty")}</div>
         )}
       </div>
     </section>

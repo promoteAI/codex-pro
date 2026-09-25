@@ -1,0 +1,44 @@
+{
+  "view": "Plugin Marketplace",
+  "tabs": {
+    "plugins": "Plugins",
+    "skills": "Skills",
+    "label": "Plugins & Skills"
+  },
+  "refresh": "Refresh",
+  "pluginSettings": "Plugin Settings",
+  "add": "Add",
+  "addMenu": {
+    "create": "Create Plugin",
+    "createComingSoon": "Create Plugin (Coming Soon)",
+    "addMarket": "Add Plugin Marketplace"
+  },
+  "searchPlugins": "Search plugins",
+  "searchSkills": "Search skills",
+  "loading": "Loading…",
+  "loadFailed": "Load failed: {{error}}",
+  "enabled": "Enabled ({{count}})",
+  "disabled": "Disabled ({{count}})",
+  "disable": "Disable {{name}}",
+  "enable": "Enable",
+  "noPlugins": "No plugins found",
+  "skills": {
+    "badge": "Skills",
+    "title": "Skills",
+    "subtitle": "Extend Codex with task-specific skills",
+    "installed": "Installed",
+    "emptyInstalled": "No installed skills",
+    "viewMore": "View {{count}} more",
+    "scopeLabel": "Skill categories",
+    "personal": "Personal",
+    "system": "System",
+    "recommended": "Recommended",
+    "emptyScope": "No skills in this category"
+  },
+  "toast": {
+    "refresh": "Refreshed",
+    "pluginEnabled": "Plugin \"{{name}}\" enabled",
+    "pluginDisabled": "Plugin \"{{name}}\" disabled",
+    "operationFailed": "Operation failed: {{error}}"
+  }
+}

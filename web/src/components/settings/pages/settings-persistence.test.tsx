@@ -49,15 +49,15 @@ describe("settings pages 持久化", () => {
   });
 
   it("WorktreesPage 修改根目录后在失焦时提交 ui.preferences.worktree_root", async () => {
-    const patchCalls = mockConfig({});
+    const patchCalls = mockConfig({ worktree_root: "/default/worktrees" });
     render(<WorktreesPage />);
     await waitFor(() => expect(useSettingsStore.getState().loaded).toBe(true));
 
-    const input = screen.getByDisplayValue("C:/Users/cheris/.codex-pro/worktrees");
-    fireEvent.change(input, { target: { value: "C:/Users/cheris/.worktrees" } });
+    const input = screen.getByDisplayValue("/default/worktrees");
+    fireEvent.change(input, { target: { value: "/custom/worktrees" } });
     fireEvent.blur(input);
 
     await waitFor(() => expect(patchCalls).toHaveLength(1));
-    expect(patchCalls[0]).toEqual({ "ui.preferences.worktree_root": "C:/Users/cheris/.worktrees" });
+    expect(patchCalls[0]).toEqual({ "ui.preferences.worktree_root": "/custom/worktrees" });
   });
 });

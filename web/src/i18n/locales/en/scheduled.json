@@ -1,0 +1,174 @@
+{
+  "title": "Scheduled Tasks",
+  "subtitle": "Have CodexPro schedule tasks, set reminders, or monitor updates",
+  "filter": {
+    "all": "All",
+    "on": "Active",
+    "paused": "Paused",
+    "done": "Done"
+  },
+  "searchPlaceholder": "Search scheduled tasks",
+  "loading": "Loading…",
+  "loadFailed": "Load failed: {{error}}",
+  "empty": "No scheduled tasks",
+  "create": "Create",
+  "createMenu": "Create task",
+  "createFromCodex": "Created by Codex",
+  "createFromCodexDraft": "Codex-created task",
+  "createFromCodexPrompt": "Draft task created by \"Created by Codex\". Confirm or edit later.",
+  "createManual": "Manual Setup",
+  "createManualName": "Manually scheduled task",
+  "createManualPrompt": "Task created via \"Manual Setup\". Add target, frequency, and acceptance criteria.",
+  "status": {
+    "on": "Active",
+    "paused": "Paused",
+    "done": "Done"
+  },
+  "detail": {
+    "title": "Task Details",
+    "prompt": "Task Prompt",
+    "details": "Details",
+    "runIn": "Run in",
+    "project": "Project",
+    "model": "Model",
+    "reasoning": "Reasoning",
+    "frequency": "Frequency",
+    "advancedFreq": "Advanced frequency settings",
+    "delivery": "Delivery Target",
+    "channel": "Channel",
+    "channelPlaceholder": "e.g. telegram, slack, gateway",
+    "chatId": "Chat/Group ID",
+    "chatIdPlaceholder": "e.g. 123456789",
+    "sessionKey": "Session Key",
+    "sessionKeyPlaceholder": "Optional; providing one auto-resolves the channel",
+    "authorizedNote": "Authorized unattended write/exec tool access",
+    "history": "Run History",
+    "historyLoading": "Loading…",
+    "historyEmpty": "No runs recorded",
+    "retentionNote": "Each task retains the most recent 100 executions",
+    "togglePause": "Pause Task",
+    "toggleStart": "Start Task"
+  },
+  "menu": {
+    "more": "More",
+    "triggerNow": "Run Now",
+    "delete": "Delete",
+    "togglePause": "Pause Task",
+    "toggleResume": "Resume Task"
+  },
+  "menuDetail": {
+    "triggerNow": "Run Now",
+    "delete": "Delete"
+  },
+  "frequency": {
+    "label": "Frequency Options",
+    "repeat": "Repeat",
+    "customUnit": "Repeat",
+    "interval": "Every",
+    "weekdayLabel": "On",
+    "time": "Time",
+    "notify": "Notify"
+  },
+  "runin": {
+    "title": "Choose Chat",
+    "search": "Search chats",
+    "newChat": "New chat each run",
+    "noMatch": "No matching chats found"
+  },
+  "delete": {
+    "title": "Delete {{name}}?",
+    "body": "This will permanently delete the scheduled task and stop future runs",
+    "cancel": "Cancel",
+    "confirm": "Delete Scheduled Task"
+  },
+  "toast": {
+    "saveSuccess": "Saved",
+    "saveFailed": "Save failed",
+    "createSuccess": "Created",
+    "createFailed": "Create failed",
+    "triggerSuccess": "Immediately ran \"{{name}}\"",
+    "triggerFailed": "Trigger failed",
+    "deleteSuccess": "Deleted \"{{name}}\"",
+    "deleteFailed": "Delete failed"
+  },
+  "cronManual": "Manual",
+  "cronExpression": "{{expr}}",
+  "repeatHourly": "Hourly",
+  "repeatWorkdayWithTime": "Workdays at {{time}}",
+  "repeatDailyWithTime": "Daily at {{time}}",
+  "repeatWeeklyWithTime": "Every {{weekday}} at {{time}}",
+  "suggest": {
+    "title": "Suggestions",
+    "dailyBrief": "Daily Brief",
+    "dailyBriefWhen": "Workdays at 8:00",
+    "dailyBriefDesc": "Start each workday with a calendar, unread email, and priority summary",
+    "dailyBriefPrompt": "Summarize today's calendar, unread emails, and priorities into a concise daily brief.",
+    "weeklyReview": "Weekly Review",
+    "weeklyReviewWhen": "Friday (at 16:00)",
+    "weeklyReviewDesc": "Every Friday, consolidate your recent work into a concise status update",
+    "weeklyReviewPrompt": "Organize this week's completed and outstanding work into a Friday status update.",
+    "followUp": "Follow-up Monitor",
+    "followUpWhen": "Workdays at 9:00",
+    "followUpDesc": "Review recent email and calendar activity, and flag items needing your attention",
+    "followUpPrompt": "Review recent email and calendar activity, list follow-ups, and sort them by priority."
+  },
+  "reasoning": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "xhigh": "XHigh",
+    "max": "Max",
+    "ultra": "Ultra"
+  },
+  "repeat": {
+    "hourly": "Hourly",
+    "daily": "Daily",
+    "workday": "Workday",
+    "weekly": "Weekly",
+    "custom": "Custom"
+  },
+  "unit": {
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "monthly": "Monthly"
+  },
+  "interval": {
+    "week1": "1 Week",
+    "week2": "2 Weeks",
+    "week3": "3 Weeks",
+    "week4": "4 Weeks",
+    "day1": "1 Day",
+    "day2": "2 Days",
+    "day3": "3 Days",
+    "month1": "1 Month",
+    "month2": "2 Months",
+    "month3": "3 Months"
+  },
+  "weekday": {
+    "mon": "Monday",
+    "tue": "Tuesday",
+    "wed": "Wednesday",
+    "thu": "Thursday",
+    "fri": "Friday",
+    "sat": "Saturday",
+    "sun": "Sunday"
+  },
+  "notify": {
+    "all": "All Runs",
+    "failOnly": "Failures Only",
+    "never": "Never"
+  },
+  "project": {
+    "codexPro": "codex-pro",
+    "none": "No Project"
+  },
+  "auth": {
+    "unattended": "Allow unattended write/exec tools",
+    "hint": "When unchecked the job still runs on schedule, but write and exec tools are denied.",
+    "confirmTitle": "Authorize unattended execution?",
+    "confirmMessage": "This job will run the following instruction with nobody watching, and may call write and exec tools.\n\nInstruction: {{command}}\nSchedule: {{expr}}\nDelivery: {{target}}",
+    "confirmLabel": "I understand, authorize",
+    "unset": "(not set)",
+    "noTarget": "(no delivery target)"
+  }
+}

@@ -8,14 +8,25 @@ export type SchStatus = "on" | "paused" | "done";
  *  `reasoning` in FreqState shares this field with the settings picker. */
 export const REASONING_LEVELS = ["low", "medium", "high", "xhigh", "max", "Ultra"] as const;
 
-/** Display labels for reasoning levels (ScheduledView is a zh-only page). */
-export const REASONING_LABELS: Record<string, string> = {
-  low: "轻度",
-  medium: "中",
-  high: "高",
-  xhigh: "极高",
-  max: "最高",
-  Ultra: "Ultra",
+/** i18n key path (scheduled ns) for each reasoning-level display label. */
+export const REASONING_KEY_LABELS: Record<string, string> = {
+  low: "reasoning.low",
+  medium: "reasoning.medium",
+  high: "reasoning.high",
+  xhigh: "reasoning.xhigh",
+  max: "reasoning.max",
+  Ultra: "reasoning.ultra",
+};
+
+/** i18n key path (scheduled ns) for each weekday value. Values are the canonical zh names. */
+export const WEEKDAY_KEYS: Record<string, string> = {
+  星期日: "weekday.sun",
+  星期一: "weekday.mon",
+  星期二: "weekday.tue",
+  星期三: "weekday.wed",
+  星期四: "weekday.thu",
+  星期五: "weekday.fri",
+  星期六: "weekday.sat",
 };
 
 export interface FreqState {
@@ -38,10 +49,14 @@ export const DEFAULT_FREQ: FreqState = {
   time: "20:30",
   notify: "所有运行",
   project: "codex-pro",
+  // Models are loaded dynamically from the providers store at render time.
+  // This default is a fallback for when no provider is configured.
   model: "agnes-2.5-flash",
   reasoning: "low",
 };
 
+/** Canonical internal values for each frequency field (what freqToCron reads).
+ *  The UI should translate these for display via FREQ_VALUE_KEYS. */
 export const FREQ_OPTIONS: Record<keyof FreqState, string[]> = {
   repeat: ["每小时", "每天", "工作日", "每周", "自定义"],
   unit: ["每天", "每周", "每月"],
@@ -58,8 +73,59 @@ export const FREQ_OPTIONS: Record<keyof FreqState, string[]> = {
   })(),
   notify: ["所有运行", "仅失败", "从不"],
   project: ["codex-pro", "无项目"],
+  // WARNING: model options are dynamic (see ScheduledView.tsx providers store).
+  // Do NOT use this array for the UI dropdown — it lists legacy placeholder models.
   model: ["agnes-2.5-flash", "agnes-2.0-flash", "5.6 Luna", "5.4 Instant", "o3", "o4-mini"],
   reasoning: [...REASONING_LEVELS],
+};
+
+/** Map each canonical frequency value to an i18n key path (scheduled ns).
+ *  Structured per field so the render layer can translate stored values without
+ *  any runtime dependency on the i18n instance. */
+export const FREQ_VALUE_KEYS: Partial<Record<keyof FreqState, Record<string, string>>> = {
+  repeat: {
+    每小时: "repeat.hourly",
+    每天: "repeat.daily",
+    工作日: "repeat.workday",
+    每周: "repeat.weekly",
+    自定义: "repeat.custom",
+  },
+  unit: {
+    每天: "unit.daily",
+    每周: "unit.weekly",
+    每月: "unit.monthly",
+  },
+  interval: {
+    "1 周": "interval.week1",
+    "2 周": "interval.week2",
+    "3 周": "interval.week3",
+    "4 周": "interval.week4",
+    "1 天": "interval.day1",
+    "2 天": "interval.day2",
+    "3 天": "interval.day3",
+    "1 月": "interval.month1",
+    "2 月": "interval.month2",
+    "3 月": "interval.month3",
+  },
+  weekday: {
+    星期日: "weekday.sun",
+    星期一: "weekday.mon",
+    星期二: "weekday.tue",
+    星期三: "weekday.wed",
+    星期四: "weekday.thu",
+    星期五: "weekday.fri",
+    星期六: "weekday.sat",
+  },
+  notify: {
+    所有运行: "notify.all",
+    仅失败: "notify.failOnly",
+    从不: "notify.never",
+  },
+  project: {
+    "codex-pro": "project.codexPro",
+    无项目: "project.none",
+  },
+  reasoning: REASONING_KEY_LABELS,
 };
 
 const WEEKDAY_CRON: Record<string, string> = {
@@ -87,7 +153,9 @@ function parseTime(expr: string): { min: string; hour: string } | null {
   };
 }
 
-/** Human label for a cron expression (list meta / frequency pill). */
+/** Human label for a cron expression (list meta / frequency pill).
+ *  Kept as zh-only for back-compat with external callers/tests. Use an i18n-aware
+ *  resolution via cronToLabelMeta in the UI instead. */
 export function cronToLabel(expr: string): string {
   const e = (expr || "").trim();
   if (!e) return "手动";
@@ -104,6 +172,32 @@ export function cronToLabel(expr: string): string {
     }
   }
   return e;
+}
+
+export interface CronLabelMeta {
+  key: string;
+  params: Record<string, string>;
+}
+
+/** i18n-aware cron label: returns an i18n key + interpolation params for the
+ *  scheduled ns. Render as t(meta.key, meta.params), translating the weekday
+ *  param for weekly labels via WEEKDAY_KEYS. */
+export function cronToLabelMeta(expr: string): CronLabelMeta {
+  const e = (expr || "").trim();
+  if (!e) return { key: "cronManual", params: {} };
+  if (/^0 \* \* \* \*$/.test(e) || /^\* \* \* \* \*$/.test(e)) return { key: "repeatHourly", params: {} };
+  const t = parseTime(e);
+  const parts = e.split(/\s+/);
+  if (t && parts.length >= 5) {
+    const [, , dom, mon, dow] = parts;
+    const time = `${t.hour}:${t.min}`;
+    if (dom === "*" && mon === "*" && dow === "1-5") return { key: "repeatWorkdayWithTime", params: { time } };
+    if (dom === "*" && mon === "*" && dow === "*") return { key: "repeatDailyWithTime", params: { time } };
+    if (dom === "*" && mon === "*" && /^\d$/.test(dow)) {
+      return { key: "repeatWeeklyWithTime", params: { weekday: CRON_WEEKDAY[dow] || "星期一", time } };
+    }
+  }
+  return { key: "cronExpression", params: { expr: e } };
 }
 
 /** Seed frequency UI state from a cron expression. */
@@ -175,24 +269,29 @@ export function intervalsForUnit(unit: string): string[] {
   return ["1 周", "2 周", "3 周", "4 周"];
 }
 
+/** i18n key path (scheduled ns) for each status label. */
+export const STATUS_KEYS: Record<SchStatus, string> = {
+  on: "status.on",
+  paused: "status.paused",
+  done: "status.done",
+};
+
 export function jobSchStatus(enabled: boolean, status: string): SchStatus {
   if (status === "done" || status === "completed" || status === "finished") return "done";
   return enabled ? "on" : "paused";
 }
 
-export const STATUS_LABEL: Record<SchStatus, string> = {
-  on: "已开启",
-  paused: "已暂停",
-  done: "已完成",
-};
-
 export interface SuggestItem {
   id: string;
   icon: "bell" | "review" | "follow";
-  name: string;
-  when: string;
-  desc: string;
-  prompt: string;
+  /** i18n key path (scheduled ns) for the display name. */
+  nameKey: string;
+  /** i18n key path (scheduled ns) for the "when" subtitle. */
+  whenKey: string;
+  /** i18n key path (scheduled ns) for the description. */
+  descKey: string;
+  /** i18n key path (scheduled ns) for the task prompt. */
+  promptKey: string;
   cron: string;
   freq: Partial<FreqState>;
 }
@@ -201,30 +300,30 @@ export const SUGGESTIONS: SuggestItem[] = [
   {
     id: "daily-brief",
     icon: "bell",
-    name: "每日简报",
-    when: "工作日 8:00",
-    desc: "以日历、未读电子邮件和优先事项摘要开启每个工作日",
-    prompt: "汇总今天的日历、未读邮件与优先事项，生成一份简明的每日简报。",
+    nameKey: "suggest.dailyBrief",
+    whenKey: "suggest.dailyBriefWhen",
+    descKey: "suggest.dailyBriefDesc",
+    promptKey: "suggest.dailyBriefPrompt",
     cron: "0 8 * * 1-5",
     freq: { repeat: "工作日", time: "08:00" },
   },
   {
     id: "weekly-review",
     icon: "review",
-    name: "每周回顾",
-    when: "星期五（时间：16:00）",
-    desc: "每周五将你最近的工作整理成简明的状态更新",
-    prompt: "整理本周完成的工作与未完成事项，生成一份周五状态更新。",
+    nameKey: "suggest.weeklyReview",
+    whenKey: "suggest.weeklyReviewWhen",
+    descKey: "suggest.weeklyReviewDesc",
+    promptKey: "suggest.weeklyReviewPrompt",
     cron: "0 16 * * 5",
     freq: { repeat: "每周", weekday: "星期五", time: "16:00" },
   },
   {
     id: "follow-up",
     icon: "follow",
-    name: "跟进监控",
-    when: "工作日 9:00",
-    desc: "查看最近的电子邮箱和日历活动，并标记需要你关注的事项",
-    prompt: "查看最近的邮箱与日历活动，列出需要跟进的事项并按优先级排序。",
+    nameKey: "suggest.followUp",
+    whenKey: "suggest.followUpWhen",
+    descKey: "suggest.followUpDesc",
+    promptKey: "suggest.followUpPrompt",
     cron: "0 9 * * 1-5",
     freq: { repeat: "工作日", time: "09:00" },
   },

@@ -186,7 +186,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   projectPath: "",
   env: "local",
   branch: "dev",
-  model: "agnes-2.5-flash",
+  // 旧值曾硬编码假模型 "agnes-2.5-flash"。改为空串作为中性默认，等待用户从
+  // 模型选择器/提供商列表挑选后填充，避免把本机自定义模型名写死进产物。
+  model: "",
   reasoning: 3,
   perm: "full",
   draft: "",

@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode, useEffect } from "react";
-import { BrowserRouter, Link, Navigate, Routes, Route, useSearchParams } from "react-router";
+import { BrowserRouter, Link, Routes, Route, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Layout } from "./components/Layout";
 import { Toaster } from "./components/Toaster";
@@ -15,6 +15,8 @@ const ScheduledView = lazy(() =>
 const PluginsView = lazy(() =>
   import("./pages/PluginsView").then((m) => ({ default: m.PluginsView })),
 );
+const LoginPage = lazy(() => import("./pages/Login").then((m) => ({ default: m.Login })));
+const Skills = lazy(() => import("./pages/Skills").then((m) => ({ default: m.Skills })));
 
 function RouteLoading() {
   const { t } = useTranslation("common");
@@ -66,7 +68,14 @@ export function App() {
       <ConfirmProvider>
         <Toaster />
         <Routes>
-          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route
+            path="/login"
+            element={
+              <LazyRoute>
+                <LoginPage />
+              </LazyRoute>
+            }
+          />
           <Route element={<Layout />}>
             <Route
               index
@@ -106,6 +115,14 @@ export function App() {
               element={
                 <LazyRoute>
                   <PluginsView />
+                </LazyRoute>
+              }
+            />
+            <Route
+              path="skills"
+              element={
+                <LazyRoute>
+                  <Skills />
                 </LazyRoute>
               }
             />

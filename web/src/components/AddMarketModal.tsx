@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { toast } from "../stores/toast";
 
 interface AddMarketModalProps {
@@ -9,6 +10,7 @@ interface AddMarketModalProps {
 
 /** Prototype plAddMarketModal — add a plugin marketplace from Git / local path. */
 export function AddMarketModal({ open, onClose }: AddMarketModalProps) {
+  const { t } = useTranslation("modal");
   const titleId = useId();
   const sourceRef = useRef<HTMLInputElement>(null);
   const [source, setSource] = useState("");
@@ -39,14 +41,7 @@ export function AddMarketModal({ open, onClose }: AddMarketModalProps) {
   if (!open) return null;
 
   const submit = () => {
-    const src = source.trim();
-    if (!src) {
-      sourceRef.current?.focus();
-      toast.info("请填写来源");
-      return;
-    }
-    onClose();
-    toast.success(`已添加市场：${src}`);
+    toast.info(t("addMarket.unsupported"));
   };
 
   return createPortal(
@@ -62,57 +57,51 @@ export function AddMarketModal({ open, onClose }: AddMarketModalProps) {
       <div className="pl-modal">
         <div className="pl-modal-head">
           <h3 className="pl-modal-title" id={titleId}>
-            添加插件市场
+            {t("addMarket.title")}
           </h3>
-          <button type="button" className="pl-modal-close" aria-label="关闭" onClick={onClose}>
+          <button type="button" className="pl-modal-close" aria-label={t("addMarket.closeAria")} onClick={onClose}>
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6 6l12 12M18 6 6 18" />
             </svg>
           </button>
         </div>
         <p className="pl-modal-sub">
-          从 GitHub 仓库、Git URL 或本地文件夹添加。
+          {t("addMarket.sub")}
           <a
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              toast.info("插件市场说明（即将推出）");
+              toast.info(t("addMarket.learnMoreComingSoon"));
             }}
           >
-            了解更多
+            {t("addMarket.learnMore")}
           </a>
         </p>
         <div className="pl-modal-field">
           <label className="pl-modal-label" htmlFor="plMarketSource">
-            来源
+            {t("addMarket.sourceLabel")}
           </label>
           <input
             ref={sourceRef}
             className="pl-modal-input"
             id="plMarketSource"
             type="text"
-            placeholder="openai/plugins 或 git@github.com:org/repo.git"
+            placeholder={t("addMarket.sourcePlaceholder")}
             spellCheck={false}
             autoComplete="off"
             value={source}
             onChange={(e) => setSource(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                submit();
-              }
-            }}
           />
         </div>
         <div className="pl-modal-field">
           <label className="pl-modal-label" htmlFor="plMarketRef">
-            Git 引用
+            {t("addMarket.gitRefLabel")}
           </label>
           <input
             className="pl-modal-input"
             id="plMarketRef"
             type="text"
-            placeholder="主分支"
+            placeholder={t("addMarket.refPlaceholder")}
             spellCheck={false}
             autoComplete="off"
             value={ref}
@@ -121,12 +110,12 @@ export function AddMarketModal({ open, onClose }: AddMarketModalProps) {
         </div>
         <div className="pl-modal-field">
           <label className="pl-modal-label" htmlFor="plMarketSparse">
-            稀疏路径
+            {t("addMarket.sparseLabel")}
           </label>
           <textarea
             className="pl-modal-textarea"
             id="plMarketSparse"
-            placeholder="plugins/codex"
+            placeholder={t("addMarket.sparsePlaceholder")}
             spellCheck={false}
             value={sparse}
             onChange={(e) => setSparse(e.target.value)}
@@ -134,10 +123,10 @@ export function AddMarketModal({ open, onClose }: AddMarketModalProps) {
         </div>
         <div className="pl-modal-foot">
           <button type="button" className="pl-modal-cancel" onClick={onClose}>
-            取消
+            {t("addMarket.cancel")}
           </button>
           <button type="button" className="pl-modal-submit" onClick={submit}>
-            添加市场
+            {t("addMarket.submit")}
           </button>
         </div>
       </div>

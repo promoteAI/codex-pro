@@ -1,0 +1,23 @@
+{
+  "filter": {
+    "all": "全部",
+    "review": "正在审查",
+    "mine": "由我创建"
+  },
+  "search": "搜索 Pull Request",
+  "filterBtn": "筛选",
+  "loading": "加载中…",
+  "loadFailed": "加载失败：{{error}}",
+  "empty": "未找到 Pull Request",
+  "selectEmpty": "选择要查看的 Pull Request",
+  "branch": "分支 {{branch}}",
+  "target": "目标 {{branch}}",
+  "viewOnGithub": "在 GitHub 查看→",
+  "badge": {
+    "open": "Open",
+    "merged": "Merged",
+    "review": "Review",
+    "draft": "Draft",
+    "closed": "Closed"
+  }
+}

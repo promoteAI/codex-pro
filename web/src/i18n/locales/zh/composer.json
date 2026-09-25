@@ -17,6 +17,7 @@
   "permTitle": "应如何批准操作？",
   "permSaveFailed": "权限设置保存失败",
   "model": "模型",
+  "noModel": "未选择模型",
   "modelCustom": "自定义",
   "reasoningLow": "低",
   "reasoningMed": "中",

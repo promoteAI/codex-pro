@@ -68,6 +68,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_post(f"{prefix}/skills/import", skills_api.import_skill)
     app.router.add_post(f"{prefix}/skills/upload", skills_api.upload_skill)
     app.router.add_get(f"{prefix}/skills/{{name}}", skills_api.get_skill)
+    app.router.add_get(f"{prefix}/skills/{{name}}/path", skills_api.get_skill_path)
     app.router.add_get(f"{prefix}/skills/{{name}}/deps", skills_api.get_skill_deps)
     app.router.add_post(f"{prefix}/skills/{{name}}/deps/install", skills_api.install_skill_deps)
     app.router.add_post(f"{prefix}/skills/{{name}}/toggle", skills_api.toggle_skill)
@@ -82,6 +83,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_get(f"{prefix}/knowledge/documents", knowledge_api.list_documents)
     app.router.add_get(f"{prefix}/knowledge/jobs", knowledge_api.list_jobs)
     app.router.add_get(f"{prefix}/knowledge/jobs/{{id}}", knowledge_api.get_job)
+    app.router.add_delete(f"{prefix}/knowledge/jobs/{{id}}", knowledge_api.cancel_job)
     app.router.add_delete(f"{prefix}/knowledge/documents/{{path:.+}}", knowledge_api.delete_document)
 
     # Chat/file attachments for Composer "add files" (browser local file upload)
@@ -164,6 +166,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     # File browser for tools panel
     app.router.add_get(f"{prefix}/files", files_api.list_dir)
     app.router.add_get(f"{prefix}/files/content", files_api.read_file)
+    app.router.add_get(f"{prefix}/files/open", files_api.open_file)
 
     # Pull requests
     app.router.add_get(f"{prefix}/prs", prs_api.list_prs)

@@ -1,0 +1,44 @@
+{
+  "view": "插件市场",
+  "tabs": {
+    "plugins": "插件",
+    "skills": "技能",
+    "label": "插件与技能"
+  },
+  "refresh": "刷新",
+  "pluginSettings": "插件设置",
+  "add": "添加",
+  "addMenu": {
+    "create": "创建插件",
+    "createComingSoon": "创建插件（即将推出）",
+    "addMarket": "添加插件市场"
+  },
+  "searchPlugins": "搜索插件",
+  "searchSkills": "搜索技能",
+  "loading": "加载中…",
+  "loadFailed": "加载失败：{{error}}",
+  "enabled": "已启用 ({{count}})",
+  "disabled": "已禁用 ({{count}})",
+  "disable": "禁用 {{name}}",
+  "enable": "启用",
+  "noPlugins": "未发现插件",
+  "skills": {
+    "badge": "技能",
+    "title": "技能",
+    "subtitle": "通过任务专用技能扩展 Codex",
+    "installed": "已安装",
+    "emptyInstalled": "暂无已安装技能",
+    "viewMore": "查看另有 {{count}} 项",
+    "scopeLabel": "技能分类",
+    "personal": "个人",
+    "system": "系统",
+    "recommended": "推荐",
+    "emptyScope": "该分类暂无技能"
+  },
+  "toast": {
+    "refresh": "已刷新",
+    "pluginEnabled": "插件「{{name}}」已启用",
+    "pluginDisabled": "插件「{{name}}」已禁用",
+    "operationFailed": "操作失败：{{error}}"
+  }
+}

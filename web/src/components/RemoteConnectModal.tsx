@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "../stores/toast";
 import { useShellStore } from "../stores/shell";
 
 type Method = "ssh" | "wsl" | "docker";
@@ -10,44 +12,46 @@ const METHODS: Array<{ id: Method; name: string; sub: string; ico: string }> = [
 ];
 
 export function RemoteConnectModal() {
+  const { t } = useTranslation("modal");
   const open = useShellStore((s) => s.remoteConnectOpen);
   const close = useShellStore((s) => s.closeRemoteConnect);
-  const [step, setStep] = useState(1);
   const [method, setMethod] = useState<Method>("ssh");
 
   useEffect(() => {
-    if (open) setStep(1);
-  }, [open]);
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, close]);
 
   if (!open) return null;
 
-  const stepTitle = (s: number) => ["选择连接方式", "填写配置", "连接中", "连接完成"][s - 1];
-  const desc = (s: number) =>
-    s === 1
-      ? "选择进入当前工作区的连接方式，然后继续填写对应的连接配置。"
-      : s === 2
-        ? `填写 ${METHODS.find((m) => m.id === method)?.name} 连接信息。`
-        : s === 3
-          ? "正在建立连接，请稍候…"
-          : "连接已建立，可以在设置中管理该连接。";
-
-  const next = () => {
-    if (step === 1) setStep(2);
-    else if (step === 2) setStep(3);
-    else if (step === 3) {
-      // connection established
-      setTimeout(() => setStep(4), 600);
-    }
+  const connect = () => {
+    toast.info(t("remoteConnect.unsupported"));
   };
+
+  const methodSub = (id: Method) =>
+    id === "ssh"
+      ? t("remoteConnect.methodSshSub")
+      : id === "wsl"
+        ? t("remoteConnect.methodWslSub")
+        : t("remoteConnect.methodDockerSub");
 
   return (
     <div className="rc-overlay open" role="dialog" aria-modal="true" aria-labelledby="rcMainTitle">
       <div className="rc-wizard">
-        <aside className="rc-side" aria-label="远程连接步骤">
-          <p className="rc-side-title">远程连接</p>
+        <aside className="rc-side" aria-label={t("remoteConnect.title")}>
+          <p className="rc-side-title">{t("remoteConnect.title")}</p>
           <div className="rc-steps" id="rcSteps">
-            {[["1", "选择方式"], ["2", "填写配置"], ["3", "连接中"], ["4", "连接完成"]].map(([num, label]) => (
-              <button key={num} type="button" className={`rc-step ${step >= Number(num) ? "is-active" : ""}`} disabled>
+            {[
+              ["1", t("remoteConnect.stepSelect")],
+              ["2", t("remoteConnect.stepFill")],
+              ["3", t("remoteConnect.stepConnecting")],
+              ["4", t("remoteConnect.stepDone")],
+            ].map(([num, label]) => (
+              <button key={num} type="button" className="rc-step" disabled>
                 <span className="rc-step-num">{num}</span>{label}
               </button>
             ))}
@@ -55,58 +59,53 @@ export function RemoteConnectModal() {
         </aside>
         <div className="rc-main">
           <div className="rc-main-head">
-            <h3 className="rc-main-title" id="rcMainTitle">{stepTitle(step)}</h3>
-            <button type="button" className="rc-close" onClick={close} aria-label="关闭">
+            <h3 className="rc-main-title" id="rcMainTitle">{t("remoteConnect.stepSelect")}</h3>
+            <button type="button" className="rc-close" onClick={close} aria-label={t("remoteConnect.stepSelect")}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
             </button>
           </div>
-          <p className="rc-main-desc" id="rcMainDesc">{desc(step)}</p>
+          <p className="rc-main-desc" id="rcMainDesc">{t("remoteConnect.selectDesc")}</p>
 
-          {step === 1 && (
-            <div className="rc-pane is-active" data-pane="1">
-              <div className="rc-method-grid" role="listbox" aria-label="连接方式">
-                {METHODS.map((m) => (
-                  <button key={m.id} type="button" role="option" aria-selected={method === m.id}
-                    className={`rc-method ${method === m.id ? "is-selected" : ""}`} onClick={() => setMethod(m.id)}>
-                    <span className="rc-method-ico" aria-hidden="true"><svg viewBox="0 0 24 24" dangerouslySetInnerHTML={{ __html: m.ico }} /></span>
-                    <p className="rc-method-name">{m.name}</p>
-                    <p className="rc-method-sub">{m.sub}</p>
-                  </button>
-                ))}
-              </div>
+          <div className="rc-pane is-active" data-pane="1">
+            <div className="rc-method-grid" role="listbox" aria-label={t("remoteConnect.title")}>
+              {METHODS.map((m) => (
+                <button key={m.id} type="button" role="option" aria-selected={method === m.id}
+                  className={`rc-method ${method === m.id ? "is-selected" : ""}`} onClick={() => setMethod(m.id)}>
+                  <span className="rc-method-ico" aria-hidden="true"><svg viewBox="0 0 24 24" dangerouslySetInnerHTML={{ __html: m.ico }} /></span>
+                  <p className="rc-method-name">{m.name}</p>
+                  <p className="rc-method-sub">{methodSub(m.id)}</p>
+                </button>
+              ))}
             </div>
-          )}
-
-          {step === 2 && (
-            <div className="rc-pane is-active" data-pane="2">
+            <div className="rc-pane is-active" data-pane="2" style={{ paddingTop: 8 }}>
               <div className="rc-form is-active">
                 {method === "ssh" ? (
                   <>
                     <div className="rc-field">
-                      <label>主机</label>
-                      <input type="text" placeholder="例如 10.0.0.12" defaultValue="10.102.32.16" autoComplete="off" />
+                      <label>{t("remoteConnect.host")}</label>
+                      <input type="text" placeholder={t("remoteConnect.hostPlaceholder")} autoComplete="off" />
                     </div>
                     <div className="rc-row">
                       <div className="rc-field">
-                        <label>端口</label>
-                        <input type="text" defaultValue="22" placeholder="22" autoComplete="off" />
+                        <label>{t("remoteConnect.port")}</label>
+                        <input type="text" placeholder="22" autoComplete="off" />
                       </div>
                       <div className="rc-field">
-                        <label>用户名</label>
-                        <input type="text" defaultValue="root" placeholder="root" autoComplete="off" />
+                        <label>{t("remoteConnect.user")}</label>
+                        <input type="text" placeholder="root" autoComplete="off" />
                       </div>
                     </div>
                     <div className="rc-field">
-                      <label>认证方式</label>
-                      <div className="rc-seg" role="group" aria-label="认证方式">
-                        <button type="button" className="rc-seg-btn">密码</button>
-                        <button type="button" className="rc-seg-btn is-active">私钥</button>
+                      <label>{t("remoteConnect.auth")}</label>
+                      <div className="rc-seg" role="group" aria-label={t("remoteConnect.auth")}>
+                        <button type="button" className="rc-seg-btn">{t("remoteConnect.password")}</button>
+                        <button type="button" className="rc-seg-btn is-active">{t("remoteConnect.privateKey")}</button>
                       </div>
                     </div>
                   </>
                 ) : method === "wsl" ? (
                   <div className="rc-field">
-                    <label>WSL 发行版</label>
+                    <label>{t("remoteConnect.wslDistro")}</label>
                     <select defaultValue="Ubuntu">
                       <option value="Ubuntu">Ubuntu</option>
                       <option value="Debian">Debian</option>
@@ -115,38 +114,22 @@ export function RemoteConnectModal() {
                   </div>
                 ) : (
                   <div className="rc-field">
-                    <label>容器</label>
-                    <input type="text" placeholder="容器名称或 ID" autoComplete="off" />
+                    <label>{t("remoteConnect.container")}</label>
+                    <input type="text" placeholder={t("remoteConnect.containerPlaceholder")} autoComplete="off" />
                   </div>
                 )}
               </div>
+              <p style={{ marginTop: 16, fontSize: 12.5, color: "#8a8a8a" }}>
+                {t("remoteConnect.unsupported")}
+              </p>
             </div>
-          )}
-
-          {step === 3 && (
-            <div className="rc-pane is-active" data-pane="3" style={{ textAlign: "center", color: "#9a9a9a", paddingTop: 40 }}>
-              正在连接…
-            </div>
-          )}
-
-          {step === 4 && (
-            <div className="rc-pane is-active" data-pane="4" style={{ textAlign: "center", color: "#6ecf9a", paddingTop: 40 }}>
-              已连接到 {METHODS.find((m) => m.id === method)?.name}
-            </div>
-          )}
+          </div>
 
           <div className="rc-foot">
-            {step > 1 && step < 4 ? (
-              <button type="button" className="rc-btn rc-btn-cancel" onClick={() => setStep(step - 1)}>上一步</button>
-            ) : step === 4 ? (
-              <button type="button" className="rc-btn rc-btn-primary" onClick={close}>完成</button>
-            ) : null}
-            {step < 3 && (
-              <button type="button" className="rc-btn rc-btn-primary" onClick={next}>
-                {step === 1 ? "下一步" : "连接"}
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-              </button>
-            )}
+            <button type="button" className="rc-btn rc-btn-primary" onClick={connect}>
+              {t("remoteConnect.connect")}
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            </button>
           </div>
         </div>
       </div>

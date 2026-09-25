@@ -187,7 +187,7 @@ export function Composer() {
     perm === "ask" ? t("permAsk") : perm === "agent" ? t("permAgent") : t("permFull");
   const effortLabels = [t("reasoningLow"), t("reasoningMed"), t("reasoningHigh"), t("reasoningMax")];
   const effortLabel = effortLabels[reasoning] ?? effortLabels[0];
-  const modelLabel = model;
+  const modelLabel = model || t("noModel");
   const canSend = draft.trim().length > 0 && !typing;
   const canStop = typing;
   const showGoalBtn = goalMode || planMode;

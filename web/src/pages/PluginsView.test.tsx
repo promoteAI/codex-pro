@@ -233,7 +233,7 @@ describe("PluginsView", () => {
     expect(screen.queryByRole("dialog", { name: "添加插件市场" })).not.toBeInTheDocument();
   });
 
-  it("添加市场需填写来源", async () => {
+  it("添加市场：市场接入未实现时提示并保留弹窗", async () => {
     mockApi();
     renderView();
     await waitFor(() => {
@@ -241,10 +241,9 @@ describe("PluginsView", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /添加/ }));
     fireEvent.click(screen.getByRole("menuitem", { name: "添加插件市场" }));
-    fireEvent.click(screen.getByRole("button", { name: "添加市场" }));
-    expect(screen.getByRole("dialog", { name: "添加插件市场" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("来源"), { target: { value: "openai/plugins" } });
     fireEvent.click(screen.getByRole("button", { name: "添加市场" }));
-    expect(screen.queryByRole("dialog", { name: "添加插件市场" })).not.toBeInTheDocument();
+    // 后端暂无添加插件市场的真实端点，提交仅提示「未接入」，弹窗保留。
+    expect(screen.getByRole("dialog", { name: "添加插件市场" })).toBeInTheDocument();
   });
 });

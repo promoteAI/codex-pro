@@ -30,6 +30,8 @@
   "filesCopyRel": "复制相对路径",
   "filesCopy": "复制",
   "filesOpen": "在外部编辑器中打开",
+  "filesOpenFailed": "打开文件失败",
+  "filesOpenCopyPath": "已将路径复制到剪贴板：{{path}}",
   "emptySidechat": "侧边聊天",
   "sidechatSub": "侧边聊天是临时聊天，关闭应用后会消失。",
   "sidechatPlaceholder": "发送消息…",

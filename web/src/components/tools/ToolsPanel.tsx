@@ -308,8 +308,13 @@ function FilesPane() {
     if (!filePath) return;
     try {
       await apiFetch(`/files/open?repo=${encodeURIComponent(filePath.repoPath)}&path=${encodeURIComponent(filePath.filePath)}`);
-    } catch {
-      void 0;
+    } catch (e: unknown) {
+      // 后端不支持/打开失败时不能静默失败：提示错误并提供「复制路径」兜底。
+      const detail = e instanceof Error ? e.message : String(e);
+      toast.error(`${t("filesOpenFailed")}：${detail}`);
+      const abs = resolvedPath || `${filePath.repoPath}/${filePath.filePath}`;
+      void navigator.clipboard?.writeText(abs);
+      toast.info(t("filesOpenCopyPath", { path: abs }));
     }
   };
 
@@ -581,6 +586,7 @@ function SidechatPane() {
 
   const effortLabels = [tc("reasoningLow"), tc("reasoningMed"), tc("reasoningHigh"), tc("reasoningMax")];
   const effortLabel = effortLabels[reasoning] ?? effortLabels[0];
+  const modelLabel = model || tc("noModel");
   const permLabel =
     perm === "ask" ? tc("permAskShort") : perm === "agent" ? tc("permAgentShort") : tc("permFullShort");
 
@@ -734,7 +740,7 @@ function SidechatPane() {
             aria-haspopup="menu"
             aria-expanded={menu === "model"}
           >
-            <span>{model}</span>
+            <span>{modelLabel}</span>
             <span className="text-[11px] text-codex-muted bg-codex-active px-1.5 py-0.5 rounded">{effortLabel}</span>
           </button>
           <button
@@ -787,7 +793,7 @@ function SidechatPane() {
               <div className="flex items-start justify-between gap-2 px-2 py-1">
                 <div>
                   <div className="text-[12px] text-codex-muted">{effortLabel}</div>
-                  <div className="text-[13px] text-codex-text font-medium">{model}</div>
+                  <div className="text-[13px] text-codex-text font-medium">{modelLabel}</div>
                 </div>
                 <button
                   type="button"

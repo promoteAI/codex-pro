@@ -33,16 +33,17 @@ afterEach(() => {
 });
 
 describe("Layout", () => {
-  it("无 token 时直接进入主界面，不再跳转登录页", async () => {
+  it("authRequired=true 且无 token 时跳转登录页", async () => {
     vi.spyOn(api, "apiFetch").mockResolvedValue({ admin: true, authRequired: true });
+    useAuthStore.setState({ token: null });
 
     renderAt();
 
-    expect(await screen.findByText("dashboard-content")).toBeTruthy();
-    expect(screen.queryByText("login-page")).toBeNull();
+    expect(await screen.findByText("login-page")).toBeTruthy();
+    expect(screen.queryByText("dashboard-content")).toBeNull();
   });
 
-  it("open 模式空 token 也能进入", async () => {
+  it("open 模式（authRequired=false）空 token 也能进入", async () => {
     vi.spyOn(api, "apiFetch").mockResolvedValue({ admin: true, authRequired: false });
 
     renderAt();
@@ -50,21 +51,23 @@ describe("Layout", () => {
     expect(await screen.findByText("dashboard-content")).toBeTruthy();
   });
 
-  it("有 token 时直接进入", () => {
-    vi.spyOn(api, "apiFetch").mockReturnValue(new Promise(() => {}) as never);
+  it("authRequired=true 且有 token 时进入主界面", async () => {
+    vi.spyOn(api, "apiFetch").mockResolvedValue({ admin: true, authRequired: true });
     useAuthStore.setState({ token: "tok" });
 
     renderAt();
 
-    expect(screen.getByText("dashboard-content")).toBeTruthy();
+    expect(await screen.findByText("dashboard-content")).toBeTruthy();
+    expect(screen.queryByText("login-page")).toBeNull();
   });
 
-  it("探测未返回前也渲染主界面，不空白屏", () => {
+  it("探测未返回前（authRequired=null）渲染占位，不渲染主界面也不跳登录", () => {
     vi.spyOn(api, "apiFetch").mockReturnValue(new Promise(() => {}) as never);
+    useAuthStore.setState({ token: null });
 
     renderAt();
 
-    expect(screen.getByText("dashboard-content")).toBeTruthy();
+    expect(screen.queryByText("dashboard-content")).toBeNull();
     expect(screen.queryByText("login-page")).toBeNull();
   });
 });

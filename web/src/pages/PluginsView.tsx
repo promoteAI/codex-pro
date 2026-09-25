@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useApi } from "../hooks/use-api";
 import { useWsSubscribe } from "../hooks/use-ws";
 import { useShellStore } from "../stores/shell";
@@ -187,6 +188,7 @@ function SkillCard({
 
 /** Codex-styled plugins marketplace (prototype pl-view). */
 export function PluginsView() {
+  const { t } = useTranslation(["plugins", "common"]);
   const openSettings = useShellStore((s) => s.openSettings);
   const isAdmin = useIsAdmin();
   const canAdmin = isAdmin !== false;
@@ -287,18 +289,18 @@ export function PluginsView() {
         throw new Error(body.error || `HTTP ${resp.status}`);
       }
       await refetchPlugins();
-      toast.success(enable ? `插件「${name}」已启用` : `插件「${name}」已禁用`);
+      toast.success(enable ? t("toast.pluginEnabled", { name }) : t("toast.pluginDisabled", { name }));
     } catch (e: unknown) {
-      toast.error(`操作失败：${e instanceof Error ? e.message : String(e)}`);
+      toast.error(t("toast.operationFailed", { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       setToggling(null);
     }
   };
 
   return (
-    <section className="pl-view" aria-label="插件市场">
+    <section className="pl-view" aria-label={t("view")}>
       <div className="pl-top">
-        <div className="pl-tabs" role="tablist" aria-label="插件与技能">
+        <div className="pl-tabs" role="tablist" aria-label={t("tabs.label")}>
           <button
             type="button"
             role="tab"
@@ -306,7 +308,7 @@ export function PluginsView() {
             className={`pl-tab${tab === "plugins" ? " active" : ""}`}
             onClick={() => setTab("plugins")}
           >
-            插件
+            {t("tabs.plugins")}
           </button>
           <button
             type="button"
@@ -315,19 +317,19 @@ export function PluginsView() {
             className={`pl-tab${tab === "skills" ? " active" : ""}`}
             onClick={() => setTab("skills")}
           >
-            技能
+            {t("tabs.skills")}
           </button>
         </div>
         <div className="pl-top-actions">
           <button
             type="button"
             className="pl-icon-btn"
-            title="刷新"
-            aria-label="刷新"
+            title={t("refresh")}
+            aria-label={t("refresh")}
             onClick={() => {
               if (tab === "skills") void refetchSkills();
               else void refetchPlugins();
-              toast.success("已刷新");
+              toast.success(t("toast.refresh"));
             }}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -338,8 +340,8 @@ export function PluginsView() {
           <button
             type="button"
             className="pl-icon-btn"
-            title="插件设置"
-            aria-label="插件设置"
+            title={t("pluginSettings")}
+            aria-label={t("pluginSettings")}
             onClick={() => openSettings("plugins")}
           >
             <GearIcon />
@@ -352,7 +354,7 @@ export function PluginsView() {
               aria-expanded={addOpen}
               onClick={() => setAddOpen((o) => !o)}
             >
-              添加{" "}
+              {t("add")}{" "}
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m6 9 6 6 6-6" />
               </svg>
@@ -362,17 +364,15 @@ export function PluginsView() {
                 type="button"
                 className="add-plugin-item"
                 role="menuitem"
-                onClick={() => {
-                  setAddOpen(false);
-                  toast.info("创建插件（即将推出）");
-                }}
+                disabled
+                title={t("addMenu.createComingSoon")}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <circle cx="12" cy="12" r="8.5" />
                   <circle cx="12" cy="12" r="2.2" />
                   <path d="M12 3.5v6.3M12 14.2v6.3M3.5 12h6.3M14.2 12h6.3" />
                 </svg>
-                创建插件
+                {t("addMenu.create")}
               </button>
               <button
                 type="button"
@@ -386,7 +386,7 @@ export function PluginsView() {
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
-                添加插件市场
+                {t("addMenu.addMarket")}
               </button>
             </div>
           </div>
@@ -403,19 +403,19 @@ export function PluginsView() {
             </svg>
             <input
               type="search"
-              placeholder="搜索插件"
-              aria-label="搜索插件"
+              placeholder={t("searchPlugins")}
+              aria-label={t("searchPlugins")}
               value={pluginQuery}
               onChange={(e) => setPluginQuery(e.target.value)}
             />
           </div>
 
           {pluginsLoading && (
-            <div style={{ color: "#888", fontSize: 13, textAlign: "center", padding: 24 }}>加载中…</div>
+            <div style={{ color: "#888", fontSize: 13, textAlign: "center", padding: 24 }}>{t("loading")}</div>
           )}
           {!pluginsLoading && pluginsError && (
             <div style={{ color: "#e85d5d", fontSize: 13, textAlign: "center", padding: 24 }}>
-              加载失败：{pluginsError}
+              {t("loadFailed", { error: pluginsError })}
             </div>
           )}
 
@@ -423,7 +423,7 @@ export function PluginsView() {
           <>
             {enabledPlugins.length > 0 && (
             <div className="pl-section">
-              <h3 className="pl-section-title">已启用 ({enabledPlugins.length})</h3>
+              <h3 className="pl-section-title">{t("enabled", { count: enabledPlugins.length })}</h3>
               <div className="pl-grid">
                 {enabledPlugins.map((p) => (
                   <div key={p.name} className="pl-card">
@@ -437,7 +437,7 @@ export function PluginsView() {
                     <ToggleSwitch
                       checked={true}
                       onChange={() => togglePlugin(p.name, false)}
-                      label={`禁用 ${p.name}`}
+                      label={t("disable", { name: p.name })}
                     />
                   </div>
                 ))}
@@ -447,7 +447,7 @@ export function PluginsView() {
 
             {disabledPlugins.length > 0 && (
             <div className="pl-section">
-              <h3 className="pl-section-title">已禁用 ({disabledPlugins.length})</h3>
+              <h3 className="pl-section-title">{t("disabled", { count: disabledPlugins.length })}</h3>
               <div className="pl-grid">
                 {disabledPlugins.map((p) => (
                   <div key={p.name} className="pl-card pl-card--dimmed">
@@ -464,7 +464,7 @@ export function PluginsView() {
                       disabled={toggling === p.name}
                       onClick={() => togglePlugin(p.name, true)}
                     >
-                      {toggling === p.name ? "…" : "启用"}
+                      {toggling === p.name ? "…" : t("enable")}
                     </button>
                   </div>
                 ))}
@@ -474,7 +474,7 @@ export function PluginsView() {
 
             {enabledPlugins.length === 0 && disabledPlugins.length === 0 && (
               <div className="pl-section" style={{ textAlign: "center", color: "#6e6e6e", fontSize: 13, padding: 32 }}>
-                未发现插件
+                {t("noPlugins")}
               </div>
             )}
           </>
@@ -484,9 +484,9 @@ export function PluginsView() {
 
         {tab === "skills" && (
         <div className="pl-skills-panel is-visible">
-          <span className="pl-sk-badge">技能</span>
-          <h1 className="pl-sk-title">技能</h1>
-          <p className="pl-sk-sub">通过任务专用技能扩展 Codex</p>
+          <span className="pl-sk-badge">{t("skills.badge")}</span>
+          <h1 className="pl-sk-title">{t("skills.title")}</h1>
+          <p className="pl-sk-sub">{t("skills.subtitle")}</p>
 
           <div className="pl-sk-search">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -495,28 +495,28 @@ export function PluginsView() {
             </svg>
             <input
               type="search"
-              placeholder="搜索技能"
-              aria-label="搜索技能"
+              placeholder={t("searchSkills")}
+              aria-label={t("searchSkills")}
               value={skillQuery}
               onChange={(e) => setSkillQuery(e.target.value)}
             />
           </div>
 
           {skillsLoading && (
-            <div style={{ color: "#888", fontSize: 13, textAlign: "center", padding: 24 }}>加载中…</div>
+            <div style={{ color: "#888", fontSize: 13, textAlign: "center", padding: 24 }}>{t("loading")}</div>
           )}
           {!skillsLoading && skillsError && (
             <div style={{ color: "#e85d5d", fontSize: 13, textAlign: "center", padding: 24 }}>
-              加载失败：{skillsError}
+              {t("loadFailed", { error: skillsError })}
             </div>
           )}
 
           {!skillsLoading && !skillsError && (
             <>
               <div className="pl-sk-block">
-                <h2 className="pl-sk-block-title">已安装</h2>
+                <h2 className="pl-sk-block-title">{t("skills.installed")}</h2>
                 {installedPreview.length === 0 ? (
-                  <div style={{ color: "#6e6e6e", fontSize: 13, padding: "8px 0 16px" }}>暂无已安装技能</div>
+                  <div style={{ color: "#6e6e6e", fontSize: 13, padding: "8px 0 16px" }}>{t("skills.emptyInstalled")}</div>
                 ) : (
                   <div className="pl-sk-grid">
                     {installedPreview.map((s) => (
@@ -530,19 +530,19 @@ export function PluginsView() {
                     className="pl-sk-more"
                     onClick={() => setInstalledExpanded(true)}
                   >
-                    查看另有 {installedExtra} 项
+                    {t("skills.viewMore", { count: installedExtra })}
                   </button>
                 )}
               </div>
 
-              <div className="pl-sk-scopes" role="tablist" aria-label="技能分类">
+              <div className="pl-sk-scopes" role="tablist" aria-label={t("skills.scopeLabel")}>
                 {(
                   [
-                    ["personal", "个人"],
-                    ["system", "系统"],
-                    ["recommended", "推荐"],
+                    ["personal", "skills.personal"],
+                    ["system", "skills.system"],
+                    ["recommended", "skills.recommended"],
                   ] as const
-                ).map(([id, label]) => (
+                ).map(([id, key]) => (
                   <button
                     key={id}
                     type="button"
@@ -552,14 +552,14 @@ export function PluginsView() {
                       setScopeExpanded(false);
                     }}
                   >
-                    {label}
+                    {t(key)}
                   </button>
                 ))}
               </div>
 
               <div className="pl-sk-scope-panel is-active">
                 {scopePreview.length === 0 ? (
-                  <div style={{ color: "#6e6e6e", fontSize: 13, padding: "8px 0" }}>该分类暂无技能</div>
+                  <div style={{ color: "#6e6e6e", fontSize: 13, padding: "8px 0" }}>{t("skills.emptyScope")}</div>
                 ) : (
                   <div className="pl-sk-grid">
                     {scopePreview.map((s) => (
@@ -578,7 +578,7 @@ export function PluginsView() {
                     className="pl-sk-more"
                     onClick={() => setScopeExpanded(true)}
                   >
-                    查看另有 {scopeExtra} 项
+                    {t("skills.viewMore", { count: scopeExtra })}
                   </button>
                 )}
               </div>

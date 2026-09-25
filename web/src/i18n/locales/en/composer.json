@@ -17,6 +17,7 @@
   "permTitle": "How should actions be approved?",
   "permSaveFailed": "Failed to save permission settings",
   "model": "Model",
+  "noModel": "No model selected",
   "modelCustom": "Custom",
   "reasoningLow": "Low",
   "reasoningMed": "Medium",

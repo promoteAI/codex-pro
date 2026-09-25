@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect } from "react";
-import { Outlet, useLocation } from "react-router";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { Navigate, Outlet, useLocation } from "react-router";
 import { RouteErrorBoundary } from "./ErrorBoundary";
 import { CodexSidebar } from "./shell/CodexSidebar";
 import { LayoutToolbar } from "./shell/LayoutToolbar";
@@ -10,10 +10,38 @@ import { RemoteConnectModal } from "./RemoteConnectModal";
 import { ToolsPanel } from "./tools/ToolsPanel";
 import { TermPanel } from "./tools/TermPanel";
 import { useShellStore } from "../stores/shell";
+import { useAuthStore } from "../stores/auth";
+import { useAuthRequired } from "../stores/capabilities";
 
 const SettingsOverlay = lazy(() =>
   import("./settings/SettingsOverlay").then((m) => ({ default: m.SettingsOverlay })),
 );
+
+/**
+ * Auth gate for the app shell. The `/login` route is a sibling of the Layout
+ * route (not nested inside it), so the gate never blocks the login page itself.
+ *
+ * State machine:
+ * - `authRequired === null` (capability probe in flight): wait. Returning to
+ *   `/login` here would loop in open mode, and guessing "not required" would
+ *   flash the dashboard on a real deployment before its first 401. Until the
+ *   gateway answers we render a neutral placeholder and nothing else.
+ * - `authRequired === true && !token`: the deployment authenticates and we are
+ *   not signed in — send to /login.
+ * - otherwise (open mode, or authenticated): render the shell.
+ */
+function AuthGate({ children }: { children: ReactNode }) {
+  const authRequired = useAuthRequired();
+  const token = useAuthStore((s) => s.token);
+
+  if (authRequired === null) {
+    return null;
+  }
+  if (authRequired === true && !token) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
 
 export function Layout() {
   const location = useLocation();
@@ -83,6 +111,7 @@ export function Layout() {
   }, [openTool, openTerm, openSearch, openSettings]);
 
   return (
+    <AuthGate>
     <div className="app-shell h-screen flex flex-col bg-codex-bg text-codex-text overflow-hidden">
       <div className="flex-1 flex min-h-0 relative">
         <CodexSidebar />
@@ -107,6 +136,7 @@ export function Layout() {
       <BotsModal />
       <RemoteConnectModal />
     </div>
+    </AuthGate>
   );
 }
 

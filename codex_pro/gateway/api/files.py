@@ -6,6 +6,7 @@ Serves files relative to the gateway workspace root.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -181,4 +182,49 @@ class FilesAPI:
             "content": content,
             "size": size,
             "truncated": False,
+        })
+
+    async def open_file(self, request: web.Request) -> web.Response:
+        """Open a workspace file with the OS's default handler.
+
+        Query params: ``repo`` (absolute path of the project, or empty for the
+        workspace root) and ``path`` (the file path relative to that repo).
+        Rejects directories and files escaping the repo root, then launches the
+        platform default app (``os.startfile`` on Windows, ``xdg-open`` on
+        POSIX).
+        """
+        guard = self._guard(request, "files_open")
+        if guard is not None:
+            return guard
+
+        repo_path = request.query.get("repo", "")
+        rel_path = request.query.get("path", "")
+
+        repo = self._resolve_repo(repo_path)
+        if repo is None:
+            return web.json_response({"error": "repo not allowed"}, status=403)
+
+        try:
+            target = (repo / rel_path).resolve()
+            target.relative_to(repo)
+        except (ValueError, OSError):
+            return web.json_response({"error": "access denied"}, status=403)
+
+        if not target.is_file():
+            return web.json_response({"error": "not a file"}, status=400)
+
+        try:
+            if os.name == "nt":
+                os.startfile(str(target))
+            else:
+                import subprocess
+
+                subprocess.Popen(["xdg-open", str(target)])
+        except Exception:
+            return web.json_response({"error": "failed to open file"}, status=500)
+
+        return web.json_response({
+            "path": rel_path,
+            "name": target.name,
+            "opened": True,
         })

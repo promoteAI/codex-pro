@@ -109,6 +109,23 @@ class SkillsAPI:
             }
         )
 
+    async def get_skill_path(self, request: web.Request) -> web.Response:
+        guard = self._guard(request, "skills_path")
+        if guard is not None:
+            return guard
+        unavailable = self._unavailable()
+        if unavailable is not None:
+            return unavailable
+
+        name = request.match_info["name"]
+        store = self._store()
+        # include_disabled: this is the admin detail view, and the path is what
+        # an operator opens in their editor before deciding whether to enable it.
+        skill_dir = store.find_skill_dir(name, include_disabled=True)
+        if skill_dir is None:
+            return web.json_response({"error": "not found"}, status=404)
+        return web.json_response({"name": name, "path": str(skill_dir)})
+
     async def toggle_skill(self, request: web.Request) -> web.Response:
         # Enabling a skill changes what the agent can do on its next turn, which
         # is the same class of change as installing or deleting one — those

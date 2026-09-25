@@ -3,7 +3,7 @@ import { X, Download, MoreHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "../hooks/use-api";
 import { apiFetch } from "../lib/api";
-import { runMutation } from "../stores/toast";
+import { runMutation, toast } from "../stores/toast";
 import { useShellStore } from "../stores/shell";
 import { Toggle } from "./settings/ui";
 
@@ -107,6 +107,8 @@ export function SkillDetailDrawer({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
+        role="dialog"
+        aria-label={name}
         className="relative w-full max-w-2xl mx-4 max-h-[90vh] bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
         onMouseEnter={() => setHovered(true)}
@@ -166,11 +168,19 @@ export function SkillDetailDrawer({
                       setMenuOpen(false);
                       if (data.files.length > 0) {
                         try {
-                          await apiFetch(`/skills/${encodeURIComponent(name)}/path`);
-                          // Fallback: attempt to open via gateway endpoint
-                          window.open(`/api/skills/${encodeURIComponent(name)}/open`, "_blank");
-                        } catch {
-                          window.open(`/skills/${encodeURIComponent(name)}`, "_blank");
+                          const res = await apiFetch<{ path: string }>(
+                            `/skills/${encodeURIComponent(name)}/path`,
+                          );
+                          if (res.path) {
+                            await navigator.clipboard.writeText(res.path);
+                            toast.info(`技能路径已复制到剪贴板：${res.path}`);
+                          }
+                        } catch (e: unknown) {
+                          const detail = e instanceof Error ? e.message : String(e);
+                          toast.error(`无法定位技能路径：${detail}`);
+                          // 兜底：仍把可展示的技能名/路径文本给用户，并复制 SKILL.md 内容代替。
+                          await navigator.clipboard.writeText(data.content || data.name || name);
+                          toast.info("已将技能内容复制到剪贴板");
                         }
                       }
                     }}

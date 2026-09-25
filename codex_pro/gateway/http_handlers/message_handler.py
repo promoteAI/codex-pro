@@ -551,7 +551,7 @@ class MessageHandler:
                 _no_proj = self._server._agent_loop.config.ui.preferences.no_project_folder
                 no_project_base = Path(_no_proj).expanduser().resolve()
                 date_dir = no_project_base / datetime.now().strftime("%Y-%m-%d")
-                no_project_dir = date_dir / session_dir_name(session_key) / "work"
+                no_project_dir = date_dir / session_dir_name(session_key)
                 no_project_dir.mkdir(parents=True, exist_ok=True)
                 effective_workspace = str(no_project_dir)
                 # 注意:此处不设置 session.project。project 字段用于在 /sessions 中

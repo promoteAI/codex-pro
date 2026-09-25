@@ -48,17 +48,20 @@ export function Toggle({
   checked,
   onChange,
   label,
+  disabled,
 }: {
   checked: boolean;
   onChange?: (next: boolean) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
-    <label className="relative w-9 h-5 shrink-0 inline-block cursor-pointer">
+    <label className={`relative w-9 h-5 shrink-0 inline-block ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
       <input
         type="checkbox"
         className="peer sr-only"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange?.(e.target.checked)}
         aria-label={label}
       />

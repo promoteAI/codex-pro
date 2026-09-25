@@ -95,11 +95,15 @@ class SkillsAPI:
         if content is None:
             return web.json_response({"error": "not found"}, status=404)
 
+        from codex_pro.skills.store import parse_frontmatter
+
+        fm, _ = parse_frontmatter(content)
         files = store.list_files(name, include_disabled=True)
         return web.json_response(
             {
                 "name": name,
                 "content": content,
+                "description": fm.get("description", ""),
                 "enabled": not store.is_disabled(name),
                 "files": files,
             }

@@ -119,13 +119,16 @@ describe("SettingsPluginsPage", () => {
     });
   });
 
-  it("已启用插件显示「已启用」按钮", async () => {
+  it("已启用插件显示为勾选状态", async () => {
     mockApi();
     renderPage();
     await waitFor(() => {
       expect(screen.getByText("automate")).toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: "已启用" })).toBeInTheDocument();
+    // enable toggle for the enabled plugin should be checked
+    const toggles = screen.getAllByRole("checkbox", { name: /已启用/ });
+    expect(toggles.length).toBeGreaterThan(0);
+    toggles.forEach((t) => expect(t).toBeChecked());
   });
 
   it("无插件时显示空态提示", async () => {

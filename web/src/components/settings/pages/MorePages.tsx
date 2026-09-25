@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, } from "react";
+import { createPortal } from "react-dom";
 import { Search, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -15,12 +16,14 @@ import {
 } from "../ui";
 import { AddMarketModal } from "../../AddMarketModal";
 import { McpCreateView } from "../../McpCreateView";
+import { SkillDetailDrawer } from "../../SkillDetailDrawer";
 import { toast } from "../../../stores/toast";
 import { useShellStore } from "../../../stores/shell";
 import { useSettingsStore } from "../../../stores/settings";
 import { useWsSubscribe } from "../../../hooks/use-ws";
 import { useApi } from "../../../hooks/use-api";
 import { apiFetch } from "../../../lib/api";
+import { useIsAdmin } from "../../../stores/capabilities";
 import { dateTime } from "../../../lib/datetime";
 
 interface ApiPlugin {
@@ -47,59 +50,6 @@ interface SshConnection {
   has_password: boolean;
   created_at?: string;
   updated_at?: string;
-}
-
-interface DiscoverHost {
-  host: string;
-}
-
-/** Modal chrome matching the prototype at docs/design/prototype-codex-pro.html. */
-function SshModal({
-  title,
-  onClose,
-  children,
-}: {
-  title: string;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  const titleId = useId();
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="pl-modal-overlay open"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="pl-modal">
-        <div className="pl-modal-head">
-          <h3 className="pl-modal-title" id={titleId}>
-            {title}
-          </h3>
-          <button type="button" className="pl-modal-close" aria-label="关闭" onClick={onClose}>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
 }
 
 export function VoicePage() {
@@ -490,6 +440,8 @@ export function SettingsPluginsPage() {
   const { t } = useTranslation("settings");
   const navigate = useNavigate();
   const closeSettings = useShellStore((s) => s.closeSettings);
+  const isAdmin = useIsAdmin();
+  const canAdmin = isAdmin !== false;
   const [tab, setTab] = useState<PluginKind>("plugins");
   const [q, setQ] = useState("");
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -500,9 +452,14 @@ export function SettingsPluginsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
+  // Per-item dropdown for … menu. key = item id.
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [menuRect, setMenuRect] = useState<DOMRect | null>(null);
+  const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
 
-  const { data: skillsApiData } = useApi<{
+  const { data: skillsApiData, refetch: refetchSkills } = useApi<{
     skills: { name: string; description: string; enabled: boolean; source?: string }[];
   }>("/skills");
 
@@ -512,11 +469,18 @@ export function SettingsPluginsPage() {
     try {
       const data = await apiFetch<{ plugins: ApiPlugin[] }>("/plugins");
       setApiPlugins(data.plugins);
-      const next: Record<string, boolean> = {};
-      for (const p of data.plugins) {
-        next[p.name] = p.status !== "disabled";
-      }
-      setEnabled(next);
+      // Merge, don't replace: a skill may not appear in /plugins at all, and
+      // replacing wiped its key so it rendered as "off" even when enabled.
+      setEnabled((prev) => {
+        const next = { ...prev };
+        for (const p of data.plugins) {
+          next[p.name] = p.status !== "disabled";
+        }
+        return next;
+      });
+      // Refresh skills so the merge effect below re-applies each skill's own
+      // enabled flag (ws skill_changed also routes through here).
+      void refetchSkills();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -527,6 +491,21 @@ export function SettingsPluginsPage() {
   useEffect(() => {
     void loadPlugins();
   }, []);
+
+  // The plugin list's `status` only reflects the plugin system's allow/deny
+  // lists. A skill can be enabled/disabled independently in the skills store,
+  // and may not even appear in /plugins — so merge each skill's own `enabled`
+  // flag in, otherwise an enabled skill still renders as a grey "off" toggle.
+  useEffect(() => {
+    if (!skillsApiData) return;
+    setEnabled((prev) => {
+      const next = { ...prev };
+      for (const s of skillsApiData.skills) {
+        next[s.name] = s.enabled;
+      }
+      return next;
+    });
+  }, [skillsApiData]);
 
   useWsSubscribe(["plugins"], loadPlugins, ["plugin_changed"]);
   useWsSubscribe(["skills"], loadPlugins, ["skill_changed"]);
@@ -540,15 +519,64 @@ export function SettingsPluginsPage() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [addMenuOpen]);
 
-  const togglePlugin = async (name: string, enable: boolean) => {
-    setToggling(name);
+  // Close per-item menu when clicking outside.
+  useEffect(() => {
+    if (!menuId) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuId(null);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuId]);
+
+  const toggleMenu = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuId(menuId === id ? null : id);
+    setMenuRect(menuId === id ? null : rect);
+  };
+
+  const openItemAction = async (_id: string, action: "open" | "details") => {
+    setMenuId(null);
+    if (action === "open") {
+      // For skills, open inline drawer inside settings panel
+      const item = allItems.find((p) => p.id === _id);
+      if (item?.kind === "skills") {
+        setSelectedSkill(_id);
+        return;
+      }
+      closeSettings();
+      navigate("/plugins");
+    } else {
+      const item = allItems.find((p) => p.id === _id);
+      if (item?.kind === "skills") {
+        setSelectedSkill(_id);
+        return;
+      }
+      toast.info("详情页面待实现");
+    }
+  };
+
+  const togglePlugin = async (item: PluginListItem, enable: boolean) => {
+    setToggling(item.id);
+    const kind = item.kind;
     try {
-      await apiFetch(`/plugins/${encodeURIComponent(name)}/toggle`, {
-        method: "POST",
-        body: JSON.stringify({ enabled: enable }),
-      });
-      setEnabled((s) => ({ ...s, [name]: enable }));
-      toast.success(enable ? `插件「${name}」已启用` : `插件「${name}」已禁用`);
+      // Skills toggle via the skills store (flip semantics), plugins via the
+      // plugin allow/deny config. A name present in both lists is treated as a
+      // skill here, matching how the detail drawer opens for skill rows.
+      if (kind === "skills") {
+        await apiFetch(`/skills/${encodeURIComponent(item.id)}/toggle`, {
+          method: "POST",
+          body: JSON.stringify({ enabled: enable }),
+        });
+      } else {
+        await apiFetch(`/plugins/${encodeURIComponent(item.id)}/toggle`, {
+          method: "POST",
+          body: JSON.stringify({ enabled: enable }),
+        });
+      }
+      setEnabled((s) => ({ ...s, [item.id]: enable }));
+      toast.success(enable ? `「${item.id}」已启用` : `「${item.id}」已禁用`);
     } catch (e: unknown) {
       toast.error(`操作失败：${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -748,7 +776,8 @@ export function SettingsPluginsPage() {
           filtered.map((p) => (
             <div
               key={p.id}
-              className="flex items-center gap-3.5 px-4 py-3.5 bg-[#1e1e1e] border border-[#262626] rounded-[10px] hover:border-[#333]"
+              className="flex items-center gap-3.5 px-4 py-3.5 bg-[#1e1e1e] border border-[#262626] rounded-[10px] hover:border-[#333] cursor-pointer"
+              onClick={() => p.kind === "skills" && setSelectedSkill(p.id)}
             >
               <div className="w-9 h-9 rounded-lg bg-[#252525] grid place-items-center text-codex-muted shrink-0 text-xs">
                 ◆
@@ -758,22 +787,67 @@ export function SettingsPluginsPage() {
                 <div className="text-xs text-codex-muted line-clamp-2">{p.desc}</div>
               </div>
               <span className="text-xs text-[#666] px-2 py-0.5 bg-[#252525] rounded shrink-0">{p.tag}</span>
-              <button
-                type="button"
-                disabled={toggling === p.id}
-                onClick={() => togglePlugin(p.id, !enabled[p.id])}
-                className={`px-3 py-1 rounded-md text-[12px] font-medium border ${
-                  enabled[p.id]
-                    ? "bg-[#2a3a2a] border-[#3a5a3a] text-codex-success hover:bg-[#324a32]"
-                    : "bg-[#2a2a2a] border-[#3a3a3a] text-codex-text-secondary hover:bg-[#323232]"
-                }`}
-              >
-                {toggling === p.id ? "…" : enabled[p.id] ? "已启用" : "启用"}
-              </button>
+              <div className="shrink-0" onClick={(e) => e.stopPropagation()} title={toggling === p.id ? undefined : (enabled[p.id] ? "已启用" : "启用")}>
+                <Toggle
+                  checked={!!enabled[p.id]}
+                  disabled={toggling === p.id}
+                  onChange={(v) => togglePlugin(p, v)}
+                  label={toggling === p.id ? "…" : (enabled[p.id] ? "已启用" : "启用")}
+                />
+              </div>
+              <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={(e) => toggleMenu(e, p.id)}
+                  className="w-7 h-7 flex items-center justify-center rounded-md text-[#888] hover:bg-[#2a2a2a] hover:text-codex-text-secondary transition-colors"
+                  aria-label="更多操作"
+                  title="更多操作"
+                >
+                  ···
+                </button>
+              </div>
+              {menuId === p.id && menuRect && createPortal(
+                <div
+                  ref={menuRef}
+                  role="menu"
+                  className="fixed z-50 min-w-[120px] p-1.5 bg-codex-elevated border border-codex-border-strong rounded-[8px] shadow-[0_8px_24px_rgba(0,0,0,.4)]"
+                  style={{
+                    left: menuRect.right + 4,
+                    top: menuRect.bottom + 4,
+                  }}
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => openItemAction(p.id, "open")}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-[13px] text-codex-text hover:bg-[#353535]"
+                  >
+                    打开
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => openItemAction(p.id, "details")}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-[13px] text-codex-text hover:bg-[#353535]"
+                  >
+                    详情
+                  </button>
+                </div>,
+                document.body,
+              )}
             </div>
           ))
         )}
       </div>
+      )}
+
+      <AddMarketModal open={marketOpen} onClose={() => setMarketOpen(false)} />
+      {selectedSkill && (
+        <SkillDetailDrawer
+          name={selectedSkill}
+          canAdmin={canAdmin}
+          onClose={() => setSelectedSkill(null)}
+        />
       )}
 
       <AddMarketModal open={marketOpen} onClose={() => setMarketOpen(false)} />
@@ -1121,23 +1195,17 @@ export function ConnectionsPage() {
   const [connections, setConnections] = useState<SshConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [pane, setPane] = useState<"discover" | "manual">("discover");
-  const [discoverHosts, setDiscoverHosts] = useState<DiscoverHost[]>([]);
-  const [discoverLoading, setDiscoverLoading] = useState(false);
-  const [selectedHost, setSelectedHost] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<SshConnection | null>(null);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState<string | null>(null);
-  const [testResults, setTestResults] = useState<Record<string, { ok: boolean; detail: string }>>({});
-  // Manual form state.
-  const [fName, setFName] = useState("");
-  const [fHost, setFHost] = useState("");
-  const [fPort, setFPort] = useState("22");
-  const [fUser, setFUser] = useState("");
-  const [fAuth, setFAuth] = useState<AuthMethod>("none");
-  const [fIdentity, setFIdentity] = useState("");
-  const [fPassword, setFPassword] = useState("");
+  // Form state
+  const [name, setName] = useState("");
+  const [host, setHost] = useState("");
+  const [port, setPort] = useState("22");
+  const [user, setUser] = useState("");
+  const [authMethod, setAuthMethod] = useState<AuthMethod>("none");
+  const [identityFile, setIdentityFile] = useState("");
+  const [password, setPassword] = useState("");
 
   const loadConnections = async () => {
     setLoading(true);
@@ -1145,414 +1213,177 @@ export function ConnectionsPage() {
     try {
       const data = await apiFetch<{ connections: SshConnection[] }>("/connections");
       setConnections(data.connections);
-    } catch (e: unknown) {
+    } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    void loadConnections();
-  }, []);
+  useEffect(() => { void loadConnections(); }, []);
 
   const openCreate = () => {
     setEditing(null);
-    setPane("discover");
-    setSelectedHost(null);
-    setFAuth("none");
-    setFName("");
-    setFHost("");
-    setFPort("22");
-    setFUser("");
-    setFIdentity("");
-    setFPassword("");
-    setModalOpen(true);
+    setName(""); setHost(""); setPort("22"); setUser("");
+    setAuthMethod("none"); setIdentityFile(""); setPassword("");
+    setCreating(true);
   };
 
   const openEdit = (c: SshConnection) => {
     setEditing(c);
-    setPane("manual");
-    setFName(c.name);
-    setFHost(c.host);
-    setFPort(String(c.port ?? 22));
-    setFUser(c.user ?? "");
-    setFAuth(c.auth_method ?? "none");
-    setFIdentity(c.identity_file ?? "");
-    setFPassword("");
-    setSelectedHost(null);
-    setModalOpen(true);
+    setName(c.name); setHost(c.host); setPort(String(c.port));
+    setUser(c.user ?? ""); setAuthMethod(c.auth_method);
+    setIdentityFile(c.identity_file); setPassword("");
+    setCreating(true);
   };
 
-  const refreshDiscover = async () => {
-    setDiscoverLoading(true);
-    try {
-      const data = await apiFetch<{ hosts: DiscoverHost[] }>("/connections/refresh");
-      setDiscoverHosts(data.hosts);
-    } catch (e: unknown) {
-      toast.error(`${t("refresh")}：${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setDiscoverLoading(false);
-    }
+  const closeCreate = () => {
+    setCreating(false);
+    setEditing(null);
   };
 
-  useEffect(() => {
-    if (!modalOpen || pane !== "discover") return;
-    void refreshDiscover();
-  }, [modalOpen, pane]);
-
-  const submit = async () => {
-    const host = (pane === "discover" ? selectedHost : fHost) ?? "";
+  const saveConnection = async () => {
+    if (!name.trim() || !host.trim()) return;
     setSaving(true);
     try {
+      const payload = { name: name.trim(), host: host.trim(), port: Number(port) || 22, user: user.trim(), authMethod, identityFile: identityFile.trim() || undefined, password: password || undefined };
       if (editing) {
-        await apiFetch(`/connections/${encodeURIComponent(editing.name)}`, {
-          method: "PUT",
-          body: JSON.stringify({
-            host,
-            port: Number(fPort) || 22,
-            user: fUser,
-            auth_method: fAuth,
-            identity_file: fIdentity,
-            password: fPassword || undefined,
-          }),
-        });
-        toast.success(t("sshSaved"));
+        await apiFetch(`/connections/${encodeURIComponent(editing.name)}`, { method: "PUT", body: JSON.stringify(payload) });
       } else {
-        const payload: Record<string, unknown> = {
-          name: fName,
-          host,
-          port: Number(fPort) || 22,
-          user: fUser,
-          auth_method: fAuth,
-          identity_file: fIdentity,
-        };
-        if (fPassword) payload.password = fPassword;
-        await apiFetch("/connections", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-        toast.success(t("sshSaved"));
+        await apiFetch("/connections", { method: "POST", body: JSON.stringify(payload) });
       }
-      setModalOpen(false);
+      toast.success(t("connectionSaved"));
+      closeCreate();
       await loadConnections();
-    } catch (e: unknown) {
+    } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
   };
 
-  const removeConnection = async (name: string) => {
-    if (!window.confirm(t("sshDeleteConfirm", { name }))) return;
+  const deleteConnection = async (name: string) => {
+    if (!window.confirm(t("deleteConfirm", { name }))) return;
     try {
       await apiFetch(`/connections/${encodeURIComponent(name)}`, { method: "DELETE" });
-      toast.success(t("sshDeleted"));
-      setConnections((s) => s.filter((c) => c.name !== name));
-    } catch (e: unknown) {
+      toast.success(t("connectionDeleted"));
+      await loadConnections();
+    } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     }
   };
 
-  const testConnection = async (name: string) => {
-    setTesting(name);
-    setTestResults((s) => ({ ...s, [name]: { ok: true, detail: t("sshTesting") } }));
-    try {
-      const data = await apiFetch<{ ok: boolean; detail: string }>(
-        `/connections/${encodeURIComponent(name)}/test`,
-        { method: "POST" },
-      );
-      setTestResults((s) => ({ ...s, [name]: data }));
-    } catch (e: unknown) {
-      setTestResults((s) => ({
-        ...s,
-        [name]: { ok: false, detail: e instanceof Error ? e.message : String(e) },
-      }));
-    } finally {
-      setTesting(null);
-    }
-  };
-
-  const pickDiscoverHost = (host: string) => {
-    setSelectedHost(host);
-    setFHost(host);
-    if (!fName) setFName(host);
-  };
-
   return (
-    <div className="min-w-0">
-      <PageTitle>{t("connections")}</PageTitle>
-      <PageSub>{t("connectionsDesc")}</PageSub>
-
-      <div className="flex items-center justify-between mb-5">
-        <span className="text-[12.5px] text-codex-muted">
-          {t("sshConnectionsN", { n: connections.length })}
-        </span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            title={t("refresh")}
-            aria-label={t("refresh")}
-            onClick={() => void loadConnections()}
-            className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-codex-text-secondary hover:bg-[#333]"
-          >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
-              <path d="M21 12a9 9 0 1 1-2.6-6.3" />
-              <path d="M21 3v6h-6" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={openCreate}
-            className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium"
-          >
-            + {t("add")}
-          </button>
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-[22px] font-semibold text-codex-text">{t("sshConnections")}</h1>
+          <p className="text-[12px] text-codex-muted mt-0.5">{t("connectionsDesc")}</p>
         </div>
+        <button
+          type="button"
+          onClick={openCreate}
+          className="pl-btn-primary flex items-center gap-1.5"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          {t("addConnection")}
+        </button>
       </div>
 
-      {loading ? (
-        <div className="text-codex-muted text-sm py-8 text-center">{t("loading")}</div>
-      ) : error ? (
-        <div className="text-codex-danger text-sm py-6 text-center">{error}</div>
-      ) : connections.length === 0 ? (
-        <EmptyState
-          title={t("sshEmpty")}
-          desc={t("sshEmptyDesc")}
-          action={
-            <button
-              type="button"
-              onClick={openCreate}
-              className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium"
-            >
-              + {t("add")}
-            </button>
-          }
-        />
-      ) : (
-        <div className="bg-codex-surface border border-codex-border rounded-xl overflow-hidden">
-          {connections.map((c, i) => {
-            const result = testResults[c.name];
-            return (
-              <div
-                key={c.name}
-                className={`flex items-center justify-between gap-4 px-4 py-3.5 ${
-                  i > 0 ? "border-t border-codex-border" : ""
-                }`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[13.5px] font-medium text-codex-text">{c.name}</span>
-                    {result && (
-                      <span
-                        className={`text-[11px] px-1.5 py-0.5 rounded ${
-                          result.ok
-                            ? "bg-[#1f2f1f] text-[#7cd47c]"
-                            : "bg-[#3a1a1a] text-[#f87171]"
-                        }`}
-                      >
-                        {result.ok ? t("sshReachable") : t("sshUnreachable")}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[12px] text-codex-muted truncate">
-                    {c.user ? `${c.user}@` : ""}
-                    {c.host}:{c.port ?? 22}
-                    {c.identity_file ? ` · ${c.identity_file}` : ""}
-                  </div>
-                </div>
-                <div className="shrink-0 flex items-center gap-1.5">
-                  <ActionBtn onClick={() => void testConnection(c.name)} disabled={testing === c.name}>
-                    {testing === c.name ? t("sshTesting") : t("sshTest")}
-                  </ActionBtn>
-                  <ActionBtn onClick={() => openEdit(c)}>{t("edit")}</ActionBtn>
-                  <ActionBtn danger onClick={() => void removeConnection(c.name)}>
-                    {t("delete")}
-                  </ActionBtn>
-                </div>
-              </div>
-            );
-          })}
+      {loading && <div className="text-center text-codex-muted py-8 text-sm">{t("loading")}</div>}
+      {error && <div className="text-center text-red-400 py-8 text-sm">{error}</div>}
+      {!loading && !error && connections.length === 0 && (
+        <div className="text-center py-12 text-codex-muted">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 opacity-30"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <div className="text-sm">{t("noConnections")}</div>
         </div>
       )}
 
-      {modalOpen && (
-        <SshModal
-          title={editing ? t("sshEditTitle") : t("sshAddTitle")}
-          onClose={() => setModalOpen(false)}
-        >
-          {pane === "discover" ? (
-            <>
-              <div className="mb-3 text-[12.5px] text-[#9a9a9a]">{t("sshAvailable")}</div>
-              <div className="max-h-[260px] overflow-y-auto rounded-lg border border-[#3a3a3a] bg-[#1e1e1e] divide-y divide-[#2c2c2c]">
-                {discoverLoading ? (
-                  <div className="p-4 text-center text-codex-muted text-[12.5px]">{t("loading")}</div>
-                ) : discoverHosts.length === 0 ? (
-                  <div className="p-4 text-center text-codex-muted text-[12.5px]">
-                    {t("sshNoConnections")}
-                  </div>
-                ) : (
-                  discoverHosts.map((h) => (
-                    <button
-                      key={h.host}
-                      type="button"
-                      onClick={() => pickDiscoverHost(h.host)}
-                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left ${
-                        selectedHost === h.host ? "bg-[#2c2c2c]" : "hover:bg-[#262626]"
-                      }`}
-                    >
-                      <svg viewBox="0 0 24 24" className="w-4 h-4 text-codex-muted shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6">
-                        <rect x="3" y="4" width="18" height="12" rx="2" />
-                        <path d="M8 20h8M12 16v4" />
-                      </svg>
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-[13px] text-codex-text truncate">{h.host}</span>
-                        <span className="block text-[11.5px] text-codex-muted truncate">{h.host}</span>
-                      </span>
-                      {selectedHost === h.host && (
-                        <svg viewBox="0 0 24 24" className="w-4 h-4 text-codex-accent shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="m5 12 5 5 9-10" />
-                        </svg>
-                      )}
-                    </button>
-                  ))
-                )}
+      {!loading && !error && connections.map((conn, i) => (
+        <div key={conn.name} className={`pl-conn-card${i > 0 ? " pl-conn-card--bordered" : ""}`}>
+          <div className="pl-conn-card__head">
+            <div className="pl-conn-card__icon" style={{ background: `hsl(${(conn.name.charCodeAt(0) * 37) % 360}, 50%, 45%)` }}>
+              <span>{conn.name[0].toUpperCase()}</span>
+            </div>
+            <div className="pl-conn-card__info">
+              <div className="pl-conn-card__name">{conn.name}</div>
+              <div className="pl-conn-card__host">
+                {conn.user && <span className="pl-conn-card__user">{conn.user}@</span>}
+                {conn.host}:{conn.port}
               </div>
-              <div className="flex items-center justify-between mt-5">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    title={t("refresh")}
-                    aria-label={t("refresh")}
-                    onClick={() => void refreshDiscover()}
-                    className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#252525] text-codex-text-secondary hover:bg-codex-active"
-                  >
-                    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
-                      <path d="M21 12a9 9 0 1 1-2.6-6.3" />
-                      <path d="M21 3v6h-6" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPane("manual")}
-                    className="px-3 py-1.5 rounded-md border border-[#3a3a3a] bg-[#252525] text-codex-text-secondary text-[12.5px] hover:bg-codex-active"
-                  >
-                    {t("sshManualAdd")}
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void submit()}
-                  disabled={saving || !selectedHost}
-                  className="px-3.5 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium disabled:opacity-45"
-                >
-                  {t("add")}
-                </button>
+            </div>
+            <span className={`pl-conn-badge ${conn.auth_method === "password" ? "pl-conn-badge--ok" : "pl-conn-badge--warn"}`}>
+              {conn.auth_method === "password" ? (t("connected") as string) : (t("unknown") as string)}
+            </span>
+          </div>
+          <div className="pl-conn-card__foot">
+            <span className="pl-conn-card__id">{conn.host}</span>
+            <div className="pl-conn-card__actions">
+              <button type="button" onClick={() => openEdit(conn)} className="pl-conn-act">{t("edit")}</button>
+              <button type="button" onClick={() => void deleteConnection(conn.name)} className="pl-conn-act pl-conn-act--danger">{t("delete")}</button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Create/Edit Dialog */}
+      {creating && (
+        <div className="pl-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeCreate(); }}>
+          <div className="pl-modal">
+            <div className="pl-modal-head">
+              <h3 className="pl-modal-title">{editing ? t("editConnection") : t("addConnection")}</h3>
+              <button type="button" className="pl-modal-close" onClick={closeCreate} aria-label={t("close")}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+              </button>
+            </div>
+            <div className="pl-modal-body">
+              <label className="pl-modal-label">
+                {t("displayName")}
+                <input className="pl-modal-input" value={name} onChange={(e) => setName(e.target.value)} disabled={!!editing} placeholder={t("displayNamePlaceholder")} spellCheck={false} autoComplete="off" />
+              </label>
+              <label className="pl-modal-label">
+                {t("host")}
+                <input className="pl-modal-input" value={host} onChange={(e) => setHost(e.target.value)} placeholder={t("hostPlaceholder")} spellCheck={false} autoComplete="off" />
+              </label>
+              <div className="pl-modal-row">
+                <label className="pl-modal-label pl-modal-label--half">
+                  {t("port")}
+                  <input className="pl-modal-input" value={port} onChange={(e) => setPort(e.target.value)} inputMode="numeric" spellCheck={false} autoComplete="off" />
+                </label>
+                <label className="pl-modal-label pl-modal-label--half">
+                  {t("user")}
+                  <input className="pl-modal-input" value={user} onChange={(e) => setUser(e.target.value)} spellCheck={false} autoComplete="off" />
+                </label>
               </div>
-            </>
-          ) : (
-            <>
-              <div className="space-y-3.5">
-                <div>
-                  <label className="pl-modal-label">{t("sshDisplayName")}</label>
-                  <input
-                    className="pl-modal-input"
-                    value={fName}
-                    onChange={(e) => setFName(e.target.value)}
-                    disabled={!!editing}
-                    spellCheck={false}
-                    autoComplete="off"
-                  />
-                </div>
-                <div>
-                  <label className="pl-modal-label">{t("sshHost")}</label>
-                  <input
-                    className="pl-modal-input"
-                    value={fHost}
-                    onChange={(e) => setFHost(e.target.value)}
-                    placeholder={t("sshHostPlaceholder")}
-                    spellCheck={false}
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3.5">
-                  <div>
-                    <label className="pl-modal-label">{t("sshPort")}</label>
-                    <input
-                      className="pl-modal-input"
-                      value={fPort}
-                      onChange={(e) => setFPort(e.target.value)}
-                      inputMode="numeric"
-                      spellCheck={false}
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div>
-                    <label className="pl-modal-label">{t("sshUser")}</label>
-                    <input
-                      className="pl-modal-input"
-                      value={fUser}
-                      onChange={(e) => setFUser(e.target.value)}
-                      spellCheck={false}
-                      autoComplete="off"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="pl-modal-label">{t("sshAuth")}</label>
-                  <SegGroup
-                    value={fAuth}
-                    onChange={(v) => setFAuth(v as AuthMethod)}
-                    options={[
-                      { id: "none", label: t("sshAuthNone") },
-                      { id: "identity", label: t("sshAuthIdentity") },
-                      { id: "password", label: t("sshAuthPassword") },
-                    ]}
-                  />
-                </div>
-                {fAuth === "identity" && (
-                  <div>
-                    <label className="pl-modal-label">{t("sshIdentityPath")}</label>
-                    <input
-                      className="pl-modal-input"
-                      value={fIdentity}
-                      onChange={(e) => setFIdentity(e.target.value)}
-                      placeholder={t("sshIdentityPlaceholder")}
-                      spellCheck={false}
-                      autoComplete="off"
-                    />
-                  </div>
-                )}
-                {fAuth === "password" && (
-                  <div>
-                    <label className="pl-modal-label">{t("sshPassword")}</label>
-                    <input
-                      className="pl-modal-input"
-                      type="password"
-                      value={fPassword}
-                      onChange={(e) => setFPassword(e.target.value)}
-                      placeholder={t("sshPasswordPlaceholder")}
-                      autoComplete="new-password"
-                    />
-                  </div>
-                )}
-              </div>
-              <div className="pl-modal-foot">
-                <button type="button" className="pl-modal-cancel" onClick={() => setModalOpen(false)}>
-                  {t("cancel")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void submit()}
-                  disabled={saving || !fHost}
-                  className="px-4 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium disabled:opacity-45"
-                >
-                  {editing ? t("save") : t("add")}
-                </button>
-              </div>
-            </>
-          )}
-        </SshModal>
+              <label className="pl-modal-label">
+                {t("authMethod")}
+                <select className="pl-modal-input" value={authMethod} onChange={(e) => setAuthMethod(e.target.value as "none" | "identity" | "password")}>
+                  <option value="none">{t("authNone")}</option>
+                  <option value="identity">{t("authIdentity")}</option>
+                  <option value="password">{t("authPassword")}</option>
+                </select>
+              </label>
+              {authMethod === "identity" && (
+                <label className="pl-modal-label">
+                  {t("identityFile")}
+                  <input className="pl-modal-input" value={identityFile} onChange={(e) => setIdentityFile(e.target.value)} placeholder={t("identityPlaceholder")} spellCheck={false} autoComplete="off" />
+                </label>
+              )}
+              {authMethod === "password" && (
+                <label className="pl-modal-label">
+                  {t("password")}
+                  <input className="pl-modal-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("passwordPlaceholder")} autoComplete="new-password" />
+                </label>
+              )}
+            </div>
+            <div className="pl-modal-foot">
+              <button type="button" className="pl-modal-cancel" onClick={closeCreate}>{t("cancel")}</button>
+              <button type="button" className="pl-btn-primary" onClick={saveConnection} disabled={saving || !name.trim() || !host.trim()}>
+                {saving ? t("saving") : editing ? t("save") : t("add")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

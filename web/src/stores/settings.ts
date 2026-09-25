@@ -170,7 +170,7 @@ export const DEFAULT_PREFS: UIPreferences = {
   gitMonitorInstr: "",
   gitCommitInstr: "",
   gitPrInstr: "",
-  worktreeRoot: "",
+  worktreeRoot: "~/.codex-pro/worktrees",
   worktreePullUpstream: false,
   worktreeAutoDelete: true,
   worktreeDeleteLimit: 15,

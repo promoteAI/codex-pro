@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
@@ -16,20 +17,60 @@ WEB_DIST = ROOT / "web" / "dist"
 PKG = ROOT / "codex_pro"
 
 # Collect the vector-search stack. PyInstaller's static analysis misses the
-# dynamic imports and data files these libraries use.
+# dynamic imports and data files these libraries use. This group is load-bearing
+# (Codex Pro must retain vector retrieval), so a real collection failure is NOT
+# silent: it aborts the build unless CODEX_PRO_DESKTOP_NO_VECTOR=1 opts out.
 datas = []
 binaries = []
 hiddenimports = []
 
-for pkg in ("fastembed", "onnxruntime", "faiss", "numpy"):
+NO_VECTOR = bool(os.environ.get("CODEX_PRO_DESKTOP_NO_VECTOR"))
+
+
+def _collect(pkg: str) -> None:
+    d, b, h = collect_all(pkg)
+    datas.extend(d)
+    binaries.extend(b)
+    hiddenimports.extend(h)
+
+
+# Vector stack: fail loudly. The binary is unusable without these.
+for pkg in ("fastembed", "onnxruntime", "faiss"):
     try:
-        d, b, h = collect_all(pkg)
-        datas += d
-        binaries += b
-        hiddenimports += h
+        _collect(pkg)
+    except Exception as exc:
+        if NO_VECTOR:
+            print(
+                f"warning: {pkg} collection failed; CODEX_PRO_DESKTOP_NO_VECTOR is set, "
+                f"skipping vector stack ({exc})",
+                file=sys.stderr,
+            )
+        else:
+            raise SystemExit(
+                f"ERROR: failed to collect '{pkg}' for the vector stack; "
+                f"the desktop binary would lack vector retrieval. Set "
+                f"CODEX_PRO_DESKTOP_NO_VECTOR=1 to skip this check. Cause: {exc}"
+            )
+
+# numpy is a hard dependency of the embedding stack; collection failure is a
+# real problem, but not fatal (numpy may still be reachable via other hooks).
+try:
+    _collect("numpy")
+except Exception as exc:
+    print(
+        f"warning: numpy collection failed ({exc}); continuing — verify numpy "
+        f"is bundled before shipping.",
+        file=sys.stderr,
+    )
+
+# Optional LLM provider SDKs. These are optional extras, so a missing/collect-
+# failure is tolerated exactly like the vector stack used to be.
+for pkg in ("google.generativeai", "boto3", "openai", "anthropic"):
+    try:
+        _collect(pkg)
     except Exception:
-        # A missing optional package is acceptable — Codex Pro degrades
-        # gracefully when fastembed is absent (see memory/local_embed.py).
+        # Optional extra not installed or not collectable — Codex Pro degrades
+        # gracefully when a provider SDK is absent (see models/providers/).
         pass
 
 # Bundle the built SPA at codex_pro/_bundled/web.
@@ -53,6 +94,15 @@ a = Analysis(
         "codex_pro.config.schema",
         "codex_pro.cli.workspace",
         "codex_pro.runtime_paths",
+        # Provider submodules are loaded by string via importlib in
+        # codex_pro.models.providers.__init__ (factory), so PyInstaller's static
+        # analysis cannot see them without being listed here. Include the
+        # OpenAI-compatible/anthropic ones too as a safety net.
+        "codex_pro.models.providers.gemini_provider",
+        "codex_pro.models.providers.openrouter_provider",
+        "codex_pro.models.providers.bedrock_provider",
+        "codex_pro.models.providers.openai_provider",
+        "codex_pro.models.providers.anthropic_provider",
     ]
     + hiddenimports,
     hookspath=[],

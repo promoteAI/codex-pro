@@ -23,7 +23,10 @@ Push-Location web
 $inst = Invoke-Capture { pnpm install --frozen-lockfile }
 if ($inst.ExitCode -ne 0) {
     Write-Host "error: pnpm install failed; aborting. See output below (might be stale node_modules)." -ForegroundColor Red
-    $inst.Out | Write-Host
+    # Join into a single string first so Write-Host receives scalar input and
+    # cannot trip over $ErrorActionPreference="Stop" + a non-UTF-8 console
+    # codepage's StringToByte Literal path when handed an object[] via pipeline.
+    Write-Host ($inst.Out | Out-String)
     Pop-Location
     exit 1
 }
@@ -38,7 +41,7 @@ if ($bld.ExitCode -ne 0) {
         Write-Warning "frontend build failed on the bundle budget check (see web/scripts/check-bundle-size.mjs); continuing with web/dist."
     } else {
         Write-Host "error: frontend build failed; aborting to avoid shipping stale web/dist. See output below." -ForegroundColor Red
-        $bld.Out | Write-Host
+        Write-Host ($bld.Out | Out-String)
         Pop-Location
         exit 1
     }

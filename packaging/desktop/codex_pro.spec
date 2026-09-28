@@ -24,20 +24,66 @@ datas = []
 binaries = []
 hiddenimports = []
 
-NO_VECTOR = bool(os.environ.get("CODEX_PRO_DESKTOP_NO_VECTOR"))
+# CODEX_PRO_DESKTOP_NO_VECTOR opts out of the fail-loud vector check. Treat the
+# value as "skip" only when it explicitly says so ("1" / "true" / "yes"), so
+# "0" / "false" / empty STILL fail loudly. A lingering truthy value like "0"
+# must not silently disable the load-bearing check.
+def _no_vector_requested() -> bool:
+    value = os.environ.get("CODEX_PRO_DESKTOP_NO_VECTOR", "").strip().lower()
+    return value in ("1", "true", "yes")
 
 
-def _collect(pkg: str) -> None:
-    d, b, h = collect_all(pkg)
+NO_VECTOR = _no_vector_requested()
+
+
+def _collect(pkg: str, *, on_error: str = "warn once", fail_on_empty: bool = False) -> None:
+    """Collect one package; empty result (missing/uncollectable) raises when
+    fail_on_empty is set, so a silently-empty builtin catch (collect_all returns
+    [] for a missing package rather than raising) can't slip through."""
+    d, b, h = collect_all(pkg, on_error=on_error)
     datas.extend(d)
     binaries.extend(b)
     hiddenimports.extend(h)
+    if fail_on_empty and not (d or b or h):
+        raise RuntimeError(
+            f"collect_all('{pkg}') returned nothing — the package is missing or "
+            f"not importable in the build environment; the bundle would lack it."
+        )
 
 
 # Vector stack: fail loudly. The binary is unusable without these.
+#
+# onnxruntime ships optional subpackages (onnxruntime.backend, onnxruntime.
+# quantization) that `import onnx` — an optional extra that fastembed's
+# inference path never needs and that is NOT installed in the build env. With
+# the default `on_error="warn once"` those submodules are silently dropped,
+# which is exactly the silent vector loss C2 must close. `on_error="raise"`
+# surfaces the failure, and the filter below removes the optional-onnx subtrees
+# (which are not part of the inference path) so a genuine corrupt / missing
+# onnxruntime is what aborts the build, not a missing optional.
+def _vector_filter(name: str) -> bool:
+    for probe in ("onnxruntime.backend", "onnxruntime.quantization"):
+        if name == probe or name.startswith(probe + "."):
+            return False
+    return True
+
+
+def _collect_vector(pkg: str) -> None:
+    d, b, h = collect_all(pkg, on_error="raise", filter_submodules=_vector_filter)
+    datas.extend(d)
+    binaries.extend(b)
+    hiddenimports.extend(h)
+    if not (d or b or h):
+        raise RuntimeError(
+            f"collect_all('{pkg}') returned nothing — the vector package is "
+            f"missing or not importable; the desktop binary would lack vector "
+            f"retrieval."
+        )
+
+
 for pkg in ("fastembed", "onnxruntime", "faiss"):
     try:
-        _collect(pkg)
+        _collect_vector(pkg)
     except Exception as exc:
         if NO_VECTOR:
             print(

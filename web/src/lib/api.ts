@@ -9,13 +9,26 @@ export interface MetaInfo {
 
 let _meta: MetaInfo | null = null;
 
+/** Base URL to use when the app runs inside the Tauri desktop shell.
+ *  When IS_DESKTOP is true, both API calls and WebSocket connections are
+ *  routed to the Rust proxy on a fixed localhost port so the gateway's
+ *  cross-site CSRF gate is bypassed. */
+export const DESKTOP_ORIGIN =
+  typeof import.meta !== "undefined" &&
+  import.meta.env?.VITE_DESKTOP_ORIGIN
+    ? import.meta.env.VITE_DESKTOP_ORIGIN
+    : "http://127.0.0.1:58124";
+
 export function getMeta(): MetaInfo | null {
   return _meta;
 }
 
 export async function initApiBase(): Promise<void> {
   try {
-    const resp = await fetch("/meta");
+    // Desktop mode hits the Rust proxy which rewrites /meta to the gateway.
+    // Browser mode uses a relative path served by the gateway itself.
+    const base = isDesktop() ? `${DESKTOP_ORIGIN}/meta` : "/meta";
+    const resp = await fetch(base);
     if (resp.ok) {
       _meta = await resp.json();
       if (_meta?.api_prefix) API_BASE = _meta.api_prefix;
@@ -23,6 +36,17 @@ export async function initApiBase(): Promise<void> {
   } catch {
     // Fallback to default /api/v1 — server may be too old to serve /meta.
   }
+}
+
+/** Whether the app is running inside the Tauri desktop shell. */
+export function isDesktop(): boolean {
+  if (typeof import.meta !== "undefined" && import.meta.env?.VITE_DESKTOP === "1") {
+    return true;
+  }
+  if (typeof window !== "undefined" && "__TAURI__" in window) {
+    return true;
+  }
+  return false;
 }
 
 export const TOKEN_STORAGE_KEY = "codex_token";

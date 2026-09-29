@@ -33,6 +33,7 @@ botpy.log
 reference
 .codex-pro/
 .*
+!.github/
 
 
 # Editor / IDE

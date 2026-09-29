@@ -14,14 +14,16 @@
 #   the gateway binary AND a fresh web/dist that the Tauri build uses.
 # - Ruling 2: the platform script is selected by runner OS — the Windows-only
 #   .ps1 runs only on Windows, the POSIX .sh runs on the Linux/macOS runners.
-# - Ruling 3: the gateway binary is NOT wired into the Tauri bundle config.
-#   resolve_binary() searches the Tauri app exe's own directory for
-#   `codex-pro-desktop-gateway.exe`; Tauri's `bundle.resources` places files in
-#   `$RESOURCE_DIR` which is only the exe directory on Windows (on macOS it is
-#   `Contents/Resources`, on Linux `/usr/lib/<name>`), and declaring a
-#   `resources`/`externalBin` entry also makes `tauri_build` fail at build time
-#   if the binary is absent. So the gateway binary is uploaded as a separate
-#   artifact alongside the installer. See the report for the full limitation.
+# - Ruling 3: the gateway binary is bundled as a Tauri sidecar via
+#   `bundle.externalBin`. tauri-build's copy_binaries() strips the
+#   `-{target_triple}` suffix from the source and copies the result next to the
+#   app executable, exactly where gateway.rs::resolve_binary() looks for
+#   `codex-pro-desktop-gateway.exe`. The source file must exist with the
+#   host's target-triple suffix before `tauri build`, or tauri-build fails at
+#   compile time with ResourcePathNotFound — hence the "Stage gateway sidecar"
+#   step below.
+# - Ruling 5: bundle.targets has the four host formats; each runner builds only
+#   the ones its host supports.
 
 name: Desktop Build
 
@@ -71,21 +73,40 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
             librsvg2-dev patchelf
 
       - name: Build gateway backend (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          pip install -e ".[all]"
           pip install pyinstaller
           pwsh packaging/desktop/build_desktop.ps1
 
       - name: Build gateway backend (macOS / Linux)
         if: runner.os != 'Windows'
         run: |
+          pip install -e ".[all]"
           pip install pyinstaller
           bash packaging/desktop/build_desktop.sh
+
+      # The gateway binary must exist as a target-triple-named sidecar source
+      # BEFORE `tauri build`, because bundle.externalBin makes tauri-build copy
+      # `binaries/codex-pro-desktop-gateway-{triple}{.exe}` to the bundle root.
+      # We build it to an explicit distpath, then rename it to the host triple.
+      - name: Stage gateway sidecar
+        shell: bash
+        run: |
+          set -e
+          # Host target triple, e.g. x86_64-pc-windows-msvc / x86_64-unknown-linux-gnu
+          TRIPLE="$(rustc -vV | grep host | awk '{print $2}')"
+          EXT=""
+          if [ "${RUNNER_OS:-}" = "Windows" ]; then EXT=".exe"; fi
+          mkdir -p src-tauri/binaries
+          cp "dist/codex-pro-desktop-gateway${EXT}" \
+             "src-tauri/binaries/codex-pro-desktop-gateway-${TRIPLE}${EXT}"
+          echo "staged sidecar: src-tauri/binaries/codex-pro-desktop-gateway-${TRIPLE}${EXT}"
 
       - name: Install Tauri CLI
         run: npm install -g @tauri-apps/cli

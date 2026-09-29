@@ -32,7 +32,9 @@ rm -f "$BUILD_LOG"
 
 echo "==> Building desktop executable..."
 export CODEX_PRO_ROOT="$ROOT"
-pyinstaller --clean --noconfirm packaging/desktop/codex_pro.spec
+# Explicit distpath so the gateway binary always lands at $ROOT/dist regardless
+# of where pyinstaller is invoked from (CI and local both rely on this).
+pyinstaller --distpath "$ROOT/dist" --clean --noconfirm packaging/desktop/codex_pro.spec
 
 echo "==> Done: $(ls dist/desktop/ 2>/dev/null || echo dist/)"
 echo "   Look for codex-pro-desktop-gateway in dist/ or the build output."

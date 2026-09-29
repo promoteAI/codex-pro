@@ -50,6 +50,8 @@ Pop-Location
 
 Write-Host "==> Building desktop executable..."
 $env:CODEX_PRO_ROOT = $ROOT
-pyinstaller --clean --noconfirm packaging/desktop/codex_pro.spec
+# Explicit distpath so the gateway binary always lands at $ROOT\dist regardless
+# of where pyinstaller is invoked from (CI and local both rely on this).
+pyinstaller --distpath (Join-Path $ROOT "dist") --clean --noconfirm packaging/desktop/codex_pro.spec
 
 Write-Host "==> Done. Look for codex-pro-desktop-gateway(.exe) in dist/ or the build output."

@@ -52,6 +52,9 @@ export default defineConfig(({ mode }) => {
       outDir: process.env.CODEX_PRO_WEB_OUT_DIR ?? "dist",
       emptyOutDir: true,
     },
+    // Desktop builds set VITE_DESKTOP=1; the SPA then targets the Rust proxy.
+    // (Added to the existing build object, not replacing it.)
+    define: { "import.meta.env.VITE_DESKTOP": process.env.VITE_DESKTOP ?? "0" },
     test: {
       environment: "jsdom",
       globals: true,

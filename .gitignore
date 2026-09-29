@@ -67,5 +67,8 @@ docs/assets/generated/
 # pnpm content-addressable store (local package cache, never versioned)
 /.pnpm-store/
 
+# Rust / Tauri desktop shell build output
+src-tauri/target/
+
 .vite/
 web/.vite/

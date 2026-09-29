@@ -1,0 +1,25 @@
+{
+  "productName": "Codex Pro Desktop",
+  "version": "0.1.0",
+  "identifier": "io.codexpro.desktop",
+  "build": {
+    "frontendDist": "../web/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Codex Pro",
+        "width": 1280,
+        "height": 820,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}

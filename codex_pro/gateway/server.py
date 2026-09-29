@@ -49,6 +49,7 @@ from codex_pro.gateway.host_rules import (
 from codex_pro.gateway.http_handlers.message_handler import MessageHandler
 from codex_pro.gateway.http_handlers.metadata_handler import MetadataHandlers
 from codex_pro.gateway.http_handlers.session_handler import SessionHandlers
+from codex_pro.gateway.http_handlers.setup_handler import SetupHandlers
 from codex_pro.gateway.media import MediaCache
 from codex_pro.gateway.rate_limiter import RateLimiter
 from codex_pro.gateway.router import DeliveryRouter
@@ -172,6 +173,7 @@ class GatewayServer:
         self._msg_handler = MessageHandler(self)
         self._meta_handler = MetadataHandlers(self)
         self._session_handler = SessionHandlers(self)
+        self._setup_handler = SetupHandlers(self._config, self._config_path)
         self._ws_handler = WebSocketHandler(self)
 
     def _normalize_platform(self, reported: str | None) -> str:
@@ -506,6 +508,9 @@ class GatewayServer:
         app.router.add_post(f"{prefix}/pair/verify", self._session_handler.handle_pair_verify)
         app.router.add_get(f"{prefix}/stats", self._meta_handler.handle_stats)
         app.router.add_get(f"{prefix}/capabilities", self._meta_handler.handle_capabilities)
+        app.router.add_get(f"{prefix}/setup/providers", self._setup_handler.list_providers)
+        app.router.add_get(f"{prefix}/setup/status", self._setup_handler.setup_status)
+        app.router.add_post(f"{prefix}/setup/config", self._setup_handler.save_config)
         app.router.add_get(self._config.ws_path, self._ws_handler.handle_websocket)
         app.router.add_get("/ws/web", self._web_ws.handle)
         if self._config.terminal.enabled:

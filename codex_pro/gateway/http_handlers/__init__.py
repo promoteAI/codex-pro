@@ -18,6 +18,7 @@ from codex_pro.gateway.http_handlers.base import (
 from codex_pro.gateway.http_handlers.message_handler import MessageHandler
 from codex_pro.gateway.http_handlers.metadata_handler import MetadataHandlers
 from codex_pro.gateway.http_handlers.session_handler import SessionHandlers
+from codex_pro.gateway.http_handlers.setup_handler import SetupHandlers
 
 __all__ = [
     "check_csrf",
@@ -32,4 +33,5 @@ __all__ = [
     "MessageHandler",
     "MetadataHandlers",
     "SessionHandlers",
+    "SetupHandlers",
 ]

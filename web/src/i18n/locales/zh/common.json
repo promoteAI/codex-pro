@@ -20,5 +20,17 @@
   "adminOnly": "此操作需要管理员令牌（admin token），当前登录令牌权限不足",
   "adminOnlyShort": "需要管理员令牌",
   "renderErrorTitle": "页面渲染出错",
-  "renderErrorHint": "该页面遇到未预期的数据或异常，其余功能仍可正常使用。可以重试，或切换到其他页面。"
+  "renderErrorHint": "该页面遇到未预期的数据或异常，其余功能仍可正常使用。可以重试，或切换到其他页面。",
+  "setup": {
+    "title": "首次配置",
+    "intro": "选择一个模型服务商，配置你的 API 密钥和工作区，即可开始使用 Codex Pro。",
+    "api_key": "API Key",
+    "api_base": "API Base",
+    "model": "模型",
+    "workspace": "工作区",
+    "save": "保存",
+    "done": "配置完成",
+    "doneHint": "你可以开始使用 Codex Pro 了。",
+    "provider_group": "服务商分类"
+  }
 }

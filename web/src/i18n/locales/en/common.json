@@ -20,5 +20,17 @@
   "adminOnly": "This action needs an admin token; the token you signed in with is not allowed",
   "adminOnlyShort": "Admin token required",
   "renderErrorTitle": "This page failed to render",
-  "renderErrorHint": "The page hit unexpected data or an error. The rest of Codex Pro still works — retry, or switch to another page."
+  "renderErrorHint": "The page hit unexpected data or an error. The rest of Codex Pro still works — retry, or switch to another page.",
+  "setup": {
+    "title": "First-time Setup",
+    "intro": "Choose a model provider, configure your API key and workspace, and start using Codex Pro.",
+    "api_key": "API Key",
+    "api_base": "API Base",
+    "model": "Model",
+    "workspace": "Workspace",
+    "save": "Save",
+    "done": "Setup complete",
+    "doneHint": "You're ready to start using Codex Pro.",
+    "provider_group": "Provider Group"
+  }
 }

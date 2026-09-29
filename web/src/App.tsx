@@ -17,6 +17,9 @@ const PluginsView = lazy(() =>
 );
 const LoginPage = lazy(() => import("./pages/Login").then((m) => ({ default: m.Login })));
 const Skills = lazy(() => import("./pages/Skills").then((m) => ({ default: m.Skills })));
+const SetupWizard = lazy(() =>
+  import("./pages/SetupWizard").then((m) => ({ default: m.SetupWizard })),
+);
 
 function RouteLoading() {
   const { t } = useTranslation("common");
@@ -123,6 +126,14 @@ export function App() {
               element={
                 <LazyRoute>
                   <Skills />
+                </LazyRoute>
+              }
+            />
+            <Route
+              path="setup"
+              element={
+                <LazyRoute>
+                  <SetupWizard />
                 </LazyRoute>
               }
             />

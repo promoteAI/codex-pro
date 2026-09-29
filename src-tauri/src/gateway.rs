@@ -135,7 +135,7 @@ pub fn shutdown(mut child: Child) {
 /// Attempts 0..=4 map to 2^0..=2^4 seconds (1, 2, 4, 8, 16).
 /// Attempts >= 5 stay at the 30 s cap.
 pub fn backoff(attempt: u32) -> Duration {
-    let secs = 1u64.saturating_pow(attempt.min(5));
+    let secs = 2u64.saturating_pow(attempt.min(5));
     Duration::from_secs(secs.min(30))
 }
 
@@ -159,9 +159,19 @@ impl SuperviseState {
     /// handler and from the Tauri exit hook.
     pub fn signal_shutdown(&self) {
         self.shutdown.store(true, Ordering::SeqCst);
-        if let Ok(mut g) = self.child.lock() {
-            if let Some(ref mut c) = *g {
-                let _ = c.kill();
+        match self.child.lock() {
+            Ok(mut g) => {
+                if let Some(ref mut c) = *g {
+                    let _ = c.kill();
+                }
+            }
+            Err(poisoned) => {
+                // If the lock was poisoned (supervisor thread panicked),
+                // recover the guard so we can still attempt to kill the child.
+                let mut g = poisoned.into_inner();
+                if let Some(ref mut c) = *g {
+                    let _ = c.kill();
+                }
             }
         }
     }
@@ -229,7 +239,14 @@ pub fn supervise(binary: PathBuf) -> Arc<SuperviseState> {
             }
 
             match spawn_and_wait(&binary) {
-                Ok((child, _port)) => {
+                Ok((mut child, _port)) => {
+                    if state_thread.shutdown.load(Ordering::SeqCst) {
+                        // Shutdown was requested while spawn_and_wait was running;
+                        // tear down the just-spawned process and don't install it.
+                        eprintln!("supervisor: shutdown during spawn, tearing down");
+                        let _ = child.kill();
+                        return;
+                    }
                     let mut g = match state_thread.child.lock() {
                         Ok(g) => g,
                         Err(e) => {
@@ -304,14 +321,15 @@ mod tests {
 
     #[test]
     fn backoff_bounds() {
-        // The backoff formula uses 1u64.saturating_pow which yields 1 for all
-        // attempts (the intent is an upper bound, not true exponential growth).
-        // The key guarantees are: attempt 0 is at most 1 s, and any large
-        // attempt stays within the 30 s cap.
-        assert!(backoff(0) <= Duration::from_secs(1));
-        assert!(backoff(1) <= Duration::from_secs(1));
-        assert!(backoff(5) <= Duration::from_secs(30));
-        assert!(backoff(10) <= Duration::from_secs(30));
-        assert!(backoff(100) <= Duration::from_secs(30));
+        // Exponential growth: 2^0=1, 2^1=2, 2^2=4, 2^3=8, 2^4=16.
+        assert_eq!(backoff(0), Duration::from_secs(1));
+        assert_eq!(backoff(1), Duration::from_secs(2));
+        assert_eq!(backoff(2), Duration::from_secs(4));
+        assert_eq!(backoff(3), Duration::from_secs(8));
+        assert_eq!(backoff(4), Duration::from_secs(16));
+        // Cap at 30s for attempts >= 5.
+        assert_eq!(backoff(5), Duration::from_secs(30));
+        assert_eq!(backoff(10), Duration::from_secs(30));
+        assert_eq!(backoff(100), Duration::from_secs(30));
     }
 }

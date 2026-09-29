@@ -116,7 +116,7 @@ export class WebWS {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
-    const ws = new WebSocket(this.buildWsUrl("web"));
+    const ws = new WebSocket(this.buildWsUrl("/ws/web"));
     this.ws = ws;
     this.authed = false;
 

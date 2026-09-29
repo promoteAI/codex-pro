@@ -63,6 +63,16 @@ afterEach(() => {
 });
 
 describe("WebWS 连接复用", () => {
+  it("连接到 gateway 的 /ws/web 完整路径", () => {
+    // The dashboard socket must target /ws/web (NOT bare /web) — the gateway
+    // only registers the full /ws/web path. Regression guard for the fix that
+    // routes this through the shared buildWsUrl helper.
+    const ws = new WebWS();
+    ws.subscribe("t1", ["tasks"]);
+    const socket = FakeWebSocket.instances[0];
+    expect(socket.url).toBe(`ws://${location.host}/ws/web`);
+  });
+
   it("重复订阅同一频道只开一条连接", () => {
     const ws = new WebWS();
     ws.subscribe("t1", ["tasks"]);

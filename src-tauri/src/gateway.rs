@@ -32,6 +32,29 @@ pub(crate) struct RuntimeEndpoint {
     pub(crate) port: u16,
 }
 
+/// Try `base` and `base.exe` in `dir`, returning the first that exists and is
+/// not the Tauri app executable itself.
+///
+/// Tauri's sidecar bundling strips the target-triple suffix and only appends
+/// `.exe` on Windows, so the gateway may be next to the app exe either as
+/// `codex-pro-desktop-gateway` (macOS/Linux) or `codex-pro-desktop-gateway.exe`
+/// (Windows). `resolve_binary` therefore probes both spellings on every
+/// platform; this helper keeps that logic in one place.
+fn find_candidate(dir: &Path, base: &str, app_exe: &Path) -> Option<PathBuf> {
+    let app_canonical = app_exe.canonicalize().ok();
+    for name in [base.to_string(), format!("{base}.exe")] {
+        let candidate = dir.join(&name);
+        // Guard: in dev mode `dir` may point at the Tauri dev binary's folder,
+        // so a candidate here could be the Tauri binary itself (e.g. when the
+        // exe was copied into a temp dir with the gateway name alongside it).
+        // If the resolved path equals the Tauri app exe, skip that spelling.
+        if candidate.exists() && candidate.canonicalize().ok() != app_canonical {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
 /// Locate the gateway binary to spawn.
 ///
 /// Priority order:
@@ -46,32 +69,24 @@ pub(crate) struct RuntimeEndpoint {
 /// debug Tauri binary, which is NOT the gateway; we must not return a path
 /// that would cause the spawned process to re-enter this same `run()` flow.
 ///
+/// The gateway is probed both with and without a `.exe` suffix, because Tauri's
+/// `externalBin`/sidecar bundling only appends `.exe` on Windows; on macOS and
+/// Linux the sidecar is extensionless (`codex-pro-desktop-gateway`). Both
+/// bundled and dev layouts are searched for both spellings.
+///
 /// Falls back to `None` when neither location holds a recognizable binary.
 pub(crate) fn resolve_binary(app_exe: &Path) -> Option<PathBuf> {
+    const GATEWAY: &str = "codex-pro-desktop-gateway";
     // Bundled layout: the gateway binary sits alongside the Tauri app exe.
-    // Search for `codex-pro-desktop-gateway.exe` (distinct from
-    // `codex-pro-desktop.exe`, the Tauri app itself) to avoid the self-match
-    // trap where `current_binary()` returns the Tauri app and would otherwise
-    // cause recursive spawning.
     if let Some(parent) = app_exe.parent() {
-        let bundled = parent.join("codex-pro-desktop-gateway.exe");
-        // Guard: in dev mode `app_exe.parent()` may point at the Tauri dev
-        // binary, so the candidate here could be the Tauri binary itself
-        // (e.g. when the exe was copied into a temp dir with the gateway name
-        // alongside it). If the resolved path equals the Tauri app exe, skip
-        // and fall back to the dev layout.
-        if bundled.exists() && bundled.canonicalize().ok() != app_exe.canonicalize().ok() {
-            return Some(bundled);
+        if let Some(found) = find_candidate(parent, GATEWAY, app_exe) {
+            return Some(found);
         }
     }
-    // Dev layout: Plan A output lives at <repo_root>/dist/codex-pro-desktop-gateway.exe.
+    // Dev layout: Plan A output lives at <repo_root>/dist/codex-pro-desktop-gateway(.exe).
     // Use an absolute path so it stays valid even if cwd shifts.
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent()?; // src-tauri -> repo root
-    let dev = repo_root.join("dist").join("codex-pro-desktop-gateway.exe");
-    if dev.exists() && dev.canonicalize().ok() != app_exe.canonicalize().ok() {
-        return Some(dev);
-    }
-    None
+    find_candidate(&repo_root.join("dist"), GATEWAY, app_exe)
 }
 
 /// Spawn the PyInstaller gateway with a dynamic port, then block until the
@@ -326,6 +341,49 @@ mod tests {
                 p,
                 repo_root
             );
+        }
+    }
+
+    #[test]
+    fn find_candidate_matches_with_and_without_exe_suffix() {
+        let dir = std::env::temp_dir().join(format!("gateway-sidecar-test-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let base = "codex-pro-desktop-gateway";
+        let app_exe = dir.join("codex-pro-desktop");
+
+        // Extensionless sidecar (macOS/Linux bundled layout).
+        let extless = dir.join(base);
+        std::fs::write(&extless, b"gateway").unwrap();
+        let found = find_candidate(&dir, base, &app_exe);
+        assert_eq!(found, Some(extless.clone()));
+
+        // Remove the extensionless spelling, leave only the .exe spelling
+        // (Windows bundled layout) — it must resolve too.
+        std::fs::remove_file(&extless).unwrap();
+        let exe_name = dir.join(format!("{base}.exe"));
+        std::fs::write(&exe_name, b"gateway").unwrap();
+        let found = find_candidate(&dir, base, &app_exe);
+        assert_eq!(found, Some(exe_name));
+
+        // A candidate equal to the Tauri app exe must be skipped (self-match trap).
+        let self_exe = dir.join(format!("{base}.exe"));
+        let app_exe_same = self_exe.clone();
+        let found = find_candidate(&dir, base, &app_exe_same);
+        assert!(found.is_none() || found != Some(self_exe.clone()));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn resolve_binary_finds_dev_artifact_without_exe_suffix() {
+        // Dev layout: an extensionless dist artifact should resolve, matching the
+        // macOS/Linux sidecar naming.
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let fake_exe = PathBuf::from("/some/random/dir/Whatever.exe");
+        let found = resolve_binary(&fake_exe);
+        if let Some(p) = found {
+            assert!(p.to_string_lossy().contains("codex-pro-desktop-gateway"));
+            assert!(p.starts_with(repo_root));
         }
     }
 

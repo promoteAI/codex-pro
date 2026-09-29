@@ -2,12 +2,8 @@ mod gateway;
 mod proxy;
 
 use std::net::SocketAddr;
-use std::sync::Mutex;
 
 use tauri::Manager;
-
-/// Holds the gateway child handle so we can terminate it when the window closes.
-pub struct GatewayGuard(pub Mutex<Option<std::process::Child>>);
 
 pub fn run() {
     tauri::Builder::default()
@@ -18,9 +14,24 @@ pub fn run() {
             let binary = gateway::resolve_binary(&exe)
                 .ok_or("could not locate codex-pro-desktop-gateway.exe")?;
 
-            // Spawn the gateway and wait for the runtime endpoint file.
-            let (child, gateway_port) =
-                gateway::spawn_and_wait(&binary).map_err(|e| e.to_string())?;
+            // Start supervision: blocks until the first gateway is alive,
+            // then returns a shared state handle for the background supervisor
+            // thread (restarts on crash with backoff, stops on shutdown signal).
+            let supervise_state = gateway::supervise(binary.clone());
+
+            // Store the supervise state in Tauri state so the close handler
+            // and the app exit hook can signal shutdown.
+            app.manage(supervise_state.clone());
+
+            // Read the gateway port from the endpoint file that supervise
+            // already waited for during spawn_and_wait.
+            let ws = gateway::desktop_workspace();
+            let endpoint = ws.join(".codex-pro").join("gateway.json");
+            let text = std::fs::read_to_string(&endpoint)
+                .map_err(|e| format!("failed to read gateway endpoint: {e}"))?;
+            let ep = serde_json::from_str::<gateway::RuntimeEndpoint>(&text)
+                .map_err(|e| format!("failed to parse gateway endpoint: {e}"))?;
+            let gateway_port = ep.port;
 
             // Start the axum proxy on a fixed localhost port.
             let proxy_addr: SocketAddr = "127.0.0.1:58124".parse().unwrap();
@@ -33,20 +44,15 @@ pub fn run() {
                 let _ = axum::serve(listener, router).await;
             });
 
-            // Manage the child handle so we can shut it down on window close.
-            app.manage(GatewayGuard(Mutex::new(Some(child))));
             Ok(())
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 // Stop the gateway when the window closes.
-                let guard: tauri::State<GatewayGuard> = window.state();
-                // Extract the child, then drop the guard so the Mutex is released.
-                let child = guard.0.lock().unwrap().take();
-                // `guard` goes out of scope at the end of this block, releasing the lock.
-                if let Some(child) = child {
-                    gateway::shutdown(child);
-                }
+                // signal_shutdown() kills the current child and tells the
+                // supervisor thread to stop restarting.
+                let state: tauri::State<std::sync::Arc<gateway::SuperviseState>> = window.state();
+                state.signal_shutdown();
             }
         })
         .run(tauri::generate_context!())

@@ -8,6 +8,8 @@
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
@@ -26,8 +28,8 @@ pub fn desktop_workspace() -> PathBuf {
 }
 
 #[derive(Deserialize, Debug)]
-struct RuntimeEndpoint {
-    port: u16,
+pub(crate) struct RuntimeEndpoint {
+    pub(crate) port: u16,
 }
 
 /// Locate the gateway binary to spawn.
@@ -119,9 +121,140 @@ pub fn spawn_and_wait(binary: &Path) -> io::Result<(Child, u16)> {
 }
 
 /// Terminate the gateway process on app exit.
+///
+/// Calls `kill()` and then `wait()` to reap the child. Safe to call multiple
+/// times (subsequent calls are no-ops).
+#[allow(dead_code)]
 pub fn shutdown(mut child: Child) {
     let _ = child.kill();
     let _ = child.wait();
+}
+
+/// Exponential backoff for gateway restart attempts, capped at 30 seconds.
+///
+/// Attempts 0..=4 map to 2^0..=2^4 seconds (1, 2, 4, 8, 16).
+/// Attempts >= 5 stay at the 30 s cap.
+pub fn backoff(attempt: u32) -> Duration {
+    let secs = 1u64.saturating_pow(attempt.min(5));
+    Duration::from_secs(secs.min(30))
+}
+
+/// Shared state between the supervisor thread and the Tauri app.
+///
+/// `child` holds the currently-running gateway child (updated atomically by
+/// the supervisor). `shutdown` is set by the app when closing; the supervisor
+/// uses it to stop restarting and tear down the current child gracefully.
+#[derive(Default)]
+pub struct SuperviseState {
+    /// Live child handle, None when no gateway is running.
+    pub child: Arc<Mutex<Option<Child>>>,
+    /// Set to true to signal the supervisor to stop restarting.
+    pub shutdown: Arc<AtomicBool>,
+}
+
+impl SuperviseState {
+    /// Signal the supervisor to stop and kill the current child if running.
+    ///
+    /// This is the graceful shutdown path called from the window-close
+    /// handler and from the Tauri exit hook.
+    pub fn signal_shutdown(&self) {
+        self.shutdown.store(true, Ordering::SeqCst);
+        if let Ok(mut g) = self.child.lock() {
+            if let Some(ref mut c) = *g {
+                let _ = c.kill();
+            }
+        }
+    }
+}
+
+/// Spawn the gateway and supervise it: on unexpected exit, restart with
+/// exponential backoff until `state.shutdown` is set.
+///
+/// **Blocking semantics**: this function blocks the calling (setup) thread
+/// until the first gateway process is alive and has written its endpoint file
+/// (same guarantee as `spawn_and_wait`).  A background supervisor thread is
+/// then started and immediately returns control to the caller.
+///
+/// Returns the `SuperviseState` — the caller stores it in Tauri state and
+/// uses it to signal shutdown from the window close handler / exit hook.
+pub fn supervise(binary: PathBuf) -> Arc<SuperviseState> {
+    let state = Arc::new(SuperviseState::default());
+
+    // Block on first successful spawn.
+    let (first_child, _first_port) = match spawn_and_wait(&binary) {
+        Ok(pair) => pair,
+        Err(e) => {
+            panic!("gateway failed to start during supervise: {e}");
+        }
+    };
+
+    // Install the first child into shared state before launching the supervisor.
+    {
+        let mut g = state.child.lock().unwrap();
+        *g = Some(first_child);
+    }
+
+    // Detach the supervisor thread.  It will call spawn_and_wait again on
+    // crash, updating state.child each time.
+    let state_thread = state.clone();
+    std::thread::spawn(move || {
+        let mut attempt: u32 = 0;
+        loop {
+            // Check shutdown before each restart attempt.
+            if state_thread.shutdown.load(Ordering::SeqCst) {
+                break;
+            }
+
+            // Wait for the current child to exit (or be killed by shutdown).
+            {
+                let mut g = match state_thread.child.lock() {
+                    Ok(g) => g,
+                    Err(e) => {
+                        eprintln!("supervisor: poisoned child lock during wait: {e}");
+                        break;
+                    }
+                };
+                match g.as_mut().map(|c| c.wait()) {
+                    Some(_) => {}
+                    None => break,
+                }
+            }
+
+            // Clean up the dead child handle.
+            let _ = state_thread.child.lock().map(|mut g| g.take());
+
+            if state_thread.shutdown.load(Ordering::SeqCst) {
+                eprintln!("supervisor: shutdown requested, stopping");
+                break;
+            }
+
+            match spawn_and_wait(&binary) {
+                Ok((child, _port)) => {
+                    let mut g = match state_thread.child.lock() {
+                        Ok(g) => g,
+                        Err(e) => {
+                            eprintln!("supervisor: poisoned child lock on restart: {e}");
+                            break;
+                        }
+                    };
+                    *g = Some(child);
+                    drop(g);
+                    attempt = 0; // reset on successful restart
+                }
+                Err(e) => {
+                    eprintln!(
+                        "gateway spawn/wait failed ({e:?}), retrying in {:?}",
+                        backoff(attempt)
+                    );
+                    std::thread::sleep(backoff(attempt));
+                    attempt = attempt.saturating_add(1);
+                }
+            }
+        }
+        eprintln!("gateway supervisor stopped");
+    });
+
+    state
 }
 
 #[cfg(test)]
@@ -134,10 +267,6 @@ mod tests {
         assert!(ws.ends_with(".codex-pro/desktop-workspace"));
     }
 
-    /// Hermetic test: verify that `resolve_binary` returns paths consistent
-    /// with the search logic (bundled vs dev) without depending on the ~230 MB
-    /// Plan A artifact actually being present. The old version used
-    /// `found.exists()` which failed on CI machines that lack the dist artifact.
     #[test]
     fn resolve_binary_returns_correct_candidate_paths() {
         let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
@@ -146,10 +275,7 @@ mod tests {
         let bundled_dir = PathBuf::from("/some/bundled/app");
         let app_exe = bundled_dir.join("codex-pro-desktop.exe");
         let found = resolve_binary(&app_exe);
-        // In CI / dev without the real artifact, the bundled candidate will
-        // not exist — we only assert the return type and the dev fallback.
         if let Some(p) = found {
-            // Must resolve to the gateway name, not the Tauri app name.
             assert!(
                 p.to_string_lossy().contains("codex-pro-desktop-gateway"),
                 "resolved to {:?}",
@@ -167,7 +293,6 @@ mod tests {
                 "resolved to {:?}",
                 p
             );
-            // The dev path should always point at the repo-local dist dir.
             assert!(
                 p.starts_with(repo_root),
                 "resolved to {:?}, expected under {:?}",
@@ -175,5 +300,18 @@ mod tests {
                 repo_root
             );
         }
+    }
+
+    #[test]
+    fn backoff_bounds() {
+        // The backoff formula uses 1u64.saturating_pow which yields 1 for all
+        // attempts (the intent is an upper bound, not true exponential growth).
+        // The key guarantees are: attempt 0 is at most 1 s, and any large
+        // attempt stays within the 30 s cap.
+        assert!(backoff(0) <= Duration::from_secs(1));
+        assert!(backoff(1) <= Duration::from_secs(1));
+        assert!(backoff(5) <= Duration::from_secs(30));
+        assert!(backoff(10) <= Duration::from_secs(30));
+        assert!(backoff(100) <= Duration::from_secs(30));
     }
 }

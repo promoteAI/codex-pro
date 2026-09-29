@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import threading
 from collections.abc import Callable
@@ -32,9 +33,15 @@ class CLIChannel(BaseChannel):
         self._max_stream_entries = 32
 
     async def start(self) -> None:
-        if not sys.stdin.isatty():
+        # In desktop mode the gateway is spawned by the Tauri shell with a
+        # dynamic port and serves the web UI over localhost; there is no
+        # terminal for interactive CLI input. Even if `sys.stdin.isatty()`
+        # reports True on some hosts (e.g. PyInstaller onefile under the
+        # Tauri process), a desktop-supervised gateway must not block on a
+        # stdin-read loop. Guard on the env marker that _desktop_entry.py sets.
+        if os.environ.get("_CODEX_PRO_DESKTOP") == "1" or not sys.stdin.isatty():
             self._running = False
-            logger.warning("CLI channel disabled because stdin is not interactive")
+            logger.warning("CLI channel disabled because stdin is not interactive (desktop mode)")
             return
         self._running = True
         self.bus.subscribe_outbound(self.name, self.send)

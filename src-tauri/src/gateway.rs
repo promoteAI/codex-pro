@@ -100,6 +100,12 @@ pub fn spawn_and_wait(binary: &Path) -> io::Result<(Child, u16)> {
     std::fs::create_dir_all(&ws)?;
     let endpoint = ws.join(".codex-pro").join("gateway.json");
 
+    // Remove any stale endpoint file from a previous run before spawning. If
+    // left behind, `spawn_and_wait` would read the old port and return
+    // immediately, and the proxy would forward to a dead gateway. The fresh
+    // gateway rewrites this file after it binds its dynamic port.
+    let _ = std::fs::remove_file(&endpoint);
+
     // Run the gateway as a background process. We deliberately redirect stdin
     // to null so the gateway does NOT inherit the Tauri app's console.
     // Without this, the gateway receives console control events (close, Ctrl-C)
@@ -117,13 +123,24 @@ pub fn spawn_and_wait(binary: &Path) -> io::Result<(Child, u16)> {
         .arg("--workspace")
         .arg(&ws)
         .stdin(std::process::Stdio::null())
+        // Mark this as a desktop-supervised gateway. The Python side sets the
+        // same marker in _desktop_entry.py; primarily the CLI channel reads it
+        // to disable interactive stdin on hosts where isatty() wrongly reports
+        // True under PyInstaller onefile + Tauri.
+        .env("_CODEX_PRO_DESKTOP", "1")
         .spawn()?;
 
     let deadline = Instant::now() + Duration::from_secs(300);
     loop {
         if let Ok(text) = std::fs::read_to_string(&endpoint) {
             if let Ok(ep) = serde_json::from_str::<RuntimeEndpoint>(&text) {
-                if ep.port > 0 {
+                if ep.port > 0 && port_is_listening(ep.port) {
+                    // Only accept the endpoint once its port actually accepts
+                    // connections. A stale gateway.json (left by a killed prior
+                    // run) or a transient early write can expose a port that is
+                    // already dead; trusting it would point the proxy at a
+                    // gateway that never answers. Confirming a live listener
+                    // makes the returned port authoritative.
                     return Ok((child, ep.port));
                 }
             }
@@ -143,6 +160,18 @@ pub fn spawn_and_wait(binary: &Path) -> io::Result<(Child, u16)> {
         }
         std::thread::sleep(Duration::from_millis(250));
     }
+}
+
+/// Return whether a TCP listener is currently accepting connections on
+/// `127.0.0.1:port`.
+///
+/// Used to validate a port read from `gateway.json` before it is trusted: a
+/// stale or transient entry can name a port that is already closed, and the
+/// proxy must not be pointed at it.
+fn port_is_listening(port: u16) -> bool {
+    use std::net::{SocketAddr, TcpStream};
+    let addr: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
+    TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_ok()
 }
 
 /// Terminate the gateway process on app exit.
@@ -221,6 +250,7 @@ impl SuperviseState {
 pub fn start_proxy(gateway_port: u16) {
     use std::net::SocketAddr;
 
+    eprintln!("[start_proxy] starting proxy on 127.0.0.1:58124 (gateway port {gateway_port})");
     let proxy_addr: SocketAddr = "127.0.0.1:58124".parse().unwrap();
     let std_listener = match std::net::TcpListener::bind(proxy_addr) {
         Ok(l) => l,
@@ -436,6 +466,23 @@ mod tests {
             assert!(p.to_string_lossy().contains("codex-pro-desktop-gateway"));
             assert!(p.starts_with(repo_root));
         }
+    }
+
+    #[test]
+    fn port_is_listening_rejects_closed_port() {
+        // Reserve a port by binding it, then drop the listener so it is closed.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+        // After the listener is dropped the port is closed — the connect must fail.
+        assert!(!port_is_listening(port));
+    }
+
+    #[test]
+    fn port_is_listening_accepts_live_port() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        assert!(port_is_listening(port));
     }
 
     #[test]

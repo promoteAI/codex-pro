@@ -4,6 +4,13 @@
 //! `127.0.0.1:58124` (the Rust native listening port). The proxy strips
 //! browser-origin headers so the gateway treats the request as coming from a
 //! native client, bypassing the cross-site CSRF gate.
+//!
+//! CORS handling: the WebView page is served from `http://tauri.localhost`,
+//! which is cross-origin with the proxy's `http://127.0.0.1:58124`.
+//! Responses forwarded by this proxy preserve gateway headers (Content-Type,
+//! etc.) and synthesize an Access-Control-Allow-Origin header so the browser
+//! allows the SPA to read them. OPTIONS preflight requests for `/api/*`,
+//! `/meta`, and `/ws` are answered directly without contacting the gateway.
 
 use std::iter::once;
 
@@ -37,19 +44,65 @@ use tokio_tungstenite::{
 /// Note: axum 0.7 uses `*path` (single `*`, no braces) for catch-all route
 /// parameters. `{*path}` panics at route-build time.
 pub fn router(target: String) -> Router {
-    let state = ProxyState { target };
+    let state = ProxyState {
+        client: Client::new(),
+        target,
+    };
+
+    // Route tree that handles CORS preflight for every publicly-addressable
+    // path: /meta, /api/*, and /ws(/*).
     Router::new()
-        .route("/api/*path", any(forward_http))
-        .route("/meta", get(forward_http))
-        .route("/ws", any(forward_ws))
-        .route("/ws/*path", any(forward_ws))
+        .route("/meta", get(forward_http).options(cors_options))
+        .route("/api/*path", any(forward_http).options(cors_options))
+        .route("/ws", any(forward_ws).options(cors_options))
+        .route("/ws/*path", any(forward_ws).options(cors_options))
         .with_state(state)
 }
 
 #[derive(Clone)]
 struct ProxyState {
+    /// Reusable HTTP client shared across all forwarded requests.
+    client: Client,
     /// Gateway base URL, e.g. `http://127.0.0.1:8443`.
     target: String,
+}
+
+/// Handle CORS preflight OPTIONS requests.
+///
+/// Answers locally without forwarding to the gateway. This lets the WebView
+/// browser satisfy its CORS preflight before the actual request, regardless of
+/// whether the gateway itself is reachable.
+async fn cors_options(State(state): State<ProxyState>, req: Request<Body>) -> Response {
+    let _ = state; // state unused — this is a pure CORS response.
+    // Capture origin before consuming the body (into_body moves `req`).
+    let origin = cors_origin(&req);
+    let _ = to_bytes(req.into_body(), usize::MAX).await;
+    let resp = Response::builder()
+        .status(204)
+        .header("Access-Control-Allow-Origin", origin)
+        .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        .header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        .header("Access-Control-Max-Age", "86400")
+        .body(Body::empty())
+        .unwrap();
+    resp
+}
+
+/// Pick the CORS origin to emit.
+///
+/// * In desktop mode the browser sends `Origin: http://tauri.localhost`, which
+///   the gateway also uses. Echo it back so the browser trusts the proxy
+///   response.
+/// * In browser mode the request usually lacks an Origin header (same-origin
+///   navigation); fall back to `*` which is safe because the proxy only listens
+///   on localhost and serves the local app.
+fn cors_origin(req: &Request<Body>) -> String {
+    req.headers()
+        .get(tauri::http::header::ORIGIN)
+        .and_then(|v| v.to_str().ok())
+        .filter(|o| !o.is_empty())
+        .unwrap_or("*")
+        .to_string()
 }
 
 /// Forward an HTTP request to the gateway, stripping browser-origin headers.
@@ -66,6 +119,16 @@ async fn forward_http(
     // Strip browser-origin headers so the gateway sees a native client.
     let forward_headers = strip_origin_headers(req.headers());
 
+    // Capture the CORS origin before consuming the request body — it's needed
+    // both for the response header and for the OPTIONS preflight path.
+    let cors_origin = req
+        .headers()
+        .get(tauri::http::header::ORIGIN)
+        .and_then(|v| v.to_str().ok())
+        .filter(|o| !o.is_empty())
+        .unwrap_or("*")
+        .to_string();
+
     // Collect the body as bytes first (simple for now; streaming for large bodies
     // would require a different approach).
     let body_bytes = match to_bytes(req.into_body(), usize::MAX).await {
@@ -78,8 +141,9 @@ async fn forward_http(
         }
     };
 
-    // Forward via reqwest using the wrapped body stream.
-    let resp = match Client::new()
+    // Forward via the shared client instead of creating a new one per request.
+    let resp = match state
+        .client
         .request(method, &url)
         .headers(forward_headers)
         .body(reqwest::Body::wrap_stream(futures_util::stream::iter(
@@ -97,6 +161,13 @@ async fn forward_http(
         }
     };
 
+    // Capture the gateway Content-Type before consuming the response bytes.
+    let content_type = resp
+        .headers()
+        .get(tauri::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
     let status = resp.status();
     let body_bytes = match resp.bytes().await {
         Ok(b) => b,
@@ -108,8 +179,15 @@ async fn forward_http(
         }
     };
 
-    Response::builder()
-        .status(status)
+    // Echo back the gateway's Content-Type and set Access-Control-Allow-Origin
+    // so the WebView browser can read the response across the tauri.localhost
+    // vs 127.0.0.1 origin boundary.
+    let mut resp_builder = Response::builder().status(status);
+    if let Some(ct) = content_type {
+        resp_builder = resp_builder.header(tauri::http::header::CONTENT_TYPE, ct);
+    }
+    resp_builder
+        .header(tauri::http::header::ACCESS_CONTROL_ALLOW_ORIGIN, cors_origin)
         .body(Body::from(body_bytes))
         .unwrap()
 }
@@ -382,6 +460,43 @@ mod tests {
             let resp = r.clone().oneshot(req).await.unwrap();
             assert_ne!(resp.status(), StatusCode::NOT_FOUND, "route {path} did not match");
         }
+    }
+
+    #[tokio::test]
+    async fn options_preflight_returns_204_with_cors_headers() {
+        let r = router("http://127.0.0.1:12345".into());
+        let req = HttpRequest::builder()
+            .method(Method::OPTIONS)
+            .uri("/api/v1/plugins/test/toggle")
+            .header("Origin", "http://tauri.localhost")
+            .header("Access-Control-Request-Method", "POST")
+            .body(Body::empty())
+            .unwrap();
+        let resp = r.clone().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+        assert_eq!(
+            resp.headers().get("Access-Control-Allow-Origin").unwrap(),
+            "http://tauri.localhost"
+        );
+        assert_eq!(
+            resp.headers()
+                .get("Access-Control-Allow-Headers")
+                .unwrap(),
+            "Content-Type, Authorization"
+        );
+    }
+
+    #[tokio::test]
+    async fn options_preflight_falls_back_to_star_when_no_origin() {
+        let r = router("http://127.0.0.1:12345".into());
+        let req = HttpRequest::builder()
+            .method(Method::OPTIONS)
+            .uri("/meta")
+            .body(Body::empty())
+            .unwrap();
+        let resp = r.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+        assert_eq!(resp.headers().get("Access-Control-Allow-Origin").unwrap(), "*");
     }
 
     #[test]

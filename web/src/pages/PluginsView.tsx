@@ -4,6 +4,7 @@ import { useApi } from "../hooks/use-api";
 import { useWsSubscribe } from "../hooks/use-ws";
 import { useShellStore } from "../stores/shell";
 import { toast } from "../stores/toast";
+import { apiFetch } from "../lib/api";
 import { SkillDetailDrawer } from "../components/SkillDetailDrawer";
 import { AddMarketModal } from "../components/AddMarketModal";
 import { useIsAdmin } from "../stores/capabilities";
@@ -279,15 +280,10 @@ export function PluginsView() {
   const togglePlugin = async (name: string, enable: boolean) => {
     setToggling(name);
     try {
-      const resp = await fetch(`/api/v1/plugins/${encodeURIComponent(name)}/toggle`, {
+      await apiFetch(`/plugins/${encodeURIComponent(name)}/toggle`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled: enable }),
       });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        throw new Error(body.error || `HTTP ${resp.status}`);
-      }
       await refetchPlugins();
       toast.success(enable ? t("toast.pluginEnabled", { name }) : t("toast.pluginDisabled", { name }));
     } catch (e: unknown) {

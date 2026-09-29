@@ -16,7 +16,7 @@ pub fn run() {
             let exe = tauri::process::current_binary(&app.env())
                 .map_err(|e| e.to_string())?;
             let binary = gateway::resolve_binary(&exe)
-                .ok_or("could not locate codex-pro-desktop.exe")?;
+                .ok_or("could not locate codex-pro-desktop-gateway.exe")?;
 
             // Spawn the gateway and wait for the runtime endpoint file.
             let (child, gateway_port) =

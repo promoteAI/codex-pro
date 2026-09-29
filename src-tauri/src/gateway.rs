@@ -94,7 +94,7 @@ pub(crate) fn resolve_binary(app_exe: &Path) -> Option<PathBuf> {
 ///
 /// `binary` must point to the gateway artifact.
 /// Returns `(child, actual_port)` on success, or an `Err` if the gateway
-/// fails to start or does not write `gateway.json` within 30 s.
+/// fails to start or does not write `gateway.json` within 300 s.
 pub fn spawn_and_wait(binary: &Path) -> io::Result<(Child, u16)> {
     let ws = desktop_workspace();
     std::fs::create_dir_all(&ws)?;
@@ -109,7 +109,7 @@ pub fn spawn_and_wait(binary: &Path) -> io::Result<(Child, u16)> {
         .arg(&ws)
         .spawn()?;
 
-    let deadline = Instant::now() + Duration::from_secs(30);
+    let deadline = Instant::now() + Duration::from_secs(300);
     loop {
         if let Ok(text) = std::fs::read_to_string(&endpoint) {
             if let Ok(ep) = serde_json::from_str::<RuntimeEndpoint>(&text) {
@@ -128,7 +128,7 @@ pub fn spawn_and_wait(binary: &Path) -> io::Result<(Child, u16)> {
             let _ = child.kill();
             return Err(io::Error::new(
                 io::ErrorKind::TimedOut,
-                "gateway did not reveal its port within 30s",
+                "gateway did not reveal its port within 300s",
             ));
         }
         std::thread::sleep(Duration::from_millis(250));

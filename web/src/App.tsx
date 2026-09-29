@@ -1,10 +1,11 @@
-import { lazy, Suspense, type ReactNode, useEffect } from "react";
-import { BrowserRouter, Link, Routes, Route, useSearchParams } from "react-router";
+import { lazy, Suspense, type ReactNode, useEffect, useState } from "react";
+import { BrowserRouter, Link, Navigate, Routes, Route, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Layout } from "./components/Layout";
 import { Toaster } from "./components/Toaster";
 import { ConfirmProvider } from "./components/ConfirmDialog";
 import { useShellStore } from "./stores/shell";
+import { apiFetch } from "./lib/api";
 import { watchTheme } from "./lib/theme";
 
 const HomeView = lazy(() => import("./pages/HomeView").then((m) => ({ default: m.HomeView })));
@@ -59,6 +60,59 @@ function SettingsQuerySync() {
   return null;
 }
 
+interface SetupStatus {
+  configured: boolean;
+  workspace: string;
+}
+
+/**
+ * First-run gate. On startup reads `GET /setup/status` (unauthenticated) and,
+ * when the deployment has no model provider configured, redirects the user to
+ * the `/setup` wizard before the main shell renders — so a fresh install lands
+ * directly on setup instead of flashing an empty dashboard.
+ *
+ * State machine:
+ * - `null` (probe in flight): render nothing so the user never sees a flash of
+ *   the un-configured dashboard before the answer arrives. The probe is
+ *   unauthenticated, so unlike Layout's auth gate it cannot 401.
+ * - `configured === false`: `Navigate` to `/setup`.
+ * - `configured === true`: render the app (the Layout route tree).
+ *
+ * Placed as a sibling of `/login` (not inside `<Route element={<Layout />}>`):
+ * Layout's AuthGate sends `authRequired && !token` to `/login`, which would make
+ * the wizard unreachable on an auth-required deployment that is also
+ * unconfigured. `/setup/status` needs no token, so the gate can run before the
+ * auth question is even asked — first-run wins over login.
+ */
+function FirstRunGate({ children }: { children: ReactNode }) {
+  const [configured, setConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<SetupStatus>("/setup/status")
+      .then((s) => {
+        if (!cancelled) setConfigured(s.configured);
+      })
+      .catch(() => {
+        // A failed probe must not lock the user out of the app: assume
+        // configured (render the shell) and let the page's own requests be
+        // authoritative. This mirrors how the capability probe degrades.
+        if (!cancelled) setConfigured(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (configured === false) {
+    return <Navigate to="/setup" replace />;
+  }
+  if (configured === null) {
+    return null;
+  }
+  return <>{children}</>;
+}
+
 export function App() {
   useEffect(() => {
     // Live theme: re-apply whenever prefs.theme changes (e.g. on the
@@ -79,7 +133,15 @@ export function App() {
               </LazyRoute>
             }
           />
-          <Route element={<Layout />}>
+          <Route
+            path="/setup"
+            element={
+              <LazyRoute>
+                <SetupWizard />
+              </LazyRoute>
+            }
+          />
+          <Route element={<FirstRunGate><Layout /></FirstRunGate>}>
             <Route
               index
               element={
@@ -126,14 +188,6 @@ export function App() {
               element={
                 <LazyRoute>
                   <Skills />
-                </LazyRoute>
-              }
-            />
-            <Route
-              path="setup"
-              element={
-                <LazyRoute>
-                  <SetupWizard />
                 </LazyRoute>
               }
             />

@@ -153,12 +153,11 @@ pub struct SuperviseState {
 }
 
 impl SuperviseState {
-    /// Signal the supervisor to stop and kill the current child if running.
+    /// Kill whichever child is currently held in `state.child`, if any.
     ///
-    /// This is the graceful shutdown path called from the window-close
-    /// handler and from the Tauri exit hook.
-    pub fn signal_shutdown(&self) {
-        self.shutdown.store(true, Ordering::SeqCst);
+    /// Tolerates a poisoned lock (recovering the guard via `into_inner()`) so
+    /// the kill attempt is never silently skipped, matching `signal_shutdown`.
+    fn kill_current_child(&self) {
         match self.child.lock() {
             Ok(mut g) => {
                 if let Some(ref mut c) = *g {
@@ -166,14 +165,21 @@ impl SuperviseState {
                 }
             }
             Err(poisoned) => {
-                // If the lock was poisoned (supervisor thread panicked),
-                // recover the guard so we can still attempt to kill the child.
                 let mut g = poisoned.into_inner();
                 if let Some(ref mut c) = *g {
                     let _ = c.kill();
                 }
             }
         }
+    }
+
+    /// Signal the supervisor to stop and kill the current child if running.
+    ///
+    /// This is the graceful shutdown path called from the window-close
+    /// handler and from the Tauri exit hook.
+    pub fn signal_shutdown(&self) {
+        self.shutdown.store(true, Ordering::SeqCst);
+        self.kill_current_child();
     }
 }
 
@@ -212,6 +218,9 @@ pub fn supervise(binary: PathBuf) -> Arc<SuperviseState> {
         loop {
             // Check shutdown before each restart attempt.
             if state_thread.shutdown.load(Ordering::SeqCst) {
+                // Tear down whatever child is currently held before exiting so
+                // no gateway is left running as an orphan (TOCTOU guard).
+                state_thread.kill_current_child();
                 break;
             }
 
@@ -235,6 +244,7 @@ pub fn supervise(binary: PathBuf) -> Arc<SuperviseState> {
 
             if state_thread.shutdown.load(Ordering::SeqCst) {
                 eprintln!("supervisor: shutdown requested, stopping");
+                state_thread.kill_current_child();
                 break;
             }
 

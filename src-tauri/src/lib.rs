@@ -1,7 +1,7 @@
 mod gateway;
 mod proxy;
 
-use std::net::SocketAddr;
+use std::sync::Arc;
 
 use tauri::Manager;
 
@@ -14,34 +14,34 @@ pub fn run() {
             let binary = gateway::resolve_binary(&exe)
                 .ok_or("could not locate codex-pro-desktop-gateway.exe")?;
 
-            // Start supervision: blocks until the first gateway is alive,
-            // then returns a shared state handle for the background supervisor
-            // thread (restarts on crash with backoff, stops on shutdown signal).
-            let supervise_state = gateway::supervise(binary.clone());
+            // Shared supervision state, registered as Tauri state so the
+            // window-close handler can signal shutdown on the same state the
+            // supervisor thread watches.
+            let state: Arc<gateway::SuperviseState> = Arc::new(gateway::SuperviseState::default());
+            app.manage(state.clone());
 
-            // Store the supervise state in Tauri state so the close handler
-            // and the app exit hook can signal shutdown.
-            app.manage(supervise_state.clone());
-
-            // Read the gateway port from the endpoint file that supervise
-            // already waited for during spawn_and_wait.
-            let ws = gateway::desktop_workspace();
-            let endpoint = ws.join(".codex-pro").join("gateway.json");
-            let text = std::fs::read_to_string(&endpoint)
-                .map_err(|e| format!("failed to read gateway endpoint: {e}"))?;
-            let ep = serde_json::from_str::<gateway::RuntimeEndpoint>(&text)
-                .map_err(|e| format!("failed to parse gateway endpoint: {e}"))?;
-            let gateway_port = ep.port;
-
-            // Start the axum proxy on a fixed localhost port.
-            let proxy_addr: SocketAddr = "127.0.0.1:58124".parse().unwrap();
-            let std_listener = std::net::TcpListener::bind(proxy_addr)
-                .map_err(|e| format!("failed to bind proxy listener: {e}"))?;
-            let listener = tokio::net::TcpListener::from_std(std_listener)
-                .map_err(|e| format!("failed to create tokio listener: {e}"))?;
-            let router = proxy::router(format!("http://127.0.0.1:{gateway_port}"));
-            tauri::async_runtime::spawn(async move {
-                let _ = axum::serve(listener, router).await;
+            // Kick off gateway supervision on a background thread so the window
+            // is created immediately. `supervise` blocks until the gateway has
+            // written its runtime endpoint (which can take ~20s on first run,
+            // e.g. when a channel's network handshake times out), and only then
+            // starts the proxy. Running it inline in `setup` would leave the
+            // window blank for that whole time.
+            //
+            // We wrap in `catch_unwind` so that if `supervise` panics (e.g.
+            // gateway exits unexpectedly during bootstrap), the panic is
+            // contained to this thread and does NOT propagate to the main
+            // thread — otherwise the entire Tauri app would abort.
+            let binary_for_thread = binary.clone();
+            let state_for_thread = state.clone();
+            std::thread::spawn(move || {
+                if let Err(e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    gateway::supervise(binary_for_thread, state_for_thread)
+                })) {
+                    eprintln!(
+                        "gateway supervise panicked (gateway startup failed?): {:?}",
+                        e
+                    );
+                }
             });
 
             Ok(())

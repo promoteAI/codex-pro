@@ -100,6 +100,15 @@ pub fn spawn_and_wait(binary: &Path) -> io::Result<(Child, u16)> {
     std::fs::create_dir_all(&ws)?;
     let endpoint = ws.join(".codex-pro").join("gateway.json");
 
+    // Run the gateway as a background process. We deliberately redirect stdin
+    // to null so the gateway does NOT inherit the Tauri app's console.
+    // Without this, the gateway receives console control events (close, Ctrl-C)
+    // from the desktop shell and treats them as a shutdown request, terminating
+    // before it ever writes gateway.json.
+    //
+    // The CLI channel already disables itself when stdin is not a TTY
+    // (`not sys.stdin.isatty()` in cli.py), so this is safe — no interactive
+    // input functionality is lost in desktop mode.
     let mut child = Command::new(binary)
         .arg("--port")
         .arg("0")
@@ -107,6 +116,7 @@ pub fn spawn_and_wait(binary: &Path) -> io::Result<(Child, u16)> {
         .arg("127.0.0.1")
         .arg("--workspace")
         .arg(&ws)
+        .stdin(std::process::Stdio::null())
         .spawn()?;
 
     let deadline = Instant::now() + Duration::from_secs(300);
@@ -198,21 +208,59 @@ impl SuperviseState {
     }
 }
 
+/// Start the axum HTTP/WS proxy that relays frontend requests to the gateway.
+///
+/// `gateway_port` is the dynamic port the gateway bound (read from
+/// `gateway.json`). The proxy listens on a fixed localhost port
+/// (`127.0.0.1:58124`) and forwards `/api`, `/ws` and `/meta` to the gateway.
+///
+/// This must be called from a context with a Tokio runtime available (the
+/// spawned future converts the std listener with `TcpListener::from_std`,
+/// which panics outside a runtime). We bind the std listener on the calling
+/// thread (no runtime needed) and convert + serve inside the async task.
+pub fn start_proxy(gateway_port: u16) {
+    use std::net::SocketAddr;
+
+    let proxy_addr: SocketAddr = "127.0.0.1:58124".parse().unwrap();
+    let std_listener = match std::net::TcpListener::bind(proxy_addr) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("failed to bind proxy listener: {e}");
+            return;
+        }
+    };
+    if let Err(e) = std_listener.set_nonblocking(true) {
+        eprintln!("failed to set proxy listener nonblocking: {e}");
+        return;
+    }
+    let router = crate::proxy::router(format!("http://127.0.0.1:{gateway_port}"));
+    tauri::async_runtime::spawn(async move {
+        match tokio::net::TcpListener::from_std(std_listener) {
+            Ok(listener) => {
+                let _ = axum::serve(listener, router).await;
+            }
+            Err(e) => {
+                eprintln!("failed to create tokio listener for proxy: {e}");
+            }
+        }
+    });
+}
+
 /// Spawn the gateway and supervise it: on unexpected exit, restart with
 /// exponential backoff until `state.shutdown` is set.
 ///
 /// **Blocking semantics**: this function blocks the calling (setup) thread
 /// until the first gateway process is alive and has written its endpoint file
 /// (same guarantee as `spawn_and_wait`).  A background supervisor thread is
-/// then started and immediately returns control to the caller.
+/// then started and immediately returns control to the caller. Once the
+/// gateway is ready, `start_proxy` is called so the frontend can reach it.
 ///
-/// Returns the `SuperviseState` — the caller stores it in Tauri state and
-/// uses it to signal shutdown from the window close handler / exit hook.
-pub fn supervise(binary: PathBuf) -> Arc<SuperviseState> {
-    let state = Arc::new(SuperviseState::default());
-
+/// `state` is the caller-provided shared state (created by the app so it can
+/// be registered with `app.manage`) — it is installed here so the window-close
+/// handler can signal shutdown on the same state the supervisor watches.
+pub fn supervise(binary: PathBuf, state: Arc<SuperviseState>) -> Arc<SuperviseState> {
     // Block on first successful spawn.
-    let (first_child, _first_port) = match spawn_and_wait(&binary) {
+    let (first_child, first_port) = match spawn_and_wait(&binary) {
         Ok(pair) => pair,
         Err(e) => {
             panic!("gateway failed to start during supervise: {e}");
@@ -224,6 +272,9 @@ pub fn supervise(binary: PathBuf) -> Arc<SuperviseState> {
         let mut g = state.child.lock().unwrap();
         *g = Some(first_child);
     }
+
+    // The gateway is up; start the proxy so the frontend can reach it.
+    start_proxy(first_port);
 
     // Detach the supervisor thread.  It will call spawn_and_wait again on
     // crash, updating state.child each time.

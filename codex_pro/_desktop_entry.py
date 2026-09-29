@@ -8,6 +8,7 @@ machine. The real bound port is written to the runtime endpoint file
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 
 from codex_pro import __version__, app
@@ -36,6 +37,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     DESKTOP_WORKSPACE.mkdir(parents=True, exist_ok=True)
+
+    # In desktop mode, stdin is redirected to null by the Tauri shell, so
+    # `sys.stdin.isatty()` returns False and the CLI channel disables itself.
+    # This is safe because the desktop shell communicates with the gateway
+    # via HTTP/WebSocket on localhost, never via stdin.
+    #
+    # Additionally, set an environment marker so the gateway can adapt its
+    # behavior if needed (e.g., skip interactive prompts).
+    os.environ["_CODEX_PRO_DESKTOP"] = "1"
 
     def _run() -> None:
         asyncio.run(

@@ -1,0 +1,114 @@
+# Three-platform Tauri desktop build.
+#
+# Triggers on `v*` tags (release) and on manual dispatch. Each platform leg
+# builds the PyInstaller gateway binary (Plan A product) and then the Tauri
+# shell (Plan B) into a platform installer: .msi (Windows), .dmg (macOS),
+# .AppImage / .deb (Linux).
+#
+# Ruling notes (see task-5-brief.md + task-5-report.md):
+# - Ruling 1: we do NOT run `pnpm build` directly. `pnpm build` runs
+#   `check:bundle`, which is currently over budget (initial raw ~600 KiB vs the
+#   410 KiB budget) and would fail CI. Instead we invoke the platform backend
+#   build script (build_desktop.*), which already runs `pnpm build` and
+#   tolerates only the bundle-budget failure (see those scripts). It produces
+#   the gateway binary AND a fresh web/dist that the Tauri build uses.
+# - Ruling 2: the platform script is selected by runner OS — the Windows-only
+#   .ps1 runs only on Windows, the POSIX .sh runs on the Linux/macOS runners.
+# - Ruling 3: the gateway binary is NOT wired into the Tauri bundle config.
+#   resolve_binary() searches the Tauri app exe's own directory for
+#   `codex-pro-desktop-gateway.exe`; Tauri's `bundle.resources` places files in
+#   `$RESOURCE_DIR` which is only the exe directory on Windows (on macOS it is
+#   `Contents/Resources`, on Linux `/usr/lib/<name>`), and declaring a
+#   `resources`/`externalBin` entry also makes `tauri_build` fail at build time
+#   if the binary is absent. So the gateway binary is uploaded as a separate
+#   artifact alongside the installer. See the report for the full limitation.
+
+name: Desktop Build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+          - os: macos-latest
+          - os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: "10.34.5"
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux system deps (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf
+
+      - name: Build gateway backend (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          pip install pyinstaller
+          pwsh packaging/desktop/build_desktop.ps1
+
+      - name: Build gateway backend (macOS / Linux)
+        if: runner.os != 'Windows'
+        run: |
+          pip install pyinstaller
+          bash packaging/desktop/build_desktop.sh
+
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli
+
+      - name: Build Tauri bundle
+        shell: bash
+        run: |
+          cd src-tauri
+          # `tauri build` reads bundle.targets from tauri.conf.json and builds
+          # only the host-supported formats (msi on Windows, dmg on macOS,
+          # appimage+deb on Linux). web/dist is already built by
+          # build_desktop.*, so no beforeBuildCommand is needed here.
+          tauri build
+
+      - name: List bundle output
+        shell: bash
+        run: ls -R src-tauri/target/release/bundle/ || true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codex-pro-desktop-${{ runner.os }}
+          path: |
+            src-tauri/target/release/bundle/**/*
+            dist/codex-pro-desktop-gateway*
+          if-no-files-found: error
+          retention-days: 7

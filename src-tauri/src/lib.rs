@@ -41,10 +41,9 @@ pub fn run() {
             if let tauri::WindowEvent::Destroyed = event {
                 // Stop the gateway when the window closes.
                 let guard: tauri::State<GatewayGuard> = window.state();
-                // Drop the guard immediately so the MutexGuard is released
-                // before we try to move the Child out.
+                // Extract the child, then drop the guard so the Mutex is released.
                 let child = guard.0.lock().unwrap().take();
-                drop(guard);
+                // `guard` goes out of scope at the end of this block, releasing the lock.
                 if let Some(child) = child {
                     gateway::shutdown(child);
                 }

@@ -86,13 +86,10 @@ pub fn spawn_and_wait(binary: &Path) -> io::Result<(Child, u16)> {
             }
         }
         // Check if the child has exited prematurely.
-        if let Ok(status) = child.try_wait() {
-            if let Some(s) = status {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("gateway process exited unexpectedly (code={s:?})"),
-                ));
-            }
+        if let Ok(Some(s)) = child.try_wait() {
+            return Err(io::Error::other(format!(
+                "gateway process exited unexpectedly (code={s:?})",
+            )));
         }
         if Instant::now() >= deadline {
             let _ = child.kill();

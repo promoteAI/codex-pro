@@ -72,6 +72,17 @@ class SetupHandlers:
             return self._workspace
         return str(Path(_DESKTOP_WORKSPACE).expanduser())
 
+    @staticmethod
+    def _as_dict(value: Any) -> dict[str, Any]:
+        """Coerce a nested config value to a dict, tolerating a malformed scalar.
+
+        The raw YAML is authoritative here. ``load_config`` would refuse to start
+        on ``models: gpt-4o``, but these endpoints read the file directly, so a
+        non-mapping ``models`` must be treated as an empty block rather than
+        raising ``AttributeError``/``TypeError`` (which would surface as a 500).
+        """
+        return value if isinstance(value, dict) else {}
+
     def _guard_write(self, request: web.Request) -> web.Response | None:
         """Gate the config write to local clients only.
 
@@ -117,7 +128,7 @@ class SetupHandlers:
         source for the first-run decision.
         """
         data = self._load_yaml()
-        models = data.get("models") or {}
+        models = self._as_dict(data.get("models"))
         providers = models.get("providers") or []
         configured = bool(providers)
         workspace = data.get("workspace") or self._resolved_workspace()
@@ -152,7 +163,10 @@ class SetupHandlers:
         default_model = body.get("model", (entry.fallback_models or [""])[0])
 
         raw = self._load_yaml()
-        models_block = raw.setdefault("models", {})
+        # Coerce a malformed scalar models block to an empty dict before merging,
+        # and write the coerced dict back so the save produces a valid mapping.
+        models_block = self._as_dict(raw.get("models"))
+        raw["models"] = models_block
         # Preserve routes / modelWindows / fallback_model already in the block.
         models_block["default_model"] = default_model
         models_block["providers"] = [provider_cfg]

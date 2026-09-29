@@ -63,6 +63,36 @@ async def test_setup_status_unconfigured(tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_setup_status_tolerates_scalar_models(tmp_path: Path):
+    """A malformed `models: gpt-4o` (scalar, not a mapping) must not crash."""
+    cfg = tmp_path / "codex-pro.yaml"
+    cfg.write_text("models: gpt-4o\n", encoding="utf-8")
+    handlers = SetupHandlers(None, cfg, tmp_path)
+    resp = await handlers.setup_status(_empty_request())
+    assert resp.status == 200
+    data = json.loads(resp.body)
+    assert data["configured"] is False
+
+
+@pytest.mark.asyncio
+async def test_save_config_tolerates_scalar_models(tmp_path: Path):
+    """save_config on a scalar `models` block must coerce it rather than 500."""
+    cfg = tmp_path / "codex-pro.yaml"
+    cfg.write_text("models: gpt-4o\ngateway:\n  enabled: true\n", encoding="utf-8")
+    handlers = SetupHandlers(None, cfg, tmp_path)
+    request = _loopback_request(
+        {"provider_id": "openai", "api_key": "sk-test", "model": "gpt-4o"}
+    )
+    resp = await handlers.save_config(request)
+    assert resp.status == 200
+    saved = yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    # The scalar was replaced by a proper mapping; top-level keys survive.
+    assert isinstance(saved["models"], dict)
+    assert saved["models"]["default_model"] == "gpt-4o"
+    assert saved["gateway"]["enabled"] is True
+
+
+@pytest.mark.asyncio
 async def test_setup_status_configured_from_disk(tmp_path: Path):
     """Production wiring: GatewayServer gets a GatewayConfig (no models), so the
     'should I show the wizard?' answer must come from the on-disk config."""

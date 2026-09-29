@@ -173,7 +173,7 @@ class GatewayServer:
         self._msg_handler = MessageHandler(self)
         self._meta_handler = MetadataHandlers(self)
         self._session_handler = SessionHandlers(self)
-        self._setup_handler = SetupHandlers(self._config, self._config_path)
+        self._setup_handler = SetupHandlers(self._config, self._config_path, self._workspace)
         self._ws_handler = WebSocketHandler(self)
 
     def _normalize_platform(self, reported: str | None) -> str:

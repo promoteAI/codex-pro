@@ -6,6 +6,7 @@
     "frontendDist": "../web/dist"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Codex Pro",

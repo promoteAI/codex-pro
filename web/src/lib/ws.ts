@@ -1,5 +1,5 @@
 import { useAuthStore } from "../stores/auth";
-import { DESKTOP_ORIGIN, isDesktop } from "./api";
+import { buildWsUrl } from "./desktop";
 
 type Listener = (event: { type: string; payload: unknown }) => void;
 
@@ -52,13 +52,10 @@ export class WebWS {
     return [...this.channelRefs.keys()];
   }
 
-  /**
-   * Build the WebSocket URL. In desktop mode the proxy on DESKTOP_ORIGIN
-   * forwards /ws/... to the gateway, bypassing its cross-site check.
-   */
+  /** Build the WebSocket URL via the shared desktop helper (proxy on desktop,
+   *  current host in browser). Desktop mode rewrites the http scheme to ws. */
   private buildWsUrl(path: string): string {
-    const prefix = isDesktop() ? `${DESKTOP_ORIGIN}/ws` : `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
-    return `${prefix}${path.startsWith("/") ? path : `/${path}`}`;
+    return buildWsUrl(path);
   }
 
   /**

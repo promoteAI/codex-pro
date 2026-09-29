@@ -33,12 +33,16 @@ use tokio_tungstenite::{
 /// Build the proxy router.
 ///
 /// `target` is the gateway base URL, e.g. `http://127.0.0.1:8443`.
+///
+/// Note: axum 0.7 uses `*path` (single `*`, no braces) for catch-all route
+/// parameters. `{*path}` panics at route-build time.
 pub fn router(target: String) -> Router {
     let state = ProxyState { target };
     Router::new()
-        .route("/api", any(forward_http))
+        .route("/api/*path", any(forward_http))
         .route("/meta", get(forward_http))
         .route("/ws", any(forward_ws))
+        .route("/ws/*path", any(forward_ws))
         .with_state(state)
 }
 
@@ -129,16 +133,19 @@ fn strip_origin_headers(h: &HeaderMap) -> HeaderMap {
 
 /// Derive the gateway WS path from the proxy request path.
 ///
-/// The proxy receives requests at `/ws/{suffix}` and forwards to the gateway
-/// at `{suffix}` (which defaults to `/ws` when suffix is empty).
+/// The gateway registers its WebSocket endpoints on the *full* `/ws/...` path
+/// (see `codex_pro/gateway/server.py`: `ws_path` default `/ws`, plus the fixed
+/// `/ws/web` and `/ws/term` routes), so the proxy must forward the incoming
+/// path unchanged — `/ws/web` stays `/ws/web`, `/ws/term` stays `/ws/term`.
+///
+/// Only a request that does not already start with `/ws` is normalized to the
+/// gateway default.
 pub fn derive_gateway_path(path: &str) -> &str {
-    if let Some(stripped) = path.strip_prefix("/ws") {
-        if stripped.is_empty() {
-            return "/ws";
-        }
-        return stripped;
+    if path.starts_with("/ws") {
+        path
+    } else {
+        "/ws"
     }
-    "/ws"
 }
 
 /// Convert axum WS close code (u16) to tungstenite CloseCode.
@@ -213,8 +220,8 @@ fn tungstenite_to_axum(msg: TungsteniteMessage) -> axum::extract::ws::Message {
 /// Forward a WebSocket upgrade request to the gateway.
 ///
 /// The client connects to `ws://127.0.0.1:58124/ws/...`, and the proxy relays
-/// it to the gateway's WebSocket endpoint at `ws://127.0.0.1:<gateway_port>/ws`.
-/// All bytes between the two WebSocket connections are relayed bidirectionally.
+/// it to the gateway's WebSocket endpoint at `ws://127.0.0.1:<gateway_port>/ws...`.
+/// All frames between the two WebSocket connections are relayed bidirectionally.
 ///
 /// The gateway is a loopback peer, so Origin/Sec-Fetch-Site headers are stripped
 /// to avoid triggering its cross-site check.
@@ -223,7 +230,7 @@ async fn forward_ws(
     ws: WebSocketUpgrade,
     req: Request,
 ) -> Response {
-    // Derive the gateway WS path from the request URI.
+    // Preserve the full gateway WS path (e.g. `/ws/web`, `/ws/term`).
     let gateway_path = derive_gateway_path(req.uri().path());
     let target = state.target.clone();
 
@@ -309,7 +316,12 @@ async fn forward_ws(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::{
+        body::Body,
+        http::{Method, Request as HttpRequest, StatusCode},
+    };
     use tauri::http::header::HeaderValue;
+    use tower::util::ServiceExt;
 
     #[test]
     fn strip_origin_headers_removes_target_headers() {
@@ -341,19 +353,46 @@ mod tests {
         assert!(!out.contains_key("origin"));
     }
 
-    #[test]
-    fn router_has_ws_route() {
-        // The router must expose /ws for WebSocket upgrade forwarding.
-        let _r = router("http://127.0.0.1:12345".into());
-        assert!(true);
+    #[tokio::test]
+    async fn router_matches_nested_api_and_ws_paths() {
+        // The router must expose catch-all /api and /ws routes so the proxy
+        // forwards /api/v1/..., /ws/web and /ws/term instead of returning 404.
+        let r = router("http://127.0.0.1:12345".into());
+
+        // /api/v1/... must reach forward_http (non-404; the reqwest.c error means
+        // the route matched and it tried to talk to the (unreachable) target).
+        let req = HttpRequest::builder()
+            .method(Method::GET)
+            .uri("/api/v1/health")
+            .body(Body::empty())
+            .unwrap();
+        let resp = r.clone().oneshot(req).await.unwrap();
+        assert_ne!(resp.status(), StatusCode::NOT_FOUND);
+
+        // /ws/web, /ws/term and /ws must all match the WebSocket route rather
+        // than 404. A plain GET without an Upgrade handshake returns a 426
+        // Upgrade Required from the WebSocketUpgrade extractor — which proves
+        // the route matched.
+        for path in ["/ws/web", "/ws/term", "/ws"] {
+            let req = HttpRequest::builder()
+                .method(Method::GET)
+                .uri(path)
+                .body(Body::empty())
+                .unwrap();
+            let resp = r.clone().oneshot(req).await.unwrap();
+            assert_ne!(resp.status(), StatusCode::NOT_FOUND, "route {path} did not match");
+        }
     }
 
     #[test]
-    fn derive_gateway_path_correct() {
-        // Demonstrate the path derivation logic used in forward_ws.
-        assert_eq!(derive_gateway_path("/ws/web"), "/web");
+    fn derive_gateway_path_preserves_full_ws_path() {
+        // The gateway registers /ws, /ws/web and /ws/term — the proxy must
+        // forward the full path unchanged, not strip the /ws prefix.
+        assert_eq!(derive_gateway_path("/ws/web"), "/ws/web");
+        assert_eq!(derive_gateway_path("/ws/term"), "/ws/term");
         assert_eq!(derive_gateway_path("/ws"), "/ws");
-        assert_eq!(derive_gateway_path("/ws/sessions/stream"), "/sessions/stream");
+        assert_eq!(derive_gateway_path("/ws/sessions/stream"), "/ws/sessions/stream");
+        // Non-/ws paths fall back to the gateway default.
         assert_eq!(derive_gateway_path("/other"), "/ws");
     }
 }

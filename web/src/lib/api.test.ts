@@ -21,6 +21,45 @@ beforeEach(() => {
 afterEach(() => {
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
+  vi.resetModules();
+  delete (import.meta.env as any).VITE_DESKTOP;
+  delete (import.meta.env as any).VITE_DESKTOP_ORIGIN;
+});
+
+describe("initApiBase desktop mode", () => {
+  it("desktop mode fetches /meta from DESKTOP_ORIGIN and sets absolute API_BASE", async () => {
+    (import.meta.env as any).VITE_DESKTOP = "1";
+    vi.resetModules();
+    const api = await import("./api");
+    const spy = vi.fn().mockResolvedValue(
+      jsonResponse({ api_prefix: "/api/v1", ws_path: "/ws", version: "1.0", auth_required: false }),
+    );
+    globalThis.fetch = spy;
+
+    await api.initApiBase();
+
+    // The /meta fetch must target the Rust proxy, not a relative path.
+    expect(spy.mock.calls[0][0]).toBe("http://127.0.0.1:58124/meta");
+    // apiFetch must then use the absolute proxy base.
+    const apiSpy = vi.fn().mockResolvedValue(jsonResponse({ ok: true }));
+    globalThis.fetch = apiSpy;
+    await api.apiFetch("/stats");
+    expect(apiSpy.mock.calls[0][0]).toBe("http://127.0.0.1:58124/api/v1/stats");
+  });
+
+  it("desktop mode defaults to absolute proxy base even when /meta fails", async () => {
+    (import.meta.env as any).VITE_DESKTOP = "1";
+    vi.resetModules();
+    const api = await import("./api");
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error("no server"));
+
+    await api.initApiBase();
+
+    const apiSpy = vi.fn().mockResolvedValue(jsonResponse({ ok: true }));
+    globalThis.fetch = apiSpy;
+    await api.apiFetch("/stats");
+    expect(apiSpy.mock.calls[0][0]).toBe("http://127.0.0.1:58124/api/v1/stats");
+  });
 });
 
 describe("apiFetch 鉴权头", () => {

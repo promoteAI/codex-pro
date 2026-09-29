@@ -1,4 +1,5 @@
 import { useAuthStore } from "../stores/auth";
+import { buildWsUrl } from "./desktop";
 
 /**
  * One interactive terminal session over the gateway's `/ws/term` endpoint.
@@ -31,8 +32,9 @@ export class TermSession {
   /** Establish a session and spawn a shell on the gateway. */
   connect(shell: string, cwd: string, cols: number, rows: number) {
     this.token = useAuthStore.getState().token ?? "";
-    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${location.host}/ws/term`);
+    // Desktop mode routes /ws/term through the Rust proxy (which rewrites the
+    // http scheme to ws); browser mode targets the gateway on the current host.
+    const ws = new WebSocket(buildWsUrl("/ws/term"));
     this.ws = ws;
 
     ws.onopen = () => {

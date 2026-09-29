@@ -52,4 +52,4 @@ Write-Host "==> Building desktop executable..."
 $env:CODEX_PRO_ROOT = $ROOT
 pyinstaller --clean --noconfirm packaging/desktop/codex_pro.spec
 
-Write-Host "==> Done. Look for codex-pro-desktop(.exe) in dist/ or the build output."
+Write-Host "==> Done. Look for codex-pro-desktop-gateway(.exe) in dist/ or the build output."

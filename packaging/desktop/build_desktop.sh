@@ -35,4 +35,4 @@ export CODEX_PRO_ROOT="$ROOT"
 pyinstaller --clean --noconfirm packaging/desktop/codex_pro.spec
 
 echo "==> Done: $(ls dist/desktop/ 2>/dev/null || echo dist/)"
-echo "   Look for codex-pro-desktop in dist/ or the build output."
+echo "   Look for codex-pro-desktop-gateway in dist/ or the build output."

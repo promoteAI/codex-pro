@@ -165,7 +165,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="codex-pro-desktop",
+    name="codex-pro-desktop-gateway",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

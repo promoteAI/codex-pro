@@ -39,6 +39,16 @@ async def test_store_and_load_session(backend: SQLiteBackend) -> None:
 
 
 @pytest.mark.asyncio
+async def test_project_crud_roundtrip(backend: SQLiteBackend) -> None:
+    await backend.store_project("proj_foo", {"name": "Foo", "root": "/x/foo"})
+    got = await backend.load_project("proj_foo")
+    assert got is not None
+    assert got["name"] == "Foo"
+    assert await backend.delete_project("proj_foo") is True
+    assert await backend.load_project("proj_foo") is None
+
+
+@pytest.mark.asyncio
 async def test_list_sessions_returns_storage_metadata(backend: SQLiteBackend) -> None:
     await backend.store_session(
         "test:1",

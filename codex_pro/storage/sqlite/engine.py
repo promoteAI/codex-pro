@@ -302,6 +302,16 @@ _MIGRATIONS: list[tuple[int, str]] = [
         PRIMARY KEY (window_date, skill)
     )""",
     ),
+    (
+        35,
+        """CREATE TABLE IF NOT EXISTS projects (
+        project_id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )""",
+    ),
+    (36, "CREATE INDEX IF NOT EXISTS idx_projects_updated ON projects(updated_at)"),
 ]
 
 
@@ -561,6 +571,53 @@ class SQLiteBackend(StorageBackend):
             return cursor.rowcount > 0
         except Exception as e:
             logger.error("Failed to delete session '{}': {}", key, e)
+            return False
+
+    # ── Project ────────────────────────────────────────────────────────────
+
+    async def store_project(self, project_id: str, data: dict[str, Any]) -> None:
+        now = datetime.now().isoformat()
+        try:
+            async with self._write_transaction() as db:
+                await db.execute(
+                    "INSERT OR REPLACE INTO projects (project_id, data, created_at, updated_at) "
+                    "VALUES (?, ?, COALESCE((SELECT created_at FROM projects WHERE project_id=?), ?), ?)",
+                    (project_id, json.dumps(data, ensure_ascii=False), project_id, now, now),
+                )
+        except Exception as e:
+            logger.error("Failed to store project '{}': {}", project_id, e)
+            raise
+
+    async def load_project(self, project_id: str) -> dict[str, Any] | None:
+        try:
+            async with self._read_connection() as db:
+                row = await db.execute_fetchall("SELECT data FROM projects WHERE project_id=?", (project_id,))
+        except (aiosqlite.Error, OSError) as e:
+            raise self._read_failure(f"loading project '{project_id}'", e) from e
+        if not row:
+            return None
+        return self._decode_json(row[0][0], f"loading project '{project_id}'", expected_type=dict)
+
+    async def list_projects(self) -> list[dict[str, Any]]:
+        try:
+            async with self._read_connection() as db:
+                rows = await db.execute_fetchall("SELECT project_id, data FROM projects ORDER BY updated_at DESC")
+        except (aiosqlite.Error, OSError) as e:
+            raise self._read_failure("listing projects", e) from e
+        result: list[dict[str, Any]] = []
+        for pid, raw in rows:
+            data = self._decode_json(raw, f"listing project '{pid}'", expected_type=dict)
+            data["project_id"] = pid
+            result.append(data)
+        return result
+
+    async def delete_project(self, project_id: str) -> bool:
+        try:
+            async with self._write_transaction() as db:
+                cursor = await db.execute("DELETE FROM projects WHERE project_id=?", (project_id,))
+            return cursor.rowcount > 0
+        except Exception as e:
+            logger.error("Failed to delete project '{}': {}", project_id, e)
             return False
 
     async def list_sessions(self) -> list[dict[str, Any]]:

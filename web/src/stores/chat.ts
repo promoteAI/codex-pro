@@ -118,6 +118,8 @@ export function modeToPerm(mode: string | undefined): "ask" | "agent" | "full" {
 interface ChatState {
   project: string;
   projectPath: string;
+  workspaceKey: string;
+  workspacePath: string;
   env: string;
   branch: string;
   model: string;
@@ -152,6 +154,7 @@ interface ChatState {
   pendingClarify: ClarifyTicket | null;
   setProject: (project: string, projectPath?: string) => void;
   selectProject: (repo: GitRepo) => void;
+  setWorkspace: (ws: { workspaceKey: string; workspacePath: string }) => void;
   createProject: (name: string, gitInit?: boolean) => Promise<GitRepo>;
   openProject: (path: string) => Promise<void>;
   setEnv: (env: string) => void;
@@ -185,6 +188,8 @@ interface ChatState {
 export const useChatStore = create<ChatState>((set, get) => ({
   project: "",
   projectPath: "",
+  workspaceKey: "",
+  workspacePath: "",
   env: "local",
   branch: "dev",
   // 旧值曾硬编码假模型 "agnes-2.5-flash"。改为空串作为中性默认，等待用户从
@@ -214,6 +219,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isGit: false,
 
   setProject: (project, projectPath) => set({ project, projectPath: projectPath ?? get().projectPath }),
+  setWorkspace: (ws) => set({ workspaceKey: ws.workspaceKey, workspacePath: ws.workspacePath }),
   setModel: async (model: string) => {
     set({ model });
     try {

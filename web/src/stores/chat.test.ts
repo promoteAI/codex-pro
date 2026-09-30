@@ -462,4 +462,13 @@ describe("chat store permission persistence", () => {
     await useChatStore.getState().loadPerm();
     expect(useChatStore.getState().perm).toBe("agent");
   });
+
+  it("setWorkspace updates workspaceKey and workspacePath without clearing project", () => {
+    useChatStore.getState().setProject("myproj", "/ws/myproj");
+    useChatStore.getState().setWorkspace({ workspaceKey: "ws1", workspacePath: "/ws1" });
+    expect(useChatStore.getState().workspaceKey).toBe("ws1");
+    expect(useChatStore.getState().workspacePath).toBe("/ws1");
+    // project context is untouched by a workspace switch
+    expect(useChatStore.getState().project).toBe("myproj");
+  });
 });

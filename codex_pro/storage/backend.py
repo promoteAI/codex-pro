@@ -32,6 +32,20 @@ class StorageBackend(ABC):
     async def delete_session(self, key: str) -> bool:
         pass
 
+    @abstractmethod
+    async def store_project(self, project_id: str, data: dict[str, Any]) -> None:
+        pass
+
+    @abstractmethod
+    async def load_project(self, project_id: str) -> dict[str, Any] | None:
+        pass
+
+    async def list_projects(self) -> list[dict[str, Any]]:
+        return []
+
+    async def delete_project(self, project_id: str) -> bool:
+        return False
+
     async def list_sessions(self) -> list[dict[str, Any]]:
         return []
 

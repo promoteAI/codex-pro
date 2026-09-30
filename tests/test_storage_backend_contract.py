@@ -30,3 +30,11 @@ async def test_optional_capabilities_have_safe_empty_defaults() -> None:
     assert await StorageBackend.fetch_sql(backend, "SELECT 1") == []  # type: ignore[arg-type]
     assert await StorageBackend.archive_messages(backend, "session", []) is None  # type: ignore[arg-type]
     assert await StorageBackend.load_archived_messages(backend, "session") == []  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_project_capabilities_have_safe_empty_defaults() -> None:
+    backend = None
+    assert await StorageBackend.list_projects(backend) == []  # type: ignore[arg-type]
+    assert await StorageBackend.load_project(backend, "proj_x") is None  # type: ignore[arg-type]
+    assert await StorageBackend.delete_project(backend, "proj_x") is False  # type: ignore[arg-type]

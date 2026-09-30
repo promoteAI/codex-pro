@@ -389,6 +389,29 @@ class SessionManager:
         # lock across the I/O would only block concurrent turns.
         return await self._load(key)
 
+    async def fork_session(self, parent_key: str) -> Session:
+        """Create a new session forking from ``parent_key``.
+
+        The child copies the parent's message history and workspace, gets its own
+        ``session_id``, and records ``forked_from_id``/``parent_session_id`` so the
+        session tree can be traced. It is persisted immediately.
+        """
+        parent = await self.get(parent_key)
+        if parent is None:
+            raise KeyError(parent_key)
+        child = Session(
+            key=f"{parent_key}:fork",
+            messages=list(parent.messages),
+            project=parent.project,
+            workspace=parent.workspace,
+            forked_from_id=parent.session_id,
+            parent_session_id=parent.session_id,
+        )
+        async with self._lock:
+            self._cache[child.key] = child
+        await self.save(child)
+        return child
+
     async def _load(self, key: str) -> Session | None:
         if not self._storage:
             return await self._load_from_file(key)

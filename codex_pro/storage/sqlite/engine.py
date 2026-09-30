@@ -14,6 +14,7 @@ from loguru import logger
 
 from codex_pro.storage.backend import StorageBackend
 from codex_pro.storage.errors import CorruptData, StorageUnavailable
+from codex_pro.projects import project_id_from_directory
 
 
 async def _settle_cleanup(operation: Awaitable[Any]) -> asyncio.CancelledError | None:
@@ -650,6 +651,7 @@ class SQLiteBackend(StorageBackend):
                     "metadata": metadata,
                     "title": _session_title(data, messages),
                     "project": data.get("project", "") or "",
+                    "project_id": project_id_from_directory(data.get("project", "")) if data.get("project") else "",
                     "message_count": len(messages),
                 }
             )

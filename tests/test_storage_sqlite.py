@@ -49,6 +49,23 @@ async def test_project_crud_roundtrip(backend: SQLiteBackend) -> None:
 
 
 @pytest.mark.asyncio
+async def test_list_sessions_includes_project_id(backend: SQLiteBackend) -> None:
+    from codex_pro.projects import project_id_from_directory
+
+    data = {
+        "messages": [],
+        "metadata": {},
+        "status": "active",
+        "project": "E:/workspace/foo",
+        "workspace": "E:/workspace/foo",
+    }
+    await backend.store_session("cli:abc", data)
+    sessions = await backend.list_sessions()
+    assert sessions[0]["project"] == "E:/workspace/foo"
+    assert sessions[0]["project_id"] == project_id_from_directory("E:/workspace/foo")
+
+
+@pytest.mark.asyncio
 async def test_list_sessions_returns_storage_metadata(backend: SQLiteBackend) -> None:
     await backend.store_session(
         "test:1",

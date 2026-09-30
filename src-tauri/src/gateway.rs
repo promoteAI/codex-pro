@@ -110,12 +110,15 @@ pub fn spawn_and_wait(binary: &Path) -> io::Result<(Child, u16)> {
     // to null so the gateway does NOT inherit the Tauri app's console.
     // Without this, the gateway receives console control events (close, Ctrl-C)
     // from the desktop shell and treats them as a shutdown request, terminating
-    // before it ever writes gateway.json.
+    // before it ever writes gateway.json. stdout/stderr are likewise nulled so
+    // the gateway's log output cannot leak into (or hold open) the shell's
+    // console.
     //
     // The CLI channel already disables itself when stdin is not a TTY
     // (`not sys.stdin.isatty()` in cli.py), so this is safe — no interactive
     // input functionality is lost in desktop mode.
-    let mut child = Command::new(binary)
+    let mut command = Command::new(binary);
+    command
         .arg("--port")
         .arg("0")
         .arg("--host")
@@ -123,12 +126,25 @@ pub fn spawn_and_wait(binary: &Path) -> io::Result<(Child, u16)> {
         .arg("--workspace")
         .arg(&ws)
         .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         // Mark this as a desktop-supervised gateway. The Python side sets the
         // same marker in _desktop_entry.py; primarily the CLI channel reads it
         // to disable interactive stdin on hosts where isatty() wrongly reports
         // True under PyInstaller onefile + Tauri.
-        .env("_CODEX_PRO_DESKTOP", "1")
-        .spawn()?;
+        .env("_CODEX_PRO_DESKTOP", "1");
+    // On Windows, spawn the gateway without a console window. The PyInstaller
+    // gateway is a console subsystem binary, so without this flag its startup
+    // flashes a separate `cmd`/console window alongside the Tauri app. We still
+    // redirect stdin/stdout/stderr to null elsewhere, so no console output is
+    // lost — this only suppresses the visible window.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    let mut child = command.spawn()?;
 
     let deadline = Instant::now() + Duration::from_secs(300);
     loop {
@@ -288,14 +304,15 @@ pub fn start_proxy(gateway_port: u16) {
 /// `state` is the caller-provided shared state (created by the app so it can
 /// be registered with `app.manage`) — it is installed here so the window-close
 /// handler can signal shutdown on the same state the supervisor watches.
-pub fn supervise(binary: PathBuf, state: Arc<SuperviseState>) -> Arc<SuperviseState> {
+///
+/// Returns `Err` if the gateway cannot be brought up on the first attempt
+/// (typically a missing/misconfigured binary). The caller decides whether a
+/// failure to start the backend should abort application startup.
+pub fn supervise(binary: PathBuf, state: Arc<SuperviseState>) -> io::Result<Arc<SuperviseState>> {
     // Block on first successful spawn.
-    let (first_child, first_port) = match spawn_and_wait(&binary) {
-        Ok(pair) => pair,
-        Err(e) => {
-            panic!("gateway failed to start during supervise: {e}");
-        }
-    };
+    let (first_child, first_port) = spawn_and_wait(&binary).map_err(|e| {
+        io::Error::new(e.kind(), format!("gateway failed to start during supervise: {e}"))
+    })?;
 
     // Install the first child into shared state before launching the supervisor.
     {
@@ -377,7 +394,7 @@ pub fn supervise(binary: PathBuf, state: Arc<SuperviseState>) -> Arc<SuperviseSt
         eprintln!("gateway supervisor stopped");
     });
 
-    state
+    Ok(state)
 }
 
 #[cfg(test)]

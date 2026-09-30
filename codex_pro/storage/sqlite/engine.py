@@ -547,9 +547,16 @@ class SQLiteBackend(StorageBackend):
         try:
             async with self._write_transaction() as db:
                 await db.execute(
-                    "INSERT OR REPLACE INTO sessions (key, data, created_at, updated_at) "
-                    "VALUES (?, ?, COALESCE((SELECT created_at FROM sessions WHERE key=?), ?), ?)",
-                    (key, json.dumps(data, ensure_ascii=False), key, now, now),
+                    "INSERT OR REPLACE INTO sessions (key, data, pinned, created_at, updated_at) "
+                    "VALUES (?, ?, ?, COALESCE((SELECT created_at FROM sessions WHERE key=?), ?), ?)",
+                    (
+                        key,
+                        json.dumps(data, ensure_ascii=False),
+                        1 if data.get("pinned") else 0,
+                        key,
+                        now,
+                        now,
+                    ),
                 )
         except Exception as e:
             logger.error("Failed to store session '{}': {}", key, e)
@@ -629,13 +636,13 @@ class SQLiteBackend(StorageBackend):
         try:
             async with self._read_connection() as db:
                 rows = await db.execute_fetchall(
-                    "SELECT key, data, created_at, updated_at FROM sessions ORDER BY updated_at DESC"
+                    "SELECT key, data, created_at, updated_at, pinned FROM sessions ORDER BY updated_at DESC"
                 )
         except (aiosqlite.Error, OSError) as e:
             raise self._read_failure("listing sessions", e) from e
 
         sessions: list[dict[str, Any]] = []
-        for key, raw, created_at, updated_at in rows:
+        for key, raw, created_at, updated_at, pinned in rows:
             data = self._decode_json(
                 raw,
                 f"listing session '{key}'",
@@ -646,6 +653,10 @@ class SQLiteBackend(StorageBackend):
             if not isinstance(messages, list) or not isinstance(metadata, dict):
                 error = TypeError("session messages must be a list and metadata must be an object")
                 raise CorruptData(f"corrupt JSON shape while listing session '{key}': {error}")
+            # pinned column is the source of truth when set; fall back to the JSON blob
+            # for rows written before migration 37.
+            column_pinned = bool(pinned)
+            json_pinned = bool(data.get("pinned", False))
             sessions.append(
                 {
                     "key": key,
@@ -657,7 +668,7 @@ class SQLiteBackend(StorageBackend):
                     "project": data.get("project", "") or "",
                     "project_id": project_id_from_directory(data.get("project", "")) if data.get("project") else "",
                     "message_count": len(messages),
-                    "pinned": bool(data.get("pinned", False)),
+                    "pinned": column_pinned or json_pinned,
                 }
             )
         return sessions

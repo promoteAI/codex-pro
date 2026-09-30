@@ -298,23 +298,20 @@ class WebSocketHandler:
                             # cwd 会话级模型)。event.metadata["workspace"] 由此值喂给
                             # inbound.py 的会话 contextvar。
                             session, _ = await self._server._reset_session_if_needed(session_key)
-                            effective_workspace = project
                             if project:
                                 session.workspace = project
+                                effective_workspace = project
+                            elif session.workspace:
+                                # 复用已持久化的工作区，避免跨天漂移(与 HTTP 路径对称)。
+                                effective_workspace = session.workspace
                             else:
                                 _no_proj = self._server._agent_loop.config.ui.preferences.no_project_folder
                                 no_project_base = Path(_no_proj).expanduser().resolve()
                                 date_dir = no_project_base / datetime.now().strftime("%Y-%m-%d")
                                 no_project_dir = date_dir / session_dir_name(session_key)
                                 no_project_dir.mkdir(parents=True, exist_ok=True)
-                                session.workspace = str(no_project_dir)
-                            effective_workspace = session.workspace or project
-                            logger.warning(
-                                "[WS-DIAG] project={!r} session.workspace={!r} effective_workspace={!r} session_key={!r} no_proj={!r}",
-                                project, session.workspace, effective_workspace, session_key,
-                                getattr(getattr(self._server, "_agent_loop", None), "config", None) and
-                                self._server._agent_loop.config.ui.preferences.no_project_folder,
-                            )
+                                effective_workspace = str(no_project_dir)
+                                session.workspace = effective_workspace
                             # 与 HTTP 路径对称:把工作区持久化到 session,供下一轮/重开
                             # 会话复用 — 否则下次消息仍拿不到已决定的工作区。
                             save = getattr(self._server, "session_manager", None)

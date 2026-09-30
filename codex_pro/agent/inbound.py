@@ -265,10 +265,6 @@ class InboundHandler:
 
             workspace_tokens = None
             claimed_workspace = event.metadata.get("workspace") if event.metadata.get("gateway") else ""
-            logger.warning(
-                "[INBOUND-DIAG] session={!r} gateway={!r} claimed_workspace={!r} full_metadata={!r}",
-                event.session_key, event.metadata.get("gateway"), claimed_workspace, dict(event.metadata or {}),
-            )
             if claimed_workspace:
                 try:
                     ws = validate_project_workspace(claimed_workspace, str(loop.workspace))

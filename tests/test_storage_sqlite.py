@@ -61,6 +61,26 @@ async def test_sessions_table_has_pinned_column(backend: SQLiteBackend) -> None:
 
 
 @pytest.mark.asyncio
+async def test_store_session_writes_pinned_column(backend: SQLiteBackend) -> None:
+    """store_session must write pinned into the SQL column, not only the JSON blob."""
+    data = {"messages": [], "metadata": {}, "status": "active", "pinned": True}
+    await backend.store_session("cli:col", data)
+    rows = await backend.fetch_sql("SELECT pinned FROM sessions WHERE key=?", ("cli:col",))
+    assert rows == [{"pinned": 1}]
+
+
+@pytest.mark.asyncio
+async def test_list_sessions_reads_pinned_column(backend: SQLiteBackend) -> None:
+    """list_sessions must read pinned from the column when set by raw SQL."""
+    await backend.store_session("cli:a", {"messages": [], "metadata": {}, "status": "active"})
+    # Simulate a raw SQL write to the column (no JSON pinned field).
+    async with backend._write_transaction() as db:
+        await db.execute("UPDATE sessions SET pinned=1 WHERE key=?", ("cli:a",))
+    sessions = await backend.list_sessions()
+    assert next(s for s in sessions if s["key"] == "cli:a")["pinned"] is True
+
+
+@pytest.mark.asyncio
 async def test_project_crud_roundtrip(backend: SQLiteBackend) -> None:
     await backend.store_project("proj_foo", {"name": "Foo", "root": "/x/foo"})
     got = await backend.load_project("proj_foo")

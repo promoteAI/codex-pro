@@ -14,6 +14,8 @@
 
 use std::iter::once;
 
+use std::sync::{Arc, Mutex};
+
 use axum::{
     body::{to_bytes, Body},
     extract::{Request, State, WebSocketUpgrade},
@@ -39,11 +41,15 @@ use tokio_tungstenite::{
 
 /// Build the proxy router.
 ///
-/// `target` is the gateway base URL, e.g. `http://127.0.0.1:8443`.
+/// `target` is the shared handle to the gateway base URL, e.g.
+/// `http://127.0.0.1:8443`. It is read on each request because the gateway
+/// rebinds a new dynamic port on every restart; the supervisor thread rewrites
+/// the underlying value, so this proxy keeps forwarding to the live gateway
+/// without being torn down.
 ///
 /// Note: axum 0.7 uses `*path` (single `*`, no braces) for catch-all route
 /// parameters. `{*path}` panics at route-build time.
-pub fn router(target: String) -> Router {
+pub fn router(target: Arc<Mutex<String>>) -> Router {
     let state = ProxyState {
         client: Client::new(),
         target,
@@ -63,8 +69,9 @@ pub fn router(target: String) -> Router {
 struct ProxyState {
     /// Reusable HTTP client shared across all forwarded requests.
     client: Client,
-    /// Gateway base URL, e.g. `http://127.0.0.1:8443`.
-    target: String,
+    /// Shared gateway base URL, e.g. `http://127.0.0.1:8443`. Read per request
+    /// so the proxy follows the gateway across restarts.
+    target: Arc<Mutex<String>>,
 }
 
 /// Handle CORS preflight OPTIONS requests.
@@ -114,7 +121,12 @@ async fn forward_http(
     let uri = req.uri().clone();
     let path = uri.path().to_string();
     let query = uri.query().map(|q| format!("?{q}")).unwrap_or_default();
-    let url = format!("{}{}{}", state.target, path, query);
+    let target = state
+        .target
+        .lock()
+        .map(|g| g.clone())
+        .unwrap_or_default();
+    let url = format!("{target}{path}{query}");
 
     // Strip browser-origin headers so the gateway sees a native client.
     let forward_headers = strip_origin_headers(req.headers());
@@ -310,7 +322,11 @@ async fn forward_ws(
 ) -> Response {
     // Preserve the full gateway WS path (e.g. `/ws/web`, `/ws/term`).
     let gateway_path = derive_gateway_path(req.uri().path());
-    let target = state.target.clone();
+    let target = state
+        .target
+        .lock()
+        .map(|g| g.clone())
+        .unwrap_or_default();
 
     let scheme = if target.starts_with("https://") { "wss" } else { "ws" };
     // Extract host:port from target (e.g. "http://127.0.0.1:8443" -> "127.0.0.1:8443")
@@ -435,7 +451,7 @@ mod tests {
     async fn router_matches_nested_api_and_ws_paths() {
         // The router must expose catch-all /api and /ws routes so the proxy
         // forwards /api/v1/..., /ws/web and /ws/term instead of returning 404.
-        let r = router("http://127.0.0.1:12345".into());
+        let r = router(Arc::new(Mutex::new("http://127.0.0.1:12345".to_string())));
 
         // /api/v1/... must reach forward_http (non-404; the reqwest.c error means
         // the route matched and it tried to talk to the (unreachable) target).
@@ -464,7 +480,7 @@ mod tests {
 
     #[tokio::test]
     async fn options_preflight_returns_204_with_cors_headers() {
-        let r = router("http://127.0.0.1:12345".into());
+        let r = router(Arc::new(Mutex::new("http://127.0.0.1:12345".to_string())));
         let req = HttpRequest::builder()
             .method(Method::OPTIONS)
             .uri("/api/v1/plugins/test/toggle")
@@ -488,7 +504,7 @@ mod tests {
 
     #[tokio::test]
     async fn options_preflight_falls_back_to_star_when_no_origin() {
-        let r = router("http://127.0.0.1:12345".into());
+        let r = router(Arc::new(Mutex::new("http://127.0.0.1:12345".to_string())));
         let req = HttpRequest::builder()
             .method(Method::OPTIONS)
             .uri("/meta")

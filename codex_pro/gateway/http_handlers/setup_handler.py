@@ -27,7 +27,7 @@ from codex_pro.runtime_paths import default_config_path
 
 # Default desktop workspace, mirroring codex_pro/_desktop_entry.py. Used when
 # neither the config nor the gateway supplies a workspace.
-_DESKTOP_WORKSPACE = "~/.codex-pro/desktop-workspace"
+_DESKTOP_WORKSPACE = "~/.codex-pro"
 
 
 class SetupHandlers:

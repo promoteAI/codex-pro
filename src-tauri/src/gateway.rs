@@ -6,6 +6,7 @@
 //! on window close.
 
 use std::io;
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,17 +15,32 @@ use std::time::{Duration, Instant};
 
 use serde::Deserialize;
 
+/// The fixed localhost port the frontend uses to reach the proxy.
+///
+/// The Rust proxy always listens here and forwards to the gateway's *dynamic*
+/// port. Keeping it constant lets the SPA target one origin regardless of how
+/// the gateway's port changes across restarts.
+pub const PROXY_PORT: u16 = 58124;
+
+/// How long `supervise` waits for the proxy to actually accept connections on
+/// `PROXY_PORT` before declaring startup complete. The gateway can take ~20s on
+/// first run, so this is a generous bound for the proxy bind + first serve.
+pub const PROXY_READY_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// Desktop workspace shared with the CLI data model.
 ///
-/// Isolated from the CLI default workspace so the per-workspace instance lock
-/// (`workspace/data/<lock>`) never collides when a CLI gateway is also running.
+/// The desktop gateway uses the same ``~/.codex-pro`` workspace as the CLI so
+/// sessions, config and memory are shared between the shell and the CLI. The
+/// single-instance lock is bypassed on the Python side (see
+/// ``codex_pro/_desktop_entry.py``), so the desktop gateway can coexist with a
+/// running CLI gateway on the same workspace.
 ///
 /// Mirrors [`codex_pro::_desktop_entry::DESKTOP_WORKSPACE`].
 pub fn desktop_workspace() -> PathBuf {
     let home = std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .expect("HOME/USERPROFILE not set");
-    PathBuf::from(home).join(".codex-pro").join("desktop-workspace")
+    PathBuf::from(home).join(".codex-pro")
 }
 
 #[derive(Deserialize, Debug)]
@@ -220,9 +236,28 @@ pub struct SuperviseState {
     pub child: Arc<Mutex<Option<Child>>>,
     /// Set to true to signal the supervisor to stop restarting.
     pub shutdown: Arc<AtomicBool>,
+    /// The proxy's current gateway target, e.g. `http://127.0.0.1:51257`.
+    ///
+    /// The supervisor thread rewrites this after every gateway restart so the
+    /// axum router keeps forwarding to the live port. Wrapped in a Mutex because
+    /// the router reads it on every request while the supervisor updates it on
+    /// restart.
+    pub proxy_target: Arc<Mutex<String>>,
 }
 
 impl SuperviseState {
+    /// Rewrite the proxy's gateway target after a restart.
+    ///
+    /// The gateway binds a fresh dynamic port each run, so the proxy must stop
+    /// forwarding to the old (now dead) port and aim at the new one.
+    fn set_proxy_target(&self, gateway_port: u16) {
+        let target = format!("http://127.0.0.1:{gateway_port}");
+        match self.proxy_target.lock() {
+            Ok(mut g) => *g = target,
+            Err(poisoned) => *poisoned.into_inner() = target,
+        }
+    }
+
     /// Kill whichever child is currently held in `state.child`, if any.
     ///
     /// Tolerates a poisoned lock (recovering the guard via `into_inner()`) so
@@ -256,30 +291,62 @@ impl SuperviseState {
 /// Start the axum HTTP/WS proxy that relays frontend requests to the gateway.
 ///
 /// `gateway_port` is the dynamic port the gateway bound (read from
-/// `gateway.json`). The proxy listens on a fixed localhost port
-/// (`127.0.0.1:58124`) and forwards `/api`, `/ws` and `/meta` to the gateway.
+/// `gateway.json`). The proxy listens on a fixed localhost port (`PROXY_PORT`)
+/// and forwards `/api`, `/ws` and `/meta` to the gateway.
 ///
 /// This must be called from a context with a Tokio runtime available (the
 /// spawned future converts the std listener with `TcpListener::from_std`,
 /// which panics outside a runtime). We bind the std listener on the calling
 /// thread (no runtime needed) and convert + serve inside the async task.
-pub fn start_proxy(gateway_port: u16) {
-    use std::net::SocketAddr;
+///
+/// The listener is created with `SO_REUSEADDR` so a TIME_WAIT socket left by a
+/// prior run (or a crashed proxy) does not make rebinding `PROXY_PORT` fail
+/// with `WSAEADDRINUSE` / `EADDRINUSE`.
+///
+/// Returns the shared gateway-target string the supervisor thread rewrites on a
+/// gateway restart — the axum router reads it per request, so the proxy always
+/// forwards to the *current* gateway port. On bind failure it returns `Err` so
+/// the caller can abort startup instead of opening a window with no backend.
+pub fn start_proxy(gateway_port: u16) -> io::Result<Arc<Mutex<String>>> {
+    let proxy_addr: SocketAddr = format!("127.0.0.1:{PROXY_PORT}").parse().unwrap();
 
-    eprintln!("[start_proxy] starting proxy on 127.0.0.1:58124 (gateway port {gateway_port})");
-    let proxy_addr: SocketAddr = "127.0.0.1:58124".parse().unwrap();
-    let std_listener = match std::net::TcpListener::bind(proxy_addr) {
-        Ok(l) => l,
-        Err(e) => {
-            eprintln!("failed to bind proxy listener: {e}");
-            return;
-        }
-    };
-    if let Err(e) = std_listener.set_nonblocking(true) {
-        eprintln!("failed to set proxy listener nonblocking: {e}");
-        return;
-    }
-    let router = crate::proxy::router(format!("http://127.0.0.1:{gateway_port}"));
+    let socket = socket2::Socket::new(
+        socket2::Domain::IPV4,
+        socket2::Type::STREAM,
+        Some(socket2::Protocol::TCP),
+    )
+    .map_err(|e| {
+        io::Error::new(
+            e.kind(),
+            format!("failed to create proxy socket on {proxy_addr}: {e}"),
+        )
+    })?;
+    socket.set_reuse_address(true).map_err(|e| {
+        io::Error::new(
+            e.kind(),
+            format!("failed to set SO_REUSEADDR on proxy socket {proxy_addr}: {e}"),
+        )
+    })?;
+    socket
+        .bind(&proxy_addr.into())
+        .map_err(|e| io::Error::new(e.kind(), format!("failed to bind proxy listener on {proxy_addr}: {e}")))?;
+    // socket2::Socket::bind only binds the address; unlike
+    // std::net::TcpListener::bind it does NOT start accepting connections. Call
+    // listen() explicitly so the socket actually accepts — otherwise the ready
+    // probe (a connect) is refused and the proxy is unusable.
+    socket
+        .listen(1024)
+        .map_err(|e| io::Error::new(e.kind(), format!("failed to listen on proxy socket {proxy_addr}: {e}")))?;
+    // The std listener must be non-blocking before it is handed to the tokio
+    // runtime; converting a blocking listener panics.
+    socket
+        .set_nonblocking(true)
+        .map_err(|e| io::Error::new(e.kind(), format!("failed to set proxy listener nonblocking: {e}")))?;
+    let std_listener: std::net::TcpListener = socket.into();
+    eprintln!("[start_proxy] proxy on 127.0.0.1:{PROXY_PORT} -> gateway 127.0.0.1:{gateway_port}");
+
+    let proxy_target = router_target_handle(gateway_port);
+    let router = crate::proxy::router(proxy_target.clone());
     tauri::async_runtime::spawn(async move {
         match tokio::net::TcpListener::from_std(std_listener) {
             Ok(listener) => {
@@ -290,6 +357,37 @@ pub fn start_proxy(gateway_port: u16) {
             }
         }
     });
+
+    Ok(proxy_target)
+}
+
+/// Build the shared gateway-target handle the proxy router reads per request.
+///
+/// The proxy must keep forwarding to the gateway's *current* port: the gateway
+/// rebinds a new dynamic port on every restart, so the supervisor thread
+/// rewrites this value via [`SuperviseState::proxy_target`]. Returns a fresh
+/// handle each call so the router and the supervisor share the same Mutex.
+pub fn router_target_handle(gateway_port: u16) -> Arc<Mutex<String>> {
+    Arc::new(Mutex::new(format!("http://127.0.0.1:{gateway_port}")))
+}
+
+/// Poll until `port` on loopback accepts a connection, or `timeout` elapses.
+///
+/// Used by `supervise` to honour its "the window is only created once the proxy
+/// actually answers" contract: `start_proxy` binds the socket synchronously but
+/// the axum serve runs on a runtime task, so the listener may not accept yet
+/// when `start_proxy` returns.
+fn wait_until_listening(port: u16, timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if port_is_listening(port) {
+            return true;
+        }
+        if Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
 }
 
 /// Spawn the gateway and supervise it: on unexpected exit, restart with
@@ -320,8 +418,23 @@ pub fn supervise(binary: PathBuf, state: Arc<SuperviseState>) -> io::Result<Arc<
         *g = Some(first_child);
     }
 
-    // The gateway is up; start the proxy so the frontend can reach it.
-    start_proxy(first_port);
+    // Start the proxy so the frontend can reach it. Propagate a bind failure so
+    // the app aborts startup instead of opening a window with no backend.
+    let proxy_target = start_proxy(first_port)?;
+    {
+        let mut g = state.proxy_target.lock().unwrap();
+        *g = (*proxy_target).lock().unwrap().clone();
+    }
+
+    // Honour the "window is only created once the proxy actually answers"
+    // contract: the socket is bound synchronously, but the axum serve runs on a
+    // runtime task, so wait until it really accepts before returning.
+    if !wait_until_listening(PROXY_PORT, PROXY_READY_TIMEOUT) {
+        return Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            format!("proxy did not begin accepting on 127.0.0.1:{PROXY_PORT} within {PROXY_READY_TIMEOUT:?}"),
+        ));
+    }
 
     // Detach the supervisor thread.  It will call spawn_and_wait again on
     // crash, updating state.child each time.
@@ -362,7 +475,7 @@ pub fn supervise(binary: PathBuf, state: Arc<SuperviseState>) -> io::Result<Arc<
             }
 
             match spawn_and_wait(&binary) {
-                Ok((mut child, _port)) => {
+                Ok((mut child, port)) => {
                     if state_thread.shutdown.load(Ordering::SeqCst) {
                         // Shutdown was requested while spawn_and_wait was running;
                         // tear down the just-spawned process and don't install it.
@@ -379,6 +492,9 @@ pub fn supervise(binary: PathBuf, state: Arc<SuperviseState>) -> io::Result<Arc<
                     };
                     *g = Some(child);
                     drop(g);
+                    // The gateway bound a fresh dynamic port — point the proxy at
+                    // it so the frontend keeps working after a restart.
+                    state_thread.set_proxy_target(port);
                     attempt = 0; // reset on successful restart
                 }
                 Err(e) => {
@@ -402,9 +518,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn desktop_workspace_is_isolated() {
+    fn desktop_workspace_is_shared_with_cli() {
         let ws = desktop_workspace();
-        assert!(ws.ends_with(".codex-pro/desktop-workspace"));
+        assert!(ws.ends_with(".codex-pro"));
+        assert!(!ws.to_string_lossy().contains("desktop-workspace"));
     }
 
     #[test]

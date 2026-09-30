@@ -16,8 +16,8 @@ from codex_pro import _desktop_entry, app
 
 
 def test_desktop_workspace_default():
-    """默认 desktop workspace 为 ~/.codex-pro/desktop-workspace（经 codex_home）。"""
-    assert _desktop_entry.DESKTOP_WORKSPACE == Path.home() / ".codex-pro" / "desktop-workspace"
+    """默认 desktop workspace 为 ~/.codex-pro（与 CLI 共享，经 codex_home）。"""
+    assert _desktop_entry.DESKTOP_WORKSPACE == Path.home() / ".codex-pro"
 
 
 def test_main_parses_port_zero_and_loopback(monkeypatch):

@@ -85,6 +85,7 @@ export function CodexSidebar() {
   const repos = useChatStore((s) => s.repos);
   const loadRepos = useChatStore((s) => s.loadRepos);
   const selectProject = useChatStore((s) => s.selectProject);
+  const workspaceKey = useChatStore((s) => s.workspaceKey);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [filesRepo, setFilesRepo] = useState<GitRepo | null>(null);
   const kbdAnalytics = isMacPlatform() ? "⌥⌘P" : "Alt+Win+P";
@@ -185,6 +186,12 @@ export function CodexSidebar() {
           </button>
         </div>
       </div>
+
+      {workspaceKey && (
+        <div className="mx-1 px-3 py-1.5 text-[11px] text-codex-muted truncate" title={workspaceKey}>
+          {workspaceKey}
+        </div>
+      )}
 
       <nav className="flex-1 overflow-y-auto py-1" aria-label={t("appName")}>
         <NavLink to="/" end className={navClass} onClick={() => clearChat()}>

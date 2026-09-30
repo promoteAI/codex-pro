@@ -19,6 +19,16 @@ describe("Sidebar", () => {
     expect(screen.getByText("新对话")).toBeInTheDocument();
   });
 
+  it("展示当前工作区名称", () => {
+    useChatStore.setState({ workspaceKey: "ws1", workspacePath: "/ws1" });
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("ws1")).toBeInTheDocument();
+  });
+
   it("账户菜单可打开并包含使用统计/设置", async () => {
     render(
       <MemoryRouter>

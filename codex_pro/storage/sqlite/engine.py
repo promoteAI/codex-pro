@@ -313,6 +313,10 @@ _MIGRATIONS: list[tuple[int, str]] = [
     )""",
     ),
     (36, "CREATE INDEX IF NOT EXISTS idx_projects_updated ON projects(updated_at)"),
+    (
+        37,
+        "ALTER TABLE sessions ADD COLUMN pinned INTEGER DEFAULT 0",
+    ),
 ]
 
 

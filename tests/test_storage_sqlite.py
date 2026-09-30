@@ -54,6 +54,13 @@ async def test_list_sessions_includes_pinned(backend: SQLiteBackend) -> None:
 
 
 @pytest.mark.asyncio
+async def test_sessions_table_has_pinned_column(backend: SQLiteBackend) -> None:
+    cols = await backend.fetch_sql("PRAGMA table_info(sessions)")
+    names = {c["name"] for c in cols}
+    assert "pinned" in names
+
+
+@pytest.mark.asyncio
 async def test_project_crud_roundtrip(backend: SQLiteBackend) -> None:
     await backend.store_project("proj_foo", {"name": "Foo", "root": "/x/foo"})
     got = await backend.load_project("proj_foo")

@@ -224,7 +224,7 @@ export function CodexSidebar() {
           <span className="flex-1">{t("plugins")}</span>
         </NavLink>
 
-        <div className="flex items-center justify-between gap-2 px-2 pt-2.5 pb-1">
+        <div className="group flex items-center justify-between gap-2 px-2 pt-2.5 pb-1">
           <button
             type="button"
             className="text-[11px] text-codex-muted font-medium tracking-wide shrink-0 inline-flex items-center gap-1 hover:text-codex-text-secondary"
@@ -234,7 +234,7 @@ export function CodexSidebar() {
               <path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          <div className="inline-flex items-center gap-px shrink-0">
+          <div className="hidden group-hover:inline-flex items-center gap-px shrink-0">
             <button
               type="button"
               title={t("reorder")}
@@ -393,9 +393,9 @@ export function CodexSidebar() {
           );
         })}
 
-        <div className="flex items-center justify-between gap-2 px-2 pt-2.5 pb-1">
+        <div className="group flex items-center justify-between gap-2 px-2 pt-2.5 pb-1">
           <span className="text-[11px] text-codex-muted font-medium tracking-wide">{t("recents")}</span>
-          <div className="inline-flex items-center gap-px shrink-0">
+          <div className="hidden group-hover:inline-flex items-center gap-px shrink-0">
             <button
               type="button"
               title={t("reorder")}

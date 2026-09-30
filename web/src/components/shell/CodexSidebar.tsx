@@ -22,6 +22,7 @@ interface SessionItem {
   message_count: number;
   updated_at: string;
   project?: string;
+  project_id?: string;
 }
 
 function isMacPlatform(): boolean {
@@ -336,7 +337,9 @@ export function CodexSidebar() {
               </div>
 
               {(() => {
-                const projectSessions = apiRecents.filter((s) => s.project === repo.path);
+                const projectSessions = apiRecents.filter(
+                  (s) => (s.project_id ?? s.project) === (repo.project_id ?? repo.path),
+                );
                 if (projectSessions.length === 0) {
                   return (
                     <span className="text-xs text-codex-muted pl-[22px] pr-1 truncate">

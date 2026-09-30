@@ -33,6 +33,7 @@ export interface GitRepo {
   path: string;
   name: string;
   current_branch: string;
+  project_id?: string;
 }
 
 export interface GitBranch {

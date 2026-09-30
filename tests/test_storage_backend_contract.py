@@ -38,3 +38,10 @@ async def test_project_capabilities_have_safe_empty_defaults() -> None:
     assert await StorageBackend.list_projects(backend) == []  # type: ignore[arg-type]
     assert await StorageBackend.load_project(backend, "proj_x") is None  # type: ignore[arg-type]
     assert await StorageBackend.delete_project(backend, "proj_x") is False  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_history_capabilities_have_safe_empty_defaults() -> None:
+    backend = None
+    assert await StorageBackend.load_session_history(backend, "s") == []  # type: ignore[arg-type]
+    assert await StorageBackend.append_session_history(backend, "s", "2026-01-01", []) is None  # type: ignore[arg-type]

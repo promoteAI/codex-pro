@@ -46,6 +46,12 @@ class StorageBackend(ABC):
     async def delete_project(self, project_id: str) -> bool:
         return False
 
+    async def append_session_history(self, session_key: str, dt_iso: str, messages: list[dict[str, Any]]) -> None:
+        pass
+
+    async def load_session_history(self, session_key: str) -> list[dict[str, Any]]:
+        return []
+
     async def list_sessions(self) -> list[dict[str, Any]]:
         return []
 

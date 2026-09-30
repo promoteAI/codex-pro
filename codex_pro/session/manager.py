@@ -412,6 +412,22 @@ class SessionManager:
         await self.save(child)
         return child
 
+    async def pin_session(self, key: str) -> bool:
+        """Mark a session as pinned so it stays prominent in the list."""
+        s = await self.get_or_create(key)
+        s.pinned = True
+        await self.save(s)
+        return True
+
+    async def unpin_session(self, key: str) -> bool:
+        """Clear the pinned flag. Returns False if the session does not exist."""
+        s = await self.get(key)
+        if s is None:
+            return False
+        s.pinned = False
+        await self.save(s)
+        return True
+
     async def _load(self, key: str) -> Session | None:
         if not self._storage:
             return await self._load_from_file(key)
@@ -809,6 +825,7 @@ class SessionManager:
                         "project": session.project,
                         "workspace": session.workspace,
                         "message_count": len(session.messages),
+                        "pinned": session.pinned,
                     }
                     for session in self._cache.values()
                 ]
@@ -858,6 +875,7 @@ class SessionManager:
                         "title": title,
                         "project": data.get("project", "") or "",
                         "workspace": data.get("workspace", "") or "",
+                        "pinned": bool(data.get("pinned", False)),
                     })
             except Exception as e:
                 logger.debug("Failed to read session file {}: {}", path.name, e)

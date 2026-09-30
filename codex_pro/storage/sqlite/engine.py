@@ -653,6 +653,7 @@ class SQLiteBackend(StorageBackend):
                     "project": data.get("project", "") or "",
                     "project_id": project_id_from_directory(data.get("project", "")) if data.get("project") else "",
                     "message_count": len(messages),
+                    "pinned": bool(data.get("pinned", False)),
                 }
             )
         return sessions

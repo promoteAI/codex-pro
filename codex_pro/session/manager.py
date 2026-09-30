@@ -7,13 +7,13 @@ import json
 import os
 import shutil
 import tempfile
+import uuid
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
-import uuid
 
 from loguru import logger
 
@@ -401,7 +401,7 @@ class SessionManager:
             raise KeyError(parent_key)
         child = Session(
             key=f"{parent_key}:fork",
-            messages=list(parent.messages),
+            messages=[dict(m) for m in parent.messages],
             project=parent.project,
             workspace=parent.workspace,
             forked_from_id=parent.session_id,

@@ -39,6 +39,21 @@ async def test_store_and_load_session(backend: SQLiteBackend) -> None:
 
 
 @pytest.mark.asyncio
+async def test_list_sessions_includes_pinned(backend: SQLiteBackend) -> None:
+    data = {
+        "messages": [],
+        "metadata": {},
+        "status": "active",
+        "project": "E:/workspace/foo",
+        "workspace": "E:/workspace/foo",
+        "pinned": True,
+    }
+    await backend.store_session("cli:pin", data)
+    sessions = await backend.list_sessions()
+    assert sessions[0]["pinned"] is True
+
+
+@pytest.mark.asyncio
 async def test_project_crud_roundtrip(backend: SQLiteBackend) -> None:
     await backend.store_project("proj_foo", {"name": "Foo", "root": "/x/foo"})
     got = await backend.load_project("proj_foo")

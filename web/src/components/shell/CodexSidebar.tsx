@@ -86,6 +86,7 @@ export function CodexSidebar() {
   const loadRepos = useChatStore((s) => s.loadRepos);
   const selectProject = useChatStore((s) => s.selectProject);
   const workspaceKey = useChatStore((s) => s.workspaceKey);
+  const setWorkspace = useChatStore((s) => s.setWorkspace);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [filesRepo, setFilesRepo] = useState<GitRepo | null>(null);
   const kbdAnalytics = isMacPlatform() ? "⌥⌘P" : "Alt+Win+P";
@@ -94,6 +95,19 @@ export function CodexSidebar() {
   useEffect(() => {
     void loadRepos();
   }, [loadRepos]);
+
+  // Resolve the active workspace so the sidebar shows which workspace the user
+  // is in. When multiple workspaces are registered, the first is treated as the
+  // current one; a future pass can let the user switch.
+  const { data: workspaceData } = useApi<{ workspaces: { workspace_key: string; workspace_path: string }[] }>(
+    "/workspaces",
+  );
+  useEffect(() => {
+    const first = workspaceData?.workspaces?.[0];
+    if (first) {
+      setWorkspace({ workspaceKey: first.workspace_key, workspacePath: first.workspace_path });
+    }
+  }, [workspaceData, setWorkspace]);
 
   useEffect(() => {
     if (!accountOpen) return;

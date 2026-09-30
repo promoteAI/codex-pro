@@ -55,6 +55,12 @@ class WorkspaceRegistry:
         return list(self._entries.values())
 
     async def close_all(self) -> None:
+        # Note: in the single-workspace fallback the registry's entry holds the
+        # SAME storage that app.py's AsyncExitStack already closes via the
+        # bootstrap rollback. Wiring close_all() into server.stop() at that point
+        # would double-close the default workspace's storage. When Phase 3 routes
+        # multiple workspaces, close_all() must be wired WITHOUT re-closing the
+        # default workspace's backend. See the design spec Phase 3 section.
         for entry in self._entries.values():
             if entry.storage is not None and hasattr(entry.storage, "close"):
                 await entry.storage.close()

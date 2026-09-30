@@ -29,6 +29,31 @@ describe("Sidebar", () => {
     expect(screen.getByText("ws1")).toBeInTheDocument();
   });
 
+  it("拉取 /workspaces 并调用 setWorkspace 渲染工作区", async () => {
+    const repoPath = "e:\\workspace\\codex-pro";
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path) => {
+      if (String(path) === "/workspaces") {
+        return { workspaces: [{ workspace_key: "ws-prod", workspace_path: "/ws/prod" }] };
+      }
+      if (String(path) === "/git/repos") {
+        return { repos: [{ path: repoPath, name: "codex-pro", current_branch: "dev" }] };
+      }
+      if (String(path).startsWith("/sessions")) {
+        return { sessions: [] };
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(useChatStore.getState().workspaceKey).toBe("ws-prod"));
+    expect(screen.getByText("ws-prod")).toBeInTheDocument();
+  });
+
   it("账户菜单可打开并包含使用统计/设置", async () => {
     render(
       <MemoryRouter>

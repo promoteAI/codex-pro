@@ -13,10 +13,16 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
+import uuid
 
 from loguru import logger
 
 from codex_pro.storage.errors import CorruptData
+
+
+def _new_session_id() -> str:
+    """Generate a stable session id (the root thread id for a session)."""
+    return uuid.uuid4().hex
 
 
 @dataclass
@@ -33,6 +39,14 @@ class Session:
     metadata: dict[str, Any] = field(default_factory=dict)
     last_consolidated: int = 0
     status: str = "active"  # active | expired | archived
+    # ── Session tree + lifecycle (Phase 3) ─────────────────────────────────
+    # session_id is the root thread id; a forked session gets its own new
+    # session_id but keeps parent_session_id/forked_from_id for the tree.
+    session_id: str = field(default_factory=_new_session_id)
+    parent_session_id: str = ""
+    forked_from_id: str = ""
+    type: str = "interactive"  # interactive | temporary | workflow
+    pinned: bool = False
 
     def add_message(self, role: str, content: str, **kwargs: Any) -> None:
         # Give the session a human-readable title from its first user turn so the

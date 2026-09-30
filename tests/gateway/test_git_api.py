@@ -51,6 +51,31 @@ async def test_create_repo_makes_directory(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_create_repo_registers_project_entity(tmp_path):
+    from codex_pro.projects import project_id_from_directory
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+
+    class _FakeStorage:
+        def __init__(self):
+            self.projects = {}
+
+        async def store_project(self, project_id: str, data: dict) -> None:
+            self.projects[project_id] = data
+
+    srv = _server(ws, token_required=False)
+    srv.storage = _FakeStorage()
+    api = GitAPI(srv)
+
+    resp = await api.create_repo(_fake_request("POST", {"name": "newproj"}))
+    assert resp.status == 201
+    pid = project_id_from_directory(str(ws / "workspace" / "newproj"))
+    assert pid in srv.storage.projects
+    assert srv.storage.projects[pid]["name"] == "newproj"
+
+
+@pytest.mark.asyncio
 async def test_create_repo_with_git_init(tmp_path):
     ws = tmp_path / "ws"
     ws.mkdir()

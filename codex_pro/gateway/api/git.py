@@ -13,6 +13,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from aiohttp import web
+from loguru import logger
+
+from codex_pro.projects import project_id_from_directory
 
 if TYPE_CHECKING:
     from codex_pro.gateway.server import GatewayServer
@@ -176,6 +179,24 @@ class GitAPI:
     def _guard(self, request: web.Request, action: str) -> web.Response | None:
         return self._server._require_api_token(request, action=action)
 
+    async def _store_project_meta(self, project_id: str, *, name: str, root: str, current_branch: str) -> None:
+        """Register/refresh the project entity in storage (no-op if absent).
+
+        The projects table is a side-table holding display metadata for the
+        dashboard's project list. Creating/opening a project writes it so the
+        sidebar shows a stable entity; if storage is unavailable or does not
+        implement ``store_project``, the directory-based listing still works.
+        """
+        storage = getattr(self._server, "storage", None)
+        if storage is None or not hasattr(storage, "store_project"):
+            return
+        try:
+            await storage.store_project(project_id, {
+                "name": name, "root": root, "current_branch": current_branch,
+            })
+        except Exception as e:  # noqa: BLE001 — registration must never block create/open
+            logger.warning("Failed to register project meta {}: {}", project_id, e)
+
     async def list_repos(self, request: web.Request) -> web.Response:
         """Return known projects (workspace subdirectories) as repos.
 
@@ -289,6 +310,10 @@ class GitAPI:
                 rc, stdout = _run_git(target, ["branch", "--show-current"])
             current_branch = stdout.strip() if rc == 0 else ""
 
+        await self._store_project_meta(
+            project_id_from_directory(str(target)), name=name, root=str(target), current_branch=current_branch,
+        )
+
         return web.json_response({"path": str(target), "name": name, "current_branch": current_branch}, status=201)
 
     async def open_folder(self, request: web.Request) -> web.Response:
@@ -346,6 +371,10 @@ class GitAPI:
             if rc != 0:
                 rc, stdout = _run_git(real_path, ["branch", "--show-current"])
             current_branch = stdout.strip() if rc == 0 else ""
+
+        await self._store_project_meta(
+            project_id_from_directory(str(real_path)), name=target_link.name, root=str(real_path), current_branch=current_branch,
+        )
 
         return web.json_response({
             "path": str(real_path),

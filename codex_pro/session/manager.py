@@ -449,6 +449,11 @@ class SessionManager:
             metadata=metadata,
             last_consolidated=data.get("last_consolidated", 0),
             status=data.get("status", "active"),
+            session_id=data.get("session_id") or _new_session_id(),
+            parent_session_id=data.get("parent_session_id", ""),
+            forked_from_id=data.get("forked_from_id", ""),
+            type=data.get("type", "interactive"),
+            pinned=bool(data.get("pinned", False)),
         )
 
     async def _load_from_file(self, key: str) -> Session | None:
@@ -468,6 +473,11 @@ class SessionManager:
                 title = ""
                 project = ""
                 workspace = ""
+                session_id = ""
+                parent_session_id = ""
+                forked_from_id = ""
+                session_type = "interactive"
+                pinned = False
 
                 with open(path, encoding="utf-8") as f:
                     for line in f:
@@ -484,6 +494,11 @@ class SessionManager:
                             updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
                             last_consolidated = data.get("last_consolidated", 0)
                             status = data.get("status", "active")
+                            session_id = data.get("session_id", "")
+                            parent_session_id = data.get("parent_session_id", "")
+                            forked_from_id = data.get("forked_from_id", "")
+                            session_type = data.get("type", "interactive")
+                            pinned = bool(data.get("pinned", False))
                         else:
                             messages.append(data)
 
@@ -496,6 +511,11 @@ class SessionManager:
                     "workspace": workspace,
                     "last_consolidated": last_consolidated,
                     "status": status,
+                    "session_id": session_id,
+                    "parent_session_id": parent_session_id,
+                    "forked_from_id": forked_from_id,
+                    "type": session_type,
+                    "pinned": pinned,
                 })
 
             return await asyncio.to_thread(_sync_load)
@@ -523,6 +543,11 @@ class SessionManager:
             "metadata": self._persisted_metadata(session),
             "last_consolidated": session.last_consolidated,
             "status": session.status,
+            "session_id": session.session_id,
+            "parent_session_id": session.parent_session_id,
+            "forked_from_id": session.forked_from_id,
+            "type": session.type,
+            "pinned": session.pinned,
         }
         try:
             await self._storage.store_session(session.key, data)
@@ -561,6 +586,11 @@ class SessionManager:
             "metadata": self._persisted_metadata(session),
             "last_consolidated": session.last_consolidated,
             "status": session.status,
+            "session_id": session.session_id,
+            "parent_session_id": session.parent_session_id,
+            "forked_from_id": session.forked_from_id,
+            "type": session.type,
+            "pinned": session.pinned,
         }
 
         def _sync_save() -> None:

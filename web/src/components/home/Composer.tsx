@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useChatStore } from "../../stores/chat";
 import { useProvidersStore } from "../../stores/providers";
+import { apiFetch } from "../../lib/api";
 import { useIsAdmin } from "../../stores/capabilities";
 import { toast } from "../../stores/toast";
 import { useApi } from "../../hooks/use-api";
@@ -96,6 +97,20 @@ export function Composer() {
   useEffect(() => {
     fetchProviders().then(() => setProvidersLoaded(true)).catch(() => setProvidersLoaded(true));
   }, []);
+
+  // 从 /config 读取 models.default_model 填充模型选择器。若用户已手动选过
+  // (model 非空)则跳过,确保刷新后仍显示已设的默认模型。
+  useEffect(() => {
+    if (model) return;
+    apiFetch<{ models?: { default_model?: string } }>("/config")
+      .then((data) => {
+        const def = data.models?.default_model;
+        if (def && !useChatStore.getState().model) setModel(def);
+      })
+      .catch(() => {
+        // 非 admin 或无 /config 权限时保持「未选择模型」的默认态。
+      });
+  }, [model, setModel]);
 
   // admin 才有权读写权限配置(/config 受 admin 保护)。在能力探测确认 admin
   // 后拉取当前审批 mode 反推 perm 高亮;非 admin 保持本地默认值。

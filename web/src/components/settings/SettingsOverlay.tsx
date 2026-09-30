@@ -45,7 +45,6 @@ const SECTIONS: Array<{ id: SettingsSection; group: NavGroup }> = [
   { id: "shortcuts", group: "personal" },
   { id: "account", group: "personal" },
   { id: "computer", group: "integrations" },
-  { id: "connections", group: "integrations" },
   { id: "plugins", group: "integrations" },
   { id: "browser", group: "integrations" },
   { id: "hooks", group: "coding" },

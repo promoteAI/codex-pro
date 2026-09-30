@@ -80,12 +80,18 @@ class GatewayServer:
         agent_loop: Any = None,
         a2a_config: Any = None,
         config_path: Path | None = None,
+        storage: Any = None,
     ):
         self._config = config
         self._bus = bus
         self.channel_manager = channel_manager
         self.session_manager = session_manager
         self._workspace = workspace
+        # Storage backend surfaced to API modules (e.g. GitAPI) so they can
+        # register project entities. In production this is the SQLiteBackend from
+        # the app bootstrap; tests inject a fake. Defaults to None so existing
+        # callers/tests that never register projects keep working.
+        self.storage = storage
         # Projects live in a dedicated subdir so the dashboard's project list
         # and file browser never expose the workspace's system-state dirs
         # (data/, cache/, models/, skills/, .codex-pro/, ...).

@@ -144,6 +144,53 @@ async def test_list_repos_includes_non_git_directories(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_open_folder_registers_project_id_matching_list_repos(tmp_path):
+    """open_folder 注册的 project_id 必须与 list_repos 为该目录派生的 project_id 一致，
+    否则打开的项目会话无法在侧边栏按 project 分组。"""
+    from codex_pro.projects import project_id_from_directory
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    external = tmp_path / "external-folder"
+    external.mkdir()
+
+    class _FakeStorage:
+        def __init__(self):
+            self.projects = {}
+
+        async def store_project(self, project_id: str, data: dict) -> None:
+            self.projects[project_id] = data
+
+    srv = _server(ws, token_required=False)
+    srv.storage = _FakeStorage()
+    api = GitAPI(srv)
+
+    # 先创建真实 symlink,若平台不支持(如无特权的 Windows)则跳过。open_folder
+    # 依赖真实链接让 list_repos 能列出它。
+    link = ws / "workspace" / "external-folder"
+    try:
+        link.symlink_to(external, target_is_directory=True)
+    except OSError:
+        pytest.skip("directory symlink not supported on this platform")
+    # 移除刚才的真实链接,让 open_folder 自己创建,同时覆盖注册路径一致性。
+    link.unlink()
+
+    resp = await api.open_folder(_fake_request("POST", {"path": str(external)}))
+    assert resp.status == 201
+
+    # list_repos 对 open 的 symlink child 用 path.resolve()(即解析目标 external)
+    # 派生 project_id,open_folder 也基于 real_path 注册——二者必须一致。
+    list_resp = await api.list_repos(_fake_request("GET"))
+    data = _json.loads(list_resp.text)
+    opened = next(r for r in data["repos"] if r["name"] == "external-folder")
+    repo_pid = opened["project_id"]
+
+    assert repo_pid in srv.storage.projects, "open_folder 注册的 project_id 必须与 list_repos 一致"
+    assert srv.storage.projects[repo_pid]["name"] == "external-folder"
+    assert repo_pid == project_id_from_directory(str(external))
+
+
+@pytest.mark.asyncio
 async def test_list_repos_includes_project_id(tmp_path):
     from codex_pro.projects import project_id_from_directory
 

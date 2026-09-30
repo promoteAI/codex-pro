@@ -222,11 +222,15 @@ class GitAPI:
                     # Fallback for freshly-initialized repos with no commits yet
                     rc, stdout = _run_git(path, ["branch", "--show-current"])
                 current_branch = stdout.strip() if rc == 0 else ""
+            # Derive project_id from the resolved target so an opened folder
+            # (symlink) shares the SAME id that open_folder registered — otherwise
+            # sessions created in an opened folder fall into "Recent" instead of
+            # grouping under the project.
             return {
                 "path": str(path),
                 "name": name,
                 "current_branch": current_branch,
-                "project_id": project_id_from_directory(str(path)),
+                "project_id": project_id_from_directory(str(path.resolve())),
             }
 
         # Projects root if it's a git repo

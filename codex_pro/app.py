@@ -499,6 +499,7 @@ class AppRuntime:
                 agent_loop=ctx.agent,
                 a2a_config=ctx.config.a2a,
                 config_path=ctx.config_file or (ctx.workspace / "codex-pro.yaml"),
+                storage=ctx.storage,
             )
             # Say so when the SPA is absent. A supervised gateway skips the
             # on-demand build by design, so without this line the only clue is

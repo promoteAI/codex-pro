@@ -10,7 +10,7 @@ import pytest
 from codex_pro.config.schema import GatewayConfig, GatewayAuthConfig, GatewaySessionPolicyConfig
 
 
-def _make_server(storage):
+def _make_server(storage, workspace_registry=None):
     from codex_pro.gateway.server import GatewayServer
     from codex_pro.bus.queue import MessageBus
 
@@ -32,6 +32,7 @@ def _make_server(storage):
         workspace=Path("/tmp/codex-pro-test-ws"),
         agent_loop=None,
         storage=storage,
+        workspace_registry=workspace_registry,
     )
 
 
@@ -42,3 +43,16 @@ def test_gateway_server_exposes_storage_for_project_registration() -> None:
     storage = MagicMock()
     server = _make_server(storage)
     assert server.storage is storage
+
+
+def test_gateway_server_accepts_workspace_registry() -> None:
+    from codex_pro.workspace_registry import WorkspaceRegistry
+
+    registry = WorkspaceRegistry()
+    server = _make_server(MagicMock(), workspace_registry=registry)
+    assert server.workspace_registry is registry
+    # Fallback path: when no registry is supplied, one is created for the default
+    # workspace so single-workspace callers keep working.
+    fallback = _make_server(MagicMock(), workspace_registry=None)
+    assert fallback.workspace_registry is not None
+    assert fallback.workspace_registry.list() != []

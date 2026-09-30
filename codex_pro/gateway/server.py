@@ -81,6 +81,7 @@ class GatewayServer:
         a2a_config: Any = None,
         config_path: Path | None = None,
         storage: Any = None,
+        workspace_registry: Any = None,
     ):
         self._config = config
         self._bus = bus
@@ -92,6 +93,21 @@ class GatewayServer:
         # the app bootstrap; tests inject a fake. Defaults to None so existing
         # callers/tests that never register projects keep working.
         self.storage = storage
+        # Multi-workspace registry: a gateway may serve several workspaces in one
+        # process. When one is supplied, requests route through it; when absent
+        # (single-workspace callers/tests), a one-entry registry is created for the
+        # default workspace so existing behavior is unchanged.
+        if workspace_registry is not None:
+            self.workspace_registry = workspace_registry
+        else:
+            from codex_pro.workspace_registry import WorkspaceRegistry
+            from codex_pro.workspace_identity import derive_workspace_key
+
+            self.workspace_registry = WorkspaceRegistry()
+            self.workspace_registry.register(
+                derive_workspace_key(str(workspace)), str(workspace),
+                config=config, storage=storage, agent=agent_loop,
+            )
         # Projects live in a dedicated subdir so the dashboard's project list
         # and file browser never expose the workspace's system-state dirs
         # (data/, cache/, models/, skills/, .codex-pro/, ...).

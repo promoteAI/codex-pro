@@ -144,6 +144,23 @@ async def test_list_repos_includes_non_git_directories(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_list_repos_includes_project_id(tmp_path):
+    from codex_pro.projects import project_id_from_directory
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    projects = ws / "workspace"
+    projects.mkdir()
+    (projects / "proj").mkdir()
+    api = GitAPI(_server(ws, token_required=False))
+    resp = await api.list_repos(_fake_request("GET"))
+    data = _json.loads(resp.text)
+    assert all("project_id" in r for r in data["repos"]), "each repo needs a project_id"
+    proj = next(r for r in data["repos"] if r["name"] == "proj")
+    assert proj["project_id"] == project_id_from_directory(str(projects / "proj"))
+
+
+@pytest.mark.asyncio
 async def test_create_repo_creates_dir_under_projects(tmp_path):
     ws = tmp_path / "ws"
     ws.mkdir()

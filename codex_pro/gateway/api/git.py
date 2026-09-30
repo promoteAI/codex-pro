@@ -222,7 +222,12 @@ class GitAPI:
                     # Fallback for freshly-initialized repos with no commits yet
                     rc, stdout = _run_git(path, ["branch", "--show-current"])
                 current_branch = stdout.strip() if rc == 0 else ""
-            return {"path": str(path), "name": name, "current_branch": current_branch}
+            return {
+                "path": str(path),
+                "name": name,
+                "current_branch": current_branch,
+                "project_id": project_id_from_directory(str(path)),
+            }
 
         # Projects root if it's a git repo
         if (self._projects / ".git").is_dir():

@@ -37,6 +37,7 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     from codex_pro.gateway.api.browser_tabs import BrowserTabsAPI
     from codex_pro.gateway.api.context_usage import ContextUsageAPI
     from codex_pro.gateway.api.interactions import InteractionsAPI
+    from codex_pro.gateway.api.workspaces import WorkspaceAPI
 
     memory_api = MemoryAPI(server)
     attachments_api = AttachmentsAPI(server)
@@ -56,6 +57,9 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     connections_api = ConnectionsAPI(server)
     browser_tabs_api = BrowserTabsAPI(server)
     context_usage_api = ContextUsageAPI(server)
+    workspaces_api = WorkspaceAPI(server)
+
+    app.router.add_get(f"{prefix}/workspaces", workspaces_api.list_workspaces)
 
     app.router.add_get(f"{prefix}/memory", memory_api.list_entries)
     app.router.add_get(f"{prefix}/memory/stats", memory_api.stats)

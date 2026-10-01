@@ -534,8 +534,13 @@ class MessageHandler:
                     )
                 return web.json_response({"error": "rate limited"}, status=429)
 
+            # Resolve the target workspace once so the reset and everything after
+            # it (no_project_folder, session persistence) use the same entry.
+            # Header absent (single-workspace default) => default entry, so
+            # existing behavior is unchanged.
+            workspace_entry = self._server._request_workspace(request)
             session, _ = await self._server._reset_session_if_needed(
-                session_key, workspace=self._server._request_workspace(request),
+                session_key, workspace=workspace_entry,
             )
             # 会话工作区(cwd)在会话创建时决定并持久化,后续每轮复用(参考 Codex 的
             # cwd 会话级模型)——而不是按每条消息的项目字段重算,也不是依赖前端反复
@@ -560,7 +565,12 @@ class MessageHandler:
                 if session.workspace:
                     effective_workspace = session.workspace
                 else:
-                    _no_proj = self._server._agent_loop.config.ui.preferences.no_project_folder
+                    _agent_loop = (
+                        workspace_entry.agent
+                        if (workspace_entry and workspace_entry.agent)
+                        else self._server._agent_loop
+                    )
+                    _no_proj = _agent_loop.config.ui.preferences.no_project_folder
                     no_project_base = Path(_no_proj).expanduser().resolve()
                     date_dir = no_project_base / datetime.now().strftime("%Y-%m-%d")
                     no_project_dir = date_dir / session_dir_name(session_key)
@@ -568,7 +578,10 @@ class MessageHandler:
                     effective_workspace = str(no_project_dir)
                     session.workspace = effective_workspace
             # 持久化工作区到 session,供下一轮/重开会话复用。
-            save = getattr(self._server, "session_manager", None)
+            save = (
+                getattr(workspace_entry, "session_manager", None)
+                or getattr(self._server, "session_manager", None)
+            )
             if save is not None and hasattr(save, "save"):
                 try:
                     await save.save(session)

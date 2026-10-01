@@ -315,7 +315,12 @@ class WebSocketHandler:
                                 # 复用已持久化的工作区，避免跨天漂移(与 HTTP 路径对称)。
                                 effective_workspace = session.workspace
                             else:
-                                _no_proj = self._server._agent_loop.config.ui.preferences.no_project_folder
+                                _agent_loop = (
+                                    ws_workspace.agent
+                                    if (ws_workspace and ws_workspace.agent)
+                                    else self._server._agent_loop
+                                )
+                                _no_proj = _agent_loop.config.ui.preferences.no_project_folder
                                 no_project_base = Path(_no_proj).expanduser().resolve()
                                 date_dir = no_project_base / datetime.now().strftime("%Y-%m-%d")
                                 no_project_dir = date_dir / session_dir_name(session_key)
@@ -324,7 +329,10 @@ class WebSocketHandler:
                                 session.workspace = effective_workspace
                             # 与 HTTP 路径对称:把工作区持久化到 session,供下一轮/重开
                             # 会话复用 — 否则下次消息仍拿不到已决定的工作区。
-                            save = getattr(self._server, "session_manager", None)
+                            save = (
+                                getattr(ws_workspace, "session_manager", None)
+                                or getattr(self._server, "session_manager", None)
+                            )
                             if save is not None and hasattr(save, "save"):
                                 try:
                                     await save.save(session)

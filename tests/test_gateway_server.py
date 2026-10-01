@@ -186,6 +186,25 @@ async def test_manual_reset_unblocks_human_wait_before_lock() -> None:
 
 
 @pytest.mark.asyncio
+async def test_reset_routes_to_workspace_entry() -> None:
+    gw, _ = _make_gateway()
+    ws_sm = MagicMock()
+    ws_sm.get = AsyncMock(return_value=None)
+    ws_sm.get_or_create = AsyncMock(return_value=MagicMock(status="active"))
+    ws_sm.acquire = None
+    ws_agent = MagicMock()
+    entry = MagicMock(session_manager=ws_sm, agent=ws_agent)
+    gw.session_policy = MagicMock()
+    gw.session_policy.should_reset.return_value = True
+    gw.session_policy.reset = AsyncMock()
+    ws_agent.reset_session_state = AsyncMock()
+    session, reset = await gw._reset_session_if_needed("cli:x", workspace=entry)
+    assert reset is True
+    ws_sm.get_or_create.assert_awaited_once_with("cli:x")
+    ws_agent.reset_session_state.assert_awaited_once_with("cli:x")
+
+
+@pytest.mark.asyncio
 async def test_reset_fires_session_start_hooks_only_for_new_session(monkeypatch) -> None:
     """SessionStart hooks fire exactly once, on first creation, not on later messages."""
     from codex_pro.gateway.server import GatewayServer

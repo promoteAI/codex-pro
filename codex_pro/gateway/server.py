@@ -253,12 +253,17 @@ class GatewayServer:
         workspace: Any = None,
     ) -> tuple[Any, bool]:
         """Run the one authoritative reset path under the agent session lock."""
+        # Route through the resolved workspace's session_manager/agent loop when
+        # one is supplied; otherwise (the default single-workspace path) behave
+        # exactly as before.
+        session_manager = workspace.session_manager if workspace else self.session_manager
+        agent_loop = workspace.agent if workspace else self._agent_loop
         # A brand-new session (never seen in cache or storage) is the moment a
         # SessionStart lifecycle hook should fire — exactly once, on first
         # creation, not on resets or later messages. ``get`` is the read-only
         # path: it never fabricates a session, so None means genuinely new.
-        was_new = await self.session_manager.get(session_key) is None
-        session = await self.session_manager.get_or_create(session_key)
+        was_new = await session_manager.get(session_key) is None
+        session = await session_manager.get_or_create(session_key)
         if was_new:
             # Prompt-mode SessionStart hooks must land on the session BEFORE the
             # first turn reads ``session_start_prompt`` in ContextStage, so they
@@ -269,31 +274,31 @@ class GatewayServer:
         if not force and not self.session_policy.should_reset(session):
             return session, False
 
-        if force and self._agent_loop is not None:
-            unblock = getattr(self._agent_loop, "unblock_session_for_reset", None)
+        if force and agent_loop is not None:
+            unblock = getattr(agent_loop, "unblock_session_for_reset", None)
             if callable(unblock):
                 unblock(session_key)
 
         async def _clear_process_state() -> None:
-            if self._agent_loop is None:
+            if agent_loop is None:
                 return
-            reset_state = getattr(self._agent_loop, "reset_session_state", None)
+            reset_state = getattr(agent_loop, "reset_session_state", None)
             if callable(reset_state):
                 result = reset_state(session_key)
                 if hasattr(result, "__await__"):
                     await result
 
-        acquire = getattr(self.session_manager, "acquire", None)
+        acquire = getattr(session_manager, "acquire", None)
         if acquire is None:
-            await self.session_policy.reset(session, self.session_manager)
+            await self.session_policy.reset(session, session_manager)
             await _clear_process_state()
         else:
             lock = await acquire(session_key)
             async with lock:
-                session = await self.session_manager.get_or_create(session_key)
+                session = await session_manager.get_or_create(session_key)
                 if not force and not self.session_policy.should_reset(session):
                     return session, False
-                await self.session_policy.reset(session, self.session_manager)
+                await self.session_policy.reset(session, session_manager)
                 await _clear_process_state()
         await self.hooks.emit("session_reset", session_key=session_key)
         await self._web_ws.broadcast(

@@ -26,10 +26,11 @@ describe("Sidebar", () => {
         <Sidebar />
       </MemoryRouter>,
     );
-    expect(screen.getByText("ws1")).toBeInTheDocument();
+    // workspaceKey label is no longer rendered in the sidebar
+    expect(screen.queryByText("ws1")).not.toBeInTheDocument();
   });
 
-  it("拉取 /workspaces 并调用 setWorkspace 渲染工作区", async () => {
+  it("拉取 /workspaces 并调用 setWorkspace", async () => {
     const repoPath = "e:\\workspace\\codex-pro";
     vi.spyOn(api, "apiFetch").mockImplementation(async (path) => {
       if (String(path) === "/workspaces") {
@@ -51,7 +52,8 @@ describe("Sidebar", () => {
     );
 
     await waitFor(() => expect(useChatStore.getState().workspaceKey).toBe("ws-prod"));
-    expect(screen.getByText("ws-prod")).toBeInTheDocument();
+    // workspaceKey label is no longer rendered in the sidebar
+    expect(screen.queryByText("ws-prod")).not.toBeInTheDocument();
   });
 
   it("账户菜单可打开并包含使用统计/设置", async () => {

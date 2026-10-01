@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useState } from "react";
 
 export function PageTitle({ children }: { children: ReactNode }) {
   return (
@@ -152,6 +153,80 @@ export function EmptyState({
       <div className="text-[15px] font-medium text-codex-text-secondary mb-2">{title}</div>
       <p className="text-[12.5px] text-codex-muted max-w-sm mb-4">{desc}</p>
       {action}
+    </div>
+  );
+}
+
+const EFFORT_LEVELS = [
+  { id: "轻度", label: "轻度" },
+  { id: "中", label: "中" },
+  { id: "高", label: "高" },
+  { id: "极高", label: "极高" },
+  { id: "最高", label: "最高" },
+  { id: "Ultra", label: "Ultra" },
+] as const;
+
+export function EffortLevelPicker({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (levels: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const selectedCount = value.length;
+  const toggle = (id: string) => {
+    const next = value.includes(id) ? value.filter((v) => v !== id) : [...value, id];
+    onChange(next);
+  };
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 bg-[#2a3548] border border-[#3a4a66] rounded-full px-2.5 py-0.5 text-[12px] text-[#9eb6ff] hover:bg-[#2c3d52] transition-colors"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+      >
+        <span>已选择 {selectedCount} 个</span>
+        <span className="text-[10px] opacity-70">{open ? "▴" : "▾"}</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <ul
+            className="absolute right-0 top-full z-20 mt-1 w-[160px] bg-codex-surface border border-codex-border rounded-xl shadow-xl overflow-hidden"
+            role="listbox"
+            aria-label="推理强度选项"
+          >
+            {EFFORT_LEVELS.map((opt) => {
+              const checked = value.includes(opt.id);
+              return (
+                <li key={opt.id}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={checked}
+                    onClick={() => toggle(opt.id)}
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] text-left text-codex-text hover:bg-codex-hover transition-colors ${
+                      checked ? "text-[#9eb6ff]" : ""
+                    }`}
+                  >
+                    <span>{opt.label}</span>
+                    {checked && (
+                      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M5 12l5 5L20 7" />
+                      </svg>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

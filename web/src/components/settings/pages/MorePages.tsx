@@ -1682,7 +1682,10 @@ export function ArchivedPage() {
     void load();
   }, []);
 
-  const projectLabel = (project: string) => (project === NO_PROJECT ? t("noProject") : project);
+  const projectLabel = (project: string) => {
+    if (project === NO_PROJECT) return t("noProject");
+    return project.split(/[/\\]/).pop() ?? project;
+  };
   const isNoProject = (project: string) => project === NO_PROJECT;
 
   const projects = useMemo(() => groups.map((g) => projectLabel(g.project)), [groups]);

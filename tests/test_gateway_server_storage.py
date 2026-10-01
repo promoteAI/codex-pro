@@ -56,3 +56,10 @@ def test_gateway_server_accepts_workspace_registry() -> None:
     fallback = _make_server(MagicMock(), workspace_registry=None)
     assert fallback.workspace_registry is not None
     assert fallback.workspace_registry.list() != []
+
+
+def test_fallback_registry_entry_carries_session_manager() -> None:
+    fallback = _make_server(MagicMock(), workspace_registry=None)
+    entry = fallback.workspace_registry.default
+    assert entry is not None
+    assert entry.session_manager is fallback.session_manager

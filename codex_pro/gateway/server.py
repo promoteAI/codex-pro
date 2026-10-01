@@ -107,6 +107,7 @@ class GatewayServer:
             self.workspace_registry.register(
                 derive_workspace_key(str(workspace)), str(workspace),
                 config=config, storage=storage, agent=agent_loop,
+                session_manager=session_manager,
             )
         # Projects live in a dedicated subdir so the dashboard's project list
         # and file browser never expose the workspace's system-state dirs

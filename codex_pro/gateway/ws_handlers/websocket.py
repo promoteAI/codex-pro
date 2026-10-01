@@ -361,6 +361,8 @@ class WebSocketHandler:
                                 event.metadata["platform"] = platform
                                 if effective_workspace:
                                     event.metadata["workspace"] = effective_workspace
+                                if data.get("language"):
+                                    event.metadata["language"] = str(data["language"]).strip()
                                 if operation_fingerprint:
                                     event.metadata[IDEMPOTENCY_NAMESPACE_METADATA] = "gateway-message"
                                     event.metadata[IDEMPOTENCY_FINGERPRINT_METADATA] = operation_fingerprint

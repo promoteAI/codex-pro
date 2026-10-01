@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { apiFetch, apiUpload } from "../lib/api";
 import { webWS } from "../lib/ws";
 import { toast } from "./toast";
+import i18n from "../i18n";
 
 /** A browser-selected file that has been uploaded to the gateway via
  *  POST /attachments and is staged to ride along on the next /message turn. */
@@ -454,6 +455,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           text: content,
           session_key: sessionId,
           platform: "api",
+          language: i18n.resolvedLanguage,
           ...(projectPath ? { project: projectPath } : {}),
           ...(pendingAttachments.length
             ? { attachments: pendingAttachments.map((a) => ({ attachment_id: a.attachment_id })) }

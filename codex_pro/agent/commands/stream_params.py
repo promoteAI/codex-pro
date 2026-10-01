@@ -42,12 +42,6 @@ class StreamParams:
     def build_introduction(loop: "AgentLoop", event: "InboundEvent") -> str:
         from loguru import logger
         template = loop.config.session.introduction_template.strip()
-        if not template:
-            lang = event.metadata.get("language", "")
-            if lang in {"zh", "zh-cn"} or event.channel in {"wecom", "weixin"}:
-                template = "你好，我是 {agent_name}，很高兴为你服务。"
-            else:
-                template = "Hello, I'm {agent_name}. How can I help?"
         values = {
             "agent_name": loop.context.agent_name,
             "channel": event.channel,

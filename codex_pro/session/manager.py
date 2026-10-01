@@ -25,6 +25,26 @@ def _new_session_id() -> str:
     return uuid.uuid4().hex
 
 
+# Side-chat sessions mint keys with the ``cli:web-side-`` prefix. That prefix is
+# the client's uniqueness/ownership handle (isolated from the main chat), but the
+# *temporariness* is modelled by the ``type`` field, not by parsing the prefix
+# on the frontend. Infer ``temporary`` here so a freshly minted side-chat session
+# is typed correctly without the caller having to set it explicitly.
+_SIDE_CHAT_PREFIX = "cli:web-side-"
+
+
+def _infer_session_type(key: str) -> str:
+    """Return the session type for a brand-new ``key``.
+
+    Only the side-chat prefix is special-cased; every other key is an ordinary
+    interactive session (``workflow`` is assigned by the workflow engine, and a
+    persisted load always carries the stored type).
+    """
+    if key.startswith(_SIDE_CHAT_PREFIX):
+        return "temporary"
+    return "interactive"
+
+
 @dataclass
 class Session:
     """A conversation session with append-only message history."""
@@ -339,7 +359,7 @@ class SessionManager:
 
             session = await self._load(key)
             if session is None:
-                session = Session(key=key)
+                session = Session(key=key, type=_infer_session_type(key))
             self._cache[key] = session
             self._cache.move_to_end(key)
             while len(self._cache) > self._max_cache_size:

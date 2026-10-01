@@ -25,6 +25,18 @@ async def test_get_or_create_sets_session_id(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_side_chat_key_infers_temporary_type(tmp_path):
+    from codex_pro.session.manager import SessionManager
+
+    mgr = SessionManager(tmp_path)
+    s = await mgr.get_or_create("cli:web-side-12345")
+    assert s.type == "temporary"
+    # A plain key stays interactive.
+    s2 = await mgr.get_or_create("cli:abc")
+    assert s2.type == "interactive"
+
+
+@pytest.mark.asyncio
 async def test_load_preserves_persisted_session_fields(tmp_path):
     from codex_pro.session.manager import SessionManager
 

@@ -206,11 +206,51 @@ class GatewayServer:
             return normalize_platform(reported, None)
         return normalize_platform(reported, known + list(self._config.platforms or {}))
 
+    _WORKSPACE_HEADER = "X-Codex-Workspace"
+
+    def _request_workspace_key(self, request: web.Request) -> str | None:
+        """Return the workspace key a request targets, or None for the default.
+
+        The caller may pass the key via the ``X-Codex-Workspace`` header. An
+        absent/blank value yields None, which ``_resolve_workspace`` maps to the
+        default workspace (backward compatible with single-workspace callers).
+        """
+        raw = request.headers.get(self._WORKSPACE_HEADER)
+        return raw.strip() if raw and raw.strip() else None
+
+    def _resolve_workspace(self, key: str | None):
+        """Resolve a workspace key to its entry, falling back to the default.
+
+        A present-but-unknown key is logged and mapped to the default workspace
+        rather than 404ing or leaking into another workspace's session. When the
+        registry is empty (no workspace registered), a single-entry fallback is
+        built for the gateway's own workspace so callers always get an entry.
+        """
+        from codex_pro.workspace_registry import WorkspaceEntry
+
+        if key:
+            entry = self.workspace_registry.get(key)
+            if entry is not None:
+                return entry
+            logger.warning("Unknown workspace key '{}' falling back to default", key)
+        entry = self.workspace_registry.default
+        if entry is not None:
+            return entry
+        return WorkspaceEntry(
+            workspace_key="",
+            workspace_path=str(self._workspace),
+            config=self._config,
+            storage=self.storage,
+            agent=self._agent_loop,
+            session_manager=self.session_manager,
+        )
+
     async def _reset_session_if_needed(
         self,
         session_key: str,
         *,
         force: bool = False,
+        workspace: Any = None,
     ) -> tuple[Any, bool]:
         """Run the one authoritative reset path under the agent session lock."""
         # A brand-new session (never seen in cache or storage) is the moment a

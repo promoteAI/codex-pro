@@ -39,7 +39,16 @@ class CLIChannel(BaseChannel):
         # reports True on some hosts (e.g. PyInstaller onefile under the
         # Tauri process), a desktop-supervised gateway must not block on a
         # stdin-read loop. Guard on the env marker that _desktop_entry.py sets.
-        if os.environ.get("_CODEX_PRO_DESKTOP") == "1" or not sys.stdin.isatty():
+        # ``_CODEX_PRO_GATEWAY`` is the same gate for a headless ``codex-pro
+        # gateway`` process (e.g. dev.sh/dev.bat): stdin has no interactive
+        # user, so a CLI prompt would hit EOF and self-exit the gateway. That
+        # holds even when stdin reports interactive on Windows, where a
+        # backgrounded console still carries the parent TTY.
+        if (
+            os.environ.get("_CODEX_PRO_DESKTOP") == "1"
+            or os.environ.get("_CODEX_PRO_GATEWAY") == "1"
+            or not sys.stdin.isatty()
+        ):
             self._running = False
             logger.warning("CLI channel disabled because stdin is not interactive (desktop mode)")
             return

@@ -12,6 +12,7 @@ class WorkspaceEntry:
     config: Any = None
     storage: Any = None
     agent: Any = None
+    session_manager: Any = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -35,6 +36,7 @@ class WorkspaceRegistry:
         config: Any = None,
         storage: Any = None,
         agent: Any = None,
+        session_manager: Any = None,
         metadata: dict[str, Any] | None = None,
     ) -> WorkspaceEntry:
         entry = WorkspaceEntry(
@@ -43,6 +45,7 @@ class WorkspaceRegistry:
             config=config,
             storage=storage,
             agent=agent,
+            session_manager=session_manager,
             metadata=metadata or {},
         )
         self._entries[key] = entry
@@ -50,6 +53,12 @@ class WorkspaceRegistry:
 
     def get(self, key: str) -> WorkspaceEntry | None:
         return self._entries.get(key)
+
+    @property
+    def default(self) -> WorkspaceEntry | None:
+        if not self._entries:
+            return None
+        return next(iter(self._entries.values()))
 
     def list(self) -> list[WorkspaceEntry]:
         return list(self._entries.values())

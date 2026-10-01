@@ -11,6 +11,16 @@ from codex_pro.gateway.api.workspaces import WorkspaceAPI
 from codex_pro.workspace_registry import WorkspaceRegistry
 
 
+def test_entry_carries_session_manager_and_default():
+    reg = WorkspaceRegistry()
+    sm = object()
+    reg.register("ws1", "/p/ws1", session_manager=sm)
+    reg.register("ws2", "/p/ws2")
+    assert reg.get("ws1").session_manager is sm
+    assert reg.get("ws2").session_manager is None
+    assert reg.default is reg.get("ws1")  # first registered = default
+
+
 def _fake_request() -> object:
     class _Req:
         query = {}

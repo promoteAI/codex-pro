@@ -7,6 +7,7 @@ command isolation, filesystem boundaries, network control, credential injection,
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import shutil
 import sys
@@ -65,6 +66,13 @@ class ExecRequest:
     timeout: int = 30
     stdin: str = ""
     credentials: dict[str, str] = field(default_factory=dict)
+    # The execution root for this call — the session workspace (from
+    # ``session_workspace()``). ``cwd`` may be this root or a subpath of it.
+    # ``SandboxExecutor`` uses it to map a workspace that lives *outside* the
+    # gateway's global workspace into the sandbox; ``LocalExecutor`` ignores it
+    # (it already runs at ``cwd``). Defaults to empty so existing callers keep
+    # working unchanged.
+    workspace: str = ""
 
 
 @dataclass
@@ -173,37 +181,68 @@ class SandboxExecutor(BaseExecutor):
         self._source_workspace = Path(workspace).resolve() if workspace else None
         self._sandbox_dir: Path | None = None
         self._workdir: Path | None = None
+        # Extra workspace roots (session workspaces) that live outside the global
+        # workspace. Each is copied into the sandbox once, and its sandbox mirror
+        # is tracked so ``_resolve_cwd`` can map a request's cwd into it. Keyed by
+        # resolved source path so a repeated request on the same session reuses
+        # the mirror instead of re-copying.
+        self._extra_roots: dict[Path, Path] = {}
+
+    def _ignore_patterns(self) -> tuple[str, ...]:
+        return (
+            ".git",
+            "__pycache__",
+            ".pytest_cache",
+            ".ruff_cache",
+            ".venv",
+            "node_modules",
+            "data/logs",
+            # Bundled runtime dirs are hundreds of MB and never needed inside
+            # the sandbox; copying them synchronously froze the event loop.
+            "runtime",
+            "python",
+        )
+
+    async def _copy_into_sandbox(self, source: Path, target: Path) -> None:
+        """Copy ``source`` tree into ``target`` off-loop, mirroring setup()."""
+        ignore = shutil.ignore_patterns(*self._ignore_patterns())
+        if source.exists():
+            await asyncio.to_thread(
+                shutil.copytree,
+                source,
+                target,
+                dirs_exist_ok=True,
+                ignore=ignore,
+            )
+        else:
+            target.mkdir(parents=True, exist_ok=True)
+
+    async def _ensure_extra_root(self, source: Path) -> Path:
+        """Return the sandbox mirror for ``source``, copying it in on first use.
+
+        The mirror lives under ``<sandbox>/workspace/workspaces/<hash>/`` so
+        distinct workspaces (per-session, per-project, or the global fallback)
+        stay isolated within the sandbox, and nothing is copied eagerly at setup.
+        """
+        source = source.resolve()
+        existing = self._extra_roots.get(source)
+        if existing is not None:
+            return existing
+        digest = hashlib.sha256(str(source).encode("utf-8")).hexdigest()[:16]
+        mirror = self._workdir / "workspaces" / digest if self._workdir else self._sandbox_dir / "workspaces" / digest
+        await self._copy_into_sandbox(source, mirror)
+        self._extra_roots[source] = mirror
+        return mirror
 
     async def setup(self) -> None:
         self._root.mkdir(parents=True, exist_ok=True)
         self._sandbox_dir = Path(tempfile.mkdtemp(dir=self._root, prefix="sandbox_"))
         self._workdir = self._sandbox_dir / "workspace"
-        if self._source_workspace and self._source_workspace.exists():
-            ignore = shutil.ignore_patterns(
-                ".git",
-                "__pycache__",
-                ".pytest_cache",
-                ".ruff_cache",
-                ".venv",
-                "node_modules",
-                "data/logs",
-                # Bundled runtime dirs are hundreds of MB and never needed inside
-                # the sandbox; copying them synchronously froze the event loop.
-                "runtime",
-                "python",
-            )
-            # copytree walks the whole workspace synchronously; even with the
-            # ignore list a large tree can block the loop thread for seconds, so
-            # run it off-loop.
-            await asyncio.to_thread(
-                shutil.copytree,
-                self._source_workspace,
-                self._workdir,
-                dirs_exist_ok=True,
-                ignore=ignore,
-            )
-        else:
-            self._workdir.mkdir(parents=True, exist_ok=True)
+        # 不再把全局工作区复制进沙箱作为基础执行根。沙箱以「本次执行的会话工作区」
+        # 为根(见 _resolve_cwd / _ensure_extra_root)：首次用到某工作区时才把它拷贝进
+        # ``workspaces/<hash>`` 镜像。这样沙箱里不会出现全局工作区（及其中被主进程
+        # 锁定的 agent.lock 等状态文件），也不会把无关的全局目录带进来。
+        self._workdir.mkdir(parents=True, exist_ok=True)
         logger.info("Sandbox created at {}", self._sandbox_dir)
 
     async def teardown(self) -> None:
@@ -215,7 +254,7 @@ class SandboxExecutor(BaseExecutor):
             await self.setup()
         if self._network_policy == "deny" and command_uses_network(request.command):
             return ExecResponse(success=False, stderr="Network access is denied by execution policy", return_code=-1, executor=self.name)
-        cwd = str(self._resolve_cwd(request.cwd))
+        cwd = str(await self._resolve_cwd(request.cwd, request.workspace))
         env = self.inject_credentials({"HOME": cwd, "TMPDIR": cwd}, request.credentials)
         env.update(request.env)
         env["PATH"] = prepend_interpreter_bin(dict(os.environ))["PATH"]
@@ -251,15 +290,42 @@ class SandboxExecutor(BaseExecutor):
         except Exception as e:
             return ExecResponse(success=False, stderr=str(e), return_code=-1, executor=self.name)
 
-    def _resolve_cwd(self, requested_cwd: str) -> Path:
+    async def _resolve_cwd(self, requested_cwd: str, workspace: str = "") -> Path:
         if not self._workdir:
             assert self._sandbox_dir
             return self._sandbox_dir
-        if not requested_cwd or not self._source_workspace:
+        if not requested_cwd:
             return self._workdir
+
+        resolve = Path(requested_cwd).expanduser().resolve()
+
+        # The execution root is the *session workspace* (a per-session isolation
+        # dir or a project dir), never the gateway's global workspace. Take that
+        # workspace's sandbox mirror as the mapping base and translate the
+        # requested cwd relative to it. The global workspace is no longer copied
+        # into the sandbox at setup, so an out-of-root cwd falls back only when
+        # it genuinely has no workspace mapping.
+        if workspace:
+            ws_root = Path(workspace).expanduser().resolve()
+            mirror = await self._ensure_extra_root(ws_root)
+            try:
+                rel = resolve.relative_to(ws_root)
+                target = (mirror / rel).resolve()
+                target.relative_to(self._workdir)
+                target.mkdir(parents=True, exist_ok=True)
+                return target
+            except ValueError:
+                pass  # cwd outside the workspace root; fall through
+
+        # No workspace override, or cwd escaped it: fall back to the global
+        # workspace, lazily copied into its own mirror so the sandbox never
+        # carries the global tree unless a command actually needs it.
+        if not self._source_workspace:
+            return self._workdir
+        mirror = await self._ensure_extra_root(self._source_workspace)
         try:
-            rel = Path(requested_cwd).resolve().relative_to(self._source_workspace)
-            target = (self._workdir / rel).resolve()
+            rel = resolve.relative_to(self._source_workspace)
+            target = (mirror / rel).resolve()
             target.relative_to(self._workdir)
             target.mkdir(parents=True, exist_ok=True)
             return target

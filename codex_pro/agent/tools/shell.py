@@ -133,6 +133,7 @@ class ShellTool(Tool):
                     timeout=timeout,
                     env={"WORKSPACE": ws},
                     credentials=ctx.credentials if ctx else {},
+                    workspace=ws,
                 ))
                 output = response.stdout
                 err_output = response.stderr

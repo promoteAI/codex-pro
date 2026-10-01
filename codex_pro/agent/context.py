@@ -758,7 +758,12 @@ class ContextBuilder:
     def _identity(self, channel: str | None = None) -> str:
         sys_info = platform.system()
         runtime = f"{'macOS' if sys_info == 'Darwin' else sys_info} {platform.machine()}, Python {platform.python_version()}"
-        ws = str(self.workspace.resolve())
+        # 系统提示里的工作区必须是「会话工作区」(per-session cwd),而不是全局工作区:
+        # 工具层经 session_workspace() 在会话工作区执行,若这里注入全局工作区,模型会
+        # 误以为 cwd 是全局目录,从而用绝对路径把文件写到全局工作区。构建 system prompt
+        # 时 inbound 已在会话锁内 set 了 session contextvar,故此处能取到会话工作区。
+        from codex_pro.agent.workspace_scope import session_workspace
+        ws = str(Path(session_workspace(str(self.workspace))).resolve())
         return f"""# {self.agent_name}
 
 You are {self.agent_name}, a helpful AI assistant.

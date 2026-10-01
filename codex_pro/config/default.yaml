@@ -9,6 +9,11 @@
 tools:
   web:
     enabled: true
+  exec:
+    # 命令执行宿主。schema 默认是 sandbox(隔离临时拷贝,改动不写回真实工作区)。
+    # packaged 意图是命令直接在真实工作区执行,故设为 auto,让下面的
+    # execution.defaultExecutor(local) 决定执行器;显式配置 host 的用户不受影响。
+    host: auto
 execution:
   defaultExecutor: local
   networkPolicy: allow

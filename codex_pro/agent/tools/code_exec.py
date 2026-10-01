@@ -113,6 +113,7 @@ class CodeExecTool(Tool):
                     stdin=code,
                     env={"WORKSPACE": ws},
                     credentials=ctx.credentials if ctx else {},
+                    workspace=ws,
                 ))
                 out = response.stdout
                 err = response.stderr

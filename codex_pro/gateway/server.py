@@ -218,6 +218,16 @@ class GatewayServer:
         raw = request.headers.get(self._WORKSPACE_HEADER)
         return raw.strip() if raw and raw.strip() else None
 
+    def _request_workspace(self, request: web.Request):
+        """Resolve the workspace entry a request targets (header key or default).
+
+        Convenience wrapper pairing ``_request_workspace_key`` (reads the
+        ``X-Codex-Workspace`` header) with ``_resolve_workspace`` (maps that key
+        to a registered entry, or the default). Single-workspace callers that
+        never send the header get the default entry, so behavior is unchanged.
+        """
+        return self._resolve_workspace(self._request_workspace_key(request))
+
     def _resolve_workspace(self, key: str | None):
         """Resolve a workspace key to its entry, falling back to the default.
 

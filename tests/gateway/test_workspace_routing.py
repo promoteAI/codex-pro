@@ -69,3 +69,25 @@ def test_request_workspace_key_empty_header_returns_none():
         headers = {_WORKSPACE_HEADER: "   "}
 
     assert _server_with(WorkspaceRegistry())._request_workspace_key(_Req()) is None
+
+
+def test_request_workspace_resolves_header_to_entry():
+    reg = WorkspaceRegistry()
+    reg.register("default", "/p/default")
+    reg.register("other", "/p/other")
+
+    class _Req:
+        headers = {_WORKSPACE_HEADER: "other"}
+
+    assert _server_with(reg)._request_workspace(_Req()).workspace_key == "other"
+
+
+def test_request_workspace_absent_header_returns_default():
+    reg = WorkspaceRegistry()
+    reg.register("default", "/p/default")
+    reg.register("other", "/p/other")
+
+    class _Req:
+        headers = {}
+
+    assert _server_with(reg)._request_workspace(_Req()).workspace_key == "default"

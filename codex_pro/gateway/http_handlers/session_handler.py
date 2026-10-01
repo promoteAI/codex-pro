@@ -41,7 +41,9 @@ class SessionHandlers:
         if guard is not None:
             return guard
         key = request.match_info["key"]
-        await self._server._reset_session_if_needed(key, force=True)
+        await self._server._reset_session_if_needed(
+            key, force=True, workspace=self._server._request_workspace(request),
+        )
         return web.json_response({"status": "reset", "session_key": key})
 
     async def handle_pair_generate(self, request: web.Request) -> web.Response:

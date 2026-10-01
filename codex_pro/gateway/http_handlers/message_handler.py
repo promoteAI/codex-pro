@@ -534,7 +534,9 @@ class MessageHandler:
                     )
                 return web.json_response({"error": "rate limited"}, status=429)
 
-            session, _ = await self._server._reset_session_if_needed(session_key)
+            session, _ = await self._server._reset_session_if_needed(
+                session_key, workspace=self._server._request_workspace(request),
+            )
             # 会话工作区(cwd)在会话创建时决定并持久化,后续每轮复用(参考 Codex 的
             # cwd 会话级模型)——而不是按每条消息的项目字段重算,也不是依赖前端反复
             # 发送 `project`。`project` 可能为空(全局/未分类会话),此时使用

@@ -50,6 +50,12 @@ class WebSocketHandler:
         if rejected is not None:
             return rejected
 
+        # Resolve the target workspace once per connection: the handshake carries
+        # the X-Codex-Workspace header, and every reset in the loop below should
+        # route to the same entry so SessionStart hooks fire against the right
+        # workspace's session manager. Absent header => default workspace.
+        ws_workspace = self._server._request_workspace(request)
+
         # Server-driven heartbeat
         hb = self._server._config.ws_heartbeat_seconds
         websocket = web.WebSocketResponse(heartbeat=hb if hb and hb > 0 else None)
@@ -133,7 +139,9 @@ class WebSocketHandler:
                             self._server._ws_clients[delivery_key] = websocket
                             auth_deadline.mark_authenticated()
 
-                            session, _ = await self._server._reset_session_if_needed(session_key)
+                            session, _ = await self._server._reset_session_if_needed(
+                                session_key, workspace=ws_workspace,
+                            )
 
                             await websocket.send_json({"type": "auth_ok", "session_key": session_key})
                             self._server.auth.audit("ws_auth", platform=platform, user_id=user_id, ok=True)
@@ -297,7 +305,9 @@ class WebSocketHandler:
                             # 首次则按 no_project_folder 规则计算并写回(参考 Codex 的
                             # cwd 会话级模型)。event.metadata["workspace"] 由此值喂给
                             # inbound.py 的会话 contextvar。
-                            session, _ = await self._server._reset_session_if_needed(session_key)
+                            session, _ = await self._server._reset_session_if_needed(
+                                session_key, workspace=ws_workspace,
+                            )
                             if project:
                                 session.workspace = project
                                 effective_workspace = project

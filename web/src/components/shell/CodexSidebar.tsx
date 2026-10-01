@@ -140,6 +140,17 @@ export function CodexSidebar() {
   );
   const isPinned = (id: string) => pinnedMap[id] ?? false;
 
+  // 置顶的会话排到所属分组顶部，其余保持服务端 updated_at 降序。项目行与最近列表
+  // 都基于该顺序过滤，保证置顶项在各自分组内靠前。
+  const sortedRecents = useMemo(() => {
+    return [...apiRecents].sort((a, b) => {
+      const aPin = a.pinned === true ? 1 : 0;
+      const bPin = b.pinned === true ? 1 : 0;
+      if (aPin !== bPin) return bPin - aPin;
+      return String(b.updated_at).localeCompare(String(a.updated_at));
+    });
+  }, [apiRecents]);
+
   const archive = async (key: string) => {
     if (await runMutation(() => apiFetch(`/sessions/${encodeURIComponent(key)}/archive`, { method: "POST" }), { success: t("archiveDone") })) {
       refetch();
@@ -156,11 +167,11 @@ export function CodexSidebar() {
   // 带 project 的会话归到对应项目行下；project 为空的会话显示在「最近」列表。
   // API 返回空列表时不注入假会话，直接渲染「最近」空态（recents.length === 0）。
   const recents = useMemo(() => {
-    if (apiRecents.length === 0) return [];
-    return apiRecents
+    if (sortedRecents.length === 0) return [];
+    return sortedRecents
       .filter((s) => !s.project)
       .map((s) => ({ id: s.key, title: s.title || s.key }));
-  }, [apiRecents]);
+  }, [sortedRecents]);
 
   const goAnalytics = () => {
     setAccountOpen(false);
@@ -369,7 +380,7 @@ export function CodexSidebar() {
               </div>
 
               {(() => {
-                const projectSessions = apiRecents.filter(
+                const projectSessions = sortedRecents.filter(
                   (s) => (s.project_id ?? s.project) === (repo.project_id ?? repo.path),
                 );
                 if (projectSessions.length === 0) {

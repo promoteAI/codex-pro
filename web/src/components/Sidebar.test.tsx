@@ -236,4 +236,50 @@ describe("Sidebar", () => {
     });
     expect(spy.mock.calls.filter(([p]) => String(p).startsWith("/sessions?")).length).toBeGreaterThan(1);
   });
+
+  it("置顶的会话在最近列表中排到最前", async () => {
+    const repoPath = "e:\\workspace\\codex-pro";
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path) => {
+      if (String(path) === "/git/repos") {
+        return { repos: [{ path: repoPath, name: "codex-pro", current_branch: "dev" }] };
+      }
+      if (String(path).startsWith("/sessions")) {
+        return {
+          sessions: [
+            {
+              key: "cli:web:newer",
+              title: "更新但未置顶",
+              message_count: 2,
+              updated_at: "2026-02-01T00:00:00",
+            },
+            {
+              key: "cli:web:pinned",
+              title: "更早但已置顶",
+              message_count: 2,
+              updated_at: "2026-01-01T00:00:00",
+              pinned: true,
+            },
+          ],
+        };
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+    useChatStore.setState({
+      repos: [{ path: repoPath, name: "codex-pro", current_branch: "dev" }],
+      project: "codex-pro",
+      projectPath: repoPath,
+    });
+
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText("更新但未置顶")).toBeInTheDocument());
+    expect(screen.getByText("更早但已置顶")).toBeInTheDocument();
+    // 置顶项应渲染在非置顶项之前（文档顺序上排前）。
+    const items = screen.getAllByText(/但已置顶|但未置顶/).map((el) => el.textContent);
+    expect(items[0]).toBe("更早但已置顶");
+  });
 });

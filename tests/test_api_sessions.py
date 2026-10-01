@@ -389,6 +389,40 @@ async def test_unarchive_session_endpoint(mock_server, api):
 
 
 @pytest.mark.asyncio
+async def test_pin_session_endpoint(mock_server, api):
+    mock_server.session_manager.pin_session = AsyncMock(return_value=True)
+    app = web.Application()
+    app.router.add_post("/api/v1/sessions/{key}/pin", api.pin_session)
+    async with TestClient(TestServer(app)) as client:
+        resp = await client.post("/api/v1/sessions/cli%3Alocal/pin")
+        assert resp.status == 200
+        assert (await resp.json())["status"] == "pinned"
+    mock_server.session_manager.pin_session.assert_awaited_once_with("cli:local")
+
+
+@pytest.mark.asyncio
+async def test_pin_session_missing_returns_404(mock_server, api):
+    mock_server.session_manager.pin_session = AsyncMock(return_value=False)
+    app = web.Application()
+    app.router.add_post("/api/v1/sessions/{key}/pin", api.pin_session)
+    async with TestClient(TestServer(app)) as client:
+        resp = await client.post("/api/v1/sessions/nobody/pin")
+        assert resp.status == 404
+
+
+@pytest.mark.asyncio
+async def test_unpin_session_endpoint(mock_server, api):
+    mock_server.session_manager.unpin_session = AsyncMock(return_value=True)
+    app = web.Application()
+    app.router.add_post("/api/v1/sessions/{key}/unpin", api.unpin_session)
+    async with TestClient(TestServer(app)) as client:
+        resp = await client.post("/api/v1/sessions/cli%3Alocal/unpin")
+        assert resp.status == 200
+        assert (await resp.json())["status"] == "active"
+    mock_server.session_manager.unpin_session.assert_awaited_once_with("cli:local")
+
+
+@pytest.mark.asyncio
 async def test_delete_session_endpoint(mock_server, api):
     mock_server.session_manager.delete_session = AsyncMock(return_value=True)
     app = web.Application()

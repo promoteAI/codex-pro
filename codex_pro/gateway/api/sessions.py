@@ -91,6 +91,24 @@ class SessionsAPI:
             return web.json_response({"error": "not found"}, status=404)
         return web.json_response({"key": key, "status": "active"})
 
+    async def pin_session(self, request: web.Request) -> web.Response:
+        guard = self._guard(request, "sessions_pin")
+        if guard is not None:
+            return guard
+        key = request.match_info["key"]
+        if not await self._server.session_manager.pin_session(key):
+            return web.json_response({"error": "not found"}, status=404)
+        return web.json_response({"key": key, "status": "pinned"})
+
+    async def unpin_session(self, request: web.Request) -> web.Response:
+        guard = self._guard(request, "sessions_unpin")
+        if guard is not None:
+            return guard
+        key = request.match_info["key"]
+        if not await self._server.session_manager.unpin_session(key):
+            return web.json_response({"error": "not found"}, status=404)
+        return web.json_response({"key": key, "status": "active"})
+
     async def delete_session(self, request: web.Request) -> web.Response:
         guard = self._guard(request, "sessions_delete")
         if guard is not None:

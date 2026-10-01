@@ -1,11 +1,15 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { Sidebar } from "./Sidebar";
 import * as api from "../lib/api";
 import { useChatStore } from "../stores/chat";
+import { useToastStore } from "../stores/toast";
 
 describe("Sidebar", () => {
+  beforeEach(() => {
+    useToastStore.setState({ toasts: [] });
+  });
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -153,5 +157,83 @@ describe("Sidebar", () => {
     // 无 project 的会话显示在「最近」列表（它不归到任何项目行）。
     await waitFor(() => expect(screen.getByText("旧的无项目会话")).toBeInTheDocument());
     expect(screen.getByText("最近")).toBeInTheDocument();
+  });
+
+  it("点击归档调用 POST /sessions/{key}/archive 并重新拉取", async () => {
+    const repoPath = "e:\\workspace\\codex-pro";
+    const session = {
+      key: "cli:web:arch",
+      title: "待归档会话",
+      message_count: 2,
+      updated_at: "2026-01-01T00:00:00",
+    };
+    const spy = vi.spyOn(api, "apiFetch").mockImplementation(async (path) => {
+      if (String(path) === "/git/repos") {
+        return { repos: [{ path: repoPath, name: "codex-pro", current_branch: "dev" }] };
+      }
+      if (String(path).startsWith("/sessions")) {
+        return { sessions: [session] };
+      }
+      return {} as never;
+    });
+    useChatStore.setState({
+      repos: [{ path: repoPath, name: "codex-pro", current_branch: "dev" }],
+      project: "codex-pro",
+      projectPath: repoPath,
+    });
+
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText("待归档会话")).toBeInTheDocument());
+    fireEvent.click(screen.getByTitle("归档"));
+
+    await waitFor(() => {
+      expect(spy).toHaveBeenCalledWith("/sessions/cli%3Aweb%3Aarch/archive", { method: "POST" });
+    });
+    // 归档成功后应触发重新拉取列表
+    expect(spy.mock.calls.filter(([p]) => String(p).startsWith("/sessions?")).length).toBeGreaterThan(1);
+  });
+
+  it("点击置顶调用 POST /sessions/{key}/pin 并重新拉取", async () => {
+    const repoPath = "e:\\workspace\\codex-pro";
+    const session = {
+      key: "cli:web:pin",
+      title: "待置顶会话",
+      message_count: 2,
+      updated_at: "2026-01-01T00:00:00",
+      pinned: false,
+    };
+    const spy = vi.spyOn(api, "apiFetch").mockImplementation(async (path) => {
+      if (String(path) === "/git/repos") {
+        return { repos: [{ path: repoPath, name: "codex-pro", current_branch: "dev" }] };
+      }
+      if (String(path).startsWith("/sessions")) {
+        return { sessions: [session] };
+      }
+      return {} as never;
+    });
+    useChatStore.setState({
+      repos: [{ path: repoPath, name: "codex-pro", current_branch: "dev" }],
+      project: "codex-pro",
+      projectPath: repoPath,
+    });
+
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText("待置顶会话")).toBeInTheDocument());
+    fireEvent.click(screen.getByTitle("置顶"));
+
+    await waitFor(() => {
+      expect(spy).toHaveBeenCalledWith("/sessions/cli%3Aweb%3Apin/pin", { method: "POST" });
+    });
+    expect(spy.mock.calls.filter(([p]) => String(p).startsWith("/sessions?")).length).toBeGreaterThan(1);
   });
 });

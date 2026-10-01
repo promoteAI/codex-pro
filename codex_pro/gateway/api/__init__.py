@@ -133,6 +133,8 @@ def register_management_routes(app: web.Application, prefix: str, server: Gatewa
     app.router.add_get(f"{prefix}/turns/{{event_id}}", sessions_api.get_turn)
     app.router.add_post(f"{prefix}/sessions/{{key}}/archive", sessions_api.archive_session)
     app.router.add_post(f"{prefix}/sessions/{{key}}/unarchive", sessions_api.unarchive_session)
+    app.router.add_post(f"{prefix}/sessions/{{key}}/pin", sessions_api.pin_session)
+    app.router.add_post(f"{prefix}/sessions/{{key}}/unpin", sessions_api.unpin_session)
     app.router.add_delete(f"{prefix}/sessions/{{key}}", sessions_api.delete_session)
 
     interactions_api = InteractionsAPI(server)

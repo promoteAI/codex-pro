@@ -12,6 +12,8 @@ import {
 import { useShellStore } from "../../stores/shell";
 import { useChatStore } from "../../stores/chat";
 import { useApi } from "../../hooks/use-api";
+import { apiFetch } from "../../lib/api";
+import { runMutation } from "../../stores/toast";
 import { CreateProjectDialog } from "../CreateProjectDialog";
 import { SideFilesPanel } from "./SideFilesPanel";
 import type { GitRepo } from "../../stores/chat";
@@ -23,6 +25,7 @@ interface SessionItem {
   updated_at: string;
   project?: string;
   project_id?: string;
+  pinned?: boolean;
 }
 
 function isMacPlatform(): boolean {
@@ -73,7 +76,6 @@ export function CodexSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [accountOpen, setAccountOpen] = useState(false);
-  const [pinned, setPinned] = useState<Record<string, boolean>>({});
   const openSearch = useShellStore((s) => s.openSearch);
   const openMobileRemote = useShellStore((s) => s.openMobileRemote);
   const mobileRemoteOpen = useShellStore((s) => s.mobileRemoteOpen);
@@ -126,8 +128,30 @@ export function CodexSidebar() {
     };
   }, [accountOpen]);
 
-  const { data } = useApi<{ sessions: SessionItem[] }>("/sessions?limit=20&offset=0");
+  const { data, refetch } = useApi<{ sessions: SessionItem[] }>(
+    "/sessions?limit=20&offset=0&archived=false",
+  );
   const apiRecents = data?.sessions ?? [];
+
+  // 置顶状态以服务端为单一数据源：从列表响应派生，而非本地 useState（后者刷新即丢）。
+  const pinnedMap = useMemo(
+    () => Object.fromEntries(apiRecents.map((s) => [s.key, s.pinned === true])),
+    [apiRecents],
+  );
+  const isPinned = (id: string) => pinnedMap[id] ?? false;
+
+  const archive = async (key: string) => {
+    if (await runMutation(() => apiFetch(`/sessions/${encodeURIComponent(key)}/archive`, { method: "POST" }), { success: t("archiveDone") })) {
+      refetch();
+    }
+  };
+
+  const togglePin = async (key: string) => {
+    const next = !isPinned(key);
+    if (await runMutation(() => apiFetch(`/sessions/${encodeURIComponent(key)}/${next ? "pin" : "unpin"}`, { method: "POST" }), { success: next ? t("pinDone") : t("unpinDone") })) {
+      refetch();
+    }
+  };
 
   // 带 project 的会话归到对应项目行下；project 为空的会话显示在「最近」列表。
   // API 返回空列表时不注入假会话，直接渲染「最近」空态（recents.length === 0）。
@@ -151,12 +175,6 @@ export function CodexSidebar() {
     `flex items-center gap-2.5 h-8 px-3 mx-1 rounded-md text-[13.5px] cursor-pointer ${
       isActive ? "bg-codex-active text-codex-text" : "text-codex-text-secondary hover:bg-codex-hover hover:text-codex-text"
     }`;
-
-  const togglePin = (id: string) => {
-    setPinned((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const isPinned = (id: string, fallback = false) => pinned[id] ?? fallback;
 
   return (
     <aside className="w-[clamp(200px,17vw,260px)] shrink-0 border-r border-codex-border flex flex-col min-h-0 bg-codex-sidebar">
@@ -398,6 +416,7 @@ export function CodexSidebar() {
                         type="button"
                         title={t("archive")}
                         aria-label={t("archive")}
+                        onClick={() => archive(s.key)}
                         className="hidden group-hover:inline-flex w-5 h-5 shrink-0 items-center justify-center rounded text-codex-muted hover:bg-codex-active hover:text-codex-text"
                       >
                         <ArchiveIcon className="w-3 h-3" />
@@ -497,6 +516,7 @@ export function CodexSidebar() {
                 type="button"
                 title={t("archive")}
                 aria-label={t("archive")}
+                onClick={() => archive(s.id)}
                 className="hidden group-hover/row:inline-flex w-5 h-5 shrink-0 items-center justify-center rounded text-codex-muted hover:bg-codex-active hover:text-codex-text"
               >
                 <ArchiveIcon className="w-3 h-3" />

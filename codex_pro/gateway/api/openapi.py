@@ -67,6 +67,8 @@ _ROUTE_DOCS: dict[str, dict[str, dict[str, Any]]] = {
     "GET /turns/{event_id}": {"summary": "Get a specific turn", "tags": ["Sessions"]},
     "POST /sessions/{key}/archive": {"summary": "Archive a session", "tags": ["Sessions"]},
     "POST /sessions/{key}/unarchive": {"summary": "Restore an archived session", "tags": ["Sessions"]},
+    "POST /sessions/{key}/pin": {"summary": "Pin a session so it stays prominent", "tags": ["Sessions"]},
+    "POST /sessions/{key}/unpin": {"summary": "Unpin a session", "tags": ["Sessions"]},
     "DELETE /sessions/{key}": {"summary": "Permanently delete a session", "tags": ["Sessions"]},
     # Cron
     "GET /cron": {"summary": "List cron jobs", "tags": ["Cron"]},

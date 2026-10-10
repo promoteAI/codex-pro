@@ -6,7 +6,6 @@ import * as api from "../../lib/api";
 import { useChatStore } from "../../stores/chat";
 import { useProvidersStore } from "../../stores/providers";
 import { useCapabilitiesStore } from "../../stores/capabilities";
-import { webWS } from "../../lib/ws";
 
 const chatDefaults = {
   project: "",
@@ -80,7 +79,9 @@ describe("Composer 权限下拉", () => {
 describe("Composer 停止按钮", () => {
   it("typing 时渲染停止按钮，点击发送 interrupt 帧并复位 typing", async () => {
     useChatStore.setState({ typing: true, sessionId: "sess-1", pendingEventId: "evt-1" });
-    const sendSpy = vi.spyOn(webWS, "send").mockReturnValue(true);
+    const sendSpy = vi
+      .spyOn(useChatStore.getState().chatWS, "send")
+      .mockReturnValue(true);
 
     render(
       <MemoryRouter>
@@ -93,7 +94,6 @@ describe("Composer 停止按钮", () => {
 
     expect(sendSpy).toHaveBeenCalledWith({
       type: "interrupt",
-      session_key: "sess-1",
       event_id: "evt-1",
     });
     expect(useChatStore.getState().typing).toBe(false);

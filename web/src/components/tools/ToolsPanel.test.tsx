@@ -4,6 +4,7 @@ import { ToolsPanel } from "./ToolsPanel";
 import { useShellStore } from "../../stores/shell";
 import { useChatStore } from "../../stores/chat";
 import { useSidechatStore } from "../../stores/sidechat";
+import { CogDedup } from "../../lib/chat-ws-frame";
 import { apiFetch } from "../../lib/api";
 
 vi.mock("../../lib/api", async (importOriginal) => {
@@ -56,6 +57,20 @@ beforeEach(() => {
     activeTabId: "review-1",
   });
   useChatStore.setState({ projectPath: "/ws/myproj" });
+  // Stub the sidechat interactive socket so the send falls through to HTTP
+  // (send() returns false), keeping the API assertions deterministic in jsdom.
+  useSidechatStore.setState({
+    chatWS: {
+      send: vi.fn(() => false),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      onFrame: vi.fn(() => () => {}),
+      isOpen: false,
+    } as unknown as import("../../lib/chat-ws").InteractiveChatWS,
+    _cogDedup: new CogDedup(),
+    streaming: null,
+    thinkingBlocks: {},
+  });
   mockApi.mockResolvedValue(DIFF_RESPONSE as never);
 });
 

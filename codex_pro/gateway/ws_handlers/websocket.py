@@ -385,6 +385,35 @@ class WebSocketHandler:
                                     await websocket.send_json({"type": "error", "error": "server overloaded"})
                                     continue
                                 published = True
+                                # Give the session a title from its first user message
+                                # NOW, before the broadcast below, so the sidebar list
+                                # shows a proper label the moment the turn is accepted
+                                # instead of the raw session key. Mirrors add_message's
+                                # guard: only set when no title exists yet.
+                                if not getattr(session, "title", "") and text:
+                                    session.title = session.derive_title(text)
+                                    save = (
+                                        getattr(ws_workspace, "session_manager", None)
+                                        or getattr(self._server, "session_manager", None)
+                                    )
+                                    if save is not None and hasattr(save, "save"):
+                                        try:
+                                            await save.save(session)
+                                        except Exception as e:  # noqa: BLE001 — 标题持久化失败不阻断本轮
+                                            logger.warning(
+                                                "Failed to persist session title for {}: {}",
+                                                session_key, e,
+                                            )
+                                # Mirror the HTTP /message path: broadcast a
+                                # session_message so the web sidebar refreshes its
+                                # recent-session list the moment a turn is accepted
+                                # (this is how a brand-new conversation becomes
+                                # visible without a page reload). The HTTP handler
+                                # does this at message_handler.py:702.
+                                await self._server._web_ws.broadcast(
+                                    "session_message",
+                                    {"session_key": session_key, "event_id": event.event_id},
+                                )
                                 if durable_claimed:
                                     await asyncio.shield(
                                         self._server._bus.mark_durable_idempotency_admitted(event.event_id)
@@ -521,6 +550,16 @@ class WebSocketHandler:
                     await self._server._message_idempotency.complete_event(
                         correlation_id, status=response_status, payload=response_payload,
                     )
+                # The turn just completed — the session is saved with its title and
+                # user/assistant messages. Broadcast a session_message so the web
+                # sidebar re-fetches its recent-session list and shows the proper
+                # title (the accept-time broadcast at :393 only fires before the
+                # user message is persisted, so the list would show the raw key).
+                real_key = idempotency_context.get("session_key", session_key)
+                await self._server._web_ws.broadcast(
+                    "session_message",
+                    {"session_key": real_key, "event_id": correlation_id},
+                )
 
         delivered = await self.broadcast_to_ws(session_key, payload)
         if buffer_error is not None:

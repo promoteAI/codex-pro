@@ -195,7 +195,9 @@ class TurnEventEmitter:
 
         return on_reasoning
 
-    async def settle_thinking(self, event, stream, response, duration_ms) -> None:
+    async def settle_thinking(
+        self, event, stream, response, duration_ms, *, collector: list | None = None
+    ) -> None:
         """Close out a round's thinking line once the response is in hand.
 
         Three cases, and the reason each needs handling:
@@ -209,6 +211,11 @@ class TurnEventEmitter:
           same text twice.
         * The provider never streamed — emit the whole trace once, exactly as
           before streaming existed.
+
+        ``collector`` is an optional list the caller passes to capture the settled
+        spans for persistence. Only *non-retracted* spans (text survives) are
+        appended — a retracted trace is the answer itself and must not be shown
+        twice in a reopened session's history.
         """
         reasoning = getattr(response, "reasoning_content", None)
         if stream.streamed:
@@ -217,6 +224,7 @@ class TurnEventEmitter:
                     event, duration_ms, reasoning,
                     thinking_id=stream.thinking_id,
                 )
+                self._collect_thinking(collector, stream.thinking_id, reasoning, duration_ms)
             else:
                 await self.emit_thinking(
                     event, duration_ms, "",
@@ -227,6 +235,26 @@ class TurnEventEmitter:
             await self.emit_thinking(
                 event, duration_ms, reasoning, thinking_id=stream.thinking_id,
             )
+            self._collect_thinking(collector, stream.thinking_id, reasoning, duration_ms)
+
+    @staticmethod
+    def _collect_thinking(
+        collector: list | None, thinking_id: str, text: str, duration_ms: int,
+    ) -> None:
+        """Append a settled (non-retracted) reasoning span to ``collector``.
+
+        Mirrors the text truncation in ``emit_thinking`` so a persisted span is
+        exactly what the live client saw. No-op when ``collector`` is None.
+        """
+        if collector is None:
+            return
+        collector.append(
+            {
+                "thinking_id": thinking_id,
+                "text": str(text)[:2000],
+                "duration_ms": int(duration_ms),
+            }
+        )
 
     async def emit_thinking(
         self, event, duration_ms, text, *,

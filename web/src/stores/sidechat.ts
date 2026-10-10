@@ -1,7 +1,14 @@
 import { create } from "zustand";
 import { apiFetch, apiUpload } from "../lib/api";
-import { webWS } from "../lib/ws";
+import { InteractiveChatWS, type ChatFrame } from "../lib/chat-ws";
+import {
+  parseCogFrame,
+  applyThinkingFrame,
+  CogDedup,
+  type ThinkingBlocks,
+} from "../lib/chat-ws-frame";
 import { toast } from "./toast";
+import { useAuthStore } from "./auth";
 import {
   useChatStore,
   type ChatMessage,
@@ -10,6 +17,7 @@ import {
   type ClarifyTicket,
   type PendingAttachment,
   mapHistoryMessages,
+  pruneSettledThinking,
 } from "./chat";
 
 /**
@@ -42,6 +50,14 @@ interface SidechatState {
   /** True once the user stopped the stream, so neither the poll loop nor the WS
    *  handler overwrites the bubbles already on screen with a fresh history fetch. */
   streamStopped: boolean;
+  /** The single live in-progress assistant bubble from the interactive /ws. */
+  streaming: { eventId: string; text: string } | null;
+  /** Live thinking/trace blocks keyed by thinking_id. */
+  thinkingBlocks: ThinkingBlocks;
+  /** The interactive /ws connection owned by this store. */
+  chatWS: InteractiveChatWS;
+  /** Dedup of seen cognitive cog_event_ids. */
+  _cogDedup: CogDedup;
   setDraft: (draft: string) => void;
   sendMessage: (text?: string, opts?: { force?: boolean }) => void;
   decideApproval: (id: string, level: "once" | "session" | "deny") => void;
@@ -51,6 +67,8 @@ interface SidechatState {
   stopStream: () => void;
   clear: () => void;
   loadHistory: (sessionId: string) => Promise<void>;
+  _ensureChatWS: () => void;
+  _handleWsFrame: (frame: ChatFrame) => void;
   _pollForResponse: (sessionId: string, eventId: string, priorAssistantCount: number) => void;
   _softReloadHistory: (sessionId: string) => Promise<void>;
   _wsReloadHistory: (sessionId: string) => Promise<void>;
@@ -71,6 +89,10 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
   pendingClarify: null,
   pendingAttachments: [],
   streamStopped: false,
+  streaming: null,
+  thinkingBlocks: {},
+  chatWS: new InteractiveChatWS(),
+  _cogDedup: new CogDedup(),
 
   setDraft: (draft) => set({ draft }),
 
@@ -100,10 +122,18 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
       pendingClarify: null,
     }));
 
+    const attachments = get().pendingAttachments;
+    // Plain text goes over the interactive /ws (streams + thinking). Attachments
+    // keep the HTTP POST path (the WS message frame only reads text). send()
+    // buffers until auth_ok, so the first message of a new session streams too.
+    if (attachments.length === 0) {
+      get()._ensureChatWS();
+      if (get().chatWS.send({ type: "message", text: content })) return;
+    }
+
     void (async () => {
       try {
         const projectPath = useChatStore.getState().projectPath;
-        const attachments = get().pendingAttachments;
         const idempotencyKey = `${sessionId}:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const result = await apiFetch<{ status: string; event_id: string; session_key: string }>(
           "/message",
@@ -132,6 +162,125 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
         }));
       }
     })();
+  },
+
+  _ensureChatWS: () => {
+    const s = get();
+    const sessionId = s.sessionId;
+    if (!sessionId) return;
+    s.chatWS.connect({
+      platform: "cli",
+      sessionKey: sessionId,
+      token: useAuthStore.getState().token ?? "",
+    });
+  },
+
+  _handleWsFrame: (frame) => {
+    const mtype = frame.type;
+
+    if (mtype === "accepted") {
+      if (frame.event_id) set({ pendingEventId: frame.event_id });
+      return;
+    }
+    if (mtype === "error") {
+      set((s) => ({
+        typing: false,
+        activeTool: null,
+        pendingEventId: null,
+        historyError: frame.error || "stream error",
+        ...(s.streaming ? { streaming: null } : {}),
+      }));
+      const sid = get().sessionId;
+      if (sid) void get()._refreshInteractions(sid);
+      return;
+    }
+    if (mtype === "auth_ok" || mtype === "pong") return;
+
+    const cog = parseCogFrame(frame);
+    if (cog) {
+      const dedup = get()._cogDedup;
+      if (dedup.seenOnce(cog.cog_event_id)) return;
+      const s = get();
+      switch (cog.cog_type) {
+        case "thinking": {
+          set({ thinkingBlocks: applyThinkingFrame(s.thinkingBlocks, cog) });
+          break;
+        }
+        case "approval_request":
+        case "approval_closed":
+        case "clarify_request":
+        case "clarify_closed": {
+          const sid = get().sessionId;
+          if (sid) void get()._refreshInteractions(sid);
+          break;
+        }
+        case "tool_call": {
+          // The interactive /ws path never polls /history mid-turn, so the
+          // tool "running" highlight + tool row must come from these frames
+          // (status="running" before exec, a terminal status after).
+          const name = String(cog.data?.name ?? "");
+          const status = String(cog.data?.status ?? "running");
+          set((s) => ({
+            activeTool:
+              status === "running" ? name : s.activeTool === name ? null : s.activeTool,
+          }));
+          const sid = get().sessionId;
+          if (sid) void get()._wsReloadHistory(sid);
+          break;
+        }
+        default:
+          break;
+      }
+      return;
+    }
+
+    const meta = frame.metadata ?? {};
+    const inboundId = String(meta._inbound_event_id ?? frame.reply_to_id ?? "");
+    if (meta._approval_request) return;
+    const isControlReply =
+      typeof frame.text === "string" &&
+      /^\/(approve|deny|clarify)\b/.test(frame.text.trim());
+    if (isControlReply) return;
+    if (meta._tool_delivery) return;
+
+    const isStreaming = Boolean(meta._token_stream) && !frame.is_final;
+    const isFinal = frame.is_final || frame.message_kind === "final";
+
+    if (isStreaming) {
+      if (meta._stream_reset) {
+        set((s) => (s.streaming ? { streaming: { ...s.streaming, text: "" } } : {}));
+        return;
+      }
+      const text = frame.text ?? "";
+      set((s) => {
+        if (s.streaming?.eventId === inboundId) {
+          return { streaming: { ...s.streaming, text: s.streaming.text + text } };
+        }
+        return { streaming: { eventId: inboundId, text } };
+      });
+      return;
+    }
+
+    if (isFinal) {
+      const text = frame.text ?? "";
+      const done = get().streaming?.eventId === inboundId;
+      // Commit the answer, then reload the persisted transcript. The session is
+      // saved (with interleaved `thinking` rows per round) BEFORE the final
+      // frame is published, so /history is the authoritative, correctly-ordered
+      // view — folding live `thinkingBlocks` here would stack every span before
+      // the answer instead of interleaving them with tool calls.
+      set((s) => ({
+        messages: [...s.messages, { id: `a-${Date.now()}`, role: "assistant", content: text }],
+        streaming: done ? null : s.streaming,
+        typing: false,
+        activeTool: null,
+        pendingEventId: null,
+        thinkingBlocks: {},
+      }));
+      const sid = get().sessionId;
+      if (sid) void get()._wsReloadHistory(sid);
+      if (sid) void get()._refreshInteractions(sid);
+    }
   },
 
   decideApproval: (id, level) => {
@@ -165,17 +314,19 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
   clearAttachments: () => set({ pendingAttachments: [] }),
 
   stopStream: () => {
-    const { sessionId, pendingEventId } = get();
-    const sent = webWS.send({
+    const { pendingEventId } = get();
+    // Interrupt goes over the interactive /ws; the server already knows our
+    // session_key from the auth handshake, so only the exact event_id is needed.
+    const sent = get().chatWS.send({
       type: "interrupt",
-      ...(sessionId ? { session_key: sessionId } : {}),
       ...(pendingEventId ? { event_id: pendingEventId } : {}),
     });
     set({ typing: false, activeTool: null, pendingEventId: null, streamStopped: true });
     if (!sent) toast.error("停止失败：连接未就绪");
   },
 
-  clear: () =>
+  clear: () => {
+    get().chatWS.disconnect();
     set({
       messages: [],
       sessionId: null,
@@ -188,7 +339,11 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
       pendingApprovals: [],
       pendingClarify: null,
       pendingAttachments: [],
-    }),
+      streaming: null,
+      thinkingBlocks: {},
+      _cogDedup: new CogDedup(),
+    });
+  },
 
   loadHistory: async (sessionId) => {
     set({ loadingHistory: true, historyError: null, sessionId });
@@ -203,7 +358,11 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
         chatting: messages.length > 0,
         typing: false,
         activeTool: null,
+        streaming: null,
+        thinkingBlocks: {},
+        _cogDedup: new CogDedup(),
       });
+      get()._ensureChatWS();
     } catch (e: unknown) {
       set({
         messages: [],
@@ -211,6 +370,8 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
         historyError: e instanceof Error ? e.message : String(e),
         typing: false,
         activeTool: null,
+        streaming: null,
+        thinkingBlocks: {},
       });
     }
   },
@@ -221,7 +382,8 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
         `/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`,
       );
       if (get().sessionId !== sessionId) return;
-      set({ messages: mapHistoryMessages(sessionId, result.messages ?? []) });
+      const messages = mapHistoryMessages(sessionId, result.messages ?? []);
+      set({ messages, thinkingBlocks: pruneSettledThinking(messages, get().thinkingBlocks) });
     } catch {
       // transient — next poll may succeed
     }
@@ -235,7 +397,8 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
         `/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`,
       );
       if (get().sessionId !== sessionId) return;
-      set({ messages: mapHistoryMessages(sessionId, result.messages ?? []) });
+      const messages = mapHistoryMessages(sessionId, result.messages ?? []);
+      set({ messages, thinkingBlocks: pruneSettledThinking(messages, get().thinkingBlocks) });
     } catch {
       // transient — next WS event or poll will retry
     }
@@ -315,3 +478,8 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
     }
   },
 }));
+
+// Route every frame on the sidechat's interactive socket to its handler.
+useSidechatStore.getState().chatWS.onFrame((frame) =>
+  useSidechatStore.getState()._handleWsFrame(frame),
+);

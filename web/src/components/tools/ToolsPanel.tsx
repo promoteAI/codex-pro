@@ -522,6 +522,8 @@ function SidechatPane() {
   const loadingHistory = useSidechatStore((s) => s.loadingHistory);
   const sessionId = useSidechatStore((s) => s.sessionId);
   const streamStopped = useSidechatStore((s) => s.streamStopped);
+  const streaming = useSidechatStore((s) => s.streaming);
+  const thinkingBlocks = useSidechatStore((s) => s.thinkingBlocks);
   const pendingApprovals = useSidechatStore((s) => s.pendingApprovals);
   const pendingClarify = useSidechatStore((s) => s.pendingClarify);
   const decideApproval = useSidechatStore((s) => s.decideApproval);
@@ -610,6 +612,8 @@ function SidechatPane() {
     activeTool,
     sessionId,
     streamStopped,
+    streaming,
+    thinkingBlocks,
     pendingApprovals,
     pendingClarify,
     decideApproval,

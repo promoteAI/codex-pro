@@ -129,6 +129,13 @@ class ResponseStage:
                 substitute_empty=not is_inspection,
             )
 
+        # Persist this turn's settled thinking. Each span's `msg_index` was
+        # anchored in the tool loop to the assistant message of the round that
+        # produced it (either a tool-call round or the final reply), so thinking
+        # interleaves with tool calls rather than piling up before the answer.
+        # The spans were already added to the session by the tool loop (so a live
+        # /history reload mid-turn sees them interleaved); here we only save.
+
         session.add_message("assistant", response_text)
         await self._sessions.save(session)
 

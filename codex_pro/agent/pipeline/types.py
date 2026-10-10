@@ -59,3 +59,6 @@ class InferenceResult:
     task_incomplete: bool = False
     output_truncated: bool = False
     termination_reason: str = ""
+    # Settled (non-retracted) reasoning spans from the tool loop, carried to
+    # ResponseStage.finalize so they can be persisted into the session.
+    reasonings: list[dict] = field(default_factory=list)

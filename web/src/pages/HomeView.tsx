@@ -47,6 +47,8 @@ export function HomeView() {
   const activeTool = useChatStore((s) => s.activeTool);
   const sessionId = useChatStore((s) => s.sessionId);
   const streamStopped = useChatStore((s) => s.streamStopped);
+  const streaming = useChatStore((s) => s.streaming);
+  const thinkingBlocks = useChatStore((s) => s.thinkingBlocks);
   const pendingApprovals = useChatStore((s) => s.pendingApprovals);
   const pendingClarify = useChatStore((s) => s.pendingClarify);
   const decideApproval = useChatStore((s) => s.decideApproval);
@@ -62,6 +64,8 @@ export function HomeView() {
     activeTool,
     sessionId,
     streamStopped,
+    streaming,
+    thinkingBlocks,
     pendingApprovals,
     pendingClarify,
     decideApproval,

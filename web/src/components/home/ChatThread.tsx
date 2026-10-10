@@ -1,11 +1,13 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { type ChatMessage, type ToolCallFn, type ApprovalTicket, type ClarifyTicket } from "../../stores/chat";
+import { type ThinkingBlocks } from "../../lib/chat-ws-frame";
 import { useWsSubscribe } from "../../hooks/use-ws";
 import { Markdown } from "./markdown";
 import { ApprovalCard } from "./ApprovalCard";
 import { ClarifyCard } from "./ClarifyCard";
 import { TaskActivityItem } from "./TaskActivityItem";
+import { ThinkingBlock } from "./ThinkingBlock";
 
 /** Render a single tool/activity row. */
 function renderActivity(
@@ -19,7 +21,7 @@ function renderActivity(
   const toolName = m.name || m.tool_calls?.[0]?.function?.name;
   const isCurrentTool = toolName === activeTool && isRunning;
   if (m.role === "tool") {
-    return <TaskActivityItem title={title} toolName={toolName} output={m.content} running={isCurrentTool} />;
+    return <TaskActivityItem key={`${m.id}-res`} title={title} toolName={toolName} output={m.content} running={isCurrentTool} />;
   }
   if (m.tool_calls?.length) {
     return m.tool_calls.map((tc: ToolCallFn) => {
@@ -36,7 +38,7 @@ function renderActivity(
     });
   }
   if (m.internal) {
-    return <TaskActivityItem title={m.name || t("unknownTool")} toolName={m.name} output={m.content} running={isCurrentTool} />;
+    return <TaskActivityItem key={`${m.id}-int`} title={m.name || t("unknownTool")} toolName={m.name} output={m.content} running={isCurrentTool} />;
   }
   return null;
 }
@@ -49,6 +51,8 @@ export interface ChatThreadSelectors {
   activeTool: string | null;
   sessionId: string | null;
   streamStopped: boolean;
+  streaming: { eventId: string; text: string } | null;
+  thinkingBlocks: ThinkingBlocks;
   pendingApprovals: ApprovalTicket[];
   pendingClarify: ClarifyTicket | null;
   decideApproval: (id: string, level: "once" | "session" | "deny") => void;
@@ -71,6 +75,8 @@ export function ChatThread({ selectors }: ChatThreadProps) {
     activeTool,
     sessionId,
     streamStopped,
+    streaming,
+    thinkingBlocks,
     pendingApprovals,
     pendingClarify,
     decideApproval,
@@ -96,7 +102,7 @@ export function ChatThread({ selectors }: ChatThreadProps) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, typing, activeTool, pendingApprovals.length, pendingClarify]);
+  }, [messages.length, typing, activeTool, streaming?.text.length, Object.keys(thinkingBlocks).length, pendingApprovals.length, pendingClarify]);
 
   return (
     <div ref={containerRef} className="flex-1 min-h-0 overflow-y-auto px-[clamp(16px,4vw,48px)] pb-[200px] pt-5 scrollbar-gutter-stable" aria-label="chat">
@@ -119,6 +125,27 @@ export function ChatThread({ selectors }: ChatThreadProps) {
             turn = [];
           };
           messages.forEach((m, idx) => {
+            // A persisted thinking span from history renders as a collapsed
+            // reasoning block and belongs to the SAME turn-group as the tool
+            // activity around it (it interleaves: think → toolcall → tool →
+            // think → …). Push it into the current `turn` rather than calling
+            // pushTurn(), which would split the turn at every thinking row.
+            if (m.thinking) {
+              turn.push(
+                <ThinkingBlock
+                  key={`${m.id}-think`}
+                  block={{
+                    thinkingId: m.thinking.thinkingId,
+                    text: m.thinking.text,
+                    streaming: false,
+                    durationMs: m.thinking.durationMs,
+                    retracted: false,
+                    cogEventId: m.id,
+                  }}
+                />,
+              );
+              return;
+            }
             const isActivity =
               m.role === "tool" || m.internal || (m.tool_calls && m.tool_calls.length > 0);
             if (isActivity) {
@@ -152,43 +179,56 @@ export function ChatThread({ selectors }: ChatThreadProps) {
           return nodes;
         })()}
 
-        {typing && (
+        {Object.values(thinkingBlocks).map((b) => (
+          <ThinkingBlock key={b.thinkingId} block={b} />
+        ))}
+
+        {streaming ? (
           <div className="chat-msg is-assistant">
-            {activeTool ? (
-              <div className="inline-flex items-center gap-2 px-1 mb-1">
-                <span className="bui-pixels" aria-hidden>
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 0ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 90ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 180ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 270ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 360ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 450ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 540ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 630ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 720ms infinite" }} />
-                </span>
-                <span className="bui-shimmer text-[13px]">{t("toolRunning", { name: activeTool })}</span>
-              </div>
-            ) : (
-              <div className="inline-flex items-center gap-2.5 px-1 mb-1">
-                <span className="bui-pixels" aria-hidden>
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 0ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 90ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 180ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 270ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 360ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 450ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 540ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 630ms infinite" }} />
-                  <span style={{ animation: "bui-pixel-on 650ms ease-in-out 720ms infinite" }} />
-                </span>
-                <span className="bui-shimmer text-[13px]">{t("thinking")}</span>
-              </div>
-            )}
             <div className="chat-msg-bubble">
+              {streaming.text}
               <span className="chat-cursor" aria-hidden />
             </div>
           </div>
+        ) : (
+          typing && (
+            <div className="chat-msg is-assistant">
+              {activeTool ? (
+                <div className="inline-flex items-center gap-2 px-1 mb-1">
+                  <span className="bui-pixels" aria-hidden>
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 0ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 90ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 180ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 270ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 360ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 450ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 540ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 630ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 720ms infinite" }} />
+                  </span>
+                  <span className="bui-shimmer text-[13px]">{t("toolRunning", { name: activeTool })}</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2.5 px-1 mb-1">
+                  <span className="bui-pixels" aria-hidden>
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 0ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 90ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 180ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 270ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 360ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 450ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 540ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 630ms infinite" }} />
+                    <span style={{ animation: "bui-pixel-on 650ms ease-in-out 720ms infinite" }} />
+                  </span>
+                  <span className="bui-shimmer text-[13px]">{t("thinking")}</span>
+                </div>
+              )}
+              <div className="chat-msg-bubble">
+                <span className="chat-cursor" aria-hidden />
+              </div>
+            </div>
+          )
         )}
         {pendingApprovals.map((a) => (
           <ApprovalCard

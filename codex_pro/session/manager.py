@@ -67,6 +67,14 @@ class Session:
     forked_from_id: str = ""
     type: str = "interactive"  # interactive | temporary | workflow
     pinned: bool = False
+    # Reasoned "thinking" spans from each LLM round, kept OUT of ``messages``.
+    # ``get_history`` / consolidation read only ``messages``, so a non-standard
+    # role here would otherwise be force-coerced to a ``user`` message for the
+    # model (see format_utils) and pollute its context. Each entry is a dict:
+    #   {"thinking_id", "text", "duration_ms", "timestamp", "msg_index"}
+    # where ``msg_index`` is the position in ``messages`` of the assistant reply
+    # this thinking belongs to (filled at persist time).
+    thinkings: list[dict[str, Any]] = field(default_factory=list)
 
     def add_message(self, role: str, content: str, **kwargs: Any) -> None:
         # Give the session a human-readable title from its first user turn so the
@@ -92,6 +100,33 @@ class Session:
             **kwargs,
         }
         self.messages.append(msg)
+        self.updated_at = datetime.now()
+
+    def add_thinking(
+        self,
+        *,
+        thinking_id: str,
+        text: str,
+        duration_ms: int,
+        msg_index: int | None = None,
+    ) -> None:
+        """Append a settled reasoning span, kept separate from ``messages``.
+
+        Thinking is never part of the LLM's working record (``get_history`` reads
+        only ``messages``), so it is stored in its own ordered list and merged back
+        into the human-readable view by ``display_messages`` at ``msg_index``.
+        ``msg_index`` is the position in ``messages`` of the assistant reply this
+        thinking precedes; it is filled by the pipeline at persist time.
+        """
+        self.thinkings.append(
+            {
+                "thinking_id": thinking_id,
+                "text": text,
+                "duration_ms": int(duration_ms),
+                "timestamp": datetime.now().isoformat(),
+                "msg_index": msg_index,
+            }
+        )
         self.updated_at = datetime.now()
 
     @staticmethod
@@ -205,8 +240,27 @@ class Session:
         """
         from codex_pro.agent.compression.assembler import SUMMARY_ACK, SUMMARY_PREFIX
 
+        # Reasoning spans are merged in here (by ``msg_index``) so the human
+        # transcript shows each thinking line just before the assistant reply it
+        # preceded. Kept out of ``self.messages`` entirely — see add_thinking.
+        thinkings_by_index: dict[int | None, list[dict[str, Any]]] = {}
+        for th in self.thinkings:
+            thinkings_by_index.setdefault(th.get("msg_index"), []).append(th)
+
+        def _thinking_row(th: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "role": "thinking",
+                "content": th.get("text", ""),
+                "thinking_id": th.get("thinking_id", ""),
+                "duration_ms": th.get("duration_ms", 0),
+                "timestamp": th.get("timestamp", ""),
+                "internal": True,
+            }
+
         visible: list[dict[str, Any]] = []
-        for msg in self.messages:
+        for idx, msg in enumerate(self.messages):
+            # Emit any thinking that precedes this message before the message.
+            visible.extend(_thinking_row(th) for th in thinkings_by_index.pop(idx, []))
             role = msg.get("role")
             content = msg.get("content")
             if isinstance(content, str):
@@ -219,6 +273,10 @@ class Session:
             if role == "tool" or msg.get("tool_calls"):
                 entry["internal"] = True
             visible.append(entry)
+        # Any thinking whose msg_index fell outside the message list (or was
+        # never tagged) goes to the end, preserving its stored order.
+        for idx in thinkings_by_index:
+            visible.extend(_thinking_row(th) for th in thinkings_by_index[idx])
         return visible
 
     def clear(self) -> None:
@@ -497,6 +555,9 @@ class SessionManager:
         workspace = data.get("workspace", "")
         if not isinstance(workspace, str):
             workspace = ""
+        thinkings = data.get("thinkings", [])
+        if not isinstance(thinkings, list):
+            thinkings = []
         return Session(
             key=key,
             messages=messages,
@@ -513,6 +574,7 @@ class SessionManager:
             forked_from_id=data.get("forked_from_id", ""),
             type=data.get("type", "interactive"),
             pinned=bool(data.get("pinned", False)),
+            thinkings=thinkings,
         )
 
     async def _load_from_file(self, key: str) -> Session | None:
@@ -524,6 +586,7 @@ class SessionManager:
 
             def _sync_load() -> Session | None:
                 messages: list[dict[str, Any]] = []
+                thinkings: list[dict[str, Any]] = []
                 metadata: dict[str, Any] = {}
                 created_at = None
                 updated_at = None
@@ -558,6 +621,12 @@ class SessionManager:
                             forked_from_id = data.get("forked_from_id", "")
                             session_type = data.get("type", "interactive")
                             pinned = bool(data.get("pinned", False))
+                        elif data.get("_type") == "thinking":
+                            # Drop the marker key so the span matches the schema
+                            # of the in-memory `thinkings` list entries.
+                            th = dict(data)
+                            th.pop("_type", None)
+                            thinkings.append(th)
                         else:
                             messages.append(data)
 
@@ -575,6 +644,7 @@ class SessionManager:
                     "forked_from_id": forked_from_id,
                     "type": session_type,
                     "pinned": pinned,
+                    "thinkings": thinkings,
                 })
 
             return await asyncio.to_thread(_sync_load)
@@ -607,6 +677,7 @@ class SessionManager:
             "forked_from_id": session.forked_from_id,
             "type": session.type,
             "pinned": session.pinned,
+            "thinkings": session.thinkings,
         }
         try:
             await self._storage.store_session(session.key, data)
@@ -634,6 +705,7 @@ class SessionManager:
         # Snapshot on the event loop before handing off to a thread: the
         # writer must not iterate a list another task may still append to.
         messages_snapshot = list(session.messages)
+        thinkings_snapshot = list(session.thinkings)
         meta = {
             "_type": "metadata",
             "key": session.key,
@@ -659,6 +731,11 @@ class SessionManager:
                     f.write(json.dumps(meta, ensure_ascii=False) + "\n")
                     for msg in messages_snapshot:
                         f.write(json.dumps(msg, ensure_ascii=False) + "\n")
+                    # Thinking spans ride along as their own `_type` lines so the
+                    # reader can tell them apart from messages, keeping the JSONL
+                    # format uniform (a separate list is not stuffed into meta).
+                    for th in thinkings_snapshot:
+                        f.write(json.dumps({"_type": "thinking", **th}, ensure_ascii=False) + "\n")
                     f.flush()
                     os.fsync(f.fileno())
                 os.replace(tmp, str(path))

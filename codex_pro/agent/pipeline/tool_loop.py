@@ -66,6 +66,9 @@ class LoopResult:
     skill_iters: int = 0
     memory_iters: int = 0
     degraded_notices: list[str] = field(default_factory=list)
+    # Settled (non-retracted) reasoning spans from each LLM round, carried out
+    # so InferenceStage → ResponseStage can persist them into the session.
+    reasonings: list[dict] = field(default_factory=list)
 
 
 ChatStreamFn = Callable[..., Awaitable[tuple[LLMResponse, RouteDecision]]]
@@ -158,6 +161,10 @@ class ToolLoop:
         artifact_incomplete = False
         output_truncated = False
         artifact_contract_retries = 0
+        # Settled reasoning spans from each LLM round. Passed into
+        # settle_thinking as the collector; only non-retracted spans survive,
+        # and they are threaded out to InferenceResult for persistence.
+        reasonings: list[dict] = []
 
         # Read nudge counters from session (do NOT write back — run() owns that)
         _skill_iters = session.metadata.get("_nudge_tool_iters_skill", 0)
@@ -283,10 +290,34 @@ class ToolLoop:
             # partial snapshots under _thinking.thinking_id and this closes it
             # out; providers that don't emit their whole trace here for the
             # first time.
+            #
+            # Anchor each settled span to the assistant message this round is
+            # about to append (len(messages) right now), so thinking interleaves
+            # with the tool calls instead of piling up before the final answer.
+            reasoning_start = len(reasonings)
             await self._events.settle_thinking(
                 event, _thinking, response,
                 int((time.monotonic() - _llm_started) * 1000),
+                collector=reasonings,
             )
+            for span in reasonings[reasoning_start:]:
+                span["msg_index"] = len(session.messages)
+            # Persist this round's settled thinking to the session IMMEDIATELY so a
+            # live /history reload (triggered by the tool_call cog frame this round
+            # is about to emit) already sees the span interleaved with the tool
+            # row. Without this, live thinking only arrives as separate cognition
+            # frames that stack below the transcript — correct in a reopened session
+            # (finalize persists it) but not mid-turn. ResponseStage no longer
+            # re-adds; it only saves. For a tool-call round msg_index points at the
+            # assistant message appended below; for the final reply round it points
+            # at where ResponseStage will append the answer.
+            for span in reasonings[reasoning_start:]:
+                session.add_thinking(
+                    thinking_id=span.get("thinking_id", ""),
+                    text=span.get("text", ""),
+                    duration_ms=int(span.get("duration_ms", 0) or 0),
+                    msg_index=span.get("msg_index", len(session.messages)),
+                )
 
             # post_llm_call hook
             if self._live("_hook_registry") and self._live("_hook_registry").has_hooks("post_llm_call"):
@@ -653,5 +684,6 @@ class ToolLoop:
             skill_iters=counters.skill_iters,
             memory_iters=counters.memory_iters,
             degraded_notices=counters.degraded_notices,
+            reasonings=reasonings,
         )
 

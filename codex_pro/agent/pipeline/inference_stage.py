@@ -413,6 +413,7 @@ class InferenceStage:
                 "loop_exhausted" if loop_result.loop_exhausted else
                 "plan_step_failed" if plan_failed else ""
             ),
+            reasonings=loop_result.reasonings,
         )
 
 

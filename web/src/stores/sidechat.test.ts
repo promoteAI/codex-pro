@@ -2,7 +2,19 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { useSidechatStore } from "./sidechat";
 import { useChatStore } from "./chat";
 import * as api from "../lib/api";
-import { webWS } from "../lib/ws";
+import { CogDedup } from "../lib/chat-ws-frame";
+
+/** Stubbed interactive /ws so store tests fall through to the HTTP POST path
+ *  (send() returns false) unless the test overrides it. */
+function fakeChatWS() {
+  return {
+    send: vi.fn(() => false),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    onFrame: vi.fn(() => () => {}),
+    isOpen: false,
+  } as unknown as import("../lib/chat-ws").InteractiveChatWS;
+}
 
 beforeEach(() => {
   useSidechatStore.setState({
@@ -18,6 +30,10 @@ beforeEach(() => {
     pendingApprovals: [],
     pendingClarify: null,
     streamStopped: false,
+    streaming: null,
+    thinkingBlocks: {},
+    chatWS: fakeChatWS(),
+    _cogDedup: new CogDedup(),
   });
   useChatStore.setState({ projectPath: "/ws/myproj" });
   vi.useFakeTimers();
@@ -89,15 +105,16 @@ describe("sidechat store", () => {
     expect(useSidechatStore.getState().messages).toHaveLength(0);
   });
 
-  it("stopStream sends an interrupt frame with the side session + event ids", () => {
+  it("stopStream sends an interrupt frame with the event id", () => {
     useSidechatStore.setState({ typing: true, sessionId: "cli:web-side-1", pendingEventId: "evt-9" });
-    const sendSpy = vi.spyOn(webWS, "send").mockReturnValue(true);
+    const sendSpy = vi
+      .spyOn(useSidechatStore.getState().chatWS, "send")
+      .mockReturnValue(true);
 
     useSidechatStore.getState().stopStream();
 
     expect(sendSpy).toHaveBeenCalledWith({
       type: "interrupt",
-      session_key: "cli:web-side-1",
       event_id: "evt-9",
     });
     expect(useSidechatStore.getState().typing).toBe(false);

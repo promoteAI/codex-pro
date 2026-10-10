@@ -1,7 +1,14 @@
 import { create } from "zustand";
 import { apiFetch, apiUpload } from "../lib/api";
-import { webWS } from "../lib/ws";
+import { InteractiveChatWS, type ChatFrame } from "../lib/chat-ws";
+import {
+  parseCogFrame,
+  applyThinkingFrame,
+  CogDedup,
+  type ThinkingBlocks,
+} from "../lib/chat-ws-frame";
 import { toast } from "./toast";
+import { useAuthStore } from "./auth";
 import i18n from "../i18n";
 
 /** A browser-selected file that has been uploaded to the gateway via
@@ -28,6 +35,9 @@ export interface ChatMessage {
   name?: string;
   tool_call_id?: string;
   tool_calls?: ToolCallFn[];
+  /** A reasoning span from a reopened history session. When set, the row is
+   *  rendered as a collapsed thinking block (not a chat bubble). */
+  thinking?: { thinkingId: string; text: string; durationMs: number };
 }
 
 export interface GitRepo {
@@ -65,10 +75,28 @@ export type HistoryRow = {
   name?: string;
   tool_call_id?: string;
   tool_calls?: ToolCallFn[];
+  thinking_id?: string;
+  duration_ms?: number;
 };
 
 export function mapHistoryMessages(sessionId: string, rows: HistoryRow[]): ChatMessage[] {
   return (rows ?? []).map((m, i) => {
+    // A persisted thinking row is a reasoning span, rendered as a collapsed
+    // block rather than a chat bubble. Kept on a separate `thinking` field so
+    // the closed role union (user/assistant/system/tool) is never stretched.
+    if (m.role === "thinking") {
+      return {
+        id: `${sessionId}-${i}`,
+        role: "assistant",
+        content: m.content ?? "",
+        internal: true,
+        thinking: {
+          thinkingId: m.thinking_id ?? `${sessionId}-${i}`,
+          text: m.content ?? "",
+          durationMs: m.duration_ms ?? 0,
+        },
+      };
+    }
     const role: ChatMessage["role"] =
       m.role === "user"
         ? "user"
@@ -87,6 +115,30 @@ export function mapHistoryMessages(sessionId: string, rows: HistoryRow[]): ChatM
       tool_calls: m.tool_calls,
     };
   });
+}
+
+/** Drop live thinking blocks whose span has already been persisted into the
+ *  loaded transcript as a ``thinking`` row.
+ *
+ *  Live thinking arrives as separate ``thinkingBlocks`` (rendered below the
+ *  messages), but once a round settles it is persisted to the session and the
+ *  next /history reload carries it as a ``thinking`` row interleaved with the
+ *  tool call. Keeping both would render the same span twice. The reloaded row
+ *  is authoritative (settled text + duration), so the live block is removed. */
+export function pruneSettledThinking(
+  messages: ChatMessage[],
+  thinkingBlocks: ThinkingBlocks,
+): ThinkingBlocks {
+  const settled = new Set<string>();
+  for (const m of messages) {
+    if (m.thinking?.thinkingId) settled.add(m.thinking.thinkingId);
+  }
+  if (settled.size === 0) return thinkingBlocks;
+  const next: ThinkingBlocks = {};
+  for (const [id, block] of Object.entries(thinkingBlocks)) {
+    if (!settled.has(id)) next[id] = block;
+  }
+  return next;
 }
 
 // Composer 的权限三档(ask/agent/full) ↔ 后端 permissions.approval.mode
@@ -142,6 +194,16 @@ interface ChatState {
    *  tool cards already on screen) with a fresh history fetch. Cleared on the
    *  next sendMessage. */
   streamStopped: boolean;
+  /** The single live in-progress assistant bubble from the interactive /ws,
+   *  correlated by inbound event id. Null when no stream is mid-flight. */
+  streaming: { eventId: string; text: string } | null;
+  /** Live thinking/trace blocks keyed by thinking_id. */
+  thinkingBlocks: ThinkingBlocks;
+  /** The interactive /ws connection owned by this store. */
+  chatWS: InteractiveChatWS;
+  /** Dedup of seen cognitive cog_event_ids so a reconnect re-delivery does not
+   *  double-render a thinking block or approval card. */
+  _cogDedup: CogDedup;
   repos: GitRepo[];
   branches: GitBranch[];
   loadingBranches: boolean;
@@ -180,6 +242,8 @@ interface ChatState {
   loadRepos: () => Promise<void>;
   loadBranches: (repoPath: string) => Promise<void>;
   createBranch: (branchName: string) => Promise<void>;
+  _ensureChatWS: () => void;
+  _handleWsFrame: (frame: ChatFrame) => void;
   _pollForResponse: (sessionId: string, eventId: string, priorAssistantCount?: number) => void;
   _refreshInteractions: (sessionId: string) => Promise<void>;
   _softReloadHistory: (sessionId: string) => Promise<void>;
@@ -211,6 +275,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   pendingApprovals: [],
   pendingClarify: null,
   streamStopped: false,
+  streaming: null,
+  thinkingBlocks: {},
+  chatWS: new InteractiveChatWS(),
+  _cogDedup: new CogDedup(),
   repos: [],
   branches: [],
   loadingBranches: false,
@@ -313,7 +381,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }),
   clearPlanMode: () => set({ planMode: false, planTask: "", goalMode: false }),
 
-  clearChat: () =>
+  clearChat: () => {
+    // Disconnect the interactive socket so a stale /ws socket does not keep
+    // delivering frames for a session we have abandoned.
+    get().chatWS.disconnect();
     set({
       messages: [],
       sessionId: null,
@@ -327,10 +398,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       pendingAttachments: [],
       pendingApprovals: [],
       pendingClarify: null,
+      streaming: null,
+      thinkingBlocks: {},
+      _cogDedup: new CogDedup(),
       project: "",
       projectPath: "",
       isGit: false,
-    }),
+    });
+  },
 
   loadRepos: async () => {
     try {
@@ -435,6 +510,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
       streamStopped: false,
     }));
 
+    // The interactive /ws only carries plain text (websocket.py:156 reads
+    // `text`). Attachments must keep the HTTP POST + polling path, which also
+    // serves as the fallback when the interactive socket cannot be reached.
+    // On the WS path the server already knows our session_key from the auth
+    // frame and replies with an `accepted` frame carrying event_id — no
+    // per-message idempotency key needed. _ensureChatWS() opens the socket
+    // (no-op if already open); send() buffers until auth_ok so the very first
+    // message of a new session streams too.
+    if (pendingAttachments.length === 0) {
+      get()._ensureChatWS();
+      const sent = get().chatWS.send({ type: "message", text: content });
+      if (sent) return;
+      // Socket could not be opened at all — fall through to HTTP.
+    }
+
     try {
       const projectPath = get().projectPath;
       // Generate a per-message idempotency key so the backend sets a real
@@ -480,22 +570,163 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  _ensureChatWS: () => {
+    const s = get();
+    const sessionId = s.sessionId;
+    if (!sessionId) return;
+    // Auth frame: platform="cli" (enables gateway:cli cognitive + optimistic
+    // streaming), chat_id = session_key so the server registers this socket
+    // under gateway:cli:<sessionKey> and outbound frames for this turn route
+    // back to it. user_id is left empty — the browser passes the loopback/token
+    // gate exactly as HTTP /message does today.
+    s.chatWS.connect({
+      platform: "cli",
+      sessionKey: sessionId,
+      token: useAuthStore.getState().token ?? "",
+    });
+  },
+
+  _handleWsFrame: (frame) => {
+    const mtype = frame.type;
+
+    if (mtype === "accepted") {
+      // Capture the accepted turn's event_id so a later interrupt can scope to
+      // THIS turn (the gateway matches it against _inbound_event_id / target).
+      if (frame.event_id) set({ pendingEventId: frame.event_id });
+      return;
+    }
+    if (mtype === "error") {
+      set((s) => ({
+        typing: false,
+        activeTool: null,
+        pendingEventId: null,
+        historyError: frame.error || "stream error",
+        ...(s.streaming ? { streaming: null } : {}),
+      }));
+      const sid = get().sessionId;
+      if (sid) void get()._refreshInteractions(sid);
+      return;
+    }
+    if (mtype === "auth_ok" || mtype === "pong") return;
+
+    // Cognitive frames (thinking / approvals / ...) — only produced for
+    // gateway:cli, which is why we switched to platform="cli".
+    const cog = parseCogFrame(frame);
+    if (cog) {
+      const dedup = get()._cogDedup;
+      if (dedup.seenOnce(cog.cog_event_id)) return;
+      const s = get();
+      switch (cog.cog_type) {
+        case "thinking": {
+          set({ thinkingBlocks: applyThinkingFrame(s.thinkingBlocks, cog) });
+          break;
+        }
+        case "approval_request":
+        case "approval_closed":
+        case "clarify_request":
+        case "clarify_closed": {
+          const sid = get().sessionId;
+          if (sid) void get()._refreshInteractions(sid);
+          break;
+        }
+        case "tool_call": {
+          // Tool activity is NOT otherwise surfaced on the interactive /ws path
+          // (sendMessage returns without the 1s /history polling the HTTP path
+          // used to feed the tool rows). The turn_runs current_tool that drive
+          // the "running" highlight arrives here per invocation: status="running"
+          // before exec, a terminal status after. Set activeTool and refresh
+          // history so the TaskActivityItem row appears live.
+          const name = String(cog.data?.name ?? "");
+          const status = String(cog.data?.status ?? "running");
+          set((s) => ({
+            activeTool:
+              status === "running" ? name : s.activeTool === name ? null : s.activeTool,
+          }));
+          const sid = get().sessionId;
+          if (sid) void get()._wsReloadHistory(sid);
+          break;
+        }
+        default:
+          // heartbeat / cost_update / memory_* — already handled elsewhere or
+          // not rendered live on the WS path; skip to keep scope minimal.
+          break;
+      }
+      return;
+    }
+
+    // Plain outbound text (streaming or final).
+    const meta = frame.metadata ?? {};
+    const inboundId = String(meta._inbound_event_id ?? frame.reply_to_id ?? "");
+    // Control replies (approve/deny/clarify) are published as redundant text —
+    // the interactive approval/clarify UI already rendered them as cognitive
+    // frames. Avoid rendering them as assistant text or ending the turn.
+    if (meta._approval_request) return;
+    const isControlReply =
+      typeof frame.text === "string" &&
+      /^\/(approve|deny|clarify)\b/.test(frame.text.trim());
+    if (isControlReply) return;
+
+    if (meta._tool_delivery) return;
+
+    const isStreaming = Boolean(meta._token_stream) && !frame.is_final;
+    const isFinal = frame.is_final || frame.message_kind === "final";
+
+    if (isStreaming) {
+      // A optimistically-streamed draft turned out to be a pre-tool preamble
+      // and was retracted server-side. Clear the accumulated text (keep the
+      // bubble) so the next iteration's tokens don't splice onto the draft.
+      if (meta._stream_reset) {
+        set((s) => (s.streaming ? { streaming: { ...s.streaming, text: "" } } : {}));
+        return;
+      }
+      const text = frame.text ?? "";
+      set((s) => {
+        if (s.streaming?.eventId === inboundId) {
+          return { streaming: { ...s.streaming, text: s.streaming.text + text } };
+        }
+        return { streaming: { eventId: inboundId, text } };
+      });
+      return;
+    }
+
+    if (isFinal) {
+      const text = frame.text ?? "";
+      const done = get().streaming?.eventId === inboundId;
+      // Commit the answer, then reload the persisted transcript. The session is
+      // saved (with interleaved `thinking` rows per round) BEFORE the final
+      // frame is published, so /history is the authoritative, correctly-ordered
+      // view — folding live `thinkingBlocks` here would stack every span before
+      // the answer instead of interleaving them with tool calls.
+      set((s) => ({
+        messages: [...s.messages, { id: `a-${Date.now()}`, role: "assistant", content: text }],
+        streaming: done ? null : s.streaming,
+        typing: false,
+        activeTool: null,
+        pendingEventId: null,
+        thinkingBlocks: {},
+      }));
+      const sid = get().sessionId;
+      if (sid) void get()._wsReloadHistory(sid);
+      if (sid) void get()._refreshInteractions(sid);
+    }
+  },
+
   stopStream: () => {
-    const { sessionId, pendingEventId } = get();
-    // Send the interrupt control frame the WS server converts into a
-    // /__interrupt__ turn event. It needs both the session and the exact
-    // event_id so it stops this turn, not a later one on the same session.
-    const sent = webWS.send({
+    const { pendingEventId } = get();
+    // Send the interrupt control frame over the interactive /ws. The server
+    // already knows our session_key from the auth handshake, so only the exact
+    // event_id is needed to stop THIS turn, not a later one on the session.
+    const sent = get().chatWS.send({
       type: "interrupt",
-      ...(sessionId ? { session_key: sessionId } : {}),
       ...(pendingEventId ? { event_id: pendingEventId } : {}),
     });
     // Stop the spinner now, and drop pendingEventId so the in-flight poll
-    // loop exits on its next tick without calling finish()/loadSessionHistory.
-    // That reload would overwrite the local messages — including the tool
-    // cards already on screen — with a fresh, possibly stale history fetch
-    // while the interrupt is still being processed server-side. Freeze the
-    // current messages instead so they don't get cleared.
+    // loop (HTTP fallback) exits on its next tick without calling
+    // finish()/loadSessionHistory. That reload would overwrite the local
+    // messages — including the tool cards already on screen — with a fresh,
+    // possibly stale history fetch while the interrupt is still being
+    // processed server-side. Freeze the current messages instead so they
+    // don't get cleared.
     set({ typing: false, activeTool: null, pendingEventId: null, streamStopped: true });
     if (!sent) toast.error("停止失败：连接未就绪");
   },
@@ -506,9 +737,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         `/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`,
       );
       if (get().sessionId !== sessionId) return;
+      const messages = mapHistoryMessages(sessionId, result.messages ?? []);
       set({
-        messages: mapHistoryMessages(sessionId, result.messages ?? []),
+        messages,
         chatting: true,
+        // A span that settled (and is now interleaved in the reloaded
+        // transcript) must not also render from the live thinkingBlocks.
+        thinkingBlocks: pruneSettledThinking(messages, get().thinkingBlocks),
       });
     } catch {
       // keep typing; next poll may succeed
@@ -523,9 +758,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         `/sessions/${encodeURIComponent(sessionId)}/history?limit=100&offset=0`,
       );
       if (get().sessionId !== sessionId) return;
+      const messages = mapHistoryMessages(sessionId, result.messages ?? []);
       set({
-        messages: mapHistoryMessages(sessionId, result.messages ?? []),
+        messages,
         chatting: true,
+        thinkingBlocks: pruneSettledThinking(messages, get().thinkingBlocks),
       });
     } catch {
       // transient — next WS event or poll will retry
@@ -613,8 +850,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         chatting: messages.length > 0,
         typing: false,
         activeTool: null,
+        streaming: null,
+        thinkingBlocks: {},
+        _cogDedup: new CogDedup(),
         ...(project ? { projectPath: workspace || project, project } : { projectPath: "", project: "" }),
       });
+      // Open the interactive socket for this (re)opened session so the next
+      // send streams and thinking frames flow. No-op if already connected.
+      get()._ensureChatWS();
     } catch (e: unknown) {
       set({
         messages: [],
@@ -622,7 +865,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         historyError: e instanceof Error ? e.message : String(e),
         typing: false,
         activeTool: null,
+        streaming: null,
+        thinkingBlocks: {},
       });
     }
   },
 }));
+
+// Route every frame on the interactive socket to the store's handler, with a
+// stable reference so the store's own _handleWsFrame (which closes over get()/
+// set()) is the only subscriber. Registered once for the singleton store.
+useChatStore.getState().chatWS.onFrame((frame) =>
+  useChatStore.getState()._handleWsFrame(frame),
+);

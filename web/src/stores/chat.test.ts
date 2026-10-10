@@ -1,7 +1,22 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { useChatStore } from "./chat";
+import { useChatStore, mapHistoryMessages, pruneSettledThinking, type ChatMessage } from "./chat";
 import * as api from "../lib/api";
-import { webWS } from "../lib/ws";
+import { CogDedup } from "../lib/chat-ws-frame";
+
+/** A stubbed interactive /ws so store tests deterministically fall through to
+ *  the HTTP POST path (send returns false). The real InteractiveChatWS opens a
+ *  network socket, which is unavailable under jsdom; stubbing it keeps the
+ *  existing HTTP-path assertions valid while the WS-path tests assert on
+ *  chatWS.send directly. */
+function fakeChatWS() {
+  return {
+    send: vi.fn(() => false),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    onFrame: vi.fn(() => () => {}),
+    isOpen: false,
+  } as unknown as import("../lib/chat-ws").InteractiveChatWS;
+}
 
 beforeEach(() => {
   useChatStore.setState({
@@ -22,6 +37,10 @@ beforeEach(() => {
     pendingEventId: null,
     activeTool: null,
     streamStopped: false,
+    streaming: null,
+    thinkingBlocks: {},
+    chatWS: fakeChatWS(),
+    _cogDedup: new CogDedup(),
     pendingAttachments: [],
     pendingApprovals: [],
     pendingClarify: null,
@@ -76,10 +95,12 @@ describe("chat store", () => {
     expect(useChatStore.getState().typing).toBe(true);
     expect(useChatStore.getState().pendingEventId).toBe("evt-1");
 
-    await vi.advanceTimersByTimeAsync(2000);
+    // 1s poll #1 → /turns returns "running" (turnCalls=1): still streaming.
+    await vi.advanceTimersByTimeAsync(1000);
     expect(useChatStore.getState().typing).toBe(true);
 
-    await vi.advanceTimersByTimeAsync(2000);
+    // 1s poll #2 → /turns returns "failed" (turnCalls=2): terminal → finish.
+    await vi.advanceTimersByTimeAsync(1000);
     await Promise.resolve();
 
     expect(useChatStore.getState().typing).toBe(false);
@@ -398,13 +419,14 @@ describe("chat store stopStream", () => {
       activeTool: "bash",
       messages: [{ id: "t-1", role: "tool", content: "done", internal: true }],
     });
-    const sendSpy = vi.spyOn(webWS, "send").mockReturnValue(true);
+    const sendSpy = vi
+      .spyOn(useChatStore.getState().chatWS, "send")
+      .mockReturnValue(true);
 
     useChatStore.getState().stopStream();
 
     expect(sendSpy).toHaveBeenCalledWith({
       type: "interrupt",
-      session_key: "sess-1",
       event_id: "evt-9",
     });
     expect(useChatStore.getState().typing).toBe(false);
@@ -418,7 +440,9 @@ describe("chat store stopStream", () => {
 
   it("omits session/event ids when not set and still stops the stream", () => {
     useChatStore.setState({ sessionId: null, pendingEventId: null, typing: true });
-    const sendSpy = vi.spyOn(webWS, "send").mockReturnValue(false);
+    const sendSpy = vi
+      .spyOn(useChatStore.getState().chatWS, "send")
+      .mockReturnValue(false);
 
     useChatStore.getState().stopStream();
 
@@ -438,6 +462,271 @@ describe("chat store stopStream", () => {
     // sendMessage is async; fire-and-forget like the Composer does.
     void sendMessage();
     expect(useChatStore.getState().streamStopped).toBe(false);
+  });
+});
+
+describe("chat store interactive /ws path", () => {
+  it("sendMessage with open WS sends a message frame and skips /message", async () => {
+    const sendSpy = vi
+      .spyOn(useChatStore.getState().chatWS, "send")
+      .mockReturnValue(true);
+    const fetchSpy = vi.spyOn(api, "apiFetch").mockResolvedValue({
+      status: "accepted",
+      event_id: "evt-1",
+      session_key: "cli:web-1",
+    });
+
+    useChatStore.setState({ streamStopped: false, draft: "hello" });
+    await useChatStore.getState().sendMessage();
+
+    expect(sendSpy).toHaveBeenCalledWith({ type: "message", text: "hello" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(useChatStore.getState().typing).toBe(true);
+  });
+
+  it("attachments keep the HTTP /message path even when WS is open", async () => {
+    const sendSpy = vi
+      .spyOn(useChatStore.getState().chatWS, "send")
+      .mockReturnValue(true);
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path, init) => {
+      if (path === "/message") {
+        const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        expect(body.attachments).toEqual([{ attachment_id: "att-1" }]);
+        return { status: "accepted", event_id: "evt-1", session_key: "cli:web-1" };
+      }
+      if (String(path).startsWith("/turns/")) return { turn: { status: "completed", response_text: "ok" } };
+      return { messages: [] };
+    });
+    useChatStore.setState({
+      pendingAttachments: [
+        { attachment_id: "att-1", url: "/p", name: "note.txt", mime_type: "text/plain", size: 5 },
+      ],
+      draft: "hello",
+    });
+    await useChatStore.getState().sendMessage("hello");
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
+  it("streaming frames accumulate into a live bubble keyed by inbound event", () => {
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "streaming",
+      is_final: false,
+      text: "Hel",
+      metadata: { _token_stream: true, _inbound_event_id: "evt-1" },
+    });
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "streaming",
+      is_final: false,
+      text: "lo",
+      metadata: { _token_stream: true, _inbound_event_id: "evt-1" },
+    });
+    expect(useChatStore.getState().streaming).toEqual({ eventId: "evt-1", text: "Hello" });
+  });
+
+  it("a _stream_reset frame clears the accumulated draft but keeps the bubble", () => {
+    useChatStore.setState({ streaming: { eventId: "evt-1", text: "Draft preamble" } });
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "streaming",
+      is_final: false,
+      text: "",
+      metadata: { _token_stream: true, _stream_reset: true, _inbound_event_id: "evt-1" },
+    });
+    expect(useChatStore.getState().streaming).toEqual({ eventId: "evt-1", text: "" });
+  });
+
+  it("a matching final frame pushes an assistant message and clears streaming", () => {
+    useChatStore.setState({ streaming: { eventId: "evt-1", text: "Hello" }, typing: true });
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "final",
+      is_final: true,
+      text: "Hello world",
+      metadata: { _inbound_event_id: "evt-1" },
+    });
+    const s = useChatStore.getState();
+    expect(s.streaming).toBe(null);
+    expect(s.typing).toBe(false);
+    expect(s.messages.some((m) => m.role === "assistant" && m.content === "Hello world")).toBe(true);
+  });
+
+  it("final frame commits the answer then reloads the persisted transcript", async () => {
+    useChatStore.setState({ streaming: { eventId: "evt-1", text: "" }, typing: true, sessionId: "cli:web-1" });
+    // /history returns the interleaved transcript (thinking between tool rounds).
+    const fetchSpy = vi.spyOn(api, "apiFetch").mockResolvedValue({
+      messages: [
+        { role: "user", content: "研究一下" },
+        { role: "thinking", content: "用户想了解项目。", thinking_id: "t-1", duration_ms: 1200 },
+        { role: "assistant", content: "好的，项目是……" },
+      ],
+    });
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "final",
+      is_final: true,
+      text: "好的，项目是……",
+      metadata: { _inbound_event_id: "evt-1" },
+    });
+    // The reload fetch is fire-and-forget; flush the microtask.
+    expect(fetchSpy).toHaveBeenCalled();
+    await Promise.resolve();
+    // The turn commits the answer and clears live blocks.
+    const s = useChatStore.getState();
+    expect(s.thinkingBlocks).toEqual({});
+    // The authoritative interleaved view (with the thinking row) is reloaded.
+    expect(s.messages.some((m) => m.thinking?.text === "用户想了解项目。")).toBe(true);
+    expect(s.messages.some((m) => m.role === "assistant" && m.content === "好的，项目是……")).toBe(true);
+  });
+
+  it("retracted thinking blocks are excluded from the reloaded transcript", async () => {
+    useChatStore.setState({ typing: true, streaming: null, sessionId: "cli:web-1" });
+    vi.spyOn(api, "apiFetch").mockResolvedValue({
+      messages: [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "answer" },
+      ],
+    });
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "cognitive",
+      metadata: {
+        cog_type: "thinking",
+        cog_event_id: "cog-2",
+        _inbound_event_id: "evt-1",
+        data: { thinking_id: "t-2", text: "", duration_ms: 0, streaming: false, retracted: true },
+      },
+    });
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "final",
+      is_final: true,
+      text: "answer",
+      metadata: { _inbound_event_id: "evt-1" },
+    });
+    await Promise.resolve();
+    const s = useChatStore.getState();
+    expect(s.messages.filter((m) => m.thinking)).toHaveLength(0);
+  });
+
+  it("control replies (/approve) are not rendered as assistant text", () => {
+    useChatStore.setState({ typing: true, streaming: null, sessionId: "cli:web-1" });
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "final",
+      is_final: true,
+      text: "/approve req-1",
+      metadata: { _inbound_event_id: "evt-1" },
+    });
+    expect(useChatStore.getState().messages.filter((m) => m.role === "assistant")).toHaveLength(0);
+  });
+
+  it("cognitive thinking frames populate thinkingBlocks and a retracted frame removes", () => {
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "cognitive",
+      text: "思考中",
+      metadata: {
+        cog_type: "thinking",
+        cog_event_id: "cog-1",
+        _inbound_event_id: "evt-1",
+        data: { thinking_id: "th-1", text: "Let me think", streaming: true, duration_ms: 100 },
+      },
+    });
+    expect(useChatStore.getState().thinkingBlocks["th-1"]?.text).toBe("Let me think");
+    expect(useChatStore.getState().thinkingBlocks["th-1"]?.streaming).toBe(true);
+
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "cognitive",
+      text: "思考 0.1s",
+      metadata: {
+        cog_type: "thinking",
+        cog_event_id: "cog-2",
+        _inbound_event_id: "evt-1",
+        data: { thinking_id: "th-1", text: "", streaming: false, duration_ms: 100, retracted: true },
+      },
+    });
+    expect(useChatStore.getState().thinkingBlocks["th-1"]).toBeUndefined();
+  });
+
+  it("duplicate cog_event_id re-delivery is deduped", () => {
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "cognitive",
+      text: "思考中",
+      metadata: { cog_type: "thinking", cog_event_id: "cog-1", _inbound_event_id: "evt-1", data: { thinking_id: "th-1", text: "a", streaming: true } },
+    });
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "cognitive",
+      text: "思考中",
+      metadata: { cog_type: "thinking", cog_event_id: "cog-1", _inbound_event_id: "evt-1", data: { thinking_id: "th-1", text: "b", streaming: true } },
+    });
+    expect(useChatStore.getState().thinkingBlocks["th-1"]?.text).toBe("a");
+  });
+
+  it("cognitive tool_call frames set the running tool and refresh history", async () => {
+    const fetchSpy = vi
+      .spyOn(api, "apiFetch")
+      .mockImplementation(async (path: string) => {
+        if (path.includes("/history")) {
+          return {
+            messages: [
+              { role: "user", content: "hi" },
+              { role: "tool", content: "done", name: "exec" },
+              { role: "assistant", content: "Hello" },
+            ],
+          };
+        }
+        return { messages: [] };
+      });
+    useChatStore.setState({ sessionId: "cli:web-1", typing: true });
+
+    // running frame — tool starts
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "cognitive",
+      text: "🔧 exec · running",
+      metadata: {
+        cog_type: "tool_call",
+        cog_event_id: "cog-t1",
+        _inbound_event_id: "evt-1",
+        data: { name: "exec", status: "running", tool_call_id: "tc-1" },
+      },
+    });
+    expect(useChatStore.getState().activeTool).toBe("exec");
+
+    // terminal frame — tool finishes; the same name no longer runs
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "cognitive",
+      text: "🔧 exec · ok",
+      metadata: {
+        cog_type: "tool_call",
+        cog_event_id: "cog-t2",
+        _inbound_event_id: "evt-1",
+        data: { name: "exec", status: "ok", tool_call_id: "tc-1" },
+      },
+    });
+    expect(useChatStore.getState().activeTool).toBe(null);
+
+    // The turn's tool rows were re-fetched so the live TaskActivityItem shows.
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/sessions/cli%3Aweb-1/history?limit=100&offset=0",
+    );
+  });
+
+  it("_ensureChatWS auths with platform cli and the session key", () => {
+    useChatStore.setState({ sessionId: "cli:web-abc" });
+    const connectSpy = vi.spyOn(useChatStore.getState().chatWS, "connect");
+    useChatStore.getState()._ensureChatWS();
+    expect(connectSpy).toHaveBeenCalledWith({
+      platform: "cli",
+      sessionKey: "cli:web-abc",
+      token: "",
+    });
   });
 });
 
@@ -470,5 +759,67 @@ describe("chat store permission persistence", () => {
     expect(useChatStore.getState().workspacePath).toBe("/ws1");
     // project context is untouched by a workspace switch
     expect(useChatStore.getState().project).toBe("myproj");
+  });
+});
+
+describe("mapHistoryMessages", () => {
+  it("maps a thinking row onto the ChatMessage.thinking field", () => {
+    const rows = [
+      { role: "user", content: "研究一下" },
+      { role: "thinking", content: "用户想了解项目。", thinking_id: "t-1", duration_ms: 1200 },
+      { role: "assistant", content: "好的。" },
+    ];
+    const messages = mapHistoryMessages("cli:web-1", rows);
+    expect(messages).toHaveLength(3);
+    // The thinking row becomes an internal assistant row carrying thinking.
+    expect(messages[1].role).toBe("assistant");
+    expect(messages[1].internal).toBe(true);
+    expect(messages[1].thinking).toEqual({
+      thinkingId: "t-1",
+      text: "用户想了解项目。",
+      durationMs: 1200,
+    });
+    // Non-thinking rows are unchanged.
+    expect(messages[0].thinking).toBeUndefined();
+    expect(messages[2].thinking).toBeUndefined();
+    expect(messages[2].role).toBe("assistant");
+  });
+
+  it("falls back to content when a thinking row has no explicit thinking_id", () => {
+    const messages = mapHistoryMessages("cli:web-2", [
+      { role: "thinking", content: "trace" },
+    ]);
+    expect(messages[0].thinking?.thinkingId).toBe("cli:web-2-0");
+    expect(messages[0].thinking?.text).toBe("trace");
+  });
+});
+
+describe("pruneSettledThinking", () => {
+  it("drops live blocks whose span is already in the loaded transcript", () => {
+    const messages: ChatMessage[] = [
+      {
+        id: "0",
+        role: "assistant",
+        content: "",
+        internal: true,
+        thinking: { thinkingId: "t-1", text: "已落盘", durationMs: 100 },
+      },
+    ];
+    const blocks = {
+      "t-1": { thinkingId: "t-1", text: "已落盘", streaming: false, durationMs: 100, retracted: false, cogEventId: "c1" },
+      "t-2": { thinkingId: "t-2", text: "还没落盘", streaming: true, durationMs: 0, retracted: false, cogEventId: "c2" },
+    };
+    const pruned = pruneSettledThinking(messages, blocks);
+    expect(pruned).toEqual({
+      "t-2": blocks["t-2"],
+    });
+  });
+
+  it("returns the blocks unchanged when no span is settled", () => {
+    const messages: ChatMessage[] = [{ id: "0", role: "assistant", content: "hi" }];
+    const blocks = {
+      "t-1": { thinkingId: "t-1", text: "live", streaming: true, durationMs: 0, retracted: false, cogEventId: "c1" },
+    };
+    expect(pruneSettledThinking(messages, blocks)).toEqual(blocks);
   });
 });

@@ -12,6 +12,7 @@ import {
 import { useShellStore } from "../../stores/shell";
 import { useChatStore } from "../../stores/chat";
 import { useApi } from "../../hooks/use-api";
+import { useWsSubscribe } from "../../hooks/use-ws";
 import { apiFetch } from "../../lib/api";
 import { runMutation } from "../../stores/toast";
 import { CreateProjectDialog } from "../CreateProjectDialog";
@@ -132,6 +133,20 @@ export function CodexSidebar() {
     "/sessions?limit=20&offset=0&archived=false",
   );
   const apiRecents = data?.sessions ?? [];
+
+  // A message just landed on a session — the sidebar list must show it now.
+  // The list is keyed on updated_at, so a brand-new conversation (or the most
+  // recent one that got a reply) moves to the top the moment its first message
+  // is persisted. Without this the "recent" list only refreshed on remount or
+  // an archive/pin action, leaving a just-created session invisible until reload.
+  useWsSubscribe(
+    ["sessions"],
+    (ev) => {
+      const payload = ev.payload as { session_key?: string };
+      if (payload.session_key) void refetch();
+    },
+    ["session_message"],
+  );
 
   // 置顶状态以服务端为单一数据源：从列表响应派生，而非本地 useState（后者刷新即丢）。
   const pinnedMap = useMemo(

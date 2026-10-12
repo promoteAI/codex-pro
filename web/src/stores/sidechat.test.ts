@@ -150,7 +150,7 @@ describe("sidechat store", () => {
     expect(useSidechatStore.getState().pendingApprovals).toHaveLength(0);
   });
 
-  it("answerClarify sends the answer as a force message and clears pendingClarify", () => {
+  it("answerClarify sends /clarify <id> <answer> as a force message and clears pendingClarify", () => {
     useSidechatStore.setState({
       pendingClarify: { id: "c1", question: "Which one?", options: ["A", "B"] },
     });
@@ -165,7 +165,7 @@ describe("sidechat store", () => {
 
     expect(fetchSpy).toHaveBeenCalledWith(
       "/message",
-      expect.objectContaining({ body: expect.stringContaining("A") }),
+      expect.objectContaining({ body: expect.stringContaining("/clarify c1 A") }),
     );
     expect(useSidechatStore.getState().pendingClarify).toBe(null);
   });

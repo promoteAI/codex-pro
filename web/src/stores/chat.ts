@@ -460,8 +460,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   answerClarify: (value) => {
     const c = get().pendingClarify;
     if (!c) return;
+    // The tool is parked in wait_for_answer on the CLI path — it only wakes on
+    // the /clarify <id> <answer> command route (handled lock-free before
+    // sessions.acquire()). Sending bare text would just start a NEW turn; the
+    // parked tool would never unblock.
     set({ pendingClarify: null });
-    get().sendMessage(value, { force: true });
+    get().sendMessage(`/clarify ${c.id} ${value}`, { force: true });
   },
 
   _refreshInteractions: async (sessionId: string) => {
@@ -643,8 +647,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // (sendMessage returns without the 1s /history polling the HTTP path
           // used to feed the tool rows). The turn_runs current_tool that drive
           // the "running" highlight arrives here per invocation: status="running"
-          // before exec, a terminal status after. Set activeTool and refresh
-          // history so the TaskActivityItem row appears live.
+          // before exec, a terminal status after.
+          //
+          // 只在 status="running" 时刷新 history：此时 assistant+tool_calls 行
+          // 已写入 session(tool_loop 在 execute_tool_batch 前 add_message)，
+          // 可安全展示待执行工具卡片。
+          // 终态帧(status≠running)不调用 _wsReloadHistory：服务端 emit_tool_call
+          // 终态帧早于 session.add_message("tool",...) 写入，此时重拉 history
+          // 会拿到缺少工具结果的片段数据，覆盖掉已渲染的工具行。工具结果行由
+          // 后续的 isFinal 文本帧统一触发 _wsReloadHistory 来展示。
           const name = String(cog.data?.name ?? "");
           const status = String(cog.data?.status ?? "running");
           set((s) => ({
@@ -652,7 +663,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               status === "running" ? name : s.activeTool === name ? null : s.activeTool,
           }));
           const sid = get().sessionId;
-          if (sid) void get()._wsReloadHistory(sid);
+          if (sid && status === "running") void get()._wsReloadHistory(sid);
           break;
         }
         default:

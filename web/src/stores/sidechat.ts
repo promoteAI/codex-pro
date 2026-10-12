@@ -223,6 +223,8 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
           // The interactive /ws path never polls /history mid-turn, so the
           // tool "running" highlight + tool row must come from these frames
           // (status="running" before exec, a terminal status after).
+          // Same caveat as main chat: only reload on "running" to avoid
+          // reading history before tool result is persisted.
           const name = String(cog.data?.name ?? "");
           const status = String(cog.data?.status ?? "running");
           set((s) => ({
@@ -230,7 +232,7 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
               status === "running" ? name : s.activeTool === name ? null : s.activeTool,
           }));
           const sid = get().sessionId;
-          if (sid) void get()._wsReloadHistory(sid);
+          if (sid && status === "running") void get()._wsReloadHistory(sid);
           break;
         }
         default:
@@ -300,8 +302,12 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
   },
 
   answerClarify: (value) => {
+    // Same CLI-path contract as main chat: the parked tool only wakes on
+    // /clarify <id> <answer>, never on bare text.
+    const c = get().pendingClarify;
+    if (!c) return;
     set({ pendingClarify: null });
-    get().sendMessage(value, { force: true });
+    get().sendMessage(`/clarify ${c.id} ${value}`, { force: true });
   },
 
   addFile: async (file: File) => {

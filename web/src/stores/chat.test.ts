@@ -177,6 +177,23 @@ describe("chat store", () => {
     expect(useChatStore.getState().pendingApprovals[0].id).toBe("req-1");
   });
 
+  it("answerClarify sends /clarify <id> <answer> as a force message", () => {
+    useChatStore.setState({
+      pendingClarify: { id: "c1", question: "Which one?", options: ["A", "B"] },
+    });
+    const fetchSpy = vi.spyOn(api, "apiFetch").mockResolvedValue({
+      status: "accepted",
+      event_id: "e1",
+      session_key: "cli:abc",
+    });
+    useChatStore.getState().answerClarify("A");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/message",
+      expect.objectContaining({ body: expect.stringContaining("/clarify c1 A") }),
+    );
+    expect(useChatStore.getState().pendingClarify).toBe(null);
+  });
+
   it("setModel persists models.default_model via /config PATCH", async () => {
     const fetchSpy = vi.spyOn(api, "apiFetch").mockResolvedValue({ success: true });
     await useChatStore.getState().setModel("agnes-2.0-flash");

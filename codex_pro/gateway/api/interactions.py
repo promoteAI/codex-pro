@@ -67,7 +67,11 @@ class InteractionsAPI:
         manager = getattr(loop, "clarify", None)
         if manager is None or not session_key:
             return None
-        req = manager.get_im_pending(session_key)
+        # The web UI rides gateway:cli, which takes the BLOCKING clarify path
+        # (request() → _pending, tool parked in wait_for_answer). get_pending_
+        # for_session reads both registries so the card renders for CLI sessions
+        # too, not only the IM follow-up path.
+        req = manager.get_pending_for_session(session_key)
         if req is None:
             return None
         return {"id": req.id, "question": req.question, "options": req.options}

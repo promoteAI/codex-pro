@@ -145,3 +145,22 @@ class ClarifyManager:
         when the next message arrives). Expiry is left to ``take_im_pending``.
         """
         return self._im_pending.get(session_key)
+
+    def get_pending_for_session(self, session_key: str) -> ClarifyRequest | None:
+        """Read the pending clarify for a session, whichever registry holds it.
+
+        A gateway:cli session takes the *blocking* path (``request`` →
+        ``_pending``, parked in ``wait_for_answer``), while an IM session takes
+        the non-blocking ``register_im_pending`` → ``_im_pending`` path. The web
+        UI rides ``gateway:cli``, so /interactions must surface the blocking
+        registry too — otherwise it reports ``clarify: null`` and the card never
+        renders. The two are mutually exclusive per session, so checking IM
+        first then falling back to the blocking scan is safe.
+        """
+        req = self._im_pending.get(session_key)
+        if req is not None:
+            return req
+        for r in self._pending.values():
+            if r.session_key == session_key:
+                return r
+        return None

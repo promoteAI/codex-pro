@@ -128,7 +128,12 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
     // buffers until auth_ok, so the first message of a new session streams too.
     if (attachments.length === 0) {
       get()._ensureChatWS();
-      if (get().chatWS.send({ type: "message", text: content })) return;
+      const wsProject = useChatStore.getState().projectPath || undefined;
+      if (get().chatWS.send({
+        type: "message",
+        text: content,
+        ...(wsProject ? { project: wsProject } : {}),
+      })) return;
     }
 
     void (async () => {

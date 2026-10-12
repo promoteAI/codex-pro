@@ -310,6 +310,11 @@ class WebSocketHandler:
                             )
                             if project:
                                 session.workspace = project
+                                # 有项目会话把归属项目打到 session.project(侧边栏
+                                # 分组标签),与 HTTP /message 路径对称(message_handler.py)。
+                                # 否则这个会话的 project 恒为空,会被前端侧边栏归入
+                                # 「最近」列表而非项目分组。
+                                session.project = project
                                 effective_workspace = project
                             elif session.workspace:
                                 # 复用已持久化的工作区，避免跨天漂移(与 HTTP 路径对称)。

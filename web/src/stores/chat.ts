@@ -520,7 +520,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // message of a new session streams too.
     if (pendingAttachments.length === 0) {
       get()._ensureChatWS();
-      const sent = get().chatWS.send({ type: "message", text: content });
+      const wsProject = get().projectPath || undefined;
+      const sent = get().chatWS.send({
+        type: "message",
+        text: content,
+        // Ride the workspace/project with the WS message so the gateway can tag
+        // the session's `project` (sidebar grouping). Without it the interactive
+        // /ws path leaves session.project empty and project chats fall into the
+        // "recent" list instead of their project group (HTTP /message does this).
+        ...(wsProject ? { project: wsProject } : {}),
+      });
       if (sent) return;
       // Socket could not be opened at all — fall through to HTTP.
     }

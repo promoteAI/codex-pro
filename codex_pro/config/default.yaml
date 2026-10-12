@@ -15,7 +15,7 @@ tools:
     # execution.defaultExecutor(local) 决定执行器;显式配置 host 的用户不受影响。
     host: auto
 execution:
-  defaultExecutor: local
+  defaultExecutor: sandbox
   networkPolicy: allow
 permissions:
   approval:

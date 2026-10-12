@@ -72,8 +72,6 @@
   "searchWorkspace": "搜索工作区",
   "selectWorkspace": "选择工作区",
   "workspaceList": "工作区列表",
-  "openFolder": "打开文件夹",
-  "openFolderToast": "选择要打开的文件夹…",
   "remoteConnect": "远程连接",
   "searchModel": "搜索模型",
   "loadingModels": "加载中…",

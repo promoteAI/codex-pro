@@ -3,11 +3,6 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { ProjectMenu } from "./ProjectMenu";
 import { useShellStore } from "../stores/shell";
 import { useAuthStore } from "../stores/auth";
-import { toast } from "../stores/toast";
-
-vi.mock("../stores/toast", () => ({
-  toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
-}));
 
 beforeEach(() => {
   useAuthStore.setState({ token: "" });
@@ -46,7 +41,6 @@ describe("ProjectMenu", () => {
     expect(screen.getByText("codex-pro")).toBeInTheDocument();
     expect(screen.getByText("m-askkb")).toBeInTheDocument();
     expect(screen.getByText("DeepTutor")).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /打开文件夹/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /远程连接/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /不在项目中工作/ })).toBeInTheDocument();
   });
@@ -79,12 +73,6 @@ describe("ProjectMenu", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /远程连接/ }));
     expect(onClose).toHaveBeenCalled();
     expect(useShellStore.getState().remoteConnectOpen).toBe(true);
-  });
-
-  it("打开文件夹提示 toast", () => {
-    renderMenu();
-    fireEvent.click(screen.getByRole("menuitem", { name: /打开文件夹/ }));
-    expect(toast.info).toHaveBeenCalled();
   });
 
   it("搜索过滤工作区", () => {

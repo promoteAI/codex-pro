@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { GitRepo } from "../stores/chat";
-import { toast } from "../stores/toast";
 import { useShellStore } from "../stores/shell";
 
 /** Fallback workspaces matching prototype #projectMenu when /git/repos is empty. */
@@ -16,15 +15,6 @@ function FolderIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M3.5 8a2 2 0 0 1 2-2h4l2 2.3h7a2 2 0 0 1 2 2V16a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
-    </svg>
-  );
-}
-
-function OpenFolderIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3.5 8a2 2 0 0 1 2-2h4l2 2.3h7a2 2 0 0 1 2 2V16a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
-      <path d="M12 11v6M9 14h6" />
     </svg>
   );
 }
@@ -183,7 +173,7 @@ export function ProjectMenu({
           >
             <FolderIcon />
             <span className="proj-menu-item-label">{p.name}</span>
-            <CheckIcon />
+            {project === p.name && <CheckIcon />}
           </button>
         ))}
       </div>
@@ -199,18 +189,6 @@ export function ProjectMenu({
       >
         <FolderIcon />
         {t("createProject")}
-      </button>
-      <button
-        type="button"
-        className="proj-menu-action"
-        role="menuitem"
-        onClick={() => {
-          onClose();
-          toast.info(t("openFolderToast"));
-        }}
-      >
-        <OpenFolderIcon />
-        {t("openFolder")}
       </button>
       <button
         type="button"

@@ -72,8 +72,6 @@
   "searchWorkspace": "Search workspaces",
   "selectWorkspace": "Select workspace",
   "workspaceList": "Workspaces",
-  "openFolder": "Open folder",
-  "openFolderToast": "Choose a folder to open…",
   "remoteConnect": "Remote connect",
   "searchModel": "Search models",
   "loadingModels": "Loading…",

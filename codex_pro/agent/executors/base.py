@@ -7,18 +7,13 @@ command isolation, filesystem boundaries, network control, credential injection,
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import os
-import shutil
 import sys
-import tempfile
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-
-from loguru import logger
 
 from codex_pro.agent.proc_lifecycle import (
     communicate_owned,
@@ -176,82 +171,28 @@ class SandboxExecutor(BaseExecutor):
         network_policy: str = "deny",
         workspace: str = "",
     ):
-        self._root = Path(sandbox_root)
+        # ``sandbox_root`` is retained for backward compatibility, but the
+        # executor no longer builds a temp-dir sandbox. Commands run in the *
+        # real* project directory, so paths, produced files and ``.git`` stay
+        # consistent with the host tree. Isolation is enforced by the
+        # application-layer policy (network_policy + the tool-level guards in
+        # shell/code_exec), not by copying the workspace to a temp dir.
+        self._root = Path(sandbox_root) if sandbox_root else None
         self._network_policy = network_policy
-        self._source_workspace = Path(workspace).resolve() if workspace else None
-        self._sandbox_dir: Path | None = None
-        self._workdir: Path | None = None
-        # Extra workspace roots (session workspaces) that live outside the global
-        # workspace. Each is copied into the sandbox once, and its sandbox mirror
-        # is tracked so ``_resolve_cwd`` can map a request's cwd into it. Keyed by
-        # resolved source path so a repeated request on the same session reuses
-        # the mirror instead of re-copying.
-        self._extra_roots: dict[Path, Path] = {}
-
-    def _ignore_patterns(self) -> tuple[str, ...]:
-        return (
-            ".git",
-            "__pycache__",
-            ".pytest_cache",
-            ".ruff_cache",
-            ".venv",
-            "node_modules",
-            "data/logs",
-            # Bundled runtime dirs are hundreds of MB and never needed inside
-            # the sandbox; copying them synchronously froze the event loop.
-            "runtime",
-            "python",
-        )
-
-    async def _copy_into_sandbox(self, source: Path, target: Path) -> None:
-        """Copy ``source`` tree into ``target`` off-loop, mirroring setup()."""
-        ignore = shutil.ignore_patterns(*self._ignore_patterns())
-        if source.exists():
-            await asyncio.to_thread(
-                shutil.copytree,
-                source,
-                target,
-                dirs_exist_ok=True,
-                ignore=ignore,
-            )
-        else:
-            target.mkdir(parents=True, exist_ok=True)
-
-    async def _ensure_extra_root(self, source: Path) -> Path:
-        """Return the sandbox mirror for ``source``, copying it in on first use.
-
-        The mirror lives under ``<sandbox>/workspace/workspaces/<hash>/`` so
-        distinct workspaces (per-session, per-project, or the global fallback)
-        stay isolated within the sandbox, and nothing is copied eagerly at setup.
-        """
-        source = source.resolve()
-        existing = self._extra_roots.get(source)
-        if existing is not None:
-            return existing
-        digest = hashlib.sha256(str(source).encode("utf-8")).hexdigest()[:16]
-        mirror = self._workdir / "workspaces" / digest if self._workdir else self._sandbox_dir / "workspaces" / digest
-        await self._copy_into_sandbox(source, mirror)
-        self._extra_roots[source] = mirror
-        return mirror
+        self._workspace = Path(workspace).resolve() if workspace else None
 
     async def setup(self) -> None:
-        self._root.mkdir(parents=True, exist_ok=True)
-        self._sandbox_dir = Path(tempfile.mkdtemp(dir=self._root, prefix="sandbox_"))
-        self._workdir = self._sandbox_dir / "workspace"
-        # 不再把全局工作区复制进沙箱作为基础执行根。沙箱以「本次执行的会话工作区」
-        # 为根(见 _resolve_cwd / _ensure_extra_root)：首次用到某工作区时才把它拷贝进
-        # ``workspaces/<hash>`` 镜像。这样沙箱里不会出现全局工作区（及其中被主进程
-        # 锁定的 agent.lock 等状态文件），也不会把无关的全局目录带进来。
-        self._workdir.mkdir(parents=True, exist_ok=True)
-        logger.info("Sandbox created at {}", self._sandbox_dir)
+        # No temp dir to build. The source workspace (or an explicit request cwd)
+        # is already the real execution root; just ensure it exists.
+        if self._workspace:
+            self._workspace.mkdir(parents=True, exist_ok=True)
 
     async def teardown(self) -> None:
-        if self._sandbox_dir and self._sandbox_dir.exists():
-            await asyncio.to_thread(shutil.rmtree, self._sandbox_dir, ignore_errors=True)
+        # Nothing owned by the executor to clean up — the real project dir is
+        # left untouched (no temp sandbox tree to remove).
+        pass
 
     async def execute(self, request: ExecRequest) -> ExecResponse:
-        if not self._sandbox_dir:
-            await self.setup()
         if self._network_policy == "deny" and command_uses_network(request.command):
             return ExecResponse(success=False, stderr="Network access is denied by execution policy", return_code=-1, executor=self.name)
         cwd = str(await self._resolve_cwd(request.cwd, request.workspace))
@@ -291,43 +232,38 @@ class SandboxExecutor(BaseExecutor):
             return ExecResponse(success=False, stderr=str(e), return_code=-1, executor=self.name)
 
     async def _resolve_cwd(self, requested_cwd: str, workspace: str = "") -> Path:
-        if not self._workdir:
-            assert self._sandbox_dir
-            return self._sandbox_dir
-        if not requested_cwd:
-            return self._workdir
+        """Resolve the real working directory — no sandbox-mirror remapping.
 
-        resolve = Path(requested_cwd).expanduser().resolve()
-
-        # The execution root is the *session workspace* (a per-session isolation
-        # dir or a project dir), never the gateway's global workspace. Take that
-        # workspace's sandbox mirror as the mapping base and translate the
-        # requested cwd relative to it. The global workspace is no longer copied
-        # into the sandbox at setup, so an out-of-root cwd falls back only when
-        # it genuinely has no workspace mapping.
-        if workspace:
-            ws_root = Path(workspace).expanduser().resolve()
-            mirror = await self._ensure_extra_root(ws_root)
-            try:
-                rel = resolve.relative_to(ws_root)
-                target = (mirror / rel).resolve()
-                target.relative_to(self._workdir)
-                target.mkdir(parents=True, exist_ok=True)
-                return target
-            except ValueError:
-                pass  # cwd outside the workspace root; fall through
-
-        # No workspace override, or cwd escaped it: fall back to the global
-        # workspace, lazily copied into its own mirror so the sandbox never
-        # carries the global tree unless a command actually needs it.
-        if not self._source_workspace:
-            return self._workdir
-        mirror = await self._ensure_extra_root(self._source_workspace)
-        try:
-            rel = resolve.relative_to(self._source_workspace)
-            target = (mirror / rel).resolve()
-            target.relative_to(self._workdir)
+        The executor runs commands against the *real* project directory rather
+        than a copied temp tree, so a requested ``cwd`` maps straight back to
+        itself (or to the session/global workspace when none was given). The
+        preferred root is ``request.workspace`` (the per-session execution root),
+        falling back to the executor's configured ``workspace`` (global). A
+        requested cwd must lie under one of those roots; otherwise we fall back
+        to the workspace root so an out-of-root path does not silently become a
+        command run elsewhere on disk.
+        """
+        # Preferred base: the per-turn execution root (session workspace).
+        root = Path(workspace).expanduser().resolve() if workspace else None
+        if root is None:
+            root = self._workspace
+        if root is None:
+            # No workspace at all: run at the requested cwd itself, creating it
+            # so the command has a valid directory.
+            target = Path(requested_cwd).expanduser().resolve() if requested_cwd else Path.cwd()
             target.mkdir(parents=True, exist_ok=True)
             return target
+
+        root.mkdir(parents=True, exist_ok=True)
+        if not requested_cwd:
+            return root
+
+        target = Path(requested_cwd).expanduser().resolve()
+        try:
+            target.relative_to(root)
         except ValueError:
-            return self._workdir
+            # cwd escaped the workspace root — fall back rather than run
+            # somewhere unexpected.
+            return root
+        target.mkdir(parents=True, exist_ok=True)
+        return target

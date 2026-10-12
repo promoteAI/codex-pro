@@ -185,25 +185,34 @@ async def test_one_shot_executor_success_reaps_detached_background_work(
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_sandbox_setup_copies_workspace_excluding_ignored(tmp_path: Path):
+async def test_sandbox_runs_in_real_workspace_with_git_available(tmp_path: Path):
+    """Cleanup: the sandbox no longer copies the workspace to a temp dir.
+
+    Commands run against the *real* project directory, so the source tree (and
+    its ``.git``) must be visible as-is — not filtered out by copy ignore rules.
+    """
     src = tmp_path / "src"
     (src / ".git").mkdir(parents=True)
-    (src / ".git" / "config").write_text("should-be-ignored")
+    (src / ".git" / "config").write_text("should-stay")
     (src / "keep.txt").write_text("copied")
-    root = tmp_path / "sbroot"
 
-    ex = SandboxExecutor(sandbox_root=str(root), workspace=str(src))
+    ex = SandboxExecutor(sandbox_root=str(tmp_path / "sbroot"), workspace=str(src))
     await ex.setup()
-    resp = await ex.execute(ExecRequest(command="ls -a"))
-    assert "keep.txt" in resp.stdout
-    assert ".git" not in resp.stdout
-    await ex.teardown()
+    try:
+        resp = await ex.execute(ExecRequest(command="ls -a"))
+        assert "keep.txt" in resp.stdout
+        assert ".git" in resp.stdout
+        # cwd is the real project dir, not a temp mirror
+        pwd = await ex.execute(ExecRequest(command="pwd"))
+        assert str(src) in pwd.stdout
+    finally:
+        await ex.teardown()
 
 
 @pytest.mark.asyncio
 async def test_sandbox_execute_lazy_setup_when_not_initialized(tmp_path: Path):
     ex = SandboxExecutor(sandbox_root=str(tmp_path / "root"))
-    # 未显式 setup，execute 应自行初始化
+    # 未显式 setup，execute 应自行初始化（在这里 setup 是幂等的空操作）
     resp = await ex.execute(ExecRequest(command="codex lazy"))
     assert resp.success is True
     assert "lazy" in resp.stdout
@@ -222,13 +231,18 @@ async def test_sandbox_network_deny_blocks(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_sandbox_teardown_removes_dir(tmp_path: Path):
-    ex = SandboxExecutor(sandbox_root=str(tmp_path / "root"))
+async def test_sandbox_teardown_leaves_real_workspace_intact(tmp_path: Path):
+    """Cleanup: teardown no longer deletes anything — the real project dir is
+    owned by the user, not the executor. It must survive a setup+teardown cycle."""
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "keep.txt").write_text("precious")
+
+    ex = SandboxExecutor(sandbox_root=str(tmp_path / "root"), workspace=str(src))
     await ex.setup()
-    sandbox_dir = ex._sandbox_dir
-    assert sandbox_dir is not None and sandbox_dir.exists()
     await ex.teardown()
-    assert not sandbox_dir.exists()
+    assert src.exists()
+    assert (src / "keep.txt").read_text() == "precious"
 
 
 @pytest.mark.asyncio
@@ -241,35 +255,32 @@ async def test_sandbox_timeout_returns_error(tmp_path: Path):
     await ex.teardown()
 
 
-def test_sandbox_resolve_cwd_falls_back_to_workdir_for_outside_path(tmp_path: Path):
-    src = tmp_path / "src"
-    src.mkdir()
-    ex = SandboxExecutor(sandbox_root=str(tmp_path / "root"), workspace=str(src))
-    # 未 setup 时 workdir 为 None，_resolve_cwd 走 sandbox_dir 断言分支需先 setup。
-    # 这里手动构造 workdir 以测试路径逃逸回退。
-    ex._workdir = tmp_path / "wd"
-    ex._workdir.mkdir()
-    ex._source_workspace = src.resolve()
-    # 请求一个在 source_workspace 之外的路径 -> ValueError -> 回退到 workdir
-    outside = str(tmp_path / "elsewhere")
-    resolved = ex._resolve_cwd(outside)
-    assert resolved == ex._workdir
-
-
-def test_sandbox_resolve_cwd_maps_relative_path_into_workdir(tmp_path: Path):
+@pytest.mark.asyncio
+async def test_sandbox_resolve_cwd_real_path_within_workspace(tmp_path: Path):
+    """Cleanup: cwd resolves to the real directory under the workspace root."""
     src = tmp_path / "src"
     (src / "sub").mkdir(parents=True)
     ex = SandboxExecutor(sandbox_root=str(tmp_path / "root"), workspace=str(src))
-    ex._workdir = tmp_path / "wd"
-    ex._workdir.mkdir()
-    ex._source_workspace = src.resolve()
-    resolved = ex._resolve_cwd(str(src / "sub"))
-    assert resolved == (ex._workdir / "sub")
+    resolved = await ex._resolve_cwd(str(src / "sub"), str(src))
+    assert resolved == (src / "sub").resolve()
     assert resolved.exists()
 
 
-def test_sandbox_resolve_cwd_no_requested_returns_workdir(tmp_path: Path):
-    ex = SandboxExecutor(sandbox_root=str(tmp_path / "root"), workspace=str(tmp_path / "src"))
-    ex._workdir = tmp_path / "wd"
-    ex._workdir.mkdir()
-    assert ex._resolve_cwd("") == ex._workdir
+@pytest.mark.asyncio
+async def test_sandbox_resolve_cwd_falls_back_to_workspace_for_outside_path(tmp_path: Path):
+    src = tmp_path / "src"
+    src.mkdir()
+    ex = SandboxExecutor(sandbox_root=str(tmp_path / "root"), workspace=str(src))
+    outside = str(tmp_path / "elsewhere")
+    resolved = await ex._resolve_cwd(outside, str(src))
+    # cwd escaped the workspace root -> fall back to the workspace root
+    assert resolved == src.resolve()
+
+
+@pytest.mark.asyncio
+async def test_sandbox_resolve_cwd_no_requested_returns_workspace(tmp_path: Path):
+    src = tmp_path / "src"
+    src.mkdir()
+    ex = SandboxExecutor(sandbox_root=str(tmp_path / "root"), workspace=str(src))
+    resolved = await ex._resolve_cwd("", str(src))
+    assert resolved == src.resolve()

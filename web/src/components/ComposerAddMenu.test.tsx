@@ -14,21 +14,6 @@ vi.mock("../stores/toast", () => ({
   }),
 }));
 
-const AGENTS = [
-  {
-    id: "coder",
-    name: "Agnes 2.0 Flash",
-    description: "CCSwitchMulti managed worker pinned to 'agnes-2.0-flash'.",
-    instructions: "",
-    default_tools: [],
-    model: "",
-    provider: "",
-    max_iterations: 12,
-    max_tokens: 8192,
-    temperature: 0.4,
-  },
-];
-
 const PLUGINS = {
   plugins: [
     {
@@ -67,24 +52,11 @@ const PLUGINS = {
   ],
 };
 
-const TABS = [
-  {
-    id: "t1",
-    title: "codex",
-    url: "https://example.com/codex",
-    suffix: "· Chrome",
-    globe: false,
-  },
-];
-
 beforeEach(() => {
   useAuthStore.setState({ token: "" });
   useChatStore.setState({ pendingAttachments: [] });
   vi.spyOn(api, "apiFetch").mockImplementation(async (path: string) => {
-    if (path === "/agents") return { agents: AGENTS, total: 1 } as never;
-    if (path.startsWith("/agents/")) return { status: "deleted" } as never;
     if (path === "/plugins") return { ...PLUGINS } as never;
-    if (path === "/browser/tabs") return { tabs: TABS } as never;
     return {} as never;
   });
   vi.spyOn(window, "open").mockImplementation(() => null);
@@ -124,9 +96,7 @@ async function renderMenu({ navigateRoot = false } = {}) {
       <MemoryRouter>{menu}</MemoryRouter>
     ),
   );
-  // Flush the initial /browser/tabs fetch resolution so its state update lands
-  // inside act rather than after the test body returns.
-  await waitFor(() => expect(api.apiFetch).toHaveBeenCalledWith("/browser/tabs", expect.anything()));
+  await waitFor(() => expect(api.apiFetch).toHaveBeenCalledWith("/plugins", expect.anything()));
   return { onClose, onOpenProject, onGoal, onPlan };
 }
 
@@ -139,16 +109,11 @@ describe("ComposerAddMenu", () => {
       expect(screen.getByText("documents")).toBeInTheDocument();
       expect(screen.getByText("Create and edit documents")).toBeInTheDocument();
     });
-    expect(screen.getByText("Superpowers")).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getByText("Agnes 2.0 Flash")).toBeInTheDocument();
-    });
   });
 
   it("插件列表为空时显示占位", async () => {
     vi.spyOn(api, "apiFetch").mockImplementation(async (path: string) => {
       if (path === "/plugins") return { plugins: [] } as never;
-      if (path === "/browser/tabs") return { tabs: [] } as never;
       return {} as never;
     });
     await renderMenu();
@@ -159,7 +124,6 @@ describe("ComposerAddMenu", () => {
 
   it("目标模式回调", async () => {
     const { onGoal, onClose } = await renderMenu();
-    await screen.findByText("Agnes 2.0 Flash");
     fireEvent.click(screen.getByRole("menuitem", { name: /目标/ }));
     expect(onGoal).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
@@ -167,7 +131,6 @@ describe("ComposerAddMenu", () => {
 
   it("计划模式回调", async () => {
     const { onPlan, onClose } = await renderMenu();
-    await screen.findByText("Agnes 2.0 Flash");
     fireEvent.click(screen.getByRole("menuitem", { name: /计划模式/ }));
     expect(onPlan).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
@@ -175,7 +138,6 @@ describe("ComposerAddMenu", () => {
 
   it("在项目中使用 Work 打开项目菜单", async () => {
     const { onOpenProject, onClose } = await renderMenu();
-    await screen.findByText("Agnes 2.0 Flash");
     fireEvent.click(screen.getByRole("menuitem", { name: /在项目中使用 Work/ }));
     expect(onOpenProject).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
@@ -199,39 +161,6 @@ describe("ComposerAddMenu", () => {
     expect(addFile).toHaveBeenCalledWith(file);
   });
 
-  it("删除智能体调用 DELETE /agents/{id}", async () => {
-    await renderMenu();
-    await waitFor(() => {
-      expect(screen.getByText("Agnes 2.0 Flash")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole("button", { name: /删除智能体/ }));
-    await waitFor(() => {
-      expect(api.apiFetch).toHaveBeenCalledWith(
-        "/agents/coder",
-        expect.objectContaining({ method: "DELETE" }),
-      );
-    });
-  });
-
-  it("添加智能体表单提交 POST /agents", async () => {
-    await renderMenu();
-    await screen.findByText("Agnes 2.0 Flash");
-    fireEvent.click(screen.getByRole("menuitem", { name: /添加智能体/ }));
-    const inputs = screen.getAllByRole("textbox");
-    fireEvent.change(inputs[0], { target: { value: "planner" } });
-    fireEvent.change(inputs[1], { target: { value: "Planner" } });
-    fireEvent.click(screen.getByRole("button", { name: /创建/ }));
-    await waitFor(() => {
-      expect(api.apiFetch).toHaveBeenCalledWith(
-        "/agents",
-        expect.objectContaining({
-          method: "POST",
-          body: expect.stringContaining('"id":"planner"'),
-        }),
-      );
-    });
-  });
-
   it("点击插件项跳转到插件管理页并关闭菜单", async () => {
     await renderMenu({ navigateRoot: true });
     await waitFor(() => {
@@ -241,18 +170,5 @@ describe("ComposerAddMenu", () => {
     await waitFor(() => {
       expect(screen.getByText("PLUGINS_PAGE")).toBeInTheDocument();
     });
-  });
-
-  it("渲染真实标签页并点击新窗口打开", async () => {
-    await renderMenu();
-    await waitFor(() => {
-      expect(screen.getByText("codex")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole("menuitem", { name: /codex/ }));
-    expect(window.open).toHaveBeenCalledWith(
-      "https://example.com/codex",
-      "_blank",
-      "noopener,noreferrer",
-    );
   });
 });

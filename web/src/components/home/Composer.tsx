@@ -8,7 +8,6 @@ import {
   ArrowUp,
   RotateCcw,
   Target,
-  Lightbulb,
   X,
   Square,
 } from "lucide-react";
@@ -59,6 +58,7 @@ export function Composer() {
   const reasoning = useChatStore((s) => s.reasoning);
   const perm = useChatStore((s) => s.perm);
   const planMode = useChatStore((s) => s.planMode);
+  const planTask = useChatStore((s) => s.planTask);
   const goalMode = useChatStore((s) => s.goalMode);
   const selectProject = useChatStore((s) => s.selectProject);
   const setBranch = useChatStore((s) => s.setBranch);
@@ -403,20 +403,43 @@ export function Composer() {
             <span>{permLabel}</span>
           </button>
           {showGoalBtn && (
-            <button
-              type="button"
-              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] hover:bg-codex-hover ${
-                planMode ? "text-codex-text" : "text-codex-text-secondary"
-              }`}
-              aria-label={planMode ? t("planMode") : t("goal")}
-              onClick={() => {
-                if (planMode) setPlanMode(true);
-                else setGoalMode(true);
-              }}
-            >
-              {planMode ? <Lightbulb size={14} /> : <Target size={14} />}
-              <span>{planMode ? t("planMode") : t("goal")}</span>
-            </button>
+            <span className="inline-flex items-center">
+              {planMode ? (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-codex-border text-[12.5px] text-codex-text">
+                  <button
+                    type="button"
+                    onClick={() => setPlanMode(false)}
+                    className="rounded-full p-0.5 hover:bg-codex-active"
+                    aria-label={t("planBannerClose")}
+                  >
+                    <X size={10} />
+                  </button>
+                  <span>{t("planMode")}</span>
+                </span>
+              ) : goalMode ? (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-codex-border text-[12.5px] text-codex-text">
+                  <button
+                    type="button"
+                    onClick={() => setGoalMode(false)}
+                    className="rounded-full p-0.5 hover:bg-codex-active"
+                    aria-label={t("planBannerClose")}
+                  >
+                    <X size={10} />
+                  </button>
+                  <span>{t("goal")}</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-codex-text-secondary hover:bg-codex-hover"
+                  aria-label={t("goal")}
+                  onClick={() => setGoalMode(true)}
+                >
+                  <Target size={14} />
+                  <span>{t("goal")}</span>
+                </button>
+              )}
+            </span>
           )}
           <span className="flex-1" />
 

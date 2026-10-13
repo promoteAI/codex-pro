@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { CreateProjectDialog } from "./CreateProjectDialog";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
@@ -39,7 +39,7 @@ describe("CreateProjectDialog", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("shows path input when native picker is available and a folder is selected", () => {
+  it("shows path input when native picker is available and a folder is selected", async () => {
     // Simulate showDirectoryPicker availability.
     const original = (window as any).showDirectoryPicker;
     (window as any).showDirectoryPicker = vi.fn().mockResolvedValue({ name: "demo" });
@@ -48,7 +48,9 @@ describe("CreateProjectDialog", () => {
       // Click the dropzone to trigger the native picker.
       fireEvent.click(screen.getByText("添加 Codex 可读取和编辑的文件夹"));
       // After selection the path input should be visible.
-      expect(screen.getByPlaceholderText("输入文件夹绝对路径…")).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/输入文件夹绝对路径/)).toBeInTheDocument();
+      });
     } finally {
       (window as any).showDirectoryPicker = original;
     }

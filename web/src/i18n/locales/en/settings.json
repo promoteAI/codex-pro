@@ -487,5 +487,8 @@
   "createProviderSub": "Configure a custom API endpoint and initial models.",
   "contextWindowDefault": "1000000",
   "maxOutputTokensDefault": "128000",
-  "close": "Close"
+  "close": "Close",
+  "availableConnections": "Available SSH Connections",
+  "noConnectionsFound": "No connections found",
+  "useThis": "Use this"
 }

@@ -487,5 +487,8 @@
   "createProviderSub": "配置一个完全自定义的 API 端点和初始模型。",
   "contextWindowDefault": "1000000",
   "maxOutputTokensDefault": "128000",
-  "close": "关闭"
+  "close": "关闭",
+  "availableConnections": "可用的 SSH 连接",
+  "noConnectionsFound": "未发现可用连接",
+  "useThis": "使用此连接"
 }

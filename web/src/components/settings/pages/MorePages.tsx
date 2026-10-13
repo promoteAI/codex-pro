@@ -1206,6 +1206,7 @@ export function ConnectionsPage() {
   const [authMethod, setAuthMethod] = useState<AuthMethod>("none");
   const [identityFile, setIdentityFile] = useState("");
   const [password, setPassword] = useState("");
+  const [discoveredHosts, setDiscoveredHosts] = useState<{ host: string; user: string }[]>([]);
 
   const loadConnections = async () => {
     setLoading(true);
@@ -1220,7 +1221,28 @@ export function ConnectionsPage() {
     }
   };
 
+  const discoverHosts = async () => {
+    try {
+      const data = await apiFetch<{ hosts: { host: string; user: string }[] }>("/connections/refresh");
+      setDiscoveredHosts(data.hosts ?? []);
+    } catch {
+      setDiscoveredHosts([]);
+    }
+  };
+
+  const selectDiscovered = (h: { host: string; user: string }) => {
+    setHost(h.host);
+    setUser(h.user);
+  };
+
   useEffect(() => { void loadConnections(); }, []);
+  useEffect(() => {
+    if (creating && !editing) {
+      void discoverHosts();
+    } else {
+      setDiscoveredHosts([]);
+    }
+  }, [creating, editing]);
 
   const openCreate = () => {
     setEditing(null);
@@ -1259,6 +1281,15 @@ export function ConnectionsPage() {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const testConnection = async (conn: SshConnection) => {
+    try {
+      await apiFetch(`/connections/${encodeURIComponent(conn.name)}/test`, { method: "POST" });
+      toast.success(t("sshReachable"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -1319,7 +1350,8 @@ export function ConnectionsPage() {
           <div className="pl-conn-card__foot">
             <span className="pl-conn-card__id">{conn.host}</span>
             <div className="pl-conn-card__actions">
-              <button type="button" onClick={() => openEdit(conn)} className="pl-conn-act">{t("edit")}</button>
+              <button type="button" onClick={() => void openEdit(conn)} className="pl-conn-act">{t("edit")}</button>
+              <button type="button" onClick={() => void testConnection(conn)} className="pl-conn-act">{t("sshTest")}</button>
               <button type="button" onClick={() => void deleteConnection(conn.name)} className="pl-conn-act pl-conn-act--danger">{t("delete")}</button>
             </div>
           </div>
@@ -1328,14 +1360,31 @@ export function ConnectionsPage() {
 
       {/* Create/Edit Dialog */}
       {creating && (
-        <div className="pl-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeCreate(); }}>
+        <div className="pl-modal-overlay open" role="dialog" aria-modal="true" aria-labelledby="ssh-modal-title" onClick={(e) => { if (e.target === e.currentTarget) closeCreate(); }}>
           <div className="pl-modal">
             <div className="pl-modal-head">
-              <h3 className="pl-modal-title">{editing ? t("sshEditTitle") : t("sshAddTitle")}</h3>
+              <h3 className="pl-modal-title" id="ssh-modal-title">{editing ? t("sshEditTitle") : t("sshAddTitle")}</h3>
               <button type="button" className="pl-modal-close" onClick={closeCreate} aria-label={t("close")}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
               </button>
             </div>
+            {/* 发现面板 */}
+            {!editing && (
+              <div className="pl-modal-body pl-modal-body--discover">
+                <div className="pl-modal-section-title">{t("availableConnections")}</div>
+                <div className="pl-discover-list">
+                  {discoveredHosts.length > 0 ? discoveredHosts.map((h) => (
+                    <div key={h.host} className="pl-discover-item" onClick={() => selectDiscovered(h)}>
+                      <span className="pl-discover-host">{h.host}</span>
+                      <span className="pl-discover-detail">{h.user ? `${h.user}@${h.host}` : h.host}</span>
+                      <span className="pl-discover-action">{t("useThis")}</span>
+                    </div>
+                  )) : (
+                    <div className="pl-discover-empty">{t("noConnectionsFound")}</div>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="pl-modal-body">
               <label className="pl-modal-label">
                 {t("sshDisplayName")}

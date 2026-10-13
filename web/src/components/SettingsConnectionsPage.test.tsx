@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { ConnectionsPage } from "./settings/pages/MorePages";
+import { Toaster } from "./Toaster";
 import { useShellStore } from "../stores/shell";
 import { useAuthStore } from "../stores/auth";
 import * as api from "../lib/api";
@@ -52,6 +53,7 @@ afterEach(() => {
 function renderPage() {
   return render(
     <MemoryRouter>
+      <Toaster />
       <ConnectionsPage />
     </MemoryRouter>,
   );
@@ -65,8 +67,9 @@ describe("ConnectionsPage", () => {
       expect(screen.getByText("prod")).toBeInTheDocument();
     });
     expect(screen.getByText("staging")).toBeInTheDocument();
-    // user@host:port shown for the connection.
-    expect(screen.getByText(/root@10\.0\.0\.1:22/)).toBeInTheDocument();
+    // user is in its own span alongside host; match the user@ fragment.
+    expect(screen.getByText(/root@/)).toBeInTheDocument();
+    expect(screen.getByText("10.0.0.1")).toBeInTheDocument();
   });
 
   it("shows the empty state when there are no connections", async () => {

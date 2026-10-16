@@ -46,6 +46,19 @@ PORT="${PORT:-5173}"
 GATEWAY_PORT="${GATEWAY_PORT:-58123}"
 HEALTH_URL="http://127.0.0.1:${GATEWAY_PORT}/api/v1/health"
 
+kill_port() {
+  local port="$1"
+  local pid
+  pid=$(lsof -ti :"$port" 2>/dev/null | head -20 | tr '\n' ' ')
+  if [ -n "$pid" ]; then
+    echo "[dev] Killing existing process(es) on port $port: $pid"
+    kill -9 $pid 2>/dev/null || true
+    sleep 1
+  fi
+}
+kill_port "$GATEWAY_PORT"
+kill_port "$PORT"
+
 # --- 启动后端(后台) -----------------------------------------------------------
 echo "[dev] 启动后端 gateway(端口 $GATEWAY_PORT)..."
 "$PYTHON" -m codex_pro gateway --port "$GATEWAY_PORT" &

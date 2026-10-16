@@ -37,6 +37,24 @@ if (Test-Path $venvPython) {
     $py = 'python'
 }
 
+# --- Kill existing processes on target ports ----------------------------------
+function Stop-Port {
+    param([int]$Port)
+    $conn = netstat -ano | Select-String ":$Port\s"
+    if ($conn) {
+        $pids = $conn -replace ".*\s+(\d+)\s*$", '$1' | Sort-Object -Unique
+        foreach ($id in $pids) {
+            try {
+                Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+                Write-Host "[dev] Killed PID $id on port $Port"
+            } catch {}
+        }
+        Start-Sleep -Milliseconds 500
+    }
+}
+Stop-Port $GatewayPort
+Stop-Port $Port
+
 # --- Start backend (foreground; foreground so Ctrl+C reaches it too) --------
 $healthUrl = "http://127.0.0.1:$GatewayPort/api/v1/health"
 Write-Host "[dev] Starting backend gateway (port $GatewayPort) ..."

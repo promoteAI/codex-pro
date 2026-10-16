@@ -17,15 +17,7 @@ set "GATEWAY_PORT=58123"
 set "HEALTH_URL=http://127.0.0.1:%GATEWAY_PORT%/api/v1/health"
 
 rem --- Kill existing processes on target ports --------------------------------
-powershell -NoProfile -Command "
- param([int]\$GatewayPort,[int]\$Port)
- netstat -ano | Select-String [string]::Format(':{0} ',\$GatewayPort) | ForEach-Object {
-   if ($_ -match '\s(\d+)\s*$') { Stop-Process -Id $Matches[1] -Force -ErrorAction SilentlyContinue }
- }; Start-Sleep -Milliseconds 500;
- netstat -ano | Select-String [string]::Format(':{0} ',\$Port) | ForEach-Object {
-   if ($_ -match '\s(\d+)\s*$') { Stop-Process -Id $Matches[1] -Force -ErrorAction SilentlyContinue }
- }
-" -GatewayPort %GATEWAY_PORT% -Port %PORT% 2>nul
+powershell -NoProfile -Command "netstat -ano | Select-String ':%GATEWAY_PORT%\b' | ForEach-Object { if ($_ -match '\s(\d+)\s*$') { Stop-Process -Id $Matches[1] -Force -ErrorAction SilentlyContinue } }; Start-Sleep -Milliseconds 500; netstat -ano | Select-String ':%PORT%\b' | ForEach-Object { if ($_ -match '\s(\d+)\s*$') { Stop-Process -Id $Matches[1] -Force -ErrorAction SilentlyContinue } }" 2>nul
 
 rem --- Start backend (in this console group so Ctrl+C reaches it too) ---
 echo [dev] Starting backend gateway (port %GATEWAY_PORT%) ...

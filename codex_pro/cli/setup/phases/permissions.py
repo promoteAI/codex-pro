@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from codex_pro.cli.setup import (
-    print_info, print_success, print_warning,
-    _print_section_header, _choice, _ensure_dict,
+    print_info, print_success, _print_section_header, _choice, _ensure_dict,
     t,
 )
 

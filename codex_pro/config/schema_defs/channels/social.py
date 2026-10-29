@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from pydantic import Field
-from pydantic.alias_generators import to_camel
 
 from codex_pro.config.schema_defs.channels.base import _Base
 

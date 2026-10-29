@@ -4,14 +4,12 @@ from __future__ import annotations
 from typing import Any
 
 from codex_pro.cli.setup import (
-    print_info, print_success, print_warning,
-    _print_section_header, _choice, _ensure_dict,
+    print_success, _print_section_header, _ensure_dict,
     find_provider, grouped_catalog, verify_model,
     list_models, list_model_windows,
     t_provider_label, _detect_catalog_id, _handle_verify,
     ui, t,
 )
-from codex_pro.cli.setup.model_verify import VerifyResult
 
 
 def setup_model(config: dict) -> None:

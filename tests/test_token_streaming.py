@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from codex_pro.agent.loop import _TokenStreamPublisher
+from codex_pro.agent.streaming import _TokenStreamPublisher
 from codex_pro.bus.events import InboundEvent, OutboundEvent
 from codex_pro.bus.queue import MessageBus
 from codex_pro.channels.base import BaseChannel, SendResult

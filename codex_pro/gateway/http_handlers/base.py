@@ -7,7 +7,6 @@ straightforward.
 from __future__ import annotations
 
 import ipaddress
-import time
 from pathlib import Path
 from typing import Any
 

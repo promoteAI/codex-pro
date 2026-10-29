@@ -1,8 +1,6 @@
 """Evolution setup phase — Section 11 of the setup wizard."""
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
 
 from codex_pro.cli.setup import (
     print_info, print_success, print_warning,

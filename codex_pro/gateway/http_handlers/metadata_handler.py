@@ -4,7 +4,7 @@ Extracted from gateway/server.py for improved modularity.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from aiohttp import web
 
 from codex_pro.gateway.http_handlers.base import playground_path, resolve_web_dir

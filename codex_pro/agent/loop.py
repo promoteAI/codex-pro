@@ -55,14 +55,6 @@ from codex_pro.agent.bootstrap import LoopBootstrap
 
 
 
-from codex_pro.agent.embedding_helpers import (
-    _ProviderEmbedFn,
-    _embed_model_identity,
-    _should_publish_reply,
-    pick_embed_candidate,
-    probe_embed_provider,
-    resolve_embed_fallback,
-)
 from codex_pro.runtime_paths import bundled_skills_dir
 
 

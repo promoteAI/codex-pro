@@ -505,7 +505,6 @@ class WebSocketHandler:
         Extracted from GatewayServer._handle_outbound.
         """
         from codex_pro.channels.base import SendResult
-        from codex_pro.bus.events import TERMINAL_TURN_OUTCOMES, FAULTED_TURN_OUTCOMES, final_frame_http_status
 
         if event.metadata.get("_drop"):
             return None

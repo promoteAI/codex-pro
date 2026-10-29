@@ -2,7 +2,7 @@
 from unittest.mock import AsyncMock, MagicMock
 import pytest
 
-from codex_pro.agent.loop import (
+from codex_pro.agent.embedding_helpers import (
     _embed_model_identity,
     pick_embed_candidate,
     probe_embed_provider,

@@ -5,7 +5,7 @@ final reply is empty or carries the INSPECT_OK sentinel. Normal rounds must be
 completely unaffected, even if their text happens to contain "INSPECT_OK".
 """
 
-from codex_pro.agent.loop import _should_publish_reply
+from codex_pro.agent.embedding_helpers import _should_publish_reply
 from codex_pro.bus.events import InboundEvent
 
 

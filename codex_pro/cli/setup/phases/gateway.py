@@ -3,10 +3,9 @@ from __future__ import annotations
 
 from codex_pro.cli.setup import (
     print_info, print_success, print_warning,
-    _print_section_header, _choice, _ensure_dict,
-    is_loopback_bind, normalize_host_entries, normalize_origin_entries,
-    _bind_label, _primary_lan_address, _direct_http_origin,
-    t, ui,
+    _print_section_header, _ensure_dict,
+    normalize_host_entries, normalize_origin_entries,
+    _primary_lan_address, t, ui,
 )
 
 

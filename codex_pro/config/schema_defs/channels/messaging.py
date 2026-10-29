@@ -1,10 +1,8 @@
 """Messaging channel configs — extracted from channels.py."""
 from __future__ import annotations
 
-from typing import Literal
 
 from pydantic import Field
-from pydantic.alias_generators import to_camel
 
 from codex_pro.config.schema_defs.channels.base import _Base, TelegramChannelConfig, DiscordChannelConfig
 from codex_pro.config.schema_defs.channels.social import WeixinChannelConfig, EmailChannelConfig

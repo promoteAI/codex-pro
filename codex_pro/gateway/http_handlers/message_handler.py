@@ -20,7 +20,6 @@ from codex_pro.bus.events import (
     ContentType,
     FAULTED_TURN_OUTCOMES,
     InboundEvent,
-    OutboundEvent,
     TERMINAL_TURN_OUTCOMES,
     final_frame_http_status,
     turn_outcome_http_status,
@@ -29,7 +28,6 @@ from codex_pro.bus.idempotency import (
     IDEMPOTENCY_FINGERPRINT_METADATA,
     IDEMPOTENCY_NAMESPACE_METADATA,
     durable_fingerprint_conflicts,
-    idempotency_ledger_metadata,
 )
 from codex_pro.spill.layout import session_dir_name
 

@@ -66,7 +66,9 @@ describe("TermPanel", () => {
   it("打开面板为初始标签建立会话连接", async () => {
     render(<TermPanel />);
     await waitFor(() => expect(sessionInstances).toHaveLength(1));
-    expect(sessionInstances[0].connect).toHaveBeenCalled();
+    // connect 在第二个 effect 中触发，需等 DOM 容器注册完成；session 实例的创建
+    // 与 connect 不是同步的，因此把断言放进 waitFor 避免时序竞态。
+    await waitFor(() => expect(sessionInstances[0].connect).toHaveBeenCalled());
   });
 
   it("新建标签建立新会话", async () => {

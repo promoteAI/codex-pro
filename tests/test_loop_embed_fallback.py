@@ -10,7 +10,7 @@ class _NoEmbedProvider:
 
 def test_local_fallback_selected_when_no_embed_provider():
     """无 embed provider 且 local_embedding_model 非空 → 走本地兜底。"""
-    from codex_pro.agent.loop import resolve_embed_fallback
+    from codex_pro.agent.embedding_helpers import resolve_embed_fallback
 
     embed_fn, model_id, local = resolve_embed_fallback(
         embed_provider=None, emb_model=None,
@@ -22,7 +22,7 @@ def test_local_fallback_selected_when_no_embed_provider():
 
 
 def test_local_fallback_disabled_by_empty_config():
-    from codex_pro.agent.loop import resolve_embed_fallback
+    from codex_pro.agent.embedding_helpers import resolve_embed_fallback
 
     embed_fn, model_id, local = resolve_embed_fallback(
         embed_provider=None, emb_model=None, local_model_name="",
@@ -33,7 +33,7 @@ def test_local_fallback_disabled_by_empty_config():
 
 
 def test_provider_takes_priority_over_local():
-    from codex_pro.agent.loop import resolve_embed_fallback
+    from codex_pro.agent.embedding_helpers import resolve_embed_fallback
 
     provider = MagicMock()
     provider.embed = AsyncMock(return_value=[0.1, 0.2])

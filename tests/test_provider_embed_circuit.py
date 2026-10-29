@@ -2,7 +2,7 @@
 from unittest.mock import AsyncMock, MagicMock
 import pytest
 
-from codex_pro.agent.loop import _ProviderEmbedFn
+from codex_pro.agent.embedding_helpers import _ProviderEmbedFn
 
 
 @pytest.mark.asyncio

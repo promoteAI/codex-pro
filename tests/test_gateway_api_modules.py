@@ -132,9 +132,11 @@ class TestSkillsAPI:
         api, store, _ = self._make()
         meta = MagicMock()
         meta.name = "alpha"
+        meta.path = "/skills/alpha"
         meta.to_dict.return_value = {"name": "alpha"}
         store.list_all.return_value = [meta]
         store.is_disabled.return_value = False
+        store.source_for.return_value = "user"
 
         resp = await api.list_skills(_Request())
         assert resp.status == 200

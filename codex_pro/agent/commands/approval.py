@@ -60,7 +60,7 @@ class ApprovalCommands:
     @staticmethod
     def describe_inactive_approval(loop: "AgentLoop", request_id: str) -> str:
         """Explain why a non-pending request can't be acted on."""
-        from codex_pro.agent.approval_gate import ApprovalStatus
+        from codex_pro.permissions.manager import ApprovalStatus
         historic = loop.approval._find_history(request_id)
         if historic is None:
             return f"Approval request not found: {request_id}"

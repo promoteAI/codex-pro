@@ -92,6 +92,7 @@ export function Composer() {
   const projectBtnRef = useRef<HTMLButtonElement>(null);
   const branchBtnRef = useRef<HTMLButtonElement>(null);
   const addBtnRef = useRef<HTMLButtonElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -645,6 +646,21 @@ export function Composer() {
             </div>
           )}
 
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            aria-hidden="true"
+            tabIndex={-1}
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              if (files.length === 0) return;
+              void Promise.all(files.map((f) => useChatStore.getState().addFile(f))).finally(() => {
+                e.target.value = "";
+              });
+            }}
+          />
           <ComposerAddMenu
             open={menu === "add"}
             anchorEl={addBtnRef.current}
@@ -652,6 +668,7 @@ export function Composer() {
             onOpenProject={() => setMenu("project")}
             onGoal={() => setGoalMode(true)}
             onPlan={() => setPlanMode(true)}
+            onOpenFileChooser={() => fileInputRef.current?.click()}
           />
         </div>
       </div>

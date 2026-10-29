@@ -538,6 +538,7 @@ function SidechatPane() {
   const [providersLoaded, setProvidersLoaded] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const addBtnRef = useRef<HTMLButtonElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   // Enabled skills offered in the slash menu, same as the main composer.
@@ -869,10 +870,24 @@ function SidechatPane() {
               onOpenProject={() => setMenu(null)}
               onGoal={() => setMenu(null)}
               onPlan={() => setMenu(null)}
-              onAddFile={addFile}
-              showWorkflow={false}
+              onOpenFileChooser={() => fileInputRef.current?.click()}
             />
           )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            aria-hidden="true"
+            tabIndex={-1}
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              if (files.length === 0) return;
+              void Promise.all(files.map((f) => addFile(f))).finally(() => {
+                e.target.value = "";
+              });
+            }}
+          />
         </div>
       </div>
     </div>

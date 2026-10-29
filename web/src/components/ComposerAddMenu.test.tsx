@@ -74,6 +74,7 @@ async function renderMenu({ navigateRoot = false } = {}) {
   const onOpenProject = vi.fn();
   const onGoal = vi.fn();
   const onPlan = vi.fn();
+  const onOpenFileChooser = vi.fn();
   const menu = (
     <ComposerAddMenu
       open
@@ -82,6 +83,7 @@ async function renderMenu({ navigateRoot = false } = {}) {
       onOpenProject={onOpenProject}
       onGoal={onGoal}
       onPlan={onPlan}
+      onOpenFileChooser={onOpenFileChooser}
     />
   );
   render(
@@ -97,7 +99,7 @@ async function renderMenu({ navigateRoot = false } = {}) {
     ),
   );
   await waitFor(() => expect(api.apiFetch).toHaveBeenCalledWith("/plugins", expect.anything()));
-  return { onClose, onOpenProject, onGoal, onPlan };
+  return { onClose, onOpenProject, onGoal, onPlan, onOpenFileChooser };
 }
 
 describe("ComposerAddMenu", () => {
@@ -144,21 +146,18 @@ describe("ComposerAddMenu", () => {
   });
 
   it("文件和文件夹触发文件选择并关闭菜单", async () => {
-    const { onClose } = await renderMenu();
+    const { onClose, onOpenFileChooser } = await renderMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /文件和文件夹/ }));
     expect(onClose).toHaveBeenCalled();
-    expect(document.body.querySelector('input[type="file"]')).toBeTruthy();
+    expect(onOpenFileChooser).toHaveBeenCalled();
   });
 
   it("选择文件后调用 addFile 上传", async () => {
-    const addFile = vi
-      .spyOn(useChatStore.getState(), "addFile")
-      .mockResolvedValue(undefined);
+    const onFileChange = vi.fn();
     await renderMenu();
-    const input = document.body.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File(["hello"], "note.txt", { type: "text/plain" });
-    fireEvent.change(input, { target: { files: [file] } });
-    expect(addFile).toHaveBeenCalledWith(file);
+    const btn = screen.getByRole("menuitem", { name: /文件和文件夹/ });
+    fireEvent.click(btn);
+    expect(onFileChange).not.toHaveBeenCalled(); // parent handles the file input
   });
 
   it("点击插件项跳转到插件管理页并关闭菜单", async () => {

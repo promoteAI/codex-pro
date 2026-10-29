@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { useApi } from "../hooks/use-api";
 import { useWsSubscribe } from "../hooks/use-ws";
-import { useChatStore } from "../stores/chat";
 
 interface ApiPlugin {
   name: string;
@@ -77,9 +76,8 @@ interface ComposerAddMenuProps {
   onOpenProject: () => void;
   onGoal: () => void;
   onPlan: () => void;
-  /** Override the default `useChatStore.addFile` upload — used by the side chat,
-   *  which stages attachments on its own store. */
-  onAddFile?: (file: File) => Promise<void>;
+  /** Trigger the parent's persistent file input click. */
+  onOpenFileChooser: () => void;
   /** Hide the project/goal/plan section for panels that have no such flows. */
   showWorkflow?: boolean;
 }
@@ -92,13 +90,12 @@ export function ComposerAddMenu({
   onOpenProject,
   onGoal,
   onPlan,
-  onAddFile,
+  onOpenFileChooser,
   showWorkflow = true,
 }: ComposerAddMenuProps) {
   const { t } = useTranslation("composer");
   const navigate = useNavigate();
   const menuRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   // Real plugin list from the gateway; empty/error renders a placeholder.
@@ -175,7 +172,7 @@ export function ComposerAddMenu({
         role="menuitem"
         onClick={() => {
           onClose();
-          fileInputRef.current?.click();
+          onOpenFileChooser();
         }}
       >
         <svg className="add-menu-ico" viewBox="0 0 24 24" aria-hidden="true">
@@ -186,20 +183,6 @@ export function ComposerAddMenu({
           <span className="add-menu-title">{t("addFiles")}</span>
         </span>
       </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        className="hidden"
-        aria-hidden="true"
-        tabIndex={-1}
-        onChange={(e) => {
-          const files = Array.from(e.target.files ?? []);
-          const addFile = onAddFile ?? useChatStore.getState().addFile;
-          for (const file of files) void addFile(file);
-          e.target.value = "";
-        }}
-      />
       {showWorkflow && (
         <>
       <button

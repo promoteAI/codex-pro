@@ -56,7 +56,7 @@ tools:
 
 ### Enable A2A Protocol
 
-The `a2a` fields are flat — there is no `agent_card` subsection. Enabling it exposes the inbound `/a2a` endpoint and registers the `delegate_a2a` outbound tool. Outbound access is subject to `execution.network_policy`; target URLs do not yet use shared SSRF protection.
+The `a2a` fields are flat — there is no `agent_card` subsection. Enabling it exposes the inbound `/a2a` endpoint and registers the `delegate_a2a` outbound tool. Outbound access is subject to `execution.network_policy`, uses registered peers only, and denies private addresses by default.
 
 ```yaml
 a2a:

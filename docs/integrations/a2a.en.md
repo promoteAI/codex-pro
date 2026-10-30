@@ -56,7 +56,7 @@ When Gateway has multiple API tokens, each token yields an opaque principal. Tas
 
 ## Outbound delegation
 
-Register known peers under `a2a.remote_agents`. Outbound network access must be allowed by `execution.network_policy`; the tool carries the `network.outbound` capability and is withheld when the policy is `deny`. Each peer has an `id`, `url`, and optional `description`:
+Register allowed peers under `a2a.remote_agents`. The model can select a peer by ID but cannot supply an arbitrary URL. Outbound network access must be allowed by `execution.network_policy`; the tool carries the `network.outbound` capability and is withheld when the policy is `deny`. Private, loopback and link-local addresses are denied by default. For a trusted internal peer, set `allow_private: true` only on that peer; DNS is still resolved, validated under the explicit exception, and pinned before every connection.
 
 ```yaml
 execution:
@@ -66,17 +66,19 @@ a2a:
     - id: research-peer
       url: "https://agent.example.com"
       description: "Operator-configured research agent"
+      # Explicitly set only for an operator-reviewed internal service:
+      # allow_private: true
 ```
 
 `delegate_a2a` supports `send`, `get`, and `cancel`. Sending and cancelling are side-effecting operations; querying is read-only. Configure only peers reviewed by the operator.
 
-!!! warning "Outbound URLs do not yet use shared SSRF protection"
-    The current client does not validate target URLs through the shared `net_guard` at every redirect or pin DNS results. The tool also accepts a per-call `url`, not only peers registered in `remote_agents`. The network-policy capability is not URL or destination validation. Do not expose this capability to untrusted callers or treat model-generated/user-provided URLs as trusted; add an operator allowlist, SSRF validation, and DNS-rebinding protection before remote deployment.
+!!! warning "Private-network exceptions are high-trust configuration"
+  `allow_private: true` permits that peer to connect to RFC1918/loopback addresses. Link-local addresses (including cloud metadata), reserved, multicast and unspecified addresses remain blocked. Use it only for operator-reviewed targets and protect configuration write access; do not make it a global default. All targets still reject non-HTTP(S) schemes, URL credentials, and redirects, and response bodies are size-limited.
 
 ## Limitations
 
 - No streaming (`tasks/sendSubscribe` not implemented)
 - No push notifications
 - Only text parts processed
-- Outbound targets do not yet receive shared SSRF validation or DNS pinning
+- Private-network targets require per-peer `allow_private: true`; restrict that setting to trusted configuration administrators
 - Task retention is bounded by a TTL (3600 seconds by default) and count limit (1000 by default)

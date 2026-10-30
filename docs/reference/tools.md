@@ -86,16 +86,15 @@ Codex Pro 内置 42 个工具。本页的工具名、参数、能力标签均取
 
 #### delegate_a2a
 
-通过 A2A 将文本任务委派给远程 Agent。发送和取消会改变远端状态；查询为只读操作。需要先在 `a2a.remote_agents` 注册可信目标，或显式传入 `url`。该工具带有 `network.outbound` capability，`execution.network_policy: deny` 时会被过滤；默认 `minimal`、`messaging`、`coding` profile 不包含此工具，`full` profile 可包含。
+通过 A2A 将文本任务委派给远程 Agent。发送和取消会改变远端状态；查询为只读操作。先在 `a2a.remote_agents` 注册目标，再通过 `agent` ID 选择目标；工具不接受调用方任意 URL。该工具带有 `network.outbound` capability，`execution.network_policy: deny` 时会被过滤；默认 `minimal`、`messaging`、`coding` profile 不包含此工具，`full` profile 可包含。
 
-!!! warning "出站目标尚未完成 SSRF 防护"
-    当前客户端未执行统一 `net_guard` 的逐跳 URL 校验或 DNS 钉住，并允许调用参数携带任意 `url`。这与工具权限策略不同；仅依赖 `network_policy` 不构成目标地址校验。不要向不可信调用方开放，远程部署前需增加目标 allowlist、SSRF 校验和 DNS 重绑定防护。详见 [A2A 集成](../integrations/a2a.md)。
+!!! warning "内网例外是高信任配置"
+    默认拒绝私有/本机地址；每个目标请求都会进行 DNS 校验并 pin 住连接地址，且不跟随重定向。`allow_private: true` 也不会放行 link-local（含云元数据）、保留、多播或未指定地址。仅对管理员审核过的内网 peer 设置 `a2a.remote_agents[].allow_private: true`，并保护配置写权限。详见 [A2A 集成](../integrations/a2a.md)。
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|:----:|--------|------|
 | `task` | string | `send` 时必填 | — | 交给远端 Agent 的任务说明 |
-| `agent` | string | 与 `url` 二选一 | — | `a2a.remote_agents` 中的注册 ID |
-| `url` | string | 与 `agent` 二选一 | — | 远程 A2A Agent 的根 URL；不可信输入风险见上方警告 |
+| `agent` | string | 是 | — | `a2a.remote_agents` 中的注册 ID |
 | `action` | string | | `send` | `send`、`get` 或 `cancel` |
 | `task_id` | string | `get` / `cancel` 时必填 | — | 远端任务 ID；`send` 时可选，用于继续/指定任务 |
 | `wait` | boolean | | `true` | `send` 后是否轮询至终态 |

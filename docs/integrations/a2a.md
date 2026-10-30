@@ -63,7 +63,7 @@ Gateway 配置多个 API token 时，每个 token 会导出一个不透明 princ
 
 ## 出站委派
 
-工具通过 `a2a.remote_agents` 注册常用 peer。`execution.network_policy` 必须允许出站网络；该工具带有 `network.outbound` capability，网络策略为 `deny` 时不会开放给 Agent。每个 peer 配置 `id`、`url`，可选 `description`：
+工具通过 `a2a.remote_agents` 注册允许访问的 peer；模型只能按 ID 选择目标，不能传入任意 URL。`execution.network_policy` 必须允许出站网络；该工具带有 `network.outbound` capability，网络策略为 `deny` 时不会开放给 Agent。默认禁止私有、本机、link-local 等非公网地址。需要访问受信任的内网代理时，可仅对该 peer 显式设置 `allow_private: true`；请求仍会在每次连接前解析、校验并 pin 住 DNS 地址。
 
 ```yaml
 execution:
@@ -73,17 +73,19 @@ a2a:
     - id: research-peer
       url: "https://agent.example.com"
       description: "受管理员配置的研究代理"
+      # 仅当目标为管理员审核过的内网服务时才显式开启：
+      # allow_private: true
 ```
 
 `delegate_a2a` 支持 `send`、`get`、`cancel`；发送和取消是有副作用的执行操作，查询是只读操作。建议只配置运营方审核过的 peer。
 
-!!! warning "出站 URL 尚未纳入统一 SSRF 防护"
-    当前客户端对目标 URL 不执行共享 `net_guard` 的逐跳校验或 DNS 钉住；工具也允许调用时直接提供 `url`，而不只使用 `remote_agents` 中的注册目标。网络策略 capability 不是 URL/目标地址校验。不要向不可信调用方开放此能力，也不要将模型生成或用户提供的任意 URL 视为可信；远程部署前应先补齐目标 allowlist、SSRF 校验和 DNS 重绑定防护。
+!!! warning "内网例外是高信任配置"
+  `allow_private: true` 会允许该 peer 连接 RFC 私网/本机地址。link-local 地址（包括云元数据）、保留地址、多播和未指定地址无论如何都会拒绝。只对管理员审核过的目标开启，并保护配置文件写权限；不要把它设为全局默认。所有目标仍拒绝非 HTTP(S) scheme、URL 凭证和重定向，并限制响应大小。
 
 ## 限制
 
 - 不支持流式响应（`tasks/sendSubscribe` 未实现）
 - 不支持推送通知
 - 仅处理文本内容
-- 出站目标的统一 SSRF 校验与 DNS 钉住尚未实现
+- 私有网络目标仅能通过 peer 级 `allow_private: true` 显式授权；该设置必须限制在受信任的配置管理员手中
 - 任务存储有 TTL（默认 3600 秒）和数量上限（默认 1000）

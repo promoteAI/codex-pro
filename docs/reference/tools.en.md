@@ -86,16 +86,15 @@ The `artifact_*` tools use a dedicated session namespace, accept no arbitrary fi
 
 #### delegate_a2a
 
-Delegate a text task to a remote Agent over A2A. Sending and cancelling change remote state; querying is read-only. Configure a trusted peer under `a2a.remote_agents` or explicitly pass a `url`. The tool carries `network.outbound` and is filtered when `execution.network_policy: deny`; the default `minimal`, `messaging`, and `coding` profiles do not include it, while `full` may expose it.
+Delegate a text task to a remote Agent over A2A. Sending and cancelling change remote state; querying is read-only. Register targets under `a2a.remote_agents` and select one by `agent` ID; the tool does not accept a caller-supplied arbitrary URL. It carries `network.outbound` and is filtered when `execution.network_policy: deny`; the default `minimal`, `messaging`, and `coding` profiles do not include it, while `full` may expose it.
 
-!!! warning "Outbound targets are not yet SSRF-protected"
-    The current client does not use shared `net_guard` redirect-by-redirect URL validation or DNS pinning, and the tool accepts an arbitrary `url` parameter. Tool policy is not destination validation; `network_policy` alone does not validate target addresses. Do not expose this to untrusted callers. Add an operator allowlist, SSRF validation and DNS-rebinding protection before remote deployment. See [A2A integration](../integrations/a2a.en.md).
+!!! warning "Private-network exceptions are high-trust configuration"
+    Private and loopback addresses are denied by default. Every peer request validates DNS and pins the resolved address, and redirects are not followed. `allow_private: true` still blocks link-local (including cloud metadata), reserved, multicast and unspecified addresses. Set it only for operator-reviewed internal peers, and protect configuration write access. See [A2A integration](../integrations/a2a.en.md).
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|:--------:|---------|-------------|
 | `task` | string | Required for `send` | — | Task instruction for the remote Agent |
-| `agent` | string | One of `agent` / `url` | — | Registered ID from `a2a.remote_agents` |
-| `url` | string | One of `agent` / `url` | — | Remote A2A Agent base URL; see the untrusted-input warning above |
+| `agent` | string | Yes | — | Registered ID from `a2a.remote_agents` |
 | `action` | string | | `send` | `send`, `get`, or `cancel` |
 | `task_id` | string | Required for `get` / `cancel` | — | Remote task ID; optional for `send` to continue/specify a task |
 | `wait` | boolean | | `true` | Whether `send` polls until a terminal state |

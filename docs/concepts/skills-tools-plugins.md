@@ -285,7 +285,7 @@ flowchart LR
 - 外部系统需要标准的任务状态查询和取消接口
 - 需要按 API token 隔离多个调用主体的任务与会话
 
-如果需要 Codex Pro 主动委派给外部 Agent，当前版本尚无生产可用的出站入口。
+Codex Pro 可通过 `delegate_a2a` 工具委派给登记的远程 Agent。出站目标受 `execution.network_policy` 约束，默认拒绝私有/本机网络地址；仅管理员审核过的内网 peer 可逐项开启 `a2a.remote_agents[].allow_private`。详见 [A2A 集成与安全边界](../integrations/a2a.md)。
 
 ---
 

@@ -256,15 +256,14 @@ class A2AConfig(_Base):
             "desc_en": "Backstop retention for non-terminal A2A tasks (seconds); a leak guard, not a task deadline",
         },
     )
-    # Outbound delegation registry. Each entry names a peer agent the runtime can
-    # delegate to via the delegate_a2a tool; operators may also pass a raw URL
-    # per-call, but a configured entry lets the model reuse a known, vetted peer.
+    # Outbound delegation allowlist. The model selects a configured peer ID;
+    # it cannot supply an arbitrary URL to the delegate_a2a tool.
     remote_agents: list[RemoteAgentConfig] = Field(
         default_factory=list,
         json_schema_extra={
             "status": "effective", "ref": "agent/tools/a2a_delegate.py",
-            "desc_zh": "A2A 出站委派目标注册表(名称/URL 对),供 delegate_a2a 工具按名调用",
-            "desc_en": "Outbound A2A delegation targets (name/URL pairs) callable by the delegate_a2a tool",
+            "desc_zh": "A2A 出站委派目标白名单；Agent 只能选择此处登记的目标 ID",
+            "desc_en": "Allowlist of outbound A2A peers; the Agent can select only registered peer IDs",
         },
     )
 
@@ -281,8 +280,16 @@ class RemoteAgentConfig(_Base):
         default="",
         json_schema_extra={
             "status": "effective", "ref": "agent/tools/a2a_delegate.py",
-            "desc_zh": "远程 A2A 代理的根 URL(含协议与主机,可含路径前缀)",
-            "desc_en": "Root URL of the remote A2A agent (scheme and host, optionally a path prefix)",
+            "desc_zh": "远程 A2A 代理的根 URL(含协议与主机,可含路径前缀)；默认拒绝私有/本机网络地址",
+            "desc_en": "Root URL of the remote A2A peer (scheme and host, optionally a path prefix); private/loopback addresses are denied by default",
+        },
+    )
+    allow_private: bool = Field(
+        default=False,
+        json_schema_extra={
+            "status": "effective", "ref": "agent/tools/a2a_delegate.py",
+            "desc_zh": "是否允许此已登记 Agent 使用私有/本机网络地址；仅对管理员审核过的可信目标开启",
+            "desc_en": "Allow this registered peer to use private/loopback addresses; enable only for operator-reviewed trusted targets",
         },
     )
     description: str = Field(

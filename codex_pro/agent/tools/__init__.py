@@ -214,7 +214,12 @@ def discover_tools(
     if config.a2a.enabled:
         from codex_pro.agent.tools.a2a_delegate import A2ADelegateTool
         remote_agents = [
-            {"id": ra.id, "url": ra.url, "description": ra.description}
+            {
+                "id": ra.id,
+                "url": ra.url,
+                "description": ra.description,
+                "allow_private": ra.allow_private,
+            }
             for ra in config.a2a.remote_agents
             if ra.id and ra.url
         ]

@@ -299,8 +299,10 @@ flowchart LR
 - An external system needs standard task status and cancellation methods
 - Multiple API-token principals need isolated tasks and sessions
 
-If Codex Pro itself must delegate to external agents, this version has no production outbound
-entry point.
+Codex Pro can delegate to registered remote agents through the `delegate_a2a` tool. Outbound
+targets are subject to `execution.network_policy`; private/loopback addresses are denied by
+default. Only operator-reviewed internal peers may opt in individually with
+`a2a.remote_agents[].allow_private`. See [A2A integration and security boundaries](../integrations/a2a.en.md).
 
 ---
 

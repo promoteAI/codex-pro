@@ -57,7 +57,7 @@ tools:
 ### 启用 A2A 协议
 
 `a2a` 的字段是平铺的，没有 `agent_card` 嵌套节：
-启用后暴露入站 `/a2a` 端点，并注册 `delegate_a2a` 出站工具；出站网络受 `execution.network_policy` 约束，目标 URL 尚未接入统一 SSRF 防护。
+启用后暴露入站 `/a2a` 端点，并注册 `delegate_a2a` 出站工具；出站网络受 `execution.network_policy` 约束，目标限定为登记 peer 并默认拒绝私网地址。
 
 ```yaml
 a2a:

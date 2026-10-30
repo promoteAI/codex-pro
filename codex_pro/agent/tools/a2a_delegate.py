@@ -2,10 +2,10 @@
 
 Unlike ``delegate_task`` (which fans out to in-process worker agents), this tool
 drives the A2A client library to hand work to a *remote* peer agent over the
-A2A JSON-RPC protocol. The agent chooses a target either by a configured
-registry name (``agent``) or a raw base URL (``url``), then the tool discovers
-the peer's AgentCard and sends/gets/cancels a task, returning a structured
-result (task id, status, output) the orchestrator can act on.
+A2A JSON-RPC protocol. The Agent selects a peer ID from the operator-configured
+``a2a.remote_agents`` allowlist; it cannot provide an arbitrary URL. The tool
+discovers the peer's AgentCard and sends/gets/cancels a task, returning a
+structured result (task id, status, output) the orchestrator can act on.
 
 Unreachable/unsupported peers are reported as graceful failures classified with
 ``ToolResult.error_kind`` so the circuit breaker treats them as infra failures.
@@ -19,8 +19,9 @@ from typing import Any
 import aiohttp
 from loguru import logger
 
-from codex_pro.a2a.client import A2AClient
+from codex_pro.a2a.client import A2AClient, A2AClientError
 from codex_pro.a2a.models import A2ATask, TaskState
+from codex_pro.security.net_guard import GuardedFetchError
 from codex_pro.tools import Tool, ToolExecutionContext, ToolResult
 
 # Terminal states after which a task has settled; no further polling is useful.
@@ -45,6 +46,10 @@ def _error_kind_for(exc: BaseException) -> str:
     """
     if isinstance(exc, asyncio.TimeoutError):
         return "timeout"
+    if isinstance(exc, GuardedFetchError):
+        return "dependency" if not exc.blocked_by_policy else "validation"
+    if isinstance(exc, A2AClientError):
+        return "dependency"
     if isinstance(exc, (aiohttp.ClientError, OSError)):
         return "dependency"
     return "internal"
@@ -58,7 +63,7 @@ class A2ADelegateTool(Tool):
         "Delegate a task to a remote A2A agent and return its result. "
         "Use when work should be handed to an external agent reachable over A2A "
         "(e.g. a specialized peer service) rather than done locally. "
-        "Specify either 'agent' (a configured registry name) or 'url' (a base URL). "
+        "Specify 'agent' as the ID of an operator-configured remote peer. "
         "Set action='send' to dispatch and wait, 'get' to poll an existing task, "
         "or 'cancel' to stop one. For tasks you can do yourself, do NOT delegate."
     )
@@ -71,11 +76,7 @@ class A2ADelegateTool(Tool):
             },
             "agent": {
                 "type": "string",
-                "description": "Registered name of a configured remote agent (from the a2a.remote_agents config). Mutually exclusive with 'url'.",
-            },
-            "url": {
-                "type": "string",
-                "description": "Base URL of the remote A2A agent (scheme + host, optional path prefix). Mutually exclusive with 'agent'.",
+                "description": "ID of a peer preconfigured by the operator under a2a.remote_agents.",
             },
             "action": {
                 "type": "string",
@@ -93,6 +94,7 @@ class A2ADelegateTool(Tool):
                 "default": True,
             },
         },
+        "required": ["agent"],
     }
     # Sending or cancelling mutates remote state; polling is read-only.
     risk_level = "exec"
@@ -105,35 +107,35 @@ class A2ADelegateTool(Tool):
     def __init__(
         self,
         *,
-        remote_agents: list[dict[str, str]] | None = None,
+        remote_agents: list[dict[str, Any]] | None = None,
         timeout_seconds: float = _DEFAULT_TIMEOUT_SECONDS,
     ):
-        # ``remote_agents`` is a list of {"id", "url", "description"} dicts baked
-        # in at registration time from config; per-call ``url``/``agent`` selects
-        # among them without re-reading live config.
+        # ``remote_agents`` is the operator-controlled destination allowlist,
+        # baked in at registration time from config. Model calls select only an
+        # ID; they cannot supply an arbitrary URL.
         self._remote_agents = {a["id"]: a for a in (remote_agents or []) if a.get("id") and a.get("url")}
         self._timeout_seconds = timeout_seconds
         self._client = A2AClient(timeout=timeout_seconds)
 
     def is_ready(self) -> bool:
-        """The tool is usable as long as either the registry is populated or a
-        caller passes an explicit URL. Both are valid, so always ready."""
-        return True
+        """The tool is usable only when an operator-configured peer exists."""
+        return bool(self._remote_agents)
 
     def readiness_detail(self) -> tuple[bool, str]:
         if self._remote_agents:
             return True, f"{len(self._remote_agents)} remote agent(s) configured"
-        return True, "no configured agents; callers must pass url directly"
+        return False, "no remote agents configured under a2a.remote_agents"
 
     def execution_mode(self, params: dict[str, Any]) -> str:
         return "read_only" if params.get("action") == "get" else "side_effect"
 
-    def _resolve_url(self, params: dict[str, Any]) -> tuple[str, str]:
-        """Resolve the target base URL, returning (url, source_description)."""
-        url = params.get("url", "")
+    def _resolve_target(self, params: dict[str, Any]) -> tuple[str, str, bool]:
+        """Resolve an allowlisted target as (url, source, allow_private)."""
+        if params.get("url"):
+            raise ValueError(
+                "Direct URLs are not accepted. Select an operator-configured agent ID."
+            )
         agent_name = params.get("agent", "")
-        if url and agent_name:
-            raise ValueError("Specify either 'url' or 'agent', not both.")
         if agent_name:
             entry = self._remote_agents.get(agent_name)
             if not entry:
@@ -141,14 +143,12 @@ class A2ADelegateTool(Tool):
                 raise ValueError(
                     f"Unknown agent '{agent_name}'. Configured agents: {known}"
                 )
-            return entry["url"], f"agent '{agent_name}'"
-        if url:
-            return url, f"url {url}"
-        raise ValueError("Specify a target: either 'agent' (configured name) or 'url'.")
+            return entry["url"], f"agent '{agent_name}'", bool(entry.get("allow_private", False))
+        raise ValueError("Specify 'agent' using an operator-configured remote agent ID.")
 
     async def execute(self, params: dict[str, Any], ctx: ToolExecutionContext | None = None) -> ToolResult:
         try:
-            url, source = self._resolve_url(params)
+            url, source, allow_private = self._resolve_target(params)
         except ValueError as e:
             return ToolResult(success=False, error=str(e), error_kind="validation")
 
@@ -157,11 +157,11 @@ class A2ADelegateTool(Tool):
 
         try:
             if action == "send":
-                return await self._send_and_wait(params, url, source)
+                return await self._send_and_wait(params, url, source, allow_private)
             if action == "get":
-                return await self._get(url, source, task_id)
+                return await self._get(url, source, task_id, allow_private)
             if action == "cancel":
-                return await self._cancel(url, source, task_id)
+                return await self._cancel(url, source, task_id, allow_private)
             return ToolResult(
                 success=False,
                 error=f"Unsupported action '{action}'.",
@@ -176,7 +176,7 @@ class A2ADelegateTool(Tool):
             )
 
     async def _send_and_wait(
-        self, params: dict[str, Any], url: str, source: str
+        self, params: dict[str, Any], url: str, source: str, allow_private: bool
     ) -> ToolResult:
         task_desc = params.get("task", "")
         if not task_desc:
@@ -191,7 +191,7 @@ class A2ADelegateTool(Tool):
         # Discover first so we surface an unreachable/unsupported peer cleanly
         # before spending a task; the card name is also useful context for output.
         try:
-            card = await self._client.discover(url)
+            card = await self._client.discover(url, allow_private=allow_private)
         except Exception as e:
             return ToolResult(
                 success=False,
@@ -199,41 +199,47 @@ class A2ADelegateTool(Tool):
                 error_kind=_error_kind_for(e),
             )
 
-        task = await self._client.send_task(url, task_desc, task_id=task_id)
+        task = await self._client.send_task(
+            url, task_desc, task_id=task_id, allow_private=allow_private
+        )
 
         if wait and not self._is_terminal(task.state):
-            task = await self._poll(url, task.id)
+            task = await self._poll(url, task.id, allow_private)
 
         return self._format_task(task, source, card.name, action="send")
 
-    async def _get(self, url: str, source: str, task_id: str) -> ToolResult:
+    async def _get(
+        self, url: str, source: str, task_id: str, allow_private: bool
+    ) -> ToolResult:
         if not task_id:
             return ToolResult(
                 success=False,
                 error="action='get' requires a task_id.",
                 error_kind="validation",
             )
-        task = await self._client.get_task(url, task_id)
+        task = await self._client.get_task(url, task_id, allow_private=allow_private)
         return self._format_task(task, source, "", action="get")
 
-    async def _cancel(self, url: str, source: str, task_id: str) -> ToolResult:
+    async def _cancel(
+        self, url: str, source: str, task_id: str, allow_private: bool
+    ) -> ToolResult:
         if not task_id:
             return ToolResult(
                 success=False,
                 error="action='cancel' requires a task_id.",
                 error_kind="validation",
             )
-        task = await self._client.cancel_task(url, task_id)
+        task = await self._client.cancel_task(url, task_id, allow_private=allow_private)
         return self._format_task(task, source, "", action="cancel")
 
-    async def _poll(self, url: str, task_id: str) -> A2ATask:
+    async def _poll(self, url: str, task_id: str, allow_private: bool) -> A2ATask:
         """Poll tasks/get until the task reaches a terminal state or we give up."""
-        task = await self._client.get_task(url, task_id)
+        task = await self._client.get_task(url, task_id, allow_private=allow_private)
         for _ in range(_MAX_POLL_ITERATIONS):
             if self._is_terminal(task.state):
                 return task
             await asyncio.sleep(_POLL_INTERVAL_SECONDS)
-            task = await self._client.get_task(url, task_id)
+            task = await self._client.get_task(url, task_id, allow_private=allow_private)
         logger.warning("A2A task {} did not settle within {} polls", task_id, _MAX_POLL_ITERATIONS)
         return task
 

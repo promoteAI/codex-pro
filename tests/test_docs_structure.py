@@ -642,5 +642,12 @@ def test_audit_sensitive_capability_boundaries_are_not_overclaimed():
 
     a2a_docs = (DOCS_DIR / "integrations/a2a.md").read_text(encoding="utf-8")
     a2a_docs += (DOCS_DIR / "integrations/a2a.en.md").read_text(encoding="utf-8")
-    assert "尚未纳入统一 SSRF 防护" in a2a_docs
-    assert "do not yet use shared SSRF protection" in a2a_docs
+    assert "默认禁止私有、本机、link-local 等非公网地址" in a2a_docs
+    assert "denied by default" in a2a_docs
+    assert "allow_private: true" in a2a_docs
+
+    a2a_concepts = (DOCS_DIR / "concepts/skills-tools-plugins.md").read_text(encoding="utf-8")
+    a2a_concepts += (DOCS_DIR / "concepts/skills-tools-plugins.en.md").read_text(encoding="utf-8")
+    assert "delegate_a2a" in a2a_concepts
+    assert "尚无生产可用的出站入口" not in a2a_concepts
+    assert "no production outbound" not in a2a_concepts

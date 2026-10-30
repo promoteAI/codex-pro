@@ -39,35 +39,45 @@ def _task(task_id: str = "t-1", state: TaskState = TaskState.COMPLETED) -> A2ATa
     )
 
 
-class TestResolveUrl:
-    def test_resolve_by_agent_name(self):
+class TestResolveTarget:
+    def test_resolve_by_registered_agent(self):
         tool = _make_tool()
-        url, source = tool._resolve_url({"task": "x", "agent": "peer"})
+        url, source, allow_private = tool._resolve_target({"task": "x", "agent": "peer"})
         assert url == "https://peer.example.com"
         assert "peer" in source
+        assert allow_private is False
 
-    def test_resolve_by_url(self):
-        tool = _make_tool()
-        url, source = tool._resolve_url({"task": "x", "url": "https://other"})
-        assert url == "https://other"
-        assert "https://other" in source
+    def test_registered_agent_can_opt_in_to_private_addresses(self):
+        tool = _make_tool(remote_agents=[{
+            "id": "internal",
+            "url": "http://agent.internal",
+            "allow_private": True,
+        }])
+        url, _, allow_private = tool._resolve_target({"agent": "internal"})
+        assert url == "http://agent.internal"
+        assert allow_private is True
 
-    def test_resolve_both_rejected(self):
+    def test_resolve_by_arbitrary_url_is_rejected(self):
         tool = _make_tool()
         with pytest.raises(ValueError):
-            tool._resolve_url({"task": "x", "agent": "peer", "url": "https://other"})
+            tool._resolve_target({"task": "x", "url": "https://other"})
 
     def test_resolve_neither_rejected(self):
         tool = _make_tool()
         with pytest.raises(ValueError):
-            tool._resolve_url({"task": "x"})
+            tool._resolve_target({"task": "x"})
 
     def test_resolve_unknown_agent(self):
         tool = _make_tool()
         with pytest.raises(ValueError) as exc:
-            tool._resolve_url({"task": "x", "agent": "nope"})
+            tool._resolve_target({"task": "x", "agent": "nope"})
         assert "Unknown agent" in str(exc.value)
         assert "peer" in str(exc.value)
+
+    def test_tool_is_not_ready_without_registered_targets(self):
+        tool = _make_tool(remote_agents=[])
+        assert tool.is_ready() is False
+        assert tool.readiness_detail()[0] is False
 
 
 class TestExecutionMode:

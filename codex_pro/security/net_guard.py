@@ -54,7 +54,9 @@ def _ip_is_blocked(ip: ipaddress._BaseAddress) -> bool:
     )
 
 
-async def resolve_and_validate(url: str) -> tuple[list[str], str | None]:
+async def resolve_and_validate(
+    url: str, *, allow_private: bool = False
+) -> tuple[list[str], str | None]:
     """Resolve *url*'s host and validate every resolved IP.
 
     Returns ``(ips, error)``. ``ips`` is the list of validated address
@@ -63,7 +65,9 @@ async def resolve_and_validate(url: str) -> tuple[list[str], str | None]:
     closes the DNS-rebinding window between validation and connect.
 
     Every address must pass: a hostname with one public and one private A
-    record must not be usable to reach the private one.
+    record must not be usable to reach the private one. ``allow_private`` is
+    an explicit operator opt-in for trusted internal endpoints; resolution
+    and pinning still happen so DNS rebinding is not reintroduced.
     """
     import asyncio
 
@@ -84,10 +88,15 @@ async def resolve_and_validate(url: str) -> tuple[list[str], str | None]:
             ip = ipaddress.ip_address(addr)
         except ValueError:
             continue
-        if _ip_is_blocked(ip):
+        private_opt_in_applies = (
+            allow_private
+            and (ip.is_private or ip.is_loopback)
+            and not (ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified)
+        )
+        if _ip_is_blocked(ip) and not private_opt_in_applies:
             return [], (
                 f"Blocked: '{host}' resolves to non-public address {ip}. "
-                "Set tools.web.allowPrivateAddresses to true to permit internal targets."
+                "Only an endpoint-specific private/loopback opt-in for a trusted target can permit RFC1918 or loopback addresses."
             )
         ips.append(addr)
     if not ips:

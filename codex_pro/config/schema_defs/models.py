@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
 
-class _Base(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+from codex_pro.config.schema_defs.base import _Base
 
 # ── Channel configs ──────────────────────────────────────────────────────────
 
@@ -105,7 +103,7 @@ class ProviderConfig(_Base):
     disabled: bool = Field(
         default=False,
         json_schema_extra={
-            "status": "effective",
+            "status": "effective", "ref": "models/router.py:165",
             "desc_zh": "是否禁用该提供商（禁用后不参与路由）",
             "desc_en": "Whether to disable this provider (excluded from routing when true)",
         },

@@ -217,14 +217,27 @@ class TestTypingCancellationRegressions:
         monkeypatch.setattr(wx, "_send_typing", AsyncMock(return_value={}))
 
         await ch.send_typing("user@x")
-        await asyncio.sleep(0.01)  # loop hits cap, self-terminates, clears slot
+        task = ch._typing_tasks["user@x"]
+        # Loop hits the cap and self-terminates; _on_typing_done then clears
+        # the slot. Poll instead of a fixed sleep: Windows coarse monotonic
+        # clocks (GetTickCount64) drift against perf_counter, so asyncio
+        # timers can fire early and a single sleep(0.01) may resume between
+        # task completion and the done-callback.
+        for _ in range(200):
+            if "user@x" not in ch._typing_tasks:
+                break
+            await asyncio.sleep(0.001)
         assert "user@x" not in ch._typing_tasks  # _on_typing_done cleared it
 
         # A subsequent beat must revive it (idempotency guard sees no live task).
         await ch.send_typing("user@x")
-        assert "user@x" in ch._typing_tasks
+        revived = ch._typing_tasks["user@x"]
+        assert revived is not task
         await ch.stop_typing("user@x")
-        await asyncio.sleep(0.01)
+        for _ in range(200):
+            if revived.done():
+                break
+            await asyncio.sleep(0.001)
 
 
 class TestSendDoesNotTouchTyping:

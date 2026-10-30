@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
 
-class _Base(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+from codex_pro.config.schema_defs.base import _Base
 
 # ── Channel configs ──────────────────────────────────────────────────────────
 
@@ -25,81 +23,82 @@ class UIPreferences(_Base):
     # ── Appearance ────────────────────────────────────────────────────────────
     theme: Literal["system", "light", "dark"] = Field(
         default="dark",
-        json_schema_extra={"desc_zh": "界面主题", "desc_en": "UI theme"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "界面主题", "desc_en": "UI theme"},
     )
     contrast: int = Field(
         default=45, ge=0, le=100,
-        json_schema_extra={"desc_zh": "界面对比度", "desc_en": "UI contrast"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "界面对比度", "desc_en": "UI contrast"},
     )
     translucent_sidebar: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "半透明侧边栏", "desc_en": "Translucent sidebar"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "半透明侧边栏", "desc_en": "Translucent sidebar"},
     )
 
     # ── General / editor ─────────────────────────────────────────────────────
     no_project_folder: str = Field(
         default="~/Documents/codex-pro",
-        json_schema_extra={"desc_zh": "无项目任务文件夹", "desc_en": "Default no-project task folder"},
+        json_schema_extra={"status": "effective", "ref": "gateway/http_handlers/message_handler.py:571", "desc_zh": "无项目任务文件夹", "desc_en": "Default no-project task folder"},
     )
     agent_env: Literal["windows_native", "wsl"] = Field(
         default="windows_native",
-        json_schema_extra={"desc_zh": "Agent 运行环境", "desc_en": "Agent runtime environment"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "Agent 运行环境", "desc_en": "Agent runtime environment"},
     )
     open_in: str = Field(
         default="vscode",
-        json_schema_extra={"desc_zh": "默认文件打开位置", "desc_en": "Default open-in editor"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "默认文件打开位置", "desc_en": "Default open-in editor"},
     )
     integrated_shell: str = Field(
         default="PowerShell",
-        json_schema_extra={"desc_zh": "集成终端 Shell", "desc_en": "Integrated terminal shell"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "集成终端 Shell", "desc_en": "Integrated terminal shell"},
     )
     terminal_position: Literal["bottom", "right"] = Field(
         default="bottom",
-        json_schema_extra={"desc_zh": "默认终端位置", "desc_en": "Default terminal position"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "默认终端位置", "desc_en": "Default terminal position"},
     )
     bottom_panel: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "底部面板", "desc_en": "Bottom panel controls"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "底部面板", "desc_en": "Bottom panel controls"},
     )
     plugins_enabled: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "启用插件", "desc_en": "Enable plugins"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "启用插件", "desc_en": "Enable plugins"},
     )
     plain_editor: bool = Field(
         default=False,
-        json_schema_extra={"desc_zh": "纯文本编辑器", "desc_en": "Plain text editor"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "纯文本编辑器", "desc_en": "Plain text editor"},
     )
     show_context_usage: bool = Field(
         default=False,
-        json_schema_extra={"desc_zh": "显示上下文窗口使用情况", "desc_en": "Show context window usage"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "显示上下文窗口使用情况", "desc_en": "Show context window usage"},
     )
     follow_up_mode: Literal["queue", "steer"] = Field(
         default="queue",
-        json_schema_extra={"desc_zh": "跟进处理方式", "desc_en": "Follow-up mode"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "跟进处理方式", "desc_en": "Follow-up mode"},
     )
     standalone_chat: bool = Field(
         default=False,
-        json_schema_extra={"desc_zh": "默认使用独立聊天", "desc_en": "Default to standalone chat"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "默认使用独立聊天", "desc_en": "Default to standalone chat"},
     )
     default_permissions: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "默认权限", "desc_en": "Default permissions"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "默认权限", "desc_en": "Default permissions"},
     )
     full_access: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "完整访问权限", "desc_en": "Full access permission"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "完整访问权限", "desc_en": "Full access permission"},
     )
     permission_notify: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "启用权限通知", "desc_en": "Enable permission notifications"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "启用权限通知", "desc_en": "Enable permission notifications"},
     )
     question_notify: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "启用问题通知", "desc_en": "Enable question notifications"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "启用问题通知", "desc_en": "Enable question notifications"},
     )
     turn_notify_mode: Literal["unfocused", "never", "always"] = Field(
         default="unfocused",
         json_schema_extra={
+            "status": "effective", "ref": "gateway/api/config.py:187",
             "desc_zh": "轮次完成通知时机",
             "desc_en": "When to notify after a turn completes",
         },
@@ -108,129 +107,129 @@ class UIPreferences(_Base):
     # ── Agent ────────────────────────────────────────────────────────────────
     sandbox: Literal["read_only", "workspace_write", "full_access"] = Field(
         default="full_access",
-        json_schema_extra={"desc_zh": "运行命令时的权限范围", "desc_en": "Permission scope when running commands"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "运行命令时的权限范围", "desc_en": "Permission scope when running commands"},
     )
     verbosity: Literal["low", "medium", "high"] = Field(
         default="medium",
-        json_schema_extra={"desc_zh": "回复包含细节的详细程度", "desc_en": "How detailed agent replies should be"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "回复包含细节的详细程度", "desc_en": "How detailed agent replies should be"},
     )
     web_search: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "允许网页搜索", "desc_en": "Allow web search"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "允许网页搜索", "desc_en": "Allow web search"},
     )
     ultra_in_picker: bool = Field(
         default=False,
-        json_schema_extra={"desc_zh": "模型选择器中的 Ultra", "desc_en": "Ultra in model picker"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "模型选择器中的 Ultra", "desc_en": "Ultra in model picker"},
     )
     reasoning_levels: list[str] = Field(
         default=["low", "medium", "high", "xhigh", "max", "Ultra"],
-        json_schema_extra={"desc_zh": "模型选择器中显示的推理强度级别", "desc_en": "Reasoning levels shown in the model picker"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "模型选择器中显示的推理强度级别", "desc_en": "Reasoning levels shown in the model picker"},
     )
     reasoning_summary: Literal["auto", "concise", "detailed", "none"] = Field(
         default="auto",
-        json_schema_extra={"desc_zh": "推理摘要方式", "desc_en": "Reasoning summary mode"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "推理摘要方式", "desc_en": "Reasoning summary mode"},
     )
     approval_policy: Literal["ask_on_escalation", "never_ask"] = Field(
         default="never_ask",
-        json_schema_extra={"desc_zh": "批准策略", "desc_en": "Approval policy"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "批准策略", "desc_en": "Approval policy"},
     )
     workspace_deps: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "Codex 依赖项", "desc_en": "Workspace dependencies"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "Codex 依赖项", "desc_en": "Workspace dependencies"},
     )
 
     # ── Personalization ──────────────────────────────────────────────────────
     codex_instructions: str = Field(
         default="",
-        json_schema_extra={"desc_zh": "Codex 自定义说明", "desc_en": "Codex custom instructions"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "Codex 自定义说明", "desc_en": "Codex custom instructions"},
     )
     local_memory: bool = Field(
         default=False,
-        json_schema_extra={"desc_zh": "启用本地记忆", "desc_en": "Enable local memory"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "启用本地记忆", "desc_en": "Enable local memory"},
     )
     tool_memory: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "允许工具辅助记忆", "desc_en": "Enable tool-assisted memory"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "允许工具辅助记忆", "desc_en": "Enable tool-assisted memory"},
     )
 
     # ── Computer control ─────────────────────────────────────────────────────
     allow_any_screen: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "允许任意屏幕", "desc_en": "Allow any screen"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "允许任意屏幕", "desc_en": "Allow any screen"},
     )
     chrome_enabled: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "启用 Chrome 连接", "desc_en": "Enable Chrome connection"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "启用 Chrome 连接", "desc_en": "Enable Chrome connection"},
     )
     excel_enabled: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "启用 Excel 加载项", "desc_en": "Enable Excel add-in"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "启用 Excel 加载项", "desc_en": "Enable Excel add-in"},
     )
 
     # ── Browser ──────────────────────────────────────────────────────────────
     embedded_browser: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "嵌入式浏览器", "desc_en": "Embedded browser"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "嵌入式浏览器", "desc_en": "Embedded browser"},
     )
     ignore_cert: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "忽略证书校验", "desc_en": "Ignore certificate validation"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "忽略证书校验", "desc_en": "Ignore certificate validation"},
     )
 
     # ── Git ──────────────────────────────────────────────────────────────────
     git_branch_prefix: str = Field(
         default="codex_pro",
-        json_schema_extra={"desc_zh": "分支前缀", "desc_en": "Branch prefix"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "分支前缀", "desc_en": "Branch prefix"},
     )
     git_merge_method: Literal["merge", "squash"] = Field(
         default="merge",
-        json_schema_extra={"desc_zh": "PR 合并方法", "desc_en": "PR merge method"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "PR 合并方法", "desc_en": "PR merge method"},
     )
     git_force_push: bool = Field(
         default=False,
-        json_schema_extra={"desc_zh": "强制推送", "desc_en": "Force push"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "强制推送", "desc_en": "Force push"},
     )
     git_draft_pr: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "创建草稿 PR", "desc_en": "Draft PR"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "创建草稿 PR", "desc_en": "Draft PR"},
     )
     git_review_presentation: Literal["inline", "separate"] = Field(
         default="separate",
-        json_schema_extra={"desc_zh": "审查请求呈现方式", "desc_en": "Review presentation"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "审查请求呈现方式", "desc_en": "Review presentation"},
     )
     git_auto_merge: bool = Field(
         default=False,
-        json_schema_extra={"desc_zh": "准备就绪时自动合并", "desc_en": "Auto-merge when ready"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "准备就绪时自动合并", "desc_en": "Auto-merge when ready"},
     )
     git_monitor_instr: str = Field(
         default="",
-        json_schema_extra={"desc_zh": "监控 PR 说明", "desc_en": "Monitor PR instructions"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "监控 PR 说明", "desc_en": "Monitor PR instructions"},
     )
     git_commit_instr: str = Field(
         default="",
-        json_schema_extra={"desc_zh": "提交说明", "desc_en": "Commit instructions"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "提交说明", "desc_en": "Commit instructions"},
     )
     git_pr_instr: str = Field(
         default="",
-        json_schema_extra={"desc_zh": "PR 说明", "desc_en": "PR instructions"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "PR 说明", "desc_en": "PR instructions"},
     )
 
     # ── Worktrees ────────────────────────────────────────────────────────────
     worktree_root: str = Field(
         default="~/.codex-pro/worktrees",
-        json_schema_extra={"desc_zh": "工作树根目录", "desc_en": "Worktree root"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "工作树根目录", "desc_en": "Worktree root"},
     )
     worktree_pull_upstream: bool = Field(
         default=False,
-        json_schema_extra={"desc_zh": "创建工作树时拉取上游", "desc_en": "Pull upstream on create"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "创建工作树时拉取上游", "desc_en": "Pull upstream on create"},
     )
     worktree_auto_delete: bool = Field(
         default=True,
-        json_schema_extra={"desc_zh": "自动删除已完成工作树", "desc_en": "Auto-delete completed worktrees"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "自动删除已完成工作树", "desc_en": "Auto-delete completed worktrees"},
     )
     worktree_delete_limit: int = Field(
         default=15, ge=1, le=999,
-        json_schema_extra={"desc_zh": "自动删除限制", "desc_en": "Auto-delete limit"},
+        json_schema_extra={"status": "effective", "ref": "gateway/api/config.py:187", "desc_zh": "自动删除限制", "desc_en": "Auto-delete limit"},
     )
 
 

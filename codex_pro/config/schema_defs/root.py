@@ -1,8 +1,9 @@
 """Codex Pro configuration schema - root Config class."""
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
+
+from codex_pro.config.schema_defs.base import _Base  # noqa: F401  (re-export)
 
 from codex_pro.config.schema_defs.channels import ChannelsConfig
 from codex_pro.config.schema_defs.models import ModelsConfig
@@ -23,10 +24,6 @@ from codex_pro.config.schema_defs.system import (
 )
 from codex_pro.config.schema_defs.ui import UIConfig, AgentBehaviorConfig
 from codex_pro.config.schema_defs.budget import CostConfig
-
-
-class _Base(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
 class Config(_Base):

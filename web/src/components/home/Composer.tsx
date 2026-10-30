@@ -280,6 +280,26 @@ export function Composer() {
         />
 
         <div className="px-3 py-2 relative">
+          {pendingAttachments.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pb-1.5">
+              {pendingAttachments.map((att) => (
+                <span
+                  key={att.attachment_id}
+                  className="inline-flex items-center gap-1 max-w-[200px] text-[12px] text-codex-text-secondary bg-codex-elevated border-codex-border-strong rounded-md px-2 py-1"
+                >
+                  <span className="truncate">{att.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(att.attachment_id)}
+                    className="ml-0.5 w-4 h-4 inline-flex items-center justify-center rounded text-codex-muted hover:text-codex-text hover:bg-[#444]"
+                    aria-label={`${t("close")} ${att.name}`}
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <textarea
             ref={taRef}
             value={draft}
@@ -341,27 +361,6 @@ export function Composer() {
             </div>
           )}
         </div>
-
-        {pendingAttachments.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 px-3 pb-1">
-            {pendingAttachments.map((att) => (
-              <span
-                key={att.attachment_id}
-                className="inline-flex items-center gap-1 max-w-[200px] text-[12px] text-codex-text-secondary bg-codex-elevated border-codex-border-strong rounded-md px-2 py-1"
-              >
-                <span className="truncate">{att.name}</span>
-                <button
-                  type="button"
-                  onClick={() => removeAttachment(att.attachment_id)}
-                  className="ml-0.5 w-4 h-4 inline-flex items-center justify-center rounded text-codex-muted hover:text-codex-text hover:bg-[#444]"
-                  aria-label={`${t("close")} ${att.name}`}
-                >
-                  <X size={11} />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
 
         <div className="flex items-center gap-1.5 px-2.5 pb-2.5 relative">
           <button

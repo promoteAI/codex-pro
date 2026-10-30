@@ -101,11 +101,12 @@ export function ChatThread({ selectors }: ChatThreadProps) {
   );
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    bottomRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth" });
   }, [messages.length, typing, activeTool, streaming?.text.length, Object.keys(thinkingBlocks).length, pendingApprovals.length, pendingClarify]);
 
   return (
-    <div ref={containerRef} className="flex-1 min-h-0 overflow-y-auto px-[clamp(16px,4vw,48px)] pb-[200px] pt-5 scrollbar-gutter-stable" aria-label="chat">
+    <div ref={containerRef} className="flex-1 min-h-0 overflow-y-auto px-[clamp(16px,4vw,48px)] pb-8 pt-5 scrollbar-gutter-stable" aria-label="chat">
       <div className="chat-thread max-w-[760px] mx-auto flex flex-col gap-1.5">
         {loadingHistory && (
           <div className="text-codex-muted text-sm px-2">{t("loadingHistory")}</div>

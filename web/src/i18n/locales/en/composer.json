@@ -103,6 +103,7 @@
   "ctxTitle": "Context Usage",
   "ctxClose": "Close",
   "ctxFull": "{{pct}}% Full",
+  "ctxUsageLabel": "Context Usage",
   "slashCommands": "Commands",
   "skillsSection": "Skills"
 }

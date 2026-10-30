@@ -58,7 +58,6 @@ export function Composer() {
   const reasoning = useChatStore((s) => s.reasoning);
   const perm = useChatStore((s) => s.perm);
   const planMode = useChatStore((s) => s.planMode);
-  const planTask = useChatStore((s) => s.planTask);
   const goalMode = useChatStore((s) => s.goalMode);
   const selectProject = useChatStore((s) => s.selectProject);
   const setBranch = useChatStore((s) => s.setBranch);
@@ -453,8 +452,8 @@ export function Composer() {
                 aria-haspopup="dialog"
                 aria-expanded={menu === "ctx"}
                 className="h-[26px] px-2 inline-flex items-center gap-1.5 rounded-md text-[12.5px] text-codex-muted hover:bg-codex-active hover:text-codex-text-secondary"
-                title="Context Usage"
-                aria-label="Context Usage"
+                title={t("ctxUsageLabel")}
+                aria-label={t("ctxUsageLabel")}
               >
                 <span
                   className="w-[18px] h-[18px] rounded-full flex-none"
@@ -668,7 +667,14 @@ export function Composer() {
             onOpenProject={() => setMenu("project")}
             onGoal={() => setGoalMode(true)}
             onPlan={() => setPlanMode(true)}
-            onOpenFileChooser={() => fileInputRef.current?.click()}
+            onOpenFileChooser={() => {
+              // The file input is hidden (tabIndex={-1}), so after the OS file
+              // dialog closes focus would land on an invisible element. Park
+              // focus on the add button so keyboard/screen-reader users stay
+              // anchored where they opened the chooser.
+              addBtnRef.current?.focus();
+              fileInputRef.current?.click();
+            }}
           />
         </div>
       </div>

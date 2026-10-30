@@ -102,6 +102,31 @@ body {
   border-radius: 4px;
 }
 
+/* Respect OS "reduce motion": drop the persistent blink/shimmer/spin animations
+   and the smooth scroll so the chat doesn't fight the user's vestibular setting. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Coarse-pointer (touch/phone remote) surfaces have no hover. Un-hide the
+   hover-only row actions in the sidebar/session list and pad small icon
+   buttons to a ≥24px hit area so the thumb can actually reach them. */
+@media (pointer: coarse) {
+  .hidden.group-hover\:inline-flex,
+  .hidden.group-hover\/row\:inline-flex {
+    display: inline-flex !important;
+  }
+  .account-menu-kbd,
+  .mobile-tip {
+    display: none !important;
+  }
+}
+
 /* Dark admin panes inside settings — soften leftover light-theme utilities */
 .codex-admin-pane {
   color: #e6e6e6;

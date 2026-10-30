@@ -173,7 +173,8 @@ describe("Composer context usage", () => {
     await waitFor(() => expect(screen.getByText("15%")).toBeTruthy());
 
     // Open the context dialog and confirm segments come from the API response.
-    fireEvent.click(screen.getByRole("button", { name: "Context Usage" }));
+    // aria-label is i18n-driven; the default test language is zh.
+    fireEvent.click(screen.getByRole("button", { name: "上下文使用量" }));
     expect(screen.getByText("System prompt")).toBeTruthy();
     expect(screen.getByText("Conversation")).toBeTruthy();
     expect(screen.getByText(/30\.0K/)).toBeTruthy();

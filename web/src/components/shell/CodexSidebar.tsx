@@ -119,7 +119,12 @@ export function CodexSidebar() {
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setAccountOpen(false);
+      if (e.key === "Escape") {
+        setAccountOpen(false);
+        // The menu items unmount on close, which silently drops focus to body.
+        // Return it to the trigger so keyboard/screen-reader users aren't lost.
+        document.getElementById("accountBtn")?.focus();
+      }
     };
     document.addEventListener("mousedown", onDoc);
     window.addEventListener("keydown", onKey);

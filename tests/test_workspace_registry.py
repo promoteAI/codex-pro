@@ -1,5 +1,6 @@
-from codex_pro.workspace_registry import WorkspaceRegistry
+import pytest
 
+from codex_pro.workspace_registry import WorkspaceRegistry
 
 def test_register_and_get_workspace():
     reg = WorkspaceRegistry()
@@ -20,9 +21,6 @@ def test_list_returns_all():
 def test_unknown_key_is_none():
     reg = WorkspaceRegistry()
     assert reg.get("missing") is None
-
-
-import pytest
 
 
 @pytest.mark.asyncio

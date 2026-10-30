@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys as _sys
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -210,9 +211,6 @@ class TestPromptYesNo:
         from codex_pro.cli.prompt import prompt_yes_no
         with patch("builtins.input", return_value="no"):
             assert prompt_yes_no("Continue?") is False
-
-
-import sys as _sys
 
 
 @pytest.mark.skipif(

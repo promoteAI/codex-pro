@@ -6,7 +6,7 @@ async def test_pin_and_list_filter(tmp_path):
     from codex_pro.session.manager import SessionManager
 
     mgr = SessionManager(tmp_path)
-    s = await mgr.get_or_create("cli:pinme")
+    await mgr.get_or_create("cli:pinme")
     assert await mgr.pin_session("cli:pinme") is True
     assert (await mgr.get("cli:pinme")).pinned is True
     pinned = [x for x in mgr.list_sessions() if x["pinned"]]

@@ -6,30 +6,31 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 import pytest
 
-from codex_pro.session.manager import Session, SessionManager
+from codex_pro.session.manager import SessionManager
 from codex_pro.spill.layout import session_dir_name
 
 
 async def _ws_auth(ws) -> None:
+    # session_key 在认证握手时声明(resolve_client_session_key 只在 auth 帧
+    # 调用);消息帧里的 session_key 不会改变已建立的会话归属。
     await ws.send_json({
         "type": "auth",
         "platform": "api",
         "user_id": "user",
         "chat_id": "chat",
+        "session_key": "cli:web-np-1",
     })
     assert (await asyncio.wait_for(ws.receive_json(), timeout=2))["type"] == "auth_ok"
 
 
 def _gateway(tmp_path: Path):
     from codex_pro.bus.queue import MessageBus
-    from codex_pro.config.loader import load_config
     from codex_pro.config.schema import (
         GatewayAuthConfig,
         GatewayConfig,
@@ -46,13 +47,9 @@ def _gateway(tmp_path: Path):
     )
     bus = MessageBus()
     bus.publish_inbound = AsyncMock(return_value=True)
-    # 真实 config 提供 ui.preferences.no_project_folder,否则 WS 无项目分支会 AttributeError。
-    config_obj = load_config(tmp_path / "nope.yaml") if False else None
     sessions = SessionManager(sessions_dir=tmp_path / "sessions")
     # agent_loop 需要 .config.ui.preferences.no_project_folder
     agent_loop = MagicMock()
-    from codex_pro.config.schema_defs.ui import UIPreferences
-    from codex_pro.config.schema_defs.ui import UIConfig, UIPreferences
     agent_loop.config.ui.preferences.no_project_folder = str(tmp_path / "no-project")
     gateway = GatewayServer(
         config=config,

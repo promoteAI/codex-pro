@@ -3,7 +3,6 @@
 
 import asyncio
 import base64
-import json
 from unittest.mock import MagicMock
 
 import aiohttp

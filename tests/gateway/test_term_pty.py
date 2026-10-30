@@ -63,7 +63,6 @@ class TestPosixPty:
         await pty.terminate()
 
         # The process group should be gone.
-        import signal
         with pytest.raises(ProcessLookupError):
             os.killpg(os.getpgid(pid), 0)
 

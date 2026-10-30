@@ -1,5 +1,6 @@
-from codex_pro.session.manager import Session
+import pytest
 
+from codex_pro.session.manager import Session
 
 def test_session_defaults():
     s = Session(key="cli:xs")
@@ -8,9 +9,6 @@ def test_session_defaults():
     assert s.parent_session_id == ""
     assert s.forked_from_id == ""
     assert s.session_id != ""
-
-
-import pytest
 
 
 @pytest.mark.asyncio

@@ -239,6 +239,7 @@ nav:
       - 升级与迁移: operations/upgrade-migrations.md
       - 可观测性: operations/observability.md
       - 性能: operations/performance.md
+      - 性能基线: operations/performance-baseline.md
       - 故障排查: operations/troubleshooting.md
   - 参考手册:
       - reference/index.md

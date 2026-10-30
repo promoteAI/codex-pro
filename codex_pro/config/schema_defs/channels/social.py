@@ -85,40 +85,80 @@ class EmailChannelConfig(_Base):
     enabled: bool = Field(
         default=False,
         json_schema_extra={
-            "status": "effective", "ref": "channels/email.py",
+            "status": "effective", "ref": "channels/manager.py:362",
             "desc_zh": "是否启用邮件通道",
-            "desc_en": "Enable the Email channel",
+            "desc_en": "Enable the email channel",
         },
     )
     imap_host: str = Field(
         default="",
         json_schema_extra={
-            "status": "effective", "ref": "channels/email.py",
-            "desc_zh": "IMAP 服务器地址",
-            "desc_en": "IMAP server host",
+            "status": "effective", "ref": "channels/email.py:100",
+            "desc_zh": "收信 IMAP 服务器地址",
+            "desc_en": "IMAP server host for receiving mail",
+        },
+    )
+    imap_port: int = Field(
+        default=993,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/email.py:100",
+            "desc_zh": "收信 IMAP 服务器端口",
+            "desc_en": "IMAP server port for receiving mail",
         },
     )
     smtp_host: str = Field(
         default="",
         json_schema_extra={
-            "status": "effective", "ref": "channels/email.py",
-            "desc_zh": "SMTP 服务器地址",
-            "desc_en": "SMTP server host",
+            "status": "effective", "ref": "channels/email.py:68",
+            "desc_zh": "发信 SMTP 服务器地址",
+            "desc_en": "SMTP server host for sending mail",
+        },
+    )
+    smtp_port: int = Field(
+        default=465,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/email.py:68",
+            "desc_zh": "发信 SMTP 服务器端口",
+            "desc_en": "SMTP server port for sending mail",
         },
     )
     username: str = Field(
         default="",
         json_schema_extra={
-            "status": "effective", "ref": "channels/email.py",
-            "desc_zh": "邮箱用户名",
-            "desc_en": "Email username",
+            "status": "effective", "ref": "channels/email.py:64",
+            "desc_zh": "邮箱登录用户名",
+            "desc_en": "Mailbox login username",
         },
     )
     password: str = Field(
         default="",
         json_schema_extra={
-            "status": "effective", "ref": "channels/email.py",
-            "desc_zh": "邮箱密码",
-            "desc_en": "Email password",
+            "status": "effective", "ref": "channels/email.py:69",
+            "desc_zh": "邮箱登录密码或授权码",
+            "desc_en": "Mailbox login password or app token",
+        },
+    )
+    use_ssl: bool = Field(
+        default=True,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/email.py:67",
+            "desc_zh": "是否使用 SSL 连接邮件服务器",
+            "desc_en": "Use SSL when connecting to mail servers",
+        },
+    )
+    poll_interval_seconds: int = Field(
+        default=30,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/email.py:94",
+            "desc_zh": "轮询新邮件的间隔(秒)",
+            "desc_en": "Interval between new-mail polls (seconds)",
+        },
+    )
+    allow_from: list[str] = Field(
+        default_factory=list,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/email.py:118",
+            "desc_zh": "允许交互的发件人邮箱白名单(空为不限制)",
+            "desc_en": "Allowlist of sender addresses permitted to interact (empty = all)",
         },
     )

@@ -17,12 +17,44 @@ class WebhookChannelConfig(_Base):
             "desc_en": "Enable the Webhook channel",
         },
     )
-    endpoint: str = Field(
+    host: str = Field(
+        default="0.0.0.0",
+        json_schema_extra={
+            "status": "effective", "ref": "channels/webhook.py:34",
+            "desc_zh": "Webhook 服务监听地址",
+            "desc_en": "Webhook server bind address",
+        },
+    )
+    port: int = Field(
+        default=8080,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/webhook.py:34",
+            "desc_zh": "Webhook 服务监听端口",
+            "desc_en": "Webhook server listen port",
+        },
+    )
+    secret: str = Field(
         default="",
         json_schema_extra={
-            "status": "effective", "ref": "channels/webhook.py",
-            "desc_zh": "Webhook 端点 URL",
-            "desc_en": "Webhook endpoint URL",
+            "status": "effective", "ref": "channels/webhook.py:55",
+            "desc_zh": "校验入站请求签名的密钥",
+            "desc_en": "Secret used to verify inbound request signatures",
+        },
+    )
+    path: str = Field(
+        default="/webhook",
+        json_schema_extra={
+            "status": "effective", "ref": "channels/webhook.py:30",
+            "desc_zh": "Webhook 接收路径",
+            "desc_en": "HTTP path on which webhooks are received",
+        },
+    )
+    max_pending: int = Field(
+        default=1000,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/webhook.py:93",
+            "desc_zh": "待处理 webhook 请求队列上限",
+            "desc_en": "Maximum number of pending webhook requests queued",
         },
     )
 
@@ -35,14 +67,6 @@ class CLIChannelConfig(_Base):
             "desc_en": "Enable the CLI channel",
         },
     )
-    welcome_message: str = Field(
-        default="",
-        json_schema_extra={
-            "status": "effective", "ref": "channels/cli.py",
-            "desc_zh": "CLI 欢迎消息",
-            "desc_en": "CLI welcome message",
-        },
-    )
 
 class CronChannelConfig(_Base):
     enabled: bool = Field(
@@ -51,14 +75,6 @@ class CronChannelConfig(_Base):
             "status": "effective", "ref": "channels/manager.py:362",
             "desc_zh": "是否启用 Cron 通道",
             "desc_en": "Enable the Cron channel",
-        },
-    )
-    schedule: str = Field(
-        default="",
-        json_schema_extra={
-            "status": "effective", "ref": "channels/cron.py",
-            "desc_zh": "Cron 调度表达式",
-            "desc_en": "Cron schedule expression",
         },
     )
 
@@ -82,17 +98,17 @@ class SlackChannelConfig(_Base):
     app_token: str = Field(
         default="",
         json_schema_extra={
-            "status": "effective", "ref": "channels/slack.py:31",
+            "status": "effective", "ref": "channels/slack.py:30",
             "desc_zh": "Slack App token",
             "desc_en": "Slack app token",
         },
     )
-    channel: str = Field(
-        default="",
+    allow_from: list[str] = Field(
+        default_factory=list,
         json_schema_extra={
-            "status": "effective", "ref": "channels/slack.py:32",
-            "desc_zh": "默认频道",
-            "desc_en": "Default channel",
+            "status": "effective", "ref": "channels/base.py:107",
+            "desc_zh": "允许与机器人交互的用户白名单(空为不限制)",
+            "desc_en": "Allowlist of user IDs permitted to interact (empty = all)",
         },
     )
     reactions_enabled: bool = Field(
@@ -211,6 +227,70 @@ class QQBotChannelConfig(_Base):
             "desc_en": "QQ Bot App Secret",
         },
     )
+    allow_from: list[str] = Field(
+        default_factory=list,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/base.py:107",
+            "desc_zh": "允许与机器人交互的用户白名单(空为不限制)",
+            "desc_en": "Allowlist of user IDs permitted to interact (empty = all)",
+        },
+    )
+    sandbox: bool = Field(
+        default=False,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/qqbot.py:87",
+            "desc_zh": "是否使用 QQ 沙箱环境",
+            "desc_en": "Use the QQ sandbox environment",
+        },
+    )
+    markdown_support: bool = Field(
+        default=True,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/qqbot.py:88",
+            "desc_zh": "是否以 QQ 原生 Markdown(msg_type=2)发送并保留加粗/代码等行内标记。"
+                       "默认开启;若机器人未开通原生 Markdown 权限,首条消息会被拒并自动降级为"
+                       "纯文本重发,该会话后续对该目标直接走纯文本(24 小时后重新探测)。"
+                       "无论开关如何,表格/标题/分隔线都会降级为可读纯文本。关闭则始终发纯文本",
+            "desc_en": "Send as QQ native Markdown (msg_type=2) and keep inline markers "
+                       "like bold/code. On by default; if the bot lacks native Markdown "
+                       "permission, the first message is rejected and auto-retried as plain "
+                       "text, and later messages to that target skip markdown (re-probed "
+                       "after 24h). Tables/headings/HR are downgraded to readable plain text "
+                       "regardless. When off, always sends plain text",
+        },
+    )
+    media_enabled: bool = Field(
+        default=True,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/qqbot.py:107",
+            "desc_zh": "是否启用媒体(图片/文件)收发",
+            "desc_en": "Enable media (image/file) sending and receiving",
+        },
+    )
+    media_max_file_size_mb: int = Field(
+        default=20,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/qqbot.py:109",
+            "desc_zh": "媒体上传单文件大小上限(MB)",
+            "desc_en": "Maximum size per uploaded media file (MB)",
+        },
+    )
+    media_upload_cache_size: int = Field(
+        default=500,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/qqbot.py:111",
+            "desc_zh": "媒体上传结果缓存条目上限",
+            "desc_en": "Maximum number of cached media upload results",
+        },
+    )
+    media_parse_tags: bool = Field(
+        default=True,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/qqbot.py:108",
+            "desc_zh": "是否解析消息中的媒体标签",
+            "desc_en": "Parse media tags embedded in messages",
+        },
+    )
 
 class FeishuChannelConfig(_Base):
     enabled: bool = Field(
@@ -327,6 +407,14 @@ class DingTalkChannelConfig(_Base):
             "desc_en": "DingTalk Robot Code",
         },
     )
+    allow_from: list[str] = Field(
+        default_factory=list,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/base.py:107",
+            "desc_zh": "允许与机器人交互的用户白名单(空为不限制)",
+            "desc_en": "Allowlist of user IDs permitted to interact (empty = all)",
+        },
+    )
 
 class WeComChannelConfig(_Base):
     enabled: bool = Field(
@@ -359,6 +447,46 @@ class WeComChannelConfig(_Base):
             "status": "effective", "ref": "channels/wecom.py",
             "desc_zh": "企业微信 Secret",
             "desc_en": "WeCom Secret",
+        },
+    )
+    token: str = Field(
+        default="",
+        json_schema_extra={
+            "status": "effective", "ref": "channels/wecom.py:29",
+            "desc_zh": "企业微信回调校验 token",
+            "desc_en": "WeCom callback verification token",
+        },
+    )
+    encoding_aes_key: str = Field(
+        default="",
+        json_schema_extra={
+            "status": "effective", "ref": "channels/wecom.py:87",
+            "desc_zh": "企业微信加密回调的 EncodingAESKey,留空则为明文模式",
+            "desc_en": "EncodingAESKey for WeCom encrypted callbacks; empty means plaintext mode",
+        },
+    )
+    webhook_path: str = Field(
+        default="/wecom",
+        json_schema_extra={
+            "status": "effective", "ref": "channels/wecom.py:39",
+            "desc_zh": "企业微信事件接收路径",
+            "desc_en": "HTTP path on which WeCom events are received",
+        },
+    )
+    host: str = Field(
+        default="0.0.0.0",
+        json_schema_extra={
+            "status": "effective", "ref": "channels/wecom.py:44",
+            "desc_zh": "企业微信服务监听地址",
+            "desc_en": "WeCom server bind address",
+        },
+    )
+    port: int = Field(
+        default=8084,
+        json_schema_extra={
+            "status": "effective", "ref": "channels/wecom.py:44",
+            "desc_zh": "企业微信服务监听端口",
+            "desc_en": "WeCom server listen port",
         },
     )
 

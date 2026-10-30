@@ -102,11 +102,15 @@ When reviewing or making changes:
 
 ## Large Files to Watch
 
-- `config/schema.py` (4580 LOC) — touches carefully, extract sub-schemas
-- `gateway/server.py` (2463 LOC) — route handlers should be in `gateway/api/`
-- `agent/loop.py` (2234 LOC) — consider extracting sub-loops into pipeline stages
-- `cli/setup/__init__.py` (2194 LOC) — consider splitting by setup phase
-- `cli/tui/blocks.py` (970 LOC) — extract block types into separate modules
+Last checked: 2026-10-30. These are size signals, not automatic refactor tickets; choose work based on change frequency, defect history, coupling, and measured runtime impact.
+
+- `cli/setup/__init__.py` (~1870 LOC) — setup phases already live in `cli/setup/phases/`; keep the entry point focused on orchestration
+- `memory/store.py` (~1521 LOC) — inspect storage responsibilities and data-integrity coverage before splitting
+- `cli/tui/app.py` (~1377 LOC) and `cli/inline/app.py` (~1336 LOC) — separate UI flow from shared command/session behavior where tests show a seam
+- `channels/weixin.py` (~1096 LOC) — inspect protocol, crypto, and media responsibilities before extraction
+- `storage/sqlite/engine.py` (~1010 LOC), `config/schema_defs/storage.py` (~956 LOC), and `cli/tui/blocks/base.py` (~865 LOC) — candidates only when a concrete maintenance or testing problem exists
+
+`config/schema.py` is now a compatibility/re-export module backed by `config/schema_defs/`; `gateway/server.py` (~799 LOC) and `agent/loop.py` (~676 LOC) are no longer the large-file priorities listed in the earlier snapshot.
 
 ## Reference
 

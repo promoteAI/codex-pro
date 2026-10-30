@@ -1,6 +1,6 @@
 # 内置工具参考
 
-Codex Pro 内置 41 个工具。本页的工具名、参数、能力标签均取自代码中的注册信息：工具名是各工具类的 `name` 属性（定义在 `codex_pro/agent/tools/` 下），能力标签取自 `codex_pro/security/capabilities.py` 的 `TOOL_CAPABILITIES`，档位归属取自 `codex_pro/security/tool_policy.py`。
+Codex Pro 内置 42 个工具。本页的工具名、参数、能力标签均取自代码中的注册信息：工具名是各工具类的 `name` 属性（定义在 `codex_pro/agent/tools/` 下），能力标签取自工具声明与 `codex_pro/security/capabilities.py` 的 `TOOL_CAPABILITIES`，档位归属取自 `codex_pro/security/tool_policy.py`。
 
 !!! note "工具名不等于模块名"
     工具名与实现它的模块文件名往往不同，调用时必须使用工具名。例如 `shell.py` 注册的工具是 `exec`，`code_exec.py` 注册的是 `execute_code`，`tts.py` 注册的是 `text_to_speech`，`web.py` 同时注册 `web_fetch` 与 `web_search`。
@@ -54,6 +54,7 @@ Codex Pro 内置 41 个工具。本页的工具名、参数、能力标签均取
 | `browser` | `browser.py` | ❌ | ❌ | ❌ | 未分类 |
 | `cronjob` | `cronjob.py` | ❌ | ❌ | ❌ | `scheduler.write` |
 | `delegate_task` | `delegate.py` | ❌ | ❌ | ❌ | 未分类 |
+| `delegate_a2a` | `a2a_delegate.py` | ❌ | ❌ | ❌ | `network.outbound` |
 | `exec` | `shell.py` | ❌ | ❌ | ❌ | `process.exec` |
 | `execute_code` | `code_exec.py` | ❌ | ❌ | ❌ | `code.exec` `process.exec` |
 | `process` | `process.py` | ❌ | ❌ | ❌ | `process.exec` `process.manage` |
@@ -68,7 +69,7 @@ Codex Pro 内置 41 个工具。本页的工具名、参数、能力标签均取
 
 标记为「未分类」的工具在 `TOOL_CAPABILITIES` 中没有条目，`tool_capabilities()` 对它们返回空集合，因此基于能力的拦截规则不会命中它们；这类工具只受工具名维度的策略约束。
 
-`agents_list` 与 `agents_route` 只出现在策略表（`capabilities.py`、`tool_policy.py`、`risk_classifier.py`）中，`codex_pro/agent/tools/` 下没有对应实现，因此当前不可调用。它们是为多 Agent 协作预留的名字，本页不为其提供参数说明。除这两项外，下文为全部 41 个已实现的工具逐一列出参数。
+`agents_list` 与 `agents_route` 只出现在策略表（`capabilities.py`、`tool_policy.py`、`risk_classifier.py`）中，`codex_pro/agent/tools/` 下没有对应实现，因此当前不可调用。它们是为多 Agent 协作预留的名字，本页不为其提供参数说明。除这两项外，下文为全部 42 个已实现的工具逐一列出参数。
 
 ## 高风险工具
 
@@ -80,6 +81,24 @@ Codex Pro 内置 41 个工具。本页的工具名、参数、能力标签均取
 - **`daemon`** — 默认拒绝 `exec`、`execute_code`、`process`、`skill_install`；同时按能力拒绝 `code.exec`、`process.exec`、`process.manage`、`skill.install`。
 
 `artifact_*` 使用独立的会话产物命名空间，不接受任意文件路径，也不具备 `fs.write` 或 `process.exec` 能力，因此在 `public_gateway` 下仍默认可用。公网文档任务应使用该链路，不应放开通用 `write_file` 或 `exec`。
+
+## 远程委派
+
+#### delegate_a2a
+
+通过 A2A 将文本任务委派给远程 Agent。发送和取消会改变远端状态；查询为只读操作。需要先在 `a2a.remote_agents` 注册可信目标，或显式传入 `url`。该工具带有 `network.outbound` capability，`execution.network_policy: deny` 时会被过滤；默认 `minimal`、`messaging`、`coding` profile 不包含此工具，`full` profile 可包含。
+
+!!! warning "出站目标尚未完成 SSRF 防护"
+    当前客户端未执行统一 `net_guard` 的逐跳 URL 校验或 DNS 钉住，并允许调用参数携带任意 `url`。这与工具权限策略不同；仅依赖 `network_policy` 不构成目标地址校验。不要向不可信调用方开放，远程部署前需增加目标 allowlist、SSRF 校验和 DNS 重绑定防护。详见 [A2A 集成](../integrations/a2a.md)。
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|:----:|--------|------|
+| `task` | string | `send` 时必填 | — | 交给远端 Agent 的任务说明 |
+| `agent` | string | 与 `url` 二选一 | — | `a2a.remote_agents` 中的注册 ID |
+| `url` | string | 与 `agent` 二选一 | — | 远程 A2A Agent 的根 URL；不可信输入风险见上方警告 |
+| `action` | string | | `send` | `send`、`get` 或 `cancel` |
+| `task_id` | string | `get` / `cancel` 时必填 | — | 远端任务 ID；`send` 时可选，用于继续/指定任务 |
+| `wait` | boolean | | `true` | `send` 后是否轮询至终态 |
 
 ## 工具详细列表
 

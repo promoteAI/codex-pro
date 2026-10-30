@@ -24,7 +24,7 @@ Codex Pro integrates with external systems through a multi-layer extension archi
 | [Skills](skills/using-skills.md) | 35 built-in skills organized by category | Usage & catalog |
 | [Plugins](plugins/using-plugins.md) | Extension mechanism based on plugin.yaml | Usage & development |
 | [MCP](mcp.md) | Model Context Protocol client for external tool servers | Configuration & usage |
-| [A2A](a2a.md) | Inbound Agent-to-Agent protocol for text tasks delegated to Codex Pro by external peers | Protocol & integration |
+| [A2A](a2a.md) | Inbound Agent-to-Agent task endpoint and outbound delegation tool | Protocol, security boundaries & integration |
 
 ## Quick Start
 
@@ -56,8 +56,7 @@ tools:
 
 ### Enable A2A Protocol
 
-The `a2a` fields are flat — there is no `agent_card` subsection:
-Enabling it exposes the inbound `/a2a` endpoint; it does not register an outbound delegation tool.
+The `a2a` fields are flat — there is no `agent_card` subsection. Enabling it exposes the inbound `/a2a` endpoint and registers the `delegate_a2a` outbound tool. Outbound access is subject to `execution.network_policy`; target URLs do not yet use shared SSRF protection.
 
 ```yaml
 a2a:

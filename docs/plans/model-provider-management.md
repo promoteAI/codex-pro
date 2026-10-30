@@ -1,5 +1,9 @@
 # 模型提供商管理 — 最佳完善计划
 
+> **状态更新（2026-10-30）：下文是早期设计草案，不能作为当前实现状态。** 当前代码已包含 providers CRUD/健康 API、Provider Zustand store、真实数据驱动的 Models 页面，以及配置热重载；原草案中“无 API”“硬编码 mock”“健康状态不展示”等描述已过时。另需注意：API 列表/详情为管理员界面保留并返回配置中的 `api_key`，并非草案所写的密钥脱敏；变更凭证暴露语义前应先审查 UI 契约及安全影响。
+>
+> 本文的导入、动态拉取模型、API 行为与运行期重载部分仅供差距复核，不是已确认的缺失项。实施前先对照 `codex_pro/gateway/api/providers.py`、`web/src/stores/providers.ts`、`web/src/components/settings/pages/ModelsImport.tsx` 和对应测试更新验收范围。
+
 ## 现状差距总结
 
 | 维度 | 当前状态 | 目标状态 |

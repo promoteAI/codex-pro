@@ -1,6 +1,6 @@
 # Built-in Tool Reference
 
-Codex Pro ships 41 built-in tools. The tool names, parameters and capability tags on this page are taken from the registrations in code: a tool's name is the `name` attribute of its class (under `codex_pro/agent/tools/`), capability tags come from `TOOL_CAPABILITIES` in `codex_pro/security/capabilities.py`, and profile membership comes from `codex_pro/security/tool_policy.py`.
+Codex Pro ships 42 built-in tools. The tool names, parameters and capability tags on this page are taken from the registrations in code: a tool's name is the `name` attribute of its class (under `codex_pro/agent/tools/`), capability tags come from the tool declaration and `TOOL_CAPABILITIES` in `codex_pro/security/capabilities.py`, and profile membership comes from `codex_pro/security/tool_policy.py`.
 
 !!! note "A tool's name is not its module name"
     Tool names frequently differ from the file that implements them, and calls must use the tool name. For example `shell.py` registers `exec`, `code_exec.py` registers `execute_code`, `tts.py` registers `text_to_speech`, and `web.py` registers both `web_fetch` and `web_search`.
@@ -54,6 +54,7 @@ The table below shows which `tools.profile` tiers expose each tool. `full` permi
 | `browser` | `browser.py` | ❌ | ❌ | ❌ | unclassified |
 | `cronjob` | `cronjob.py` | ❌ | ❌ | ❌ | `scheduler.write` |
 | `delegate_task` | `delegate.py` | ❌ | ❌ | ❌ | unclassified |
+| `delegate_a2a` | `a2a_delegate.py` | ❌ | ❌ | ❌ | `network.outbound` |
 | `exec` | `shell.py` | ❌ | ❌ | ❌ | `process.exec` |
 | `execute_code` | `code_exec.py` | ❌ | ❌ | ❌ | `code.exec` `process.exec` |
 | `process` | `process.py` | ❌ | ❌ | ❌ | `process.exec` `process.manage` |
@@ -68,7 +69,7 @@ The table below shows which `tools.profile` tiers expose each tool. `full` permi
 
 Tools marked "unclassified" have no entry in `TOOL_CAPABILITIES`, so `tool_capabilities()` returns an empty set for them and capability-based deny rules never match. Such tools are constrained only by rules that name them directly.
 
-`agents_list` and `agents_route` appear only in the policy tables (`capabilities.py`, `tool_policy.py`, `risk_classifier.py`); there is no implementation under `codex_pro/agent/tools/`, so they cannot currently be called. They are reserved names for multi-agent collaboration, and this page does not document parameters for them. Every one of the 41 implemented tools is documented below.
+`agents_list` and `agents_route` appear only in the policy tables (`capabilities.py`, `tool_policy.py`, `risk_classifier.py`); there is no implementation under `codex_pro/agent/tools/`, so they cannot currently be called. They are reserved names for multi-agent collaboration, and this page does not document parameters for them. Every one of the 42 implemented tools is documented below.
 
 ## High-risk tools
 
@@ -80,6 +81,24 @@ Two deployment shapes add further restrictions on top:
 - **`daemon`** — denies `exec`, `execute_code`, `process` and `skill_install` by default, plus the capabilities `code.exec`, `process.exec`, `process.manage` and `skill.install`.
 
 The `artifact_*` tools use a dedicated session namespace, accept no arbitrary filesystem paths, and carry neither `fs.write` nor `process.exec`. They therefore remain available under `public_gateway`. Public document workflows should use this path instead of enabling general `write_file` or `exec`.
+
+## Remote delegation
+
+#### delegate_a2a
+
+Delegate a text task to a remote Agent over A2A. Sending and cancelling change remote state; querying is read-only. Configure a trusted peer under `a2a.remote_agents` or explicitly pass a `url`. The tool carries `network.outbound` and is filtered when `execution.network_policy: deny`; the default `minimal`, `messaging`, and `coding` profiles do not include it, while `full` may expose it.
+
+!!! warning "Outbound targets are not yet SSRF-protected"
+    The current client does not use shared `net_guard` redirect-by-redirect URL validation or DNS pinning, and the tool accepts an arbitrary `url` parameter. Tool policy is not destination validation; `network_policy` alone does not validate target addresses. Do not expose this to untrusted callers. Add an operator allowlist, SSRF validation and DNS-rebinding protection before remote deployment. See [A2A integration](../integrations/a2a.en.md).
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|:--------:|---------|-------------|
+| `task` | string | Required for `send` | — | Task instruction for the remote Agent |
+| `agent` | string | One of `agent` / `url` | — | Registered ID from `a2a.remote_agents` |
+| `url` | string | One of `agent` / `url` | — | Remote A2A Agent base URL; see the untrusted-input warning above |
+| `action` | string | | `send` | `send`, `get`, or `cancel` |
+| `task_id` | string | Required for `get` / `cancel` | — | Remote task ID; optional for `send` to continue/specify a task |
+| `wait` | boolean | | `true` | Whether `send` polls until a terminal state |
 
 ## Tool details
 

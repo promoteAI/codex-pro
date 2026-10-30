@@ -1,8 +1,12 @@
 # Codex Pro 后端架构分析与重构方案
 
+> **状态更新（2026-10-30）：下文原始审计与拆分方案已过时，不应直接作为执行清单。**
+> 当前核对的重点文件规模：`config/schema.py` 15 行（配置模型已拆入 `config/schema_defs/`）、`gateway/server.py` 799 行、`agent/loop.py` 676 行、`cli/setup/__init__.py` 1,870 行、`agent/pipeline/inference_stage.py` 459 行、`agent/pipeline/context_stage.py` 500 行、`cli/tui/blocks/base.py` 865 行。
+> 代码行数只用于定位候选，不等同于缺陷或重构收益。下一轮应先按变更频率、缺陷密度、耦合度与基准性能选取单个模块，维持兼容导入并以行为测试保护；在没有明确生产问题前，不引入 Event Sourcing 或 CQRS。
+
 ## 一、现状概览
 
-### 代码规模统计
+### 代码规模统计（历史数据，需以仓库当前值为准）
 
 | 模块 | 行数 | 文件数 | 状态 |
 |------|-----|--------|------|
@@ -15,7 +19,7 @@
 
 **总计**: ~75,000 行 Python 代码
 
-### 违反 AGENTS.md 规范的大文件
+### 原始审计时关注的大文件（历史快照）
 
 1. config/schema.py - 4,580 行 (规范: <800)
 2. gateway/server.py - 2,463 行
@@ -69,19 +73,19 @@ codex_pro/agent/tools/
 
 ## 二、核心问题分析
 
-### P0 - 单文件过大 (违反 AGENTS.md 规范)
+### 原始审计的 P0 - 单文件过大（已过期）
 
-**config/schema.py (4,580行)**
+**config/schema.py（原审计 4,580 行；现已拆分）**
 - 所有配置类集中在一个文件
 - 修改任何配置都需修改此文件
 - 风险：回归测试覆盖难度大
 
-**gateway/server.py (2,463行)**
+**gateway/server.py（原审计 2,463 行；当前约 799 行）**
 - 路由定义、认证、限流、消息处理混在一起
 - 难以测试单个功能
 - 建议：提取中间件层和路由处理器
 
-**agent/loop.py (2,234行)**
+**agent/loop.py（原审计 2,234 行；当前约 676 行）**
 - Agent 核心逻辑过于集中
 - 事件处理、生命周期、工具注册耦合
 - 建议：拆分为 lifecycle.py, event_handlers.py, composition.py
@@ -326,4 +330,4 @@ class GatewayServer:
 3. 测试驱动
 4. 小步快跑
 
-推荐开始: 从 config/schema.py 拆分开始 (风险最低，收益明确)
+推荐后续从实测的变更/缺陷热点开始；`config/schema.py` 拆分、网关与 Agent loop 大文件治理不再是当前首要任务。原方案保留为历史记录，执行前请先更新基线、范围和验收指标。

@@ -24,7 +24,7 @@ Codex Pro 通过多层扩展体系与外部系统集成，覆盖消息通道、A
 | [技能系统](skills/using-skills.md) | 35 个内置技能，按类别组织 | 使用与目录 |
 | [插件系统](plugins/using-plugins.md) | 基于 plugin.yaml 的扩展机制 | 使用与开发 |
 | [MCP](mcp.md) | Model Context Protocol 客户端，连接外部工具服务器 | 配置与使用 |
-| [A2A](a2a.md) | Agent-to-Agent 入站协议，接收外部 peer 委派给 Codex Pro 的文本任务 | 协议与集成 |
+| [A2A](a2a.md) | Agent-to-Agent 入站任务端点与出站委派工具 | 协议、安全边界与集成 |
 
 ## 快速开始
 
@@ -57,7 +57,7 @@ tools:
 ### 启用 A2A 协议
 
 `a2a` 的字段是平铺的，没有 `agent_card` 嵌套节：
-启用后暴露的是入站 `/a2a` 端点，不会注册出站委派工具。
+启用后暴露入站 `/a2a` 端点，并注册 `delegate_a2a` 出站工具；出站网络受 `execution.network_policy` 约束，目标 URL 尚未接入统一 SSRF 防护。
 
 ```yaml
 a2a:

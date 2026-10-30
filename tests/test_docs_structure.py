@@ -637,5 +637,10 @@ def test_audit_sensitive_capability_boundaries_are_not_overclaimed():
     assert "trusted in-process code" in corpus
 
     readmes = README_ZH.read_text(encoding="utf-8") + README_EN.read_text(encoding="utf-8")
-    assert "当前 Agent 运行时不提供 A2A 出站委派入口" in readmes
-    assert "no outbound A2A delegation entry point" in readmes
+    assert "delegate_a2a" in readmes
+    assert "outbound delegation tool" in readmes
+
+    a2a_docs = (DOCS_DIR / "integrations/a2a.md").read_text(encoding="utf-8")
+    a2a_docs += (DOCS_DIR / "integrations/a2a.en.md").read_text(encoding="utf-8")
+    assert "尚未纳入统一 SSRF 防护" in a2a_docs
+    assert "do not yet use shared SSRF protection" in a2a_docs

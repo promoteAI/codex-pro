@@ -2,13 +2,18 @@ import { gzipSync } from "node:zlib";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 
-// Deliberate CI budgets, not Vite warning settings. The route-split baseline is
-// ~345 KiB raw / ~109 KiB gzip, so these leave roughly 15-20% dependency drift
-// headroom while still catching a page accidentally imported into the entry.
-// Raise a budget only with a measured build and an explanation in review.
+// Deliberate CI budgets, not Vite warning settings. Recalibrated 2026-10-30
+// against a measured build after moving the on-demand Layout surfaces
+// (ToolsPanel/TermPanel/modals), the settings overlay and non-zh locales out
+// of the entry: 460.3 KiB raw / 145.7 KiB gzip, of which ~373 KiB raw is
+// react-dom + react-router. The old 410/130 numbers predate that work and
+// several shipped features (SSH settings, hooks, session pinning), so they
+// failed every build. ~8-10% headroom still catches a page accidentally
+// imported into the entry. Raise a budget only with a measured build and an
+// explanation in review.
 const BUDGETS = Object.freeze({
-  initialRawBytes: 410 * 1024,
-  initialGzipBytes: 130 * 1024,
+  initialRawBytes: 500 * 1024,
+  initialGzipBytes: 160 * 1024,
   anyChunkRawBytes: 500 * 1024,
 });
 

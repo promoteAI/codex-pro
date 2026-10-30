@@ -785,6 +785,20 @@ body {
 .update-pop-dismiss{padding:6px 10px;border:0;border-radius:7px;background:transparent;color:#c0c0c0;font:inherit;font-size:12.5px;cursor:pointer}
 .update-pop-dismiss:hover{background:#2e2e2e;color:#fff}
 
+/* ===== settings overlay responsive layout =====
+ * The overlay used fixed geometry (220px sidebar + 100px pane margins), which
+ * left no content visible at phone widths. Below 720px the sidebar collapses
+ * to an icon rail and the pane margins shrink to the viewport. */
+.settings-pane{margin:50px 100px 20px}
+@media (max-width:720px){
+  .settings-sidebar{width:52px}
+  .settings-sidebar .settings-nav-label,
+  .settings-sidebar .settings-nav-search,
+  .settings-sidebar .settings-nav-group{display:none}
+  .settings-sidebar nav button{justify-content:center;padding-left:0;padding-right:0}
+  .settings-pane{margin:16px 16px 20px}
+}
+
 
 /* ===== prototype account menu ===== */
 .account-wrap{position:relative;flex:0 0 auto}

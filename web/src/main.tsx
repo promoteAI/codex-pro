@@ -4,8 +4,8 @@ import { App } from "./App";
 import { initApiBase } from "./lib/api";
 import { initTheme } from "./lib/theme";
 import { useSettingsStore } from "./stores/settings";
+import i18n from "./i18n";
 import "./index.css";
-import "./i18n";
 
 initApiBase().then(async () => {
   // Load persisted UI preferences before applying the theme — without this a
@@ -13,6 +13,9 @@ initApiBase().then(async () => {
   // the light preference saved in the backend is never applied until the
   // settings page happens to be opened.
   await useSettingsStore.getState().loadPrefs();
+  // Non-default languages are lazy-loaded; make sure the detected language's
+  // bundles are in before the first render, or the shell flashes raw keys.
+  await i18n.changeLanguage(i18n.resolvedLanguage ?? "zh");
   initTheme();
   createRoot(document.getElementById("root")!).render(
     <StrictMode>

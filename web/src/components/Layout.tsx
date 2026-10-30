@@ -3,18 +3,34 @@ import { Navigate, Outlet, useLocation } from "react-router";
 import { RouteErrorBoundary } from "./ErrorBoundary";
 import { CodexSidebar } from "./shell/CodexSidebar";
 import { LayoutToolbar } from "./shell/LayoutToolbar";
-import { SearchPalette } from "./shell/SearchPalette";
-import { MobileRemoteModal } from "./MobileRemoteModal";
-import { BotsModal } from "./BotsModal";
-import { RemoteConnectModal } from "./RemoteConnectModal";
-import { ToolsPanel } from "./tools/ToolsPanel";
-import { TermPanel } from "./tools/TermPanel";
 import { useShellStore } from "../stores/shell";
 import { useAuthStore } from "../stores/auth";
 import { useAuthRequired } from "../stores/capabilities";
 
 const SettingsOverlay = lazy(() =>
   import("./settings/SettingsOverlay").then((m) => ({ default: m.SettingsOverlay })),
+);
+// Everything below renders only on demand (a toggle, a hotkey, a closed-by-
+// default modal), yet each used to sit in the entry chunk. Splitting them keeps
+// the first paint lean; the Suspense fallback is null because these appear in
+// response to a user action, where a one-frame blank is invisible.
+const SearchPalette = lazy(() =>
+  import("./shell/SearchPalette").then((m) => ({ default: m.SearchPalette })),
+);
+const MobileRemoteModal = lazy(() =>
+  import("./MobileRemoteModal").then((m) => ({ default: m.MobileRemoteModal })),
+);
+const BotsModal = lazy(() =>
+  import("./BotsModal").then((m) => ({ default: m.BotsModal })),
+);
+const RemoteConnectModal = lazy(() =>
+  import("./RemoteConnectModal").then((m) => ({ default: m.RemoteConnectModal })),
+);
+const ToolsPanel = lazy(() =>
+  import("./tools/ToolsPanel").then((m) => ({ default: m.ToolsPanel })),
+);
+const TermPanel = lazy(() =>
+  import("./tools/TermPanel").then((m) => ({ default: m.TermPanel })),
 );
 
 /**
@@ -123,18 +139,26 @@ export function Layout() {
                 <Outlet />
               </RouteErrorBoundary>
             </main>
-            {isHome && <ToolsPanel />}
+            {isHome && (
+              <Suspense fallback={null}>
+                <ToolsPanel />
+              </Suspense>
+            )}
           </div>
-          {isHome && <TermPanel />}
+          {isHome && (
+            <Suspense fallback={null}>
+              <TermPanel />
+            </Suspense>
+          )}
         </div>
         <Suspense fallback={null}>
           <SettingsOverlay />
+          <SearchPalette />
+          <MobileRemoteModal />
+          <BotsModal />
+          <RemoteConnectModal />
         </Suspense>
       </div>
-      <SearchPalette />
-      <MobileRemoteModal />
-      <BotsModal />
-      <RemoteConnectModal />
     </div>
     </AuthGate>
   );

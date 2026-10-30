@@ -15,8 +15,11 @@ import { useApi } from "../../hooks/use-api";
 import { useWsSubscribe } from "../../hooks/use-ws";
 import { apiFetch } from "../../lib/api";
 import { runMutation } from "../../stores/toast";
+import { useNotificationsStore } from "../../stores/notifications";
 import { CreateProjectDialog } from "../CreateProjectDialog";
 import { SideFilesPanel } from "./SideFilesPanel";
+import { NotificationPanel } from "./NotificationPanel";
+import { UpdatePopover } from "./UpdatePopover";
 import type { GitRepo } from "../../stores/chat";
 
 interface SessionItem {
@@ -77,6 +80,11 @@ export function CodexSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [accountOpen, setAccountOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const notifBtnRef = useRef<HTMLButtonElement>(null);
+  const updateBtnRef = useRef<HTMLButtonElement>(null);
+  const pushNotification = useNotificationsStore((s) => s.pushFromEvent);
   const openSearch = useShellStore((s) => s.openSearch);
   const openMobileRemote = useShellStore((s) => s.openMobileRemote);
   const mobileRemoteOpen = useShellStore((s) => s.mobileRemoteOpen);
@@ -151,6 +159,16 @@ export function CodexSidebar() {
       if (payload.session_key) void refetch();
     },
     ["session_message"],
+  );
+
+  // The bell's notification feed: task/channel/memory broadcasts land here so
+  // the panel shows what happened while the user was looking elsewhere. The
+  // sidebar already holds a live socket for the sessions channel, so this adds
+  // no new connection — just three more channel subscriptions.
+  useWsSubscribe(
+    ["tasks", "channels", "memory"],
+    (ev) => pushNotification(ev.type, ev.payload),
+    ["task_created", "task_transitioned", "task_updated", "channel_updated", "memory_changed"],
   );
 
   // 置顶状态以服务端为单一数据源：从列表响应派生，而非本地 useState（后者刷新即丢）。
@@ -240,8 +258,12 @@ export function CodexSidebar() {
           </button>
           <button
             type="button"
+            ref={notifBtnRef}
             title={t("notifications")}
             aria-label={t("notifications")}
+            aria-haspopup="dialog"
+            aria-expanded={notifOpen}
+            onClick={() => setNotifOpen((v) => !v)}
             className="w-7 h-7 rounded-md inline-flex items-center justify-center text-codex-text-secondary hover:bg-codex-active"
           >
             <Bell size={17} />
@@ -633,8 +655,12 @@ export function CodexSidebar() {
           </div>
           <button
             type="button"
+            ref={updateBtnRef}
             title={t("update")}
             aria-label={t("update")}
+            aria-haspopup="dialog"
+            aria-expanded={updateOpen}
+            onClick={() => setUpdateOpen((v) => !v)}
             className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-[#f0f0f0] text-[#181818] text-[12px] font-medium hover:bg-white"
           >
             <ArrowUp size={12} strokeWidth={2.4} />
@@ -642,6 +668,16 @@ export function CodexSidebar() {
           </button>
         </div>
       </div>
+      <NotificationPanel
+        open={notifOpen}
+        anchorRef={notifBtnRef}
+        onClose={() => setNotifOpen(false)}
+      />
+      <UpdatePopover
+        open={updateOpen}
+        anchorRef={updateBtnRef}
+        onClose={() => setUpdateOpen(false)}
+      />
       <CreateProjectDialog
         open={showCreateProject}
         onClose={() => setShowCreateProject(false)}

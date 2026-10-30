@@ -193,9 +193,9 @@ export function SettingsOverlay() {
           className="flex items-center gap-1.5 px-4 py-3 text-[13px] text-codex-muted border-b border-codex-border hover:bg-codex-hover hover:text-codex-text-secondary"
         >
           <BackChevron />
-          {t("back")}
+          <span className="settings-nav-label">{t("back")}</span>
         </button>
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-codex-border">
+        <div className="settings-nav-search flex items-center gap-2 px-3 py-2.5 border-b border-codex-border">
           <SearchIcon />
           <input
             value={filter}
@@ -211,7 +211,7 @@ export function SettingsOverlay() {
             if (items.length === 0) return null;
             return (
               <div key={group}>
-                <div className="px-4 pt-2 pb-1 text-[11px] text-codex-muted font-medium tracking-[0.04em]">
+                <div className="settings-nav-group px-4 pt-2 pb-1 text-[11px] text-codex-muted font-medium tracking-[0.04em]">
                   {t(`group.${group}`)}
                 </div>
                 {items.map(({ id }) => (
@@ -219,6 +219,7 @@ export function SettingsOverlay() {
                     key={id}
                     type="button"
                     onClick={() => setSettingsSection(id)}
+                    title={t(id)}
                     className={`w-[calc(100%-8px)] mx-1 flex items-center gap-2.5 pl-4 pr-3 py-[7px] rounded-[5px] text-[13px] relative my-px ${
                       section === id
                         ? "bg-codex-active text-codex-text font-medium before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-sm before:bg-codex-text"
@@ -226,7 +227,7 @@ export function SettingsOverlay() {
                     }`}
                   >
                     {SETTINGS_ICONS[id]}
-                    {t(id)}
+                    <span className="settings-nav-label">{t(id)}</span>
                   </button>
                 ))}
               </div>
@@ -236,12 +237,12 @@ export function SettingsOverlay() {
       </aside>
       <div className="settings-content w-full flex-1 min-w-0 min-h-0 overflow-auto flex flex-col">
         {ProtoPage && (
-          <div className="overflow-auto" style={{ margin: "50px 100px 20px", maxHeight: '100%' }}>
+          <div className="settings-pane overflow-auto" style={{ maxHeight: '100%' }}>
             <ProtoPage />
           </div>
         )}
         {AdminPage && (
-          <div className="overflow-auto" style={{ margin: "50px 100px 20px", maxHeight: '100%' }}>
+          <div className="settings-pane overflow-auto" style={{ maxHeight: '100%' }}>
             {showAdminChrome || !NAV_IDS.has(section) ? (
               <>
                 <h2 className="text-[22px] font-semibold text-codex-text tracking-tight m-0 mb-1.5">{t(section)}</h2>

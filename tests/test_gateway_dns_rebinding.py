@@ -290,3 +290,68 @@ def test_reject_cross_site_passes_native_client_with_no_browser_headers(
     """The CLI sends no Origin/Sec-Fetch-Site; it must not be affected."""
     req = _request({"Host": "127.0.0.1:58123"})
     assert ws_common.reject_cross_site(req, loopback_auth, action="ws_test") is None
+
+
+# ── Browsers that omit Sec-Fetch-Site ───────────────────────────────────────
+#
+# Some embedded webviews and older engines send an Origin on WebSocket
+# upgrades but no Sec-Fetch-Site at all. For a same-origin page that Origin
+# is identical to the Host, so the Origin-vs-Host comparison admits them;
+# the Host gate still runs afterwards and keeps rebinding blocked.
+
+
+@pytest.mark.parametrize("sec_fetch_site", ["", "none"])
+def test_origin_matching_host_without_sec_fetch_site_passes(
+    loopback_auth: GatewayAuth, sec_fetch_site: str,
+) -> None:
+    """A same-origin page that omits Sec-Fetch-Site is not cross-site."""
+    req = _request({
+        "Origin": "http://127.0.0.1:58123",
+        "Sec-Fetch-Site": sec_fetch_site,
+        "Host": "127.0.0.1:58123",
+    })
+    assert ws_common.reject_cross_site(req, loopback_auth, action="ws_test") is None
+
+
+@pytest.mark.parametrize("sec_fetch_site", ["", "none"])
+def test_foreign_origin_without_sec_fetch_site_is_rejected(
+    loopback_auth: GatewayAuth, sec_fetch_site: str,
+) -> None:
+    """A cross-site page that omits Sec-Fetch-Site is still refused."""
+    req = _request({
+        "Origin": "http://evil.example",
+        "Sec-Fetch-Site": sec_fetch_site,
+        "Host": "127.0.0.1:58123",
+    })
+    response = ws_common.reject_cross_site(req, loopback_auth, action="ws_test")
+    assert response is not None
+    assert response.status == 403
+
+
+@pytest.mark.parametrize("sec_fetch_site", ["", "none"])
+def test_rebind_with_matching_origin_host_but_bad_host_is_blocked(
+    loopback_auth: GatewayAuth, sec_fetch_site: str,
+) -> None:
+    """Origin and Host agreeing with each other is not enough when the Host
+    is not one the gateway was reached on — the Host gate must still fire."""
+    req = _request({
+        "Origin": "http://evil.example:58123",
+        "Sec-Fetch-Site": sec_fetch_site,
+        "Host": "evil.example:58123",
+    })
+    response = ws_common.reject_cross_site(req, loopback_auth, action="ws_test")
+    assert response is not None
+    assert response.status == 403
+
+
+def test_origin_port_mismatch_without_sec_fetch_site_is_rejected(
+    loopback_auth: GatewayAuth,
+) -> None:
+    """A different port is a different origin even when the host name matches."""
+    req = _request({
+        "Origin": "http://127.0.0.1:5173",
+        "Host": "127.0.0.1:58123",
+    })
+    response = ws_common.reject_cross_site(req, loopback_auth, action="ws_test")
+    assert response is not None
+    assert response.status == 403

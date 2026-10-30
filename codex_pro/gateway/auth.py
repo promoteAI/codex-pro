@@ -168,6 +168,10 @@ class GatewayAuth:
         # the rebinding case this does not catch.
         if sec_fetch_site == "same-origin":
             return False
+        # Same-origin is safe by definition. ALMOST — see is_host_allowed for
+        # the rebinding case this does not catch.
+        if sec_fetch_site == "same-origin":
+            return False
         # same-site is NOT same-origin: the browser is telling us the initiator
         # shares a registrable domain, which still leaves a different subdomain,
         # a different port, and (for localhost) any other local service — none of
@@ -176,7 +180,16 @@ class GatewayAuth:
         # cases the gate exists to stop. Verify it really is the same origin by
         # comparing the Origin against the Host we were reached on; with no Host
         # to compare, fall through to the allowlist rather than assume.
-        if sec_fetch_site == "same-site" and host and self._origin_matches_host(origin, host):
+        #
+        # The same Origin-vs-Host verification covers browsers that omit
+        # Sec-Fetch-Site entirely (some embedded webviews and older engines do).
+        # A same-origin page there sends an Origin identical to the Host, so
+        # requiring the match keeps them working; a cross-site page's Origin
+        # names a different host and still lands on the allowlist/reject below.
+        # The composed callers (ws_common.reject_cross_site, check_csrf) run
+        # is_host_allowed afterwards, so a rebinding page whose Origin and Host
+        # agree with each other is still caught by the Host gate.
+        if sec_fetch_site in ("same-site", "", "none") and host and self._origin_matches_host(origin, host):
             return False
         # Explicitly allowlisted Origin is trusted (for example a dev frontend).
         if origin and normalize_origin(origin) in self._allowed_origins:

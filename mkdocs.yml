@@ -9,8 +9,13 @@ copyright: Copyright &copy; 2026 Codex Pro contributors
 # Reusable snippets are source fragments, not standalone documentation pages.
 # They stay readable by pymdownx.snippets below but must not be emitted or
 # reported as pages missing from the navigation.
+# superpowers/ holds internal working plans and design specs. They link
+# directly to source files (codex_pro/..., web/src/...) which can never
+# resolve inside a docs build, so they would abort `mkdocs build --strict`.
+# They are not in nav and no published doc links into them.
 exclude_docs: |
   includes/
+  superpowers/
 
 theme:
   name: material

@@ -83,4 +83,37 @@ describe("useApi 三态", () => {
     expect(result.current.error).toBeNull();
     expect(result.current.data).toEqual({ ok: true });
   });
+
+  it("retryOn404 时对 not found 重试直到成功", async () => {
+    const spy = vi.spyOn(api, "apiFetch")
+      .mockRejectedValueOnce(new Error("not found"))
+      .mockRejectedValueOnce(new Error("not found"))
+      .mockResolvedValueOnce({ ok: true });
+    const { result } = renderHook(() => useApi<{ ok: boolean }>("/stats", { retryOn404: true }));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data).toEqual({ ok: true });
+    expect(result.current.error).toBeNull();
+    // 首次 + 2 次重试 = 3 次调用
+    expect(spy).toHaveBeenCalledTimes(3);
+  });
+
+  it("retryOn404 重试耗尽后仍暴露 error", async () => {
+    vi.spyOn(api, "apiFetch").mockRejectedValue(new Error("not found"));
+    const { result } = renderHook(() => useApi<{ ok: boolean }>("/stats", { retryOn404: true }));
+
+    // 5 次重试 × 200ms 延迟 ≈ 1s,给足等待时间
+    await waitFor(() => expect(result.current.loading).toBe(false), { timeout: 3000 });
+    expect(result.current.error).toBe("not found");
+    expect(result.current.data).toBeNull();
+  });
+
+  it("retryOn404 对非 not found 错误不重试", async () => {
+    const spy = vi.spyOn(api, "apiFetch").mockRejectedValue(new Error("boom"));
+    const { result } = renderHook(() => useApi<{ ok: boolean }>("/stats", { retryOn404: true }));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe("boom");
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
 });

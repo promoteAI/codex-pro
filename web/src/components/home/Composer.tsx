@@ -132,7 +132,9 @@ export function Composer() {
     chatting && sessionId
       ? `/sessions/${encodeURIComponent(sessionId)}/context-usage`
       : null;
-  const { data: ctxData, refetch: refetchCtx } = useApi<CtxUsageResponse>(ctxPath);
+  const { data: ctxData, refetch: refetchCtx } = useApi<CtxUsageResponse>(ctxPath, {
+    retryOn404: true,
+  });
 
   // Refresh as new turns land so the gauge tracks live consumption, not just the
   // value captured when the dialog first opened. The first run is skipped because

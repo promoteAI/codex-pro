@@ -18,7 +18,7 @@ import { apiFetch } from "../lib/api";
  * component unmounts, preventing race conditions where a slow response from a
  * previous path overwrites fresh data.
  */
-export function useApi<T>(path: string | null) {
+export function useApi<T>(path: string | null, options?: { retryOn404?: boolean }) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(path !== null);
   const [error, setError] = useState<string | null>(null);
@@ -42,13 +42,38 @@ export function useApi<T>(path: string | null) {
       setData(result);
     } catch (e: unknown) {
       if (controller.signal.aborted) return;
+      // A brand-new session is created on the server only after the WS auth
+      // handshake completes, so a context-usage request fired immediately after
+      // minting the session key can race ahead of session creation and get a
+      // 404. Retry briefly so the gauge settles on real data instead of a
+      // console error.
+      if (options?.retryOn404 && e instanceof Error && e.message === "not found") {
+        for (let attempt = 0; attempt < 5; attempt++) {
+          await new Promise((r) => setTimeout(r, 200));
+          if (controller.signal.aborted) return;
+          try {
+            const result = await apiFetch<T>(path, { signal: controller.signal });
+            if (controller.signal.aborted) return;
+            setData(result);
+            setLoading(false);
+            return;
+          } catch (retryErr: unknown) {
+            if (controller.signal.aborted) return;
+            if (!(retryErr instanceof Error) || retryErr.message !== "not found") {
+              setError(retryErr instanceof Error ? retryErr.message : String(retryErr));
+              setLoading(false);
+              return;
+            }
+          }
+        }
+      }
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       if (!controller.signal.aborted) {
         setLoading(false);
       }
     }
-  }, [path]);
+  }, [path, options?.retryOn404]);
 
   useEffect(() => {
     refetch();

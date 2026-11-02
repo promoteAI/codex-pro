@@ -799,6 +799,17 @@ body {
   .settings-pane{margin:16px 16px 20px}
 }
 
+/* Custom select styling for settings pages */
+.settings-select{
+  appearance:auto;
+  -webkit-appearance:auto;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23888' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 4.5 3 3 3-3'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 10px center;
+  padding-right:32px;
+  cursor:pointer;
+}
+
 
 /* ===== prototype account menu ===== */
 .account-wrap{position:relative;flex:0 0 auto}

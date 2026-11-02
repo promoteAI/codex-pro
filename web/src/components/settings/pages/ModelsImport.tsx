@@ -200,7 +200,7 @@ export function ModelsPage() {
       ) : (
         <div className="flex flex-1 min-h-0 bg-codex-surface border border-codex-border rounded-xl overflow-hidden">
           {/* Sidebar */}
-          <aside className="w-[200px] shrink-0 border-r border-codex-border bg-codex-bg flex flex-col">
+          <aside className="w-fit min-w-[120px] max-w-[200px] shrink-0 border-r border-codex-border bg-codex-bg flex flex-col">
             <div className="flex-1 overflow-y-auto px-2 py-3">
               {groups.map(([group, list]) => (
                 <div key={group} className="mb-3.5">

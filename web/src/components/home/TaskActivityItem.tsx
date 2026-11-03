@@ -150,7 +150,7 @@ export function TaskActivityItem({
               <div>
                 {hasInput && (
                   <div>
-                    <div className="text-[11px] uppercase tracking-wide text-[#777] pb-1">{t("toolInput")}</div>
+                    <div className="text-[11px] uppercase tracking-wide text-codex-muted pb-1">{t("toolInput")}</div>
                     <div className="shell-card">
                       <div className="shell-label">{title}</div>
                       <pre className="shell-pre">
@@ -167,7 +167,7 @@ export function TaskActivityItem({
                 )}
                 {hasOutput && (
                   <div>
-                    <div className="text-[11px] uppercase tracking-wide text-[#777] pt-1 pb-1">{t("toolOutput")}</div>
+                    <div className="text-[11px] uppercase tracking-wide text-codex-muted pt-1 pb-1">{t("toolOutput")}</div>
                     <div className="shell-card">
                       <div className="shell-label">{t("toolResult", { name: title })}</div>
                       <pre className="shell-pre">
@@ -176,7 +176,7 @@ export function TaskActivityItem({
                     </div>
                   </div>
                 )}
-                {!hasInput && !hasOutput && <div className="text-[#777] py-2">{t("emptyContent")}</div>}
+                {!hasInput && !hasOutput && <div className="text-codex-muted py-2">{t("emptyContent")}</div>}
               </div>
             </div>
           </div>

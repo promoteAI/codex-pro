@@ -66,7 +66,7 @@ export function Toggle({
         onChange={(e) => onChange?.(e.target.checked)}
         aria-label={label}
       />
-      <span className="absolute inset-0 rounded-full bg-[#3a3a3a] transition peer-checked:bg-codex-accent after:content-[''] after:absolute after:h-3.5 after:w-3.5 after:left-[3px] after:bottom-[3px] after:rounded-full after:bg-[#888] after:transition peer-checked:after:translate-x-4 peer-checked:after:bg-white" />
+      <span className="absolute inset-0 rounded-full bg-codex-border-strong transition peer-checked:bg-codex-accent after:content-[''] after:absolute after:h-3.5 after:w-3.5 after:left-[3px] after:bottom-[3px] after:rounded-full after:bg-codex-muted after:transition peer-checked:after:translate-x-4 peer-checked:after:bg-white" />
     </label>
   );
 }
@@ -91,7 +91,7 @@ export function ActionBtn({
       disabled={disabled}
       className={`shrink-0 rounded-md px-3 py-1.5 text-[12.5px] border whitespace-nowrap disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:bg-codex-active disabled:hover:text-codex-text-secondary ${
         danger
-          ? "bg-[#3a1a1a] border-[#5a2a2a] text-[#f87171] hover:bg-[#4a2020]"
+          ? "bg-codex-danger-tint border-codex-danger text-codex-danger hover:bg-codex-danger-tint"
           : "bg-codex-elevated border-codex-border-strong text-codex-text-secondary hover:bg-codex-active hover:text-codex-text"
       }`}
     >
@@ -186,7 +186,7 @@ export function EffortLevelPicker({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 bg-[#2a3548] border border-[#3a4a66] rounded-full px-2.5 py-0.5 text-[12px] text-[#9eb6ff] hover:bg-[#2c3d52] transition-colors"
+        className="inline-flex items-center gap-1.5 bg-codex-accent-tint border border-codex-border-strong rounded-full px-2.5 py-0.5 text-[12px] text-codex-accent hover:bg-codex-hover transition-colors"
         aria-expanded={open}
         aria-haspopup="listbox"
       >
@@ -211,7 +211,7 @@ export function EffortLevelPicker({
                     aria-selected={checked}
                     onClick={() => toggle(opt.id)}
                     className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] text-left text-codex-text hover:bg-codex-hover transition-colors ${
-                      checked ? "text-[#9eb6ff]" : ""
+                      checked ? "text-codex-accent" : ""
                     }`}
                   >
                     <span>{opt.label}</span>

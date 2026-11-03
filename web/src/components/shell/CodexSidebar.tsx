@@ -242,7 +242,7 @@ export function CodexSidebar() {
           aria-label={t("appName")}
         >
           {t("appName")}
-          <svg className="w-3.5 h-3.5 text-[#888]" viewBox="0 0 24 24" aria-hidden="true">
+          <svg className="w-3.5 h-3.5 text-codex-muted" viewBox="0 0 24 24" aria-hidden="true">
             <path d="m6 9.5 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
@@ -365,7 +365,7 @@ export function CodexSidebar() {
                   }}
                   className="flex items-center gap-1.5 flex-1 min-w-0 text-[13.5px] text-codex-text-secondary text-left"
                 >
-                  <Folder size={15} className="text-[#909090] shrink-0" />
+                  <Folder size={15} className="text-codex-muted shrink-0" />
                   <span className="truncate">{repo.name}</span>
                 </button>
                 <div className="hidden group-hover/row:inline-flex items-center gap-px shrink-0">
@@ -595,7 +595,7 @@ export function CodexSidebar() {
             aria-label={t("account")}
             className="account flex items-center gap-2 text-[13px] text-codex-text-secondary px-1.5 py-1 rounded hover:bg-codex-hover"
           >
-            <Settings size={18} className="text-[#888]" />
+            <Settings size={18} className="text-codex-muted" />
             <span>custom</span>
           </button>
           {accountOpen && (
@@ -644,7 +644,7 @@ export function CodexSidebar() {
               aria-haspopup="dialog"
               aria-expanded={mobileRemoteOpen}
               onClick={openMobileRemote}
-              className={`mobile-btn w-[30px] h-[30px] inline-flex items-center justify-center rounded-lg text-[#e8a04a] hover:bg-[#2a2a2a]${mobileRemoteOpen ? " is-active" : ""}`}
+              className={`mobile-btn w-[30px] h-[30px] inline-flex items-center justify-center rounded-lg text-codex-warn hover:bg-codex-hover${mobileRemoteOpen ? " is-active" : ""}`}
             >
               <Smartphone size={16} />
             </button>
@@ -661,7 +661,7 @@ export function CodexSidebar() {
             aria-haspopup="dialog"
             aria-expanded={updateOpen}
             onClick={() => setUpdateOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-[#f0f0f0] text-[#181818] text-[12px] font-medium hover:bg-white"
+              className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-codex-active text-codex-bg text-[12px] font-medium hover:bg-codex-elevated"
           >
             <ArrowUp size={12} strokeWidth={2.4} />
             {t("updateShort")}

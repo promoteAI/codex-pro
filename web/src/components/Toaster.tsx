@@ -5,15 +5,15 @@ import { CheckCircle, AlertCircle, Info, X } from "lucide-react";
 const STYLE = {
   success: {
     icon: <CheckCircle size={16} />,
-    cls: "bg-[#1a2f1a] text-codex-success border-codex-success/30",
+    cls: "bg-codex-success-tint text-codex-success border-codex-success/30",
   },
   error: {
     icon: <AlertCircle size={16} />,
-    cls: "bg-[#2f1a1a] text-codex-danger border-codex-danger/30",
+    cls: "bg-codex-danger-tint text-codex-danger border-codex-danger/30",
   },
   info: {
     icon: <Info size={16} />,
-    cls: "bg-[#1a2744] text-[#7aa2ff] border-codex-accent/30",
+    cls: "bg-codex-accent-tint text-codex-accent border-codex-accent/30",
   },
 } as const;
 

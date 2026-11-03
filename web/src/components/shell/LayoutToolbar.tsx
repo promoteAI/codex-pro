@@ -16,7 +16,7 @@ export function LayoutToolbar({ isHome }: { isHome: boolean }) {
   const btn = (active: boolean) =>
     `w-7 h-7 rounded-md inline-flex items-center justify-center ${
       active
-        ? "text-codex-text shadow-[inset_0_0_0_1.5px_#3b6aef]"
+        ? "text-codex-text shadow-[inset_0_0_0_1.5px_var(--color-codex-accent)]"
         : "text-codex-muted hover:bg-codex-hover hover:text-codex-text-secondary"
     }`;
 

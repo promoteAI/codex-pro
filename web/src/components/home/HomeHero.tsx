@@ -77,28 +77,18 @@ export function HomeHero({ project, setDraft }: HomeHeroProps = {}) {
 
   return (
     <section className="flex-1 flex flex-col items-center justify-center px-6 pb-4 min-h-0 overflow-auto">
-      <div className="w-14 h-14 mb-5 opacity-70" aria-hidden>
-        <svg viewBox="0 0 100 100" className="w-full h-full">
+      <div className="w-14 h-14 mb-5 opacity-70 text-codex-muted" aria-hidden>
+        <svg viewBox="0 0 100 100" className="w-full h-full" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
           {/* 代码框架：C 形外壳，开口朝右 */}
           <path
-            fill="none"
-            stroke="#5a5a5a"
-            strokeWidth="5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
             d="M64 28H38q-8 0-8 8v28q0 8 8 8h26"
           />
           {/* 执行提示符 `>`：agent 在框架内运行 */}
           <path
-            fill="none"
-            stroke="#5a5a5a"
-            strokeWidth="5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
             d="M42 42 58 50 42 58"
           />
           {/* 开口处的信号点：输出 / 活跃状态 */}
-          <circle fill="#5a5a5a" cx="70" cy="50" r="4" />
+          <circle cx="70" cy="50" r="4" fill="currentColor" stroke="none" />
         </svg>
       </div>
       <h1 className="text-[clamp(16px,2.2vw,22px)] font-medium text-codex-text text-center mb-6 max-w-[480px]">

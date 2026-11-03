@@ -222,7 +222,7 @@ export function Composer() {
     <div ref={rootRef} className="shrink-0 px-[clamp(16px,4vw,32px)] pb-[clamp(14px,2vw,22px)]">
       <div className="max-w-[720px] mx-auto bg-codex-surface border border-codex-border rounded-[14px] relative transition-colors duration-150 focus-within:border-codex-border-strong focus-within:shadow-[0_0_0_1px_rgba(90,130,255,0.12)]">
         {/* ctx-bar: separate top row (project / branch), hidden while chatting */}
-        <div className={`flex flex-wrap items-center gap-1 px-3 pt-2.5 pb-1 border-b border-[#262626] ${chatting ? "hidden" : ""}`}>
+        <div className={`flex flex-wrap items-center gap-1 px-3 pt-2.5 pb-1 border-b border-codex-border ${chatting ? "hidden" : ""}`}>
           <button
             ref={projectBtnRef}
             type="button"
@@ -293,7 +293,7 @@ export function Composer() {
                   <button
                     type="button"
                     onClick={() => removeAttachment(att.attachment_id)}
-                    className="ml-0.5 w-4 h-4 inline-flex items-center justify-center rounded text-codex-muted hover:text-codex-text hover:bg-[#444]"
+                    className="ml-0.5 w-4 h-4 inline-flex items-center justify-center rounded text-codex-muted hover:text-codex-text hover:bg-codex-border-strong"
                     aria-label={`${t("close")} ${att.name}`}
                   >
                     <X size={11} />
@@ -322,7 +322,7 @@ export function Composer() {
             <div className="absolute left-3 bottom-[calc(100%-6px)] w-[min(520px,calc(100vw-24px))] max-h-[min(420px,55vh)] overflow-auto p-2 pl-2.5 bg-codex-elevated border border-codex-border-strong rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30">
               {slashMatches.commands.length > 0 && (
                 <>
-                  <div className="px-2.5 py-1.5 text-[12px] text-[#7dd3fc] font-medium">{t("slashCommands")}</div>
+                  <div className="px-2.5 py-1.5 text-[12px] text-codex-accent font-medium">{t("slashCommands")}</div>
                   {slashMatches.commands.map((c) => (
                     <button
                       key={c.id}
@@ -343,7 +343,7 @@ export function Composer() {
               )}
               {slashMatches.skillItems.length > 0 && (
                 <>
-                  <div className="px-2.5 py-1.5 text-[12px] text-[#7dd3fc] font-medium">{t("skillsSection")}</div>
+                  <div className="px-2.5 py-1.5 text-[12px] text-codex-accent font-medium">{t("skillsSection")}</div>
                   {slashMatches.skillItems.map((c) => (
                     <button
                       key={c.id}

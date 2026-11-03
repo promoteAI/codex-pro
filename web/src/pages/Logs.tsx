@@ -51,7 +51,7 @@ export function Logs() {
   const changeFilter = (fn: () => void) => { fn(); setOffset(0); };
 
   const levelColor: Record<string, string> = {
-    DEBUG: "text-gray-400", INFO: "text-blue-600", WARNING: "text-yellow-600", ERROR: "text-red-600",
+    DEBUG: "text-codex-muted", INFO: "text-codex-accent", WARNING: "text-codex-warn", ERROR: "text-codex-danger",
   };
 
   return (
@@ -61,7 +61,7 @@ export function Logs() {
           value={level}
           onChange={(e) => changeFilter(() => setLevel(e.target.value))}
           aria-label={t("allLevels")}
-          className="border rounded px-2 py-1 text-sm"
+          className="border border-codex-border rounded px-2 py-1 text-sm bg-codex-surface"
         >
           <option value="">{t("allLevels")}</option>
           {LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
@@ -71,20 +71,20 @@ export function Logs() {
           onChange={(e) => changeFilter(() => setSearch(e.target.value))}
           placeholder={t("searchPlaceholder")}
           aria-label={t("searchPlaceholder")}
-          className="border rounded px-3 py-1 text-sm flex-1 min-w-40"
+          className="border border-codex-border rounded px-3 py-1 text-sm flex-1 min-w-40 bg-codex-surface"
         />
         <select
           value={pageSize}
           onChange={(e) => changeFilter(() => setPageSize(Number(e.target.value)))}
           aria-label={t("pageSize")}
-          className="border rounded px-2 py-1 text-sm"
+          className="border border-codex-border rounded px-2 py-1 text-sm bg-codex-surface"
         >
           {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
-        <button onClick={() => refetch()} className="flex items-center gap-1 border rounded px-2 py-1 text-sm hover:bg-gray-100" title={t("common:refresh")}>
+        <button onClick={() => refetch()} className="flex items-center gap-1 border border-codex-border rounded px-2 py-1 text-sm hover:bg-codex-hover" title={t("common:refresh")}>
           <RefreshCw size={14} /> {t("common:refresh")}
         </button>
-        <label className="flex items-center gap-1 text-xs text-gray-600 select-none">
+        <label className="flex items-center gap-1 text-xs text-codex-text-secondary select-none">
           <input type="checkbox" checked={live} onChange={(event) => setLive(event.target.checked)} /> {t("live")}
         </label>
       </div>
@@ -92,26 +92,26 @@ export function Logs() {
       <div
         role="log"
         aria-live="off"
-        className="flex-1 overflow-y-auto bg-gray-900 rounded-lg p-4 font-mono text-xs"
+        className="flex-1 overflow-y-auto bg-codex-panel rounded-lg p-4 font-mono text-xs"
       >
-        {error && <div className="text-red-400">{t("common:loadFailed", { error })}</div>}
-        {!error && loading && !data && <div className="text-gray-500">{t("common:loading")}</div>}
-        {!error && data && entries.length === 0 && <div className="text-gray-500">{t("empty")}</div>}
+        {error && <div className="text-codex-danger">{t("common:loadFailed", { error })}</div>}
+        {!error && loading && !data && <div className="text-codex-muted">{t("common:loading")}</div>}
+        {!error && data && entries.length === 0 && <div className="text-codex-muted">{t("empty")}</div>}
         {!error && entries.map((entry, i) => (
           <div key={`${entry.ts}-${i}`} className="flex gap-2">
             {/* 时分秒够密集地扫读,完整日期挂在 title 上:此前用 ts.slice(11,19)
                 手工切串,既假设了固定 ISO 版式,也让跨天排查分不清是哪一天。 */}
-            <span className="text-gray-500 shrink-0" title={fullTimestamp(entry.ts)}>
+            <span className="text-codex-muted shrink-0" title={fullTimestamp(entry.ts)}>
               {timeOfDay(entry.ts)}
             </span>
             <span className={`shrink-0 w-14 ${levelColor[entry.level] || ""}`}>{entry.level}</span>
-            <span className="text-gray-200 whitespace-pre-wrap break-words">{entry.message}</span>
+            <span className="text-codex-text whitespace-pre-wrap break-words">{entry.message}</span>
           </div>
         ))}
       </div>
 
       {!error && total > 0 && (
-        <div className="flex items-center justify-end gap-2 mt-2 text-xs text-gray-500">
+        <div className="flex items-center justify-end gap-2 mt-2 text-xs text-codex-muted">
           <span>
             {t("range", {
               from: offset + 1,
@@ -122,14 +122,14 @@ export function Logs() {
           <button
             onClick={() => setOffset(Math.max(0, offset - pageSize))}
             disabled={offset === 0}
-            className="flex items-center gap-0.5 border rounded px-2 py-1 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-0.5 border border-codex-border rounded px-2 py-1 hover:bg-codex-hover disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <ChevronLeft size={14} /> {t("prev")}
           </button>
           <button
             onClick={() => setOffset(offset + pageSize)}
             disabled={offset + entries.length >= total}
-            className="flex items-center gap-0.5 border rounded px-2 py-1 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-0.5 border border-codex-border rounded px-2 py-1 hover:bg-codex-hover disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {t("next")} <ChevronRight size={14} />
           </button>

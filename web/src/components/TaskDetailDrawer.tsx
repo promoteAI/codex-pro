@@ -122,7 +122,7 @@ export function TaskDetailDrawer({ task, onClose }: { task: TaskCard; onClose: (
         role="dialog"
         aria-modal="true"
         aria-labelledby="task-detail-title"
-        className="bg-white w-full max-w-md h-full overflow-y-auto shadow-xl p-5 space-y-4"
+        className="bg-codex-surface w-full max-w-md h-full overflow-y-auto shadow-xl p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
@@ -133,7 +133,7 @@ export function TaskDetailDrawer({ task, onClose }: { task: TaskCard; onClose: (
                 onClick={startEdit}
                 aria-label={t("detail.editAria", { title: detail.title })}
                 title={t("detail.edit")}
-                className="p-1 rounded hover:bg-gray-100"
+                className="p-1 rounded hover:bg-codex-hover"
               >
                 <Pencil size={16} />
               </button>
@@ -143,7 +143,7 @@ export function TaskDetailDrawer({ task, onClose }: { task: TaskCard; onClose: (
                 onClick={doCancel}
                 aria-label={t("detail.cancelTask")}
                 title={t("detail.cancelTask")}
-                className="p-1 rounded text-red-500 hover:bg-red-50"
+                className="p-1 rounded text-codex-danger hover:bg-codex-danger/10"
               >
                 <Ban size={16} />
               </button>
@@ -151,7 +151,7 @@ export function TaskDetailDrawer({ task, onClose }: { task: TaskCard; onClose: (
             <button
               onClick={onClose}
               aria-label={t("common:close")}
-              className="p-1 rounded hover:bg-gray-100"
+              className="p-1 rounded hover:bg-codex-hover"
             >
               <X size={18} />
             </button>
@@ -160,10 +160,10 @@ export function TaskDetailDrawer({ task, onClose }: { task: TaskCard; onClose: (
 
         <div className="flex items-center gap-2 flex-wrap text-xs">
           <span className={`px-2 py-0.5 rounded-full ${meta.chip}`}>{meta.label}</span>
-          <span className="text-gray-500">P{detail.priority}</span>
-          {detail.assignee && <span className="text-gray-500">@{detail.assignee}</span>}
+          <span className="text-codex-muted">P{detail.priority}</span>
+          {detail.assignee && <span className="text-codex-muted">@{detail.assignee}</span>}
           {detail.labels?.map((l) => (
-            <span key={l} className="bg-blue-100 text-blue-700 px-1.5 rounded">{l}</span>
+            <span key={l} className="bg-codex-accent/10 text-codex-accent px-1.5 rounded">{l}</span>
           ))}
         </div>
 
@@ -185,26 +185,26 @@ export function TaskDetailDrawer({ task, onClose }: { task: TaskCard; onClose: (
         )}
 
         {editing ? (
-          <form onSubmit={save} className="space-y-2 border rounded p-3">
-            <label className="block text-xs text-gray-500">
+          <form onSubmit={save} className="space-y-2 border border-codex-border rounded p-3">
+            <label className="block text-xs text-codex-muted">
               {t("detail.titleField")}
               <input
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="mt-1 border rounded px-2 py-1 w-full text-sm text-gray-800"
+                className="mt-1 border border-codex-border rounded px-2 py-1 w-full text-sm text-codex-text bg-codex-bg"
               />
             </label>
-            <label className="block text-xs text-gray-500">
+            <label className="block text-xs text-codex-muted">
               {t("detail.description")}
               <textarea
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={4}
-                className="mt-1 border rounded px-2 py-1 w-full text-sm text-gray-800"
+                className="mt-1 border border-codex-border rounded px-2 py-1 w-full text-sm text-codex-text bg-codex-bg"
               />
             </label>
             <div className="flex gap-2">
-              <label className="block text-xs text-gray-500 w-28">
+              <label className="block text-xs text-codex-muted w-28">
                 {t("detail.priorityField")}
                 <input
                   type="number"
@@ -212,38 +212,38 @@ export function TaskDetailDrawer({ task, onClose }: { task: TaskCard; onClose: (
                   max={9}
                   value={form.priority}
                   onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                  className="mt-1 border rounded px-2 py-1 w-full text-sm text-gray-800"
+                  className="mt-1 border border-codex-border rounded px-2 py-1 w-full text-sm text-codex-text bg-codex-bg"
                 />
               </label>
-              <label className="block text-xs text-gray-500 flex-1">
+              <label className="block text-xs text-codex-muted flex-1">
                 {t("detail.assigneeField")}
                 <input
                   value={form.assignee}
                   onChange={(e) => setForm({ ...form, assignee: e.target.value })}
-                  className="mt-1 border rounded px-2 py-1 w-full text-sm text-gray-800"
+                  className="mt-1 border border-codex-border rounded px-2 py-1 w-full text-sm text-codex-text bg-codex-bg"
                 />
               </label>
             </div>
-            <label className="block text-xs text-gray-500">
+            <label className="block text-xs text-codex-muted">
               {t("detail.labelsField")}
               <input
                 value={form.labels}
                 onChange={(e) => setForm({ ...form, labels: e.target.value })}
-                className="mt-1 border rounded px-2 py-1 w-full text-sm text-gray-800"
+                className="mt-1 border border-codex-border rounded px-2 py-1 w-full text-sm text-codex-text bg-codex-bg"
               />
             </label>
             <div className="flex gap-2 pt-1">
               <button
                 type="submit"
                 disabled={saving || !form.title.trim()}
-                className="bg-blue-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
+                className="bg-codex-accent text-white px-3 py-1 rounded text-sm disabled:opacity-50 hover:bg-codex-accent-hover"
               >
                 {t("detail.save")}
               </button>
               <button
                 type="button"
                 onClick={() => setEditing(false)}
-                className="bg-gray-100 px-3 py-1 rounded text-sm hover:bg-gray-200"
+                className="bg-codex-elevated px-3 py-1 rounded text-sm hover:bg-codex-active"
               >
                 {t("common:cancel")}
               </button>
@@ -258,7 +258,7 @@ export function TaskDetailDrawer({ task, onClose }: { task: TaskCard; onClose: (
         <Field label={t("detail.blockedReason")} value={detail.blocked_reason} />
         <Field label={t("detail.reviewSummary")} value={detail.review_summary} />
 
-        <dl className="text-xs text-gray-500 space-y-1 border-t pt-3">
+        <dl className="text-xs text-codex-muted space-y-1 border-t border-codex-border pt-3">
           <Row label={t("detail.source")} value={detail.source || "-"} />
           <Row label={t("detail.sessionId")} value={detail.session_id || "-"} />
           <Row label={t("detail.retries")} value={`${detail.retry_count}/${detail.max_retries}`} />
@@ -283,7 +283,7 @@ function ActionButton({ icon, label, onClick, disabled, tone }: {
   icon: React.ReactNode; label: string; onClick: () => void; disabled: boolean; tone?: "success";
 }) {
   return <button onClick={onClick} disabled={disabled}
-    className={`flex items-center gap-1.5 border rounded px-2.5 py-1.5 text-xs disabled:opacity-40 ${tone === "success" ? "text-green-700 border-green-200 hover:bg-green-50" : "text-blue-700 border-blue-200 hover:bg-blue-50"}`}>
+    className={`flex items-center gap-1.5 border border-codex-border rounded px-2.5 py-1.5 text-xs disabled:opacity-40 ${tone === "success" ? "text-codex-success border-codex-success/30 hover:bg-codex-success/10" : "text-codex-accent border-codex-accent/30 hover:bg-codex-accent/10"}`}>
     {icon}{label}
   </button>;
 }
@@ -302,10 +302,10 @@ function Field({
   if (!value) return null;
   return (
     <section>
-      <h3 className="text-xs font-medium text-gray-500 mb-1">{label}</h3>
+      <h3 className="text-xs font-medium text-codex-muted mb-1">{label}</h3>
       <div
         className={`text-sm whitespace-pre-wrap break-words rounded p-2 ${
-          tone === "error" ? "bg-red-50 text-red-700" : "bg-gray-50 text-gray-800"
+          tone === "error" ? "bg-codex-danger/10 text-codex-danger" : "bg-codex-hover text-codex-text"
         } ${mono ? "font-mono text-xs" : ""}`}
       >
         {value}

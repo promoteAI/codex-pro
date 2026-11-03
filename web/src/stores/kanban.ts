@@ -33,16 +33,17 @@ export interface StatusMeta {
 }
 
 // 配色留在代码里(与文案无关);label/hint 运行时按当前语言取。
+// 语义色一律走 codex-* token,亮暗主题自动翻转。
 const STATUS_CHIP: Record<string, string> = {
-  pending: "bg-gray-200 text-gray-600",
-  queued: "bg-blue-100 text-blue-700",
-  running: "bg-indigo-100 text-indigo-700",
-  blocked: "bg-orange-100 text-orange-700",
-  review: "bg-purple-100 text-purple-700",
-  success: "bg-green-100 text-green-700",
-  failed: "bg-red-100 text-red-700",
-  cancelled: "bg-gray-200 text-gray-500",
-  suspended: "bg-yellow-100 text-yellow-700",
+  pending: "bg-codex-active text-codex-muted",
+  queued: "bg-codex-accent/10 text-codex-accent",
+  running: "bg-codex-accent/15 text-codex-accent",
+  blocked: "bg-codex-warn/10 text-codex-warn",
+  review: "bg-codex-accent/10 text-codex-accent",
+  success: "bg-codex-success/10 text-codex-success",
+  failed: "bg-codex-danger/10 text-codex-danger",
+  cancelled: "bg-codex-active text-codex-muted",
+  suspended: "bg-codex-warn/10 text-codex-warn",
 };
 
 export function statusMeta(status: string): StatusMeta {

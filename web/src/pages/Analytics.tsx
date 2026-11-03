@@ -68,14 +68,18 @@ function friendlyChannel(raw: string, t: (k: string) => string): string {
   return mapped ? t(`channelNames.${mapped}`) : raw;
 }
 
-const CHART_TICK = { fontSize: 12, fill: "#8a8a8a" };
-const GRID = "#2a2a2a";
+const CHART_TICK = { fontSize: 12, fill: "var(--codex-muted)" };
+const GRID = "var(--codex-border)";
 const TOOLTIP_STYLE = {
-  background: "#222",
-  border: "1px solid #333",
+  background: "var(--codex-elevated)",
+  border: "1px solid var(--codex-border)",
   borderRadius: 8,
-  color: "#e0e0e0",
+  color: "var(--codex-text)",
 };
+// Chart series colors map to the design tokens so they flip with the theme.
+const SERIES_ACCENT = "var(--codex-accent)";
+const SERIES_SUCCESS = "var(--codex-success)";
+const SERIES_WARN = "var(--codex-warn)";
 
 export function Analytics() {
   const { t } = useTranslation(["analytics", "common"]);
@@ -160,7 +164,7 @@ export function Analytics() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-end gap-2 flex-wrap">
-        <span className="text-[12.5px] text-[#8a8a8a]">{t("timeRange")}</span>
+        <span className="text-[12.5px] text-codex-muted">{t("timeRange")}</span>
         {[1, 7, 30].map((d) => (
           <button
             key={d}
@@ -169,8 +173,8 @@ export function Analytics() {
             aria-pressed={days === d}
             className={`px-3 py-1.5 rounded-lg text-[12.5px] border ${
               days === d
-                ? "bg-[#2a3548] border-[#3a4a66] text-[#9eb6ff]"
-                : "bg-[#1c1c1c] border-[#2e2e2e] text-[#c0c0c0] hover:bg-[#242424]"
+                ? "bg-codex-accent/15 border-codex-accent/40 text-codex-accent"
+                : "bg-codex-elevated border-codex-border text-codex-text-secondary hover:bg-codex-hover"
             }`}
           >
             {d === 1 ? t("today") : t("days", { count: d })}
@@ -179,7 +183,7 @@ export function Analytics() {
         <button
           type="button"
           onClick={refresh}
-          className="px-3 py-1.5 rounded-lg text-[12.5px] bg-[#2a2a2a] border border-[#3a3a3a] text-[#d4d4d4] hover:bg-[#333]"
+          className="px-3 py-1.5 rounded-lg text-[12.5px] bg-codex-elevated border border-codex-border text-codex-text-secondary hover:bg-codex-hover"
         >
           {t("common:refresh")}
         </button>
@@ -213,17 +217,17 @@ export function Analytics() {
       </div>
 
       {error && (
-        <div className="bg-[#3a1a1a] text-[#f87171] border border-[#5a2a2a] rounded-xl p-4 text-[13px]">
+        <div className="bg-codex-danger/10 text-codex-danger border border-codex-danger/20 rounded-xl p-4 text-[13px]">
           {t("common:loadFailed", { error })}
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
         <div>
-          <div className="text-[13px] font-medium text-[#b8b8b8] mb-2.5">
+          <div className="text-[13px] font-medium text-codex-text-secondary mb-2.5">
             {t("tokenTrend")} ({t("days", { count: days })})
           </div>
-          <div className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-xl p-4">
+          <div className="bg-codex-surface border border-codex-border rounded-xl p-4">
             {barHeights.length > 0 ? (
               <div className="flex items-end gap-2 h-[120px] mb-1">
                 {barHeights.map((b) => (
@@ -232,38 +236,38 @@ export function Analytics() {
                       className="w-full rounded-t"
                       style={{
                         height: `${b.pct}%`,
-                        background: b.highlight ? "#3fb950" : "#1e3a5f",
+                        background: b.highlight ? SERIES_SUCCESS : "var(--codex-accent)",
                       }}
                     />
-                    <span className="text-[10px] text-[#6e6e6e] truncate w-full text-center">
+                    <span className="text-[10px] text-codex-muted truncate w-full text-center">
                       {b.label}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="h-[120px] grid place-items-center text-[13px] text-[#6e6e6e]">
+              <div className="h-[120px] grid place-items-center text-[13px] text-codex-muted">
                 {t("common:noData")}
               </div>
             )}
           </div>
         </div>
         <div>
-          <div className="text-[13px] font-medium text-[#b8b8b8] mb-2.5">{t("channelShare")}</div>
-          <div className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-xl p-4">
+          <div className="text-[13px] font-medium text-codex-text-secondary mb-2.5">{t("channelShare")}</div>
+          <div className="bg-codex-surface border border-codex-border rounded-xl p-4">
             {channelShare.length === 0 ? (
-              <div className="text-[13px] text-[#6e6e6e] py-6 text-center">{t("common:noData")}</div>
+              <div className="text-[13px] text-codex-muted py-6 text-center">{t("common:noData")}</div>
             ) : (
               <div className="flex flex-col gap-2.5">
                 {channelShare.map((row, i) => {
-                  const colors = ["#5b9dff", "#e3b341", "#3fb950"];
+                  const colors = [SERIES_ACCENT, SERIES_WARN, SERIES_SUCCESS];
                   return (
                     <div key={row.name}>
-                      <div className="flex justify-between text-[12px] text-[#c8c8c8] mb-1">
+                      <div className="flex justify-between text-[12px] text-codex-text-secondary mb-1">
                         <span>{row.friendly}</span>
                         <span>{row.pct}%</span>
                       </div>
-                      <div className="bg-[#2a2a2a] rounded h-1.5 overflow-hidden">
+                      <div className="bg-codex-active rounded h-1.5 overflow-hidden">
                         <div
                           className="h-full rounded"
                           style={{ width: `${row.pct}%`, background: colors[i % colors.length] }}
@@ -279,44 +283,44 @@ export function Analytics() {
       </div>
 
       <section>
-        <h3 className="text-[13px] font-medium text-[#b8b8b8] mb-2.5 m-0">{t("tokenTrend")}</h3>
-        <div className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-xl p-4 h-64">
+        <h3 className="text-[13px] font-medium text-codex-text-secondary mb-2.5 m-0">{t("tokenTrend")}</h3>
+        <div className="bg-codex-surface border border-codex-border rounded-xl p-4 h-64">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={usage}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
-              <XAxis dataKey="date" tick={CHART_TICK} stroke="#333" />
-              <YAxis tick={CHART_TICK} stroke="#333" />
+              <XAxis dataKey="date" tick={CHART_TICK} stroke="var(--codex-border)" />
+              <YAxis tick={CHART_TICK} stroke="var(--codex-border)" />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
-              <Legend wrapperStyle={{ color: "#a0a0a0" }} />
-              <Line type="monotone" dataKey="input_tokens" stroke="#5b9dff" name={t("inputTokens")} />
-              <Line type="monotone" dataKey="output_tokens" stroke="#3fb950" name={t("outputTokens")} />
+              <Legend wrapperStyle={{ color: "var(--codex-muted)" }} />
+              <Line type="monotone" dataKey="input_tokens" stroke={SERIES_ACCENT} name={t("inputTokens")} />
+              <Line type="monotone" dataKey="output_tokens" stroke={SERIES_SUCCESS} name={t("outputTokens")} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </section>
 
       <section>
-        <h3 className="text-[13px] font-medium text-[#b8b8b8] mb-2.5 m-0">{t("costTrend")}</h3>
-        <div className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-xl p-4 h-64">
+        <h3 className="text-[13px] font-medium text-codex-text-secondary mb-2.5 m-0">{t("costTrend")}</h3>
+        <div className="bg-codex-surface border border-codex-border rounded-xl p-4 h-64">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={usage}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
-              <XAxis dataKey="date" tick={CHART_TICK} stroke="#333" />
-              <YAxis tick={CHART_TICK} stroke="#333" unit="$" />
+              <XAxis dataKey="date" tick={CHART_TICK} stroke="var(--codex-border)" />
+              <YAxis tick={CHART_TICK} stroke="var(--codex-border)" unit="$" />
               <Tooltip formatter={formatUsd} contentStyle={TOOLTIP_STYLE} />
-              <Line type="monotone" dataKey="cost_usd" stroke="#e3b341" name={t("costUsd")} />
+              <Line type="monotone" dataKey="cost_usd" stroke={SERIES_WARN} name={t("costUsd")} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </section>
 
       <section>
-        <h3 className="text-[13px] font-medium text-[#b8b8b8] mb-2.5 m-0">{t("channelAttribution")}</h3>
-        <div className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-xl p-4 h-64">
+        <h3 className="text-[13px] font-medium text-codex-text-secondary mb-2.5 m-0">{t("channelAttribution")}</h3>
+        <div className="bg-codex-surface border border-codex-border rounded-xl p-4 h-64">
           {channelsError ? (
-            <div className="text-[13px] text-[#f87171]">{t("common:loadFailed", { error: channelsError })}</div>
+            <div className="text-[13px] text-codex-danger">{t("common:loadFailed", { error: channelsError })}</div>
           ) : channelRows.length === 0 ? (
-            <div className="text-[13px] text-[#6e6e6e]">{t("common:noData")}</div>
+            <div className="text-[13px] text-codex-muted">{t("common:noData")}</div>
           ) : (
             <>
               <ResponsiveContainer width="100%" height="85%">
@@ -325,14 +329,14 @@ export function Analytics() {
                   <XAxis
                     dataKey="channel"
                     tick={CHART_TICK}
-                    stroke="#333"
+                    stroke="var(--codex-border)"
                     tickFormatter={(v: string) => friendlyChannel(v, t)}
                   />
-                  <YAxis tick={CHART_TICK} stroke="#333" unit="$" />
+                  <YAxis tick={CHART_TICK} stroke="var(--codex-border)" unit="$" />
                   <Tooltip formatter={formatUsd} contentStyle={TOOLTIP_STYLE} />
                   <Bar
                     dataKey="cost_usd"
-                    fill={selectedChannel ? "#6366f1" : "#5b9dff"}
+                    fill={selectedChannel ? "var(--codex-accent)" : SERIES_ACCENT}
                     name={t("costUsd")}
                     onClick={(e) => {
                       if (e && typeof e === "object" && "payload" in e) {
@@ -347,7 +351,7 @@ export function Analytics() {
                 <button
                   type="button"
                   onClick={() => setSelectedChannel(null)}
-                  className="mt-2 text-[12px] text-[#4c8dff] hover:underline"
+                  className="mt-2 text-[12px] text-codex-accent hover:underline"
                 >
                   {t("clearChannelFilter")}
                 </button>
@@ -358,17 +362,17 @@ export function Analytics() {
       </section>
 
       <section>
-        <h3 className="text-[13px] font-medium text-[#b8b8b8] mb-2.5 m-0">{t("skillUsage")}</h3>
-        <div className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-xl overflow-x-auto">
+        <h3 className="text-[13px] font-medium text-codex-text-secondary mb-2.5 m-0">{t("skillUsage")}</h3>
+        <div className="bg-codex-surface border border-codex-border rounded-xl overflow-x-auto">
           {skillsError ? (
-            <div className="p-4 text-[13px] text-[#f87171]">{t("common:loadFailed", { error: skillsError })}</div>
+            <div className="p-4 text-[13px] text-codex-danger">{t("common:loadFailed", { error: skillsError })}</div>
           ) : skills?.available === false ? (
-            <div className="p-4 text-[13px] text-[#e3b341]">{t("skillUnavailable")}</div>
+            <div className="p-4 text-[13px] text-codex-warn">{t("skillUnavailable")}</div>
           ) : skillRows.length === 0 ? (
-            <div className="p-4 text-[13px] text-[#6e6e6e]">{t("common:noData")}</div>
+            <div className="p-4 text-[13px] text-codex-muted">{t("common:noData")}</div>
           ) : (
             <table className="w-full text-[13px]">
-              <thead className="bg-[#222] text-[#8a8a8a]">
+              <thead className="bg-codex-elevated text-codex-muted">
                 <tr>
                   <th className="text-left p-3 font-medium">{t("skill")}</th>
                   <th className="text-right p-3 font-medium">{t("calls")}</th>
@@ -379,12 +383,12 @@ export function Analytics() {
               </thead>
               <tbody>
                 {skillRows.map((row) => (
-                  <tr key={row.skill} className="border-t border-[#2a2a2a]">
-                    <td className="p-3 font-medium text-[#e8e8e8]">{row.skill}</td>
-                    <td className="p-3 text-right tabular-nums text-[#c8c8c8]">{row.calls}</td>
-                    <td className="p-3 text-right text-[#3fb950] tabular-nums">{row.successes}</td>
-                    <td className="p-3 text-right text-[#f87171] tabular-nums">{row.failures}</td>
-                    <td className="p-3 text-right tabular-nums text-[#c8c8c8]">
+                  <tr key={row.skill} className="border-t border-codex-border">
+                    <td className="p-3 font-medium text-codex-text">{row.skill}</td>
+                    <td className="p-3 text-right tabular-nums text-codex-text-secondary">{row.calls}</td>
+                    <td className="p-3 text-right text-codex-success tabular-nums">{row.successes}</td>
+                    <td className="p-3 text-right text-codex-danger tabular-nums">{row.failures}</td>
+                    <td className="p-3 text-right tabular-nums text-codex-text-secondary">
                       {(row.success_rate * 100).toFixed(1)}%
                     </td>
                   </tr>
@@ -411,16 +415,16 @@ function Kpi({
 }) {
   const tone =
     hintTone === "ok"
-      ? "text-[#3fb950]"
+      ? "text-codex-success"
       : hintTone === "info"
-        ? "text-[#8eb6ff]"
+        ? "text-codex-accent"
         : hintTone === "warn"
-          ? "text-[#e3b341]"
-          : "text-[#6e6e6e]";
+          ? "text-codex-warn"
+          : "text-codex-muted";
   return (
-    <div className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-xl text-center px-3 py-4">
-      <div className="text-[22px] font-semibold text-[#e0e0e0]">{value}</div>
-      <div className="text-[11.5px] text-[#6e6e6e] mt-0.5">{label}</div>
+    <div className="bg-codex-surface border border-codex-border rounded-xl text-center px-3 py-4">
+      <div className="text-[22px] font-semibold text-codex-text">{value}</div>
+      <div className="text-[11.5px] text-codex-muted mt-0.5">{label}</div>
       <div className={`text-[11px] mt-1 ${tone}`}>{hint}</div>
     </div>
   );

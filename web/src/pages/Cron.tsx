@@ -59,9 +59,9 @@ function authStateOf(job: CronJob): AuthState {
 }
 
 const AUTH_BADGE: Record<AuthState, string> = {
-  granted: "bg-green-100 text-green-800",
-  stale: "bg-amber-100 text-amber-900",
-  none: "bg-gray-100 text-gray-600",
+  granted: "bg-codex-success/10 text-codex-success",
+  stale: "bg-codex-warn/10 text-codex-warn",
+  none: "bg-codex-active text-codex-muted",
 };
 
 export function Cron() {
@@ -306,27 +306,27 @@ export function Cron() {
           onClick={() => (showForm ? resetForm() : setShowForm(true))}
           disabled={!canWrite}
           title={canWrite ? undefined : t("common:adminOnly")}
-          className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm disabled:opacity-50"
+          className="flex items-center gap-1 bg-codex-accent text-white px-3 py-1.5 rounded text-sm disabled:opacity-50 hover:bg-codex-accent-hover"
         >
           <Plus size={16} /> {t("new")}
         </button>
       </div>
 
       {showForm && (
-        <form onSubmit={submit} className="bg-white border rounded p-4 flex flex-col gap-3">
+        <form onSubmit={submit} className="bg-codex-surface border border-codex-border rounded p-4 flex flex-col gap-3">
           {editingId && (
             <h2 className="text-sm font-medium">{t("editTitle")}</h2>
           )}
           <div className="flex flex-wrap gap-3">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("form.name")} aria-label={t("form.name")} className="border rounded px-3 py-1.5 flex-1 min-w-48" />
-            <input value={expr} onChange={(e) => setExpr(e.target.value)} placeholder={t("form.expr")} aria-label={t("form.expr")} className="border rounded px-3 py-1.5 w-40" />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("form.name")} aria-label={t("form.name")} className="border border-codex-border rounded px-3 py-1.5 flex-1 min-w-48 bg-codex-bg" />
+            <input value={expr} onChange={(e) => setExpr(e.target.value)} placeholder={t("form.expr")} aria-label={t("form.expr")} className="border border-codex-border rounded px-3 py-1.5 w-40 bg-codex-bg" />
           </div>
-          <textarea value={command} onChange={(e) => setCommand(e.target.value)} placeholder={t("form.command")} aria-label={t("form.command")} className="border rounded px-3 py-1.5" rows={2} />
+          <textarea value={command} onChange={(e) => setCommand(e.target.value)} placeholder={t("form.command")} aria-label={t("form.command")} className="border border-codex-border rounded px-3 py-1.5 bg-codex-bg" rows={2} />
           <div className="flex flex-wrap gap-3">
-            <input value={deliverChannel} onChange={(e) => setDeliverChannel(e.target.value)} placeholder={t("form.deliverChannel")} aria-label={t("form.deliverChannel")} className="border rounded px-3 py-1.5 flex-1 min-w-48" />
-            <input value={deliverChatId} onChange={(e) => setDeliverChatId(e.target.value)} placeholder={t("form.deliverChatId")} aria-label={t("form.deliverChatId")} className="border rounded px-3 py-1.5 flex-1 min-w-48" />
+            <input value={deliverChannel} onChange={(e) => setDeliverChannel(e.target.value)} placeholder={t("form.deliverChannel")} aria-label={t("form.deliverChannel")} className="border border-codex-border rounded px-3 py-1.5 flex-1 min-w-48 bg-codex-bg" />
+            <input value={deliverChatId} onChange={(e) => setDeliverChatId(e.target.value)} placeholder={t("form.deliverChatId")} aria-label={t("form.deliverChatId")} className="border border-codex-border rounded px-3 py-1.5 flex-1 min-w-48 bg-codex-bg" />
           </div>
-          <input value={sourceSessionKey} onChange={(e) => setSourceSessionKey(e.target.value)} placeholder={t("form.sourceSessionKey")} aria-label={t("form.sourceSessionKey")} className="border rounded px-3 py-1.5" />
+          <input value={sourceSessionKey} onChange={(e) => setSourceSessionKey(e.target.value)} placeholder={t("form.sourceSessionKey")} aria-label={t("form.sourceSessionKey")} className="border border-codex-border rounded px-3 py-1.5 bg-codex-bg" />
           {/* htmlFor + aria-describedby rather than a wrapping label: the hint is
               a description, not part of the control's name. */}
           <div className="flex items-start gap-2 text-sm">
@@ -340,16 +340,16 @@ export function Cron() {
             />
             <div>
               <label htmlFor="cron-authorize-unattended">{t("authorizeUnattended")}</label>
-              <span id="cron-authorize-hint" className="block text-xs text-gray-500">
+              <span id="cron-authorize-hint" className="block text-xs text-codex-muted">
                 {t("authorizeHint")}
               </span>
             </div>
           </div>
           <div className="flex gap-2 self-start">
-            <button type="submit" disabled={!command.trim()} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm disabled:opacity-50">
+            <button type="submit" disabled={!command.trim()} className="bg-codex-success text-white px-3 py-1.5 rounded text-sm disabled:opacity-50 hover:bg-codex-success/90">
               {editingId ? t("save") : t("create")}
             </button>
-            <button type="button" onClick={resetForm} className="bg-gray-100 px-3 py-1.5 rounded text-sm hover:bg-gray-200">
+            <button type="button" onClick={resetForm} className="bg-codex-elevated px-3 py-1.5 rounded text-sm hover:bg-codex-active">
               {t("common:cancel")}
             </button>
           </div>
@@ -369,7 +369,7 @@ export function Cron() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[720px]">
               <thead>
-                <tr className="border-b text-left text-gray-500">
+                <tr className="border-b border-codex-border text-left text-codex-muted">
                   <th className="py-2">{t("col.name")}</th>
                   <th>{t("col.cron")}</th>
                   <th>{t("col.status")}</th>
@@ -380,11 +380,11 @@ export function Cron() {
               </thead>
               <tbody>
                 {d.jobs.map((job) => (
-                  <tr key={job.id} className="border-b">
+                  <tr key={job.id} className="border-b border-codex-border">
                     <td className="py-2 font-medium">
                       {job.name || job.id}
                       {job.config_valid === false && (
-                        <span className="ml-2 text-xs px-1.5 rounded bg-red-100 text-red-700">{t("invalidConfig")}</span>
+                        <span className="ml-2 text-xs px-1.5 rounded bg-codex-danger/10 text-codex-danger">{t("invalidConfig")}</span>
                       )}
                       <span
                         className={`ml-2 px-1.5 py-0.5 rounded text-xs ${AUTH_BADGE[authStateOf(job)]}`}
@@ -411,8 +411,8 @@ export function Cron() {
                         onClick={() => toggleEnabled(job)}
                         disabled={!canWrite || inflightOps.has(`${job.id}:toggle`)}
                         title={canWrite ? undefined : t("common:adminOnly")}
-                        className={`text-xs px-1.5 py-0.5 rounded hover:ring-1 hover:ring-blue-300 disabled:opacity-50 ${
-                          job.enabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+                        className={`text-xs px-1.5 py-0.5 rounded hover:ring-1 hover:ring-codex-accent disabled:opacity-50 ${
+                          job.enabled ? "bg-codex-success/10 text-codex-success" : "bg-codex-active text-codex-muted"
                         }`}
                       >
                         {job.enabled ? t("active") : t("paused")}
@@ -423,10 +423,10 @@ export function Cron() {
                     <td className="flex gap-1 py-2">
                       {/* Trigger / edit / delete are mutations; the run history
                           is read-scope and stays available to any token. */}
-                      <button onClick={() => trigger(job.id)} disabled={!canWrite || !job.enabled || inflightOps.has(`${job.id}:trigger`)} aria-label={t("triggerNow")} className="p-1 hover:bg-gray-100 rounded disabled:opacity-50" title={!canWrite ? t("common:adminOnly") : !job.enabled ? t("pausedCannotTrigger") : t("triggerNow")}><Play size={14} /></button>
-                      <button onClick={() => startEdit(job)} disabled={!canWrite} aria-label={t("editAria", { name: job.name || job.id })} className="p-1 hover:bg-gray-100 rounded disabled:opacity-50" title={canWrite ? t("edit") : t("common:adminOnly")}><Pencil size={14} /></button>
-                      <button onClick={() => setRunsFor(job)} aria-label={t("runsAria", { name: job.name || job.id })} className="p-1 hover:bg-gray-100 rounded" title={t("runs")}><History size={14} /></button>
-                      <button onClick={() => remove(job)} disabled={!canWrite} aria-label={t("common:delete")} className="p-1 hover:bg-red-50 rounded text-red-500 disabled:opacity-50" title={canWrite ? t("common:delete") : t("common:adminOnly")}><Trash2 size={14} /></button>
+                      <button onClick={() => trigger(job.id)} disabled={!canWrite || !job.enabled || inflightOps.has(`${job.id}:trigger`)} aria-label={t("triggerNow")} className="p-1 hover:bg-codex-hover rounded disabled:opacity-50" title={!canWrite ? t("common:adminOnly") : !job.enabled ? t("pausedCannotTrigger") : t("triggerNow")}><Play size={14} /></button>
+                      <button onClick={() => startEdit(job)} disabled={!canWrite} aria-label={t("editAria", { name: job.name || job.id })} className="p-1 hover:bg-codex-hover rounded disabled:opacity-50" title={canWrite ? t("edit") : t("common:adminOnly")}><Pencil size={14} /></button>
+                      <button onClick={() => setRunsFor(job)} aria-label={t("runsAria", { name: job.name || job.id })} className="p-1 hover:bg-codex-hover rounded" title={t("runs")}><History size={14} /></button>
+                      <button onClick={() => remove(job)} disabled={!canWrite} aria-label={t("common:delete")} className="p-1 hover:bg-codex-danger/10 rounded text-codex-danger disabled:opacity-50" title={canWrite ? t("common:delete") : t("common:adminOnly")}><Trash2 size={14} /></button>
                     </td>
                   </tr>
                 ))}

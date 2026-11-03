@@ -87,10 +87,10 @@ export function VoicePage() {
           <ActionBtn>+ {t("addEntry")}</ActionBtn>
         </SettingsRow>
         <div className="flex items-center justify-between px-4 py-3 border-t border-codex-border">
-          <div className="text-[13px] text-codex-text-secondary bg-codex-surface border border-[#333] rounded-md px-3 py-1.5 flex-1 mr-3">
+          <div className="text-[13px] text-codex-text-secondary bg-codex-surface border border-codex-border-strong rounded-md px-3 py-1.5 flex-1 mr-3">
             Jane Doe
           </div>
-          <button type="button" className="text-[#666] hover:text-codex-danger text-sm">
+          <button type="button" className="text-codex-muted hover:text-codex-danger text-sm">
             ×
           </button>
         </div>
@@ -132,7 +132,7 @@ export function PersonalizationPage() {
           onChange={(e) => setText(e.target.value)}
           onBlur={saveInstructions}
           rows={5}
-          className="w-full bg-codex-surface border border-[#333] rounded-lg px-3 py-2 text-[13px] text-codex-text outline-none focus:border-[#555] resize-y min-h-[100px]"
+          className="w-full bg-codex-surface border border-codex-border-strong rounded-lg px-3 py-2 text-[13px] text-codex-text outline-none focus:border-codex-border-strong resize-y min-h-[100px]"
           placeholder={t("instructionsPlaceholder")}
         />
       </div>
@@ -140,7 +140,7 @@ export function PersonalizationPage() {
       <div className="bg-codex-surface border border-codex-border rounded-xl p-4 mb-5">
         <div className="text-[14px] font-medium text-codex-text mb-1">{t("memory")}</div>
         <div className="text-xs text-codex-muted mb-3">{t("memorySettingsDesc")}</div>
-        <SettingsCard className="mb-0 border-0 bg-[#1e1e1e]">
+        <SettingsCard className="mb-0 border-0 bg-codex-surface">
           <SettingsRow label={t("localMemory")} desc={t("localMemoryDesc")}>
             <Toggle checked={prefs.localMemory} onChange={(v) => updatePrefs({ localMemory: v })} label={t("localMemory")} />
           </SettingsRow>
@@ -205,8 +205,8 @@ export function PetsPage() {
               onClick={() => setSelected(pet.id)}
               className={`px-3 py-1 rounded-md text-[12.5px] border ${
                 selected === pet.id
-                  ? "bg-[#2a3a2a] border-[#3a5a3a] text-codex-success"
-                  : "bg-[#2a2a2a] border-[#3a3a3a] text-codex-text-secondary hover:bg-[#323232]"
+                  ? "bg-codex-success/10 border-codex-success/30 text-codex-success"
+                  : "bg-codex-active border-codex-border-strong text-codex-text-secondary hover:bg-codex-hover"
               }`}
             >
               {selected === pet.id ? t("selected") : t("select")}
@@ -255,8 +255,8 @@ export function ShortcutsPage() {
   return (
     <div className="min-w-0">
       <PageTitle>{t("shortcuts")}</PageTitle>
-      <div className="flex items-center gap-2 bg-[#1e1e1e] border border-codex-border rounded-lg px-3 py-2 mb-4">
-        <Search size={14} className="text-[#555] shrink-0" />
+      <div className="flex items-center gap-2 bg-codex-surface border border-codex-border rounded-lg px-3 py-2 mb-4">
+        <Search size={14} className="text-codex-muted shrink-0" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -274,7 +274,7 @@ export function ShortcutsPage() {
             <span className="text-[13.5px] text-codex-text-secondary">{s.action}</span>
             <div className="flex gap-1 shrink-0">
               {s.keys.length === 0 ? (
-                <span className="text-[11.5px] text-[#666]">{t("shortcutUnset")}</span>
+                <span className="text-[11.5px] text-codex-muted">{t("shortcutUnset")}</span>
               ) : (
                 s.keys.map((k) => (
                   <kbd
@@ -305,7 +305,7 @@ export function AccountPage() {
         <div>
           <div className="text-[15px] font-semibold text-codex-text">custom</div>
           <div className="text-[12.5px] text-codex-muted">custom@example.com</div>
-          <div className="inline-flex mt-2 px-2.5 py-0.5 rounded-full bg-[#2a3548] border border-[#3a4a66] text-[11.5px] text-[#9eb6ff]">
+          <div className="inline-flex mt-2 px-2.5 py-0.5 rounded-full bg-codex-accent/15 border border-codex-accent/40 text-[11.5px] text-codex-accent">
             CodexPro
           </div>
         </div>
@@ -314,7 +314,7 @@ export function AccountPage() {
       <SectionTitle>{t("billing")}</SectionTitle>
       <SettingsCard>
         <SettingsRow label={t("manageSub")} desc={t("manageSubDesc")}>
-          <button type="button" className="text-[12.5px] text-[#4c8dff] hover:underline">
+          <button type="button" className="text-[12.5px] text-codex-accent hover:underline">
             {t("openAccount")} ↗
           </button>
         </SettingsRow>
@@ -667,7 +667,7 @@ export function SettingsPluginsPage() {
               onClick={() => setAddMenuOpen((v) => !v)}
               aria-haspopup="menu"
               aria-expanded={addMenuOpen}
-              className="px-3.5 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[13px] font-medium hover:bg-[#f2f2f2]"
+              className="px-3.5 py-1.5 rounded-md bg-codex-accent text-white text-[13px] font-medium hover:bg-codex-accent-hover"
             >
               {t("add")} ▾
             </button>
@@ -683,7 +683,7 @@ export function SettingsPluginsPage() {
                     setAddMenuOpen(false);
                     toast.info(t("modal:more.pluginComingSoon"));
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-codex-text hover:bg-[#353535]"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-codex-text hover:bg-codex-hover"
                 >
                   <span className="w-4 h-4 inline-flex items-center justify-center text-codex-muted">
                     <Plus size={14} />
@@ -697,7 +697,7 @@ export function SettingsPluginsPage() {
                     setAddMenuOpen(false);
                     setMarketOpen(true);
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-codex-text hover:bg-[#353535]"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-codex-text hover:bg-codex-hover"
                 >
                   <span className="w-4 h-4 inline-flex items-center justify-center text-codex-muted">
                     <Plus size={14} />
@@ -711,7 +711,7 @@ export function SettingsPluginsPage() {
                     setAddMenuOpen(false);
                     setCreatingMcp(true);
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-codex-text hover:bg-[#353535]"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] text-codex-text hover:bg-codex-hover"
                 >
                   <span className="w-4 h-4 inline-flex items-center justify-center text-codex-muted">
                     <Plus size={14} />
@@ -738,15 +738,15 @@ export function SettingsPluginsPage() {
             onClick={() => setTab(id)}
             className={`text-[13px] pb-1 border-b-[1.5px] -mb-px ${
               tab === id
-                ? "text-codex-text border-[#e0e0e0]"
+                ? "text-codex-text border-codex-text"
                 : "text-codex-muted border-transparent hover:text-codex-text-secondary"
             }`}
           >
             {label}
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-1.5 bg-[#1e1e1e] border border-codex-border rounded-lg px-2.5 py-1 w-[200px]">
-          <Search size={14} className="text-[#555]" />
+        <div className="ml-auto flex items-center gap-1.5 bg-codex-surface border border-codex-border rounded-lg px-2.5 py-1 w-[200px]">
+          <Search size={14} className="text-codex-muted" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -757,10 +757,10 @@ export function SettingsPluginsPage() {
       </div>
 
       {loading && (
-        <div style={{ color: "#888", fontSize: 13, textAlign: "center", padding: 24 }}>加载中…</div>
+        <div style={{ fontSize: 13, textAlign: "center", padding: 24 }} className="text-codex-muted">加载中…</div>
       )}
       {!loading && error && (
-        <div style={{ color: "#e85d5d", fontSize: 13, textAlign: "center", padding: 24 }}>
+        <div style={{ fontSize: 13, textAlign: "center", padding: 24 }} className="text-codex-danger">
           加载失败：{error}
         </div>
       )}
@@ -776,17 +776,17 @@ export function SettingsPluginsPage() {
           filtered.map((p) => (
             <div
               key={p.id}
-              className="flex items-center gap-3.5 px-4 py-3.5 bg-[#1e1e1e] border border-[#262626] rounded-[10px] hover:border-[#333] cursor-pointer"
+              className="flex items-center gap-3.5 px-4 py-3.5 bg-codex-surface border border-codex-border rounded-[10px] hover:border-codex-border-strong cursor-pointer"
               onClick={() => p.kind === "skills" && setSelectedSkill(p.id)}
             >
-              <div className="w-9 h-9 rounded-lg bg-[#252525] grid place-items-center text-codex-muted shrink-0 text-xs">
+              <div className="w-9 h-9 rounded-lg bg-codex-active grid place-items-center text-codex-muted shrink-0 text-xs">
                 ◆
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-[13.5px] font-medium text-codex-text-secondary mb-0.5">{p.name}</div>
                 <div className="text-xs text-codex-muted line-clamp-2">{p.desc}</div>
               </div>
-              <span className="text-xs text-[#666] px-2 py-0.5 bg-[#252525] rounded shrink-0">{p.tag}</span>
+              <span className="text-xs text-codex-muted px-2 py-0.5 bg-codex-active rounded shrink-0">{p.tag}</span>
               <div className="shrink-0" onClick={(e) => e.stopPropagation()} title={toggling === p.id ? undefined : (enabled[p.id] ? "已启用" : "启用")}>
                 <Toggle
                   checked={!!enabled[p.id]}
@@ -799,7 +799,7 @@ export function SettingsPluginsPage() {
                 <button
                   type="button"
                   onClick={(e) => toggleMenu(e, p.id)}
-                  className="w-7 h-7 flex items-center justify-center rounded-md text-[#888] hover:bg-[#2a2a2a] hover:text-codex-text-secondary transition-colors"
+                  className="w-7 h-7 flex items-center justify-center rounded-md text-codex-muted hover:bg-codex-active hover:text-codex-text-secondary transition-colors"
                   aria-label="更多操作"
                   title="更多操作"
                 >
@@ -820,7 +820,7 @@ export function SettingsPluginsPage() {
                     type="button"
                     role="menuitem"
                     onClick={() => openItemAction(p.id, "open")}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-[13px] text-codex-text hover:bg-[#353535]"
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-[13px] text-codex-text hover:bg-codex-hover"
                   >
                     打开
                   </button>
@@ -828,7 +828,7 @@ export function SettingsPluginsPage() {
                     type="button"
                     role="menuitem"
                     onClick={() => openItemAction(p.id, "details")}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-[13px] text-codex-text hover:bg-[#353535]"
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-[13px] text-codex-text hover:bg-codex-hover"
                   >
                     详情
                   </button>
@@ -1037,7 +1037,7 @@ export function HooksPage() {
               onChange={(e) => setCommand(e.target.value)}
               rows={4}
               placeholder={t("hookCommandPlaceholder")}
-              className="w-full bg-codex-surface border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-codex-text outline-none resize-y font-mono"
+              className="w-full bg-codex-surface border border-codex-border-strong rounded-md px-3 py-2 text-[12.5px] text-codex-text outline-none resize-y font-mono"
             />
           </div>
         </SettingsCard>
@@ -1049,7 +1049,7 @@ export function HooksPage() {
             type="button"
             onClick={saveHook}
             disabled={saving || !command.trim()}
-            className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium disabled:opacity-45 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 rounded-md bg-codex-accent text-white text-[12.5px] font-medium hover:bg-codex-accent-hover disabled:opacity-45 disabled:cursor-not-allowed"
           >
             {t("save")}
           </button>
@@ -1063,7 +1063,7 @@ export function HooksPage() {
       <PageTitle>{t("hooks")}</PageTitle>
       <PageSub>
         {t("hooksDesc")}{" "}
-        <a href="#" className="text-[#4c8dff] hover:underline">
+        <a href="#" className="text-codex-accent hover:underline">
           {t("learnMore")}
         </a>
       </PageSub>
@@ -1081,8 +1081,8 @@ export function HooksPage() {
           ))}
         </select>
         <span className="text-[12.5px] text-codex-muted">{t("hooksCount", { n: hooks.length })}</span>
-        <div className="ml-auto flex items-center gap-1.5 bg-[#1e1e1e] border border-codex-border rounded-lg px-2.5 py-1 w-[200px]">
-          <Search size={14} className="text-[#555]" />
+        <div className="ml-auto flex items-center gap-1.5 bg-codex-surface border border-codex-border rounded-lg px-2.5 py-1 w-[200px]">
+          <Search size={14} className="text-codex-muted" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -1099,7 +1099,7 @@ export function HooksPage() {
             title={t("refresh")}
             aria-label={t("refresh")}
             onClick={() => void refetch()}
-            className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-codex-text-secondary hover:bg-[#333]"
+            className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-codex-border-strong bg-codex-active text-codex-text-secondary hover:bg-codex-hover"
           >
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
               <path d="M21 12a9 9 0 1 1-2.6-6.3" />
@@ -1109,7 +1109,7 @@ export function HooksPage() {
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium"
+            className="px-3 py-1.5 rounded-md bg-codex-accent text-white text-[12.5px] font-medium hover:bg-codex-accent-hover"
           >
             + {t("new")}
           </button>
@@ -1132,7 +1132,7 @@ export function HooksPage() {
             <button
               type="button"
               onClick={() => setCreating(true)}
-              className="px-3 py-1.5 rounded-md bg-[#e8e8e8] text-[#1a1a1a] text-[12.5px] font-medium"
+              className="px-3 py-1.5 rounded-md bg-codex-accent text-white text-[12.5px] font-medium hover:bg-codex-accent-hover"
             >
               + {t("newHook")}
             </button>
@@ -1165,7 +1165,7 @@ export function HooksPage() {
                   title={t("delete")}
                   aria-label={`${t("delete")} ${h.event}`}
                   onClick={() => void deleteHook(h)}
-                  className="w-7 h-7 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-codex-text-secondary hover:bg-[#3a2a2a] hover:text-[#f87171]"
+                  className="w-7 h-7 inline-flex items-center justify-center rounded-md border border-codex-border-strong bg-codex-active text-codex-text-secondary hover:bg-codex-danger/10 hover:text-codex-danger"
                 >
                   <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
                     <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
@@ -1473,7 +1473,7 @@ export function GitPage() {
             value={prefix}
             onChange={(e) => setPrefix(e.target.value)}
             onBlur={() => updatePrefs({ gitBranchPrefix: prefix })}
-            className="bg-codex-surface border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text w-36 outline-none"
+            className="bg-codex-surface border border-codex-border-strong rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text w-36 outline-none"
           />
         </SettingsRow>
         <SettingsRow label={t("prMergeMethod")} desc={t("prMergeMethodDesc")}>
@@ -1520,7 +1520,7 @@ export function GitPage() {
             onBlur={() => updatePrefs({ gitMonitorInstr: monitorInstr })}
             rows={3}
             placeholder={t("monitorInstrPlaceholder")}
-            className="w-full bg-codex-surface border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-codex-text outline-none resize-y"
+            className="w-full bg-codex-surface border border-codex-border-strong rounded-md px-3 py-2 text-[12.5px] text-codex-text outline-none resize-y"
             aria-label={t("monitorInstrPlaceholder")}
           />
         </div>
@@ -1536,7 +1536,7 @@ export function GitPage() {
             onBlur={() => updatePrefs({ gitCommitInstr: commitInstr })}
             rows={3}
             placeholder={t("commitInstrPlaceholder")}
-            className="w-full bg-codex-surface border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-codex-text outline-none resize-y"
+            className="w-full bg-codex-surface border border-codex-border-strong rounded-md px-3 py-2 text-[12.5px] text-codex-text outline-none resize-y"
           />
         </div>
       </SettingsCard>
@@ -1551,7 +1551,7 @@ export function GitPage() {
             onBlur={() => updatePrefs({ gitPrInstr: prInstr })}
             rows={3}
             placeholder={t("prInstrPlaceholder")}
-            className="w-full bg-codex-surface border border-[#333] rounded-md px-3 py-2 text-[12.5px] text-codex-text outline-none resize-y"
+            className="w-full bg-codex-surface border border-codex-border-strong rounded-md px-3 py-2 text-[12.5px] text-codex-text outline-none resize-y"
           />
         </div>
       </SettingsCard>
@@ -1590,7 +1590,7 @@ export function EnvironmentPage() {
           >
             <span
               className={`w-4 h-4 rounded border grid place-items-center text-[10px] ${
-                selected === p.id ? "border-codex-accent bg-codex-accent text-white" : "border-[#444]"
+                selected === p.id ? "border-codex-accent bg-codex-accent text-white" : "border-codex-border-strong"
               }`}
             >
               {selected === p.id ? "✓" : ""}
@@ -1599,7 +1599,7 @@ export function EnvironmentPage() {
               <div className="text-[13.5px] text-codex-text">{p.name}</div>
               <div className="text-xs text-codex-muted">{p.sub}</div>
             </div>
-            <span className="text-[#666] text-lg leading-none">+</span>
+            <span className="text-codex-muted text-lg leading-none">+</span>
           </button>
         ))}
       </div>
@@ -1633,7 +1633,7 @@ export function WorktreesPage() {
             value={root}
             onChange={(e) => setRoot(e.target.value)}
             onBlur={() => updatePrefs({ worktreeRoot: root })}
-            className="bg-codex-surface border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text w-[280px] max-w-[40vw] outline-none"
+            className="bg-codex-surface border border-codex-border-strong rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text w-[280px] max-w-[40vw] outline-none"
           />
         </SettingsRow>
         <SettingsRow label={t("pullUpstream")} desc={t("pullUpstreamDesc")}>
@@ -1650,7 +1650,7 @@ export function WorktreesPage() {
             value={deleteLimit}
             onChange={(e) => setDeleteLimit(Number(e.target.value) || 1)}
             onBlur={() => updatePrefs({ worktreeDeleteLimit: deleteLimit })}
-            className="bg-codex-surface border border-[#333] rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text w-20 outline-none"
+            className="bg-codex-surface border border-codex-border-strong rounded-md px-2.5 py-1.5 text-[12.5px] text-codex-text w-20 outline-none"
             aria-label={t("autoDeleteLimit")}
           />
         </SettingsRow>
@@ -1661,7 +1661,7 @@ export function WorktreesPage() {
           type="button"
           title={t("refresh")}
           aria-label={t("refresh")}
-          className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[#3a3a3a] bg-[#2a2a2a] text-codex-text-secondary hover:bg-[#333]"
+          className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-codex-border-strong bg-codex-active text-codex-text-secondary hover:bg-codex-hover"
         >
           <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
             <path d="M21 12a9 9 0 1 1-2.6-6.3" />
@@ -1811,7 +1811,7 @@ export function ArchivedPage() {
         <h2 className="text-[22px] font-semibold text-codex-text tracking-tight m-0">{t("archived")}</h2>
         <button
           type="button"
-          className="text-[12.5px] text-[#f87171] hover:underline disabled:opacity-50"
+          className="text-[12.5px] text-codex-danger hover:underline disabled:opacity-50"
           onClick={() => void deleteAll()}
           disabled={loading || groups.length === 0}
         >
@@ -1819,8 +1819,8 @@ export function ArchivedPage() {
         </button>
       </div>
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <div className="flex-1 min-w-[180px] flex items-center gap-2 bg-[#1e1e1e] border border-codex-border rounded-lg px-3 py-2">
-          <Search size={14} className="text-[#555] shrink-0" />
+        <div className="flex-1 min-w-[180px] flex items-center gap-2 bg-codex-surface border border-codex-border rounded-lg px-3 py-2">
+          <Search size={14} className="text-codex-muted shrink-0" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -1858,7 +1858,7 @@ export function ArchivedPage() {
         <div className="text-center text-[13px] text-codex-muted py-10">{t("loading")}</div>
       )}
       {!loading && error && (
-        <div className="text-center text-[13px] text-[#e85d5d] py-10">{t("archivedLoadFailed", { error })}</div>
+        <div className="text-center text-[13px] text-codex-danger py-10">{t("archivedLoadFailed", { error })}</div>
       )}
 
       {!loading && !error && (
@@ -1878,7 +1878,7 @@ export function ArchivedPage() {
                   >
                     <button
                       type="button"
-                      className="ac-group-head flex items-center gap-2.5 w-full px-3.5 py-3 bg-transparent border-0 text-codex-text text-left hover:bg-[#262626]"
+                      className="ac-group-head flex items-center gap-2.5 w-full px-3.5 py-3 bg-transparent border-0 text-codex-text text-left hover:bg-codex-hover"
                       onClick={() =>
                         setCollapsed((c) => ({ ...c, [g.project]: !c[g.project] }))
                       }
@@ -1913,7 +1913,7 @@ export function ArchivedPage() {
                         {g.chats.map((c) => (
                           <div
                             key={c.key}
-                            className="flex items-center gap-3 px-3.5 py-2.5 border-t border-[#2a2a2a]"
+                            className="flex items-center gap-3 px-3.5 py-2.5 border-t border-codex-border"
                           >
                             <div className="flex-1 min-w-0">
                               <div className="text-[13px] text-codex-text truncate">{c.title}</div>
@@ -1926,7 +1926,7 @@ export function ArchivedPage() {
                                 aria-label={t("delete")}
                                 disabled={busyKey === c.key}
                                 onClick={() => void deleteChat(c.key)}
-                                className="w-7 h-7 inline-flex items-center justify-center rounded-md text-codex-muted hover:bg-[#333] hover:text-[#f87171] disabled:opacity-40"
+                                className="w-7 h-7 inline-flex items-center justify-center rounded-md text-codex-muted hover:bg-codex-hover hover:text-codex-danger disabled:opacity-40"
                               >
                                 <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
                                   <path d="M3 6h18" />
@@ -1938,7 +1938,7 @@ export function ArchivedPage() {
                                 type="button"
                                 disabled={busyKey === c.key}
                                 onClick={() => void unarchive(c.key)}
-                                className="text-[12.5px] text-[#4c8dff] hover:underline disabled:opacity-40"
+                                className="text-[12.5px] text-codex-accent hover:underline disabled:opacity-40"
                               >
                                 {busyKey === c.key ? "…" : t("unarchive")}
                               </button>

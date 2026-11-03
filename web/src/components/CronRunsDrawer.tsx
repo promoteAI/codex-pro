@@ -39,50 +39,50 @@ export function CronRunsDrawer({ job, onClose }: { job: CronJob; onClose: () => 
         role="dialog"
         aria-modal="true"
         aria-labelledby="cron-runs-title"
-        className="bg-white w-full max-w-md h-full overflow-y-auto shadow-xl p-5 space-y-4"
+        className="bg-codex-surface w-full max-w-md h-full overflow-y-auto shadow-xl p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <h2 id="cron-runs-title" className="font-semibold text-base">{t("runs")}</h2>
-            <p className="text-xs text-gray-500 break-all">{job.name || job.id}</p>
+            <p className="text-xs text-codex-muted break-all">{job.name || job.id}</p>
           </div>
           <button
             onClick={onClose}
             aria-label={t("common:close")}
-            className="p-1 rounded hover:bg-gray-100 shrink-0"
+            className="p-1 rounded hover:bg-codex-hover shrink-0"
           >
             <X size={18} />
           </button>
         </div>
 
         {error && (
-          <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
+          <div className="text-xs text-codex-danger bg-codex-danger/10 border border-codex-danger/20 rounded p-2">
             {t("common:loadFailed", { error })}
           </div>
         )}
 
         {loading ? (
-          <p className="text-sm text-gray-400">{t("common:loading")}</p>
+          <p className="text-sm text-codex-muted">{t("common:loading")}</p>
         ) : runs.length === 0 ? (
-          <p className="text-sm text-gray-400">{t("runsEmpty")}</p>
+          <p className="text-sm text-codex-muted">{t("runsEmpty")}</p>
         ) : (
           <ul className="space-y-3">
             {runs.map((run) => (
-              <li key={`${run.ts}-${run.status}`} className="border rounded p-3 space-y-1">
+              <li key={`${run.ts}-${run.status}`} className="border border-codex-border rounded p-3 space-y-1">
                 <div className="flex justify-between gap-2 text-xs">
-                  <span className="text-gray-500">{t("runTime")}</span>
+                  <span className="text-codex-muted">{t("runTime")}</span>
                   <span className="font-mono">{dateTime(run.ts)}</span>
                 </div>
                 <div className="flex justify-between gap-2 text-xs">
-                  <span className="text-gray-500">{t("runStatus")}</span>
+                  <span className="text-codex-muted">{t("runStatus")}</span>
                   <span>{run.status}</span>
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-codex-muted">
                   {t("runCount", { count: run.run_count })}
                 </div>
                 {run.error && (
-                  <div className="text-xs bg-red-50 text-red-700 rounded p-2 whitespace-pre-wrap break-words">
+                  <div className="text-xs bg-codex-danger/10 text-codex-danger rounded p-2 whitespace-pre-wrap break-words">
                     <span className="font-medium">{t("runError")}: </span>{run.error}
                   </div>
                 )}
@@ -91,7 +91,7 @@ export function CronRunsDrawer({ job, onClose }: { job: CronJob; onClose: () => 
           </ul>
         )}
 
-        <p className="text-xs text-gray-400 border-t pt-3">{t("runsRetention")}</p>
+        <p className="text-xs text-codex-muted border-t border-codex-border pt-3">{t("runsRetention")}</p>
       </aside>
     </div>
   );

@@ -190,7 +190,7 @@ export function GeneralPage() {
               {t("fullAccessPermDesc")}{" "}
               <a
                 href="#"
-                className="text-[#6ea8fe] hover:underline"
+                className="text-codex-accent hover:underline"
                 onClick={(e) => e.preventDefault()}
               >
                 {t("learnMore")}
@@ -223,7 +223,7 @@ export function GeneralPage() {
             />
           ) : (
             <>
-              <span className="text-[12.5px] text-[#a8a8a8] font-mono max-w-[280px] truncate">
+              <span className="text-[12.5px] text-codex-muted font-mono max-w-[280px] truncate">
                 {prefs.noProjectFolder}
               </span>
               <ActionBtn onClick={startNoProjEdit}>{t("change")}</ActionBtn>
@@ -262,7 +262,7 @@ export function GeneralPage() {
                       setOpenInOpen(false);
                     }}
                     className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-left text-codex-text hover:bg-codex-hover ${
-                      opt.id === prefs.openIn ? "bg-[#343434]" : ""
+                      opt.id === prefs.openIn ? "bg-codex-active" : ""
                     }`}
                   >
                     {opt.icon}
@@ -594,7 +594,7 @@ export function AppearancePage() {
       </div>
 
       <div
-        className="mb-4 grid grid-cols-2 overflow-hidden rounded-[10px] border border-codex-border bg-[#141414] font-mono text-[12px] leading-[1.55] text-[#d4d4d4]"
+        className="mb-4 grid grid-cols-2 overflow-hidden rounded-[10px] border border-codex-border bg-codex-panel font-mono text-[12px] leading-[1.55] text-codex-text"
         aria-label="Theme preview diff"
       >
         <ThemeDiffPane
@@ -626,13 +626,13 @@ export function AppearancePage() {
           <div className="flex gap-2 items-center">
             <ActionBtn>{t("importTheme")}</ActionBtn>
             <ActionBtn>{t("copyTheme")}</ActionBtn>
-            <span className="text-[11px] text-[#666] bg-codex-elevated border-codex-border-strong rounded px-2 py-0.5">
+            <span className="text-[11px] text-codex-muted bg-codex-elevated border-codex-border-strong rounded px-2 py-0.5">
               Codex
             </span>
           </div>
         </div>
         <SettingsRow label={t("accentColor")}>
-          <div className="w-9 h-6 rounded bg-codex-accent border border-[#3a3a3a]" />
+          <div className="w-9 h-6 rounded bg-codex-accent border border-codex-border-strong" />
           <ActionBtn>{t("default")}</ActionBtn>
         </SettingsRow>
         <SettingsRow label={t("bgColor")}>
@@ -693,13 +693,13 @@ export function AppearancePage() {
           <div className="flex gap-2 items-center">
             <ActionBtn>{t("importTheme")}</ActionBtn>
             <ActionBtn>{t("copyTheme")}</ActionBtn>
-            <span className="text-[11px] text-[#666] bg-codex-elevated border-codex-border-strong rounded px-2 py-0.5">
+            <span className="text-[11px] text-codex-muted bg-codex-elevated border-codex-border-strong rounded px-2 py-0.5">
               Codex
             </span>
           </div>
         </div>
         <SettingsRow label={t("accentColor")}>
-          <div className="w-9 h-6 rounded bg-codex-accent border border-[#3a3a3a]" />
+          <div className="w-9 h-6 rounded bg-codex-accent border border-codex-border-strong" />
           <ActionBtn>{t("default")}</ActionBtn>
         </SettingsRow>
         <SettingsRow label={t("translucentSidebar")}>
@@ -1129,7 +1129,7 @@ function ThemeDiffPane({
             key={line.n}
             className={`grid grid-cols-[28px_1fr] min-h-5 ${line.changed ? changedBg : ""}`}
           >
-            <span className="text-[#555] text-right pr-2 pl-1.5 select-none tabular-nums">{line.n}</span>
+            <span className="text-codex-muted text-right pr-2 pl-1.5 select-none tabular-nums">{line.n}</span>
             <span
               className={`relative px-3 whitespace-pre overflow-hidden text-ellipsis ${
                 line.changed ? `before:content-[''] before:absolute before:left-0 before:inset-y-0 before:w-[3px] ${bar}` : ""
@@ -1140,7 +1140,7 @@ function ThemeDiffPane({
           </div>
         ))}
       </div>
-      <div className="flex items-center justify-end gap-2.5 px-2.5 pb-2 pt-1.5 text-[#555]" aria-hidden>
+      <div className="flex items-center justify-end gap-2.5 px-2.5 pb-2 pt-1.5 text-codex-muted" aria-hidden>
         <ChevronLeft size={12} className="opacity-70" />
         <ChevronRight size={12} className="opacity-70" />
       </div>

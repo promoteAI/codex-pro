@@ -128,7 +128,7 @@ export function Knowledge() {
           onClick={() => fileRef.current?.click()}
           disabled={!canWrite || !!activeJob}
           title={canWrite ? undefined : t("common:adminOnly")}
-          className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1 bg-codex-accent text-white px-3 py-1.5 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-codex-accent-hover"
         >
           <Upload size={16} /> {t("upload")}
         </button>
@@ -136,44 +136,44 @@ export function Knowledge() {
           onClick={rebuild}
           disabled={!canWrite || !!activeJob}
           title={canWrite ? undefined : t("common:adminOnly")}
-          className="flex items-center gap-1 bg-gray-100 px-3 py-1.5 rounded text-sm hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1 bg-codex-elevated px-3 py-1.5 rounded text-sm hover:bg-codex-active disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <RefreshCw size={16} /> {t("rebuild")}
         </button>
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-codex-muted">
           {t("status", {
             count: status?.documents ?? 0,
             chunks: status?.chunks ?? 0,
             last: lastRebuild(),
           })}
-          {status?.stale && <span className="ml-2 text-amber-600">{t("stale")}</span>}
+          {status?.stale && <span className="ml-2 text-codex-warn">{t("stale")}</span>}
         </span>
         <input ref={fileRef} type="file" multiple className="hidden" accept=".md,.txt,.rst,.json,.yaml,.yml,.py,.pdf,.docx,.xlsx,.pptx" onChange={(e) => e.target.files?.length && upload(e.target.files)} />
       </div>
 
       {activeJob && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3" role="status">
-          <div className="flex items-center gap-3 text-sm text-blue-900">
+        <div className="bg-codex-accent/10 border border-codex-accent/20 rounded-lg p-3" role="status">
+          <div className="flex items-center gap-3 text-sm text-codex-accent">
             <RefreshCw size={15} className="animate-spin shrink-0" />
             <span className="flex-1">{t("jobRunning", { action: t(`action.${activeJob.action}`) })}</span>
-            <button onClick={cancelJob} className="p-1 rounded hover:bg-blue-100" aria-label={t("cancelJob")}>
+            <button onClick={cancelJob} className="p-1 rounded hover:bg-codex-accent/10" aria-label={t("cancelJob")}>
               <X size={15} />
             </button>
           </div>
-          <div className="h-1.5 bg-blue-100 rounded-full overflow-hidden mt-2">
-            <div className="h-full w-1/3 bg-blue-600 rounded-full animate-pulse" />
+          <div className="h-1.5 bg-codex-accent/20 rounded-full overflow-hidden mt-2">
+            <div className="h-full w-1/3 bg-codex-accent rounded-full animate-pulse" />
           </div>
         </div>
       )}
 
       {!activeJob && latestJob?.status === "failed" && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm" role="alert">
+        <div className="bg-codex-danger/10 border border-codex-danger/20 text-codex-danger rounded-lg p-3 text-sm" role="alert">
           {t("jobFailed", { error: latestJob.error || t("common:unknown") })}
         </div>
       )}
 
       {!canWrite && (
-        <div className="bg-amber-50 text-amber-700 rounded-lg px-4 py-2 text-sm">
+        <div className="bg-codex-warn/10 text-codex-warn rounded-lg px-4 py-2 text-sm">
           {t("common:adminOnly")}
         </div>
       )}
@@ -188,17 +188,17 @@ export function Knowledge() {
         {(d) => (
           <div className="space-y-2">
             {d.documents.map((doc) => (
-              <div key={doc.path} className="flex items-center justify-between bg-white border rounded p-3">
+              <div key={doc.path} className="flex items-center justify-between bg-codex-surface border border-codex-border rounded p-3">
                 <div>
                   <div className="text-sm font-medium">{doc.path}</div>
-                  <div className="text-xs text-gray-400">{(doc.size / 1024).toFixed(1)} KB</div>
+                  <div className="text-xs text-codex-muted">{(doc.size / 1024).toFixed(1)} KB</div>
                 </div>
                 <button
                   onClick={() => deleteDoc(doc.path)}
                   disabled={!canWrite || !!activeJob}
                   aria-label={t("deleteDocAria", { path: doc.path })}
                   title={canWrite ? undefined : t("common:adminOnly")}
-                  className="text-red-400 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-red-400"
+                  className="text-codex-danger hover:text-codex-danger disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-codex-danger"
                 >
                   <Trash2 size={16} />
                 </button>

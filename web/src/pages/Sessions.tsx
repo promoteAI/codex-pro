@@ -121,26 +121,26 @@ export function Sessions() {
       <div className="w-full md:w-72 md:shrink-0 flex flex-col md:border-r md:pr-4 max-h-72 md:max-h-none">
         <div className="flex gap-2 mb-3">
           <input value={search} onChange={(e) => { setSearch(e.target.value); setListOffset(0); }} placeholder={t("searchPlaceholder")}
-            aria-label={t("searchPlaceholder")} className="border rounded px-3 py-1.5 flex-1 min-w-0" />
+            aria-label={t("searchPlaceholder")} className="border border-codex-border rounded px-3 py-1.5 flex-1 min-w-0 bg-codex-surface" />
           <button onClick={refreshAll} aria-label={t("common:refresh")} title={t("common:refresh")}
-            className="border rounded px-2 hover:bg-gray-100 shrink-0">
+            className="border border-codex-border rounded px-2 hover:bg-codex-hover shrink-0">
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto space-y-1">
-          {loading && <div className="text-gray-400 text-sm px-3 py-2">{t("common:loading")}</div>}
-          {error && !loading && <div className="text-red-500 text-sm px-3 py-2">
+          {loading && <div className="text-codex-muted text-sm px-3 py-2">{t("common:loading")}</div>}
+          {error && !loading && <div className="text-codex-danger text-sm px-3 py-2">
             {isAdmin === false || String(error).includes("403") ? t("common:adminOnly") : t("common:loadFailed", { error })}
           </div>}
-          {!loading && !error && sessions.length === 0 && <div className="text-gray-400 text-sm px-3 py-2">{t("empty")}</div>}
+          {!loading && !error && sessions.length === 0 && <div className="text-codex-muted text-sm px-3 py-2">{t("empty")}</div>}
           {sessions.map((session) => <button key={session.key} onClick={() => loadHistory(session.key, session.title)}
-            className={`w-full text-left px-3 py-2 rounded text-sm ${selected === session.key ? "bg-blue-50 text-blue-700" : "hover:bg-gray-100"}`}>
+            className={`w-full text-left px-3 py-2 rounded text-sm ${selected === session.key ? "bg-codex-accent/10 text-codex-accent" : "hover:bg-codex-hover"}`}>
             <div className="font-medium truncate" title={session.key}>{session.title || t("untitled")}</div>
-            <div className="text-xs text-gray-500">{t("messageCount", { count: session.message_count,
+            <div className="text-xs text-codex-muted">{t("messageCount", { count: session.message_count,
               time: relativeTime(session.updated_at, t("unknownTime")) })}</div>
           </button>)}
         </div>
-        {(data?.total ?? 0) > PAGE_SIZE && <div className="flex justify-between items-center pt-2 text-xs text-gray-500">
+        {(data?.total ?? 0) > PAGE_SIZE && <div className="flex justify-between items-center pt-2 text-xs text-codex-muted">
           <button disabled={listOffset === 0} onClick={() => setListOffset(Math.max(0, listOffset - PAGE_SIZE))}
             className="p-1 disabled:opacity-30" aria-label={t("common:previous")}><ChevronLeft size={16} /></button>
           <span>{listOffset + 1}-{Math.min(listOffset + sessions.length, data?.total ?? 0)} / {data?.total}</span>
@@ -150,27 +150,27 @@ export function Sessions() {
       </div>
 
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        {selected && <div className="flex items-center gap-2 border-b pb-2 mb-2">
+        {selected && <div className="flex items-center gap-2 border-b border-codex-border pb-2 mb-2">
           <div className="min-w-0 flex-1"><div className="font-medium text-sm truncate" title={selected}>{selectedTitle || t("untitled")}</div>
-            <div className="text-xs text-gray-400">{t("turnCount", { count: turns.length })}</div></div>
+            <div className="text-xs text-codex-muted">{t("turnCount", { count: turns.length })}</div></div>
           <button onClick={resetSession} disabled={isAdmin === false}
-            className="flex items-center gap-1 text-xs border rounded px-2 py-1 text-red-600 hover:bg-red-50 disabled:opacity-40">
+            className="flex items-center gap-1 text-xs border border-codex-border rounded px-2 py-1 text-codex-danger hover:bg-codex-danger/10 disabled:opacity-40">
             <RotateCcw size={13} /> {t("reset")}
           </button>
         </div>}
         <div className="flex-1 overflow-y-auto space-y-3 pr-1">
           {selected && hasOlder && <button onClick={loadOlder} disabled={historyLoading}
-            className="mx-auto flex items-center gap-1 text-xs text-blue-600 hover:underline disabled:opacity-50">
+            className="mx-auto flex items-center gap-1 text-xs text-codex-accent hover:underline disabled:opacity-50">
             <History size={13} /> {historyLoading ? t("common:loading") : t("loadOlder")}
           </button>}
-          {historyError && <div className="text-red-500 text-sm text-center mt-10">
+          {historyError && <div className="text-codex-danger text-sm text-center mt-10">
             {String(historyError).includes("403") ? t("common:adminOnly") : t("historyFailed", { error: historyError })}
           </div>}
           {!historyError && messages.map((message, index) => {
             if (!message.internal && !(message.tool_calls && message.tool_calls.length)) {
               return (
                 <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[85%] md:max-w-[75%] rounded-lg px-4 py-2 text-sm ${message.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"}`}>
+                  <div className={`max-w-[85%] md:max-w-[75%] rounded-lg px-4 py-2 text-sm ${message.role === "user" ? "bg-codex-accent text-white" : "bg-codex-hover text-codex-text"}`}>
                     <MarkdownContent content={message.content} />
                   </div>
                 </div>
@@ -202,38 +202,38 @@ export function Sessions() {
 
             return blocks.map((block) => (
               <details key={block.key} className="mx-auto w-full max-w-[90%] text-xs">
-                <summary className="cursor-pointer text-gray-500 hover:text-gray-700 py-1">
+                <summary className="cursor-pointer text-codex-muted hover:text-codex-text py-1">
                   {block.title}
                 </summary>
                 <div className="mt-1 space-y-2">
                   {block.input?.trim() && (
                     <div>
-                      <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">{t("toolInput")}</div>
-                      <pre className="whitespace-pre-wrap break-words bg-gray-50 border rounded p-2 font-mono">{formatToolPayload(block.input)}</pre>
+                      <div className="text-[10px] uppercase tracking-wide text-codex-muted mb-1">{t("toolInput")}</div>
+                      <pre className="whitespace-pre-wrap break-words bg-codex-hover border border-codex-border rounded p-2 font-mono">{formatToolPayload(block.input)}</pre>
                     </div>
                   )}
                   {block.output?.trim() && (
                     <div>
-                      <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">{t("toolOutput")}</div>
-                      <pre className="whitespace-pre-wrap break-words bg-gray-50 border rounded p-2 font-mono">{block.output}</pre>
+                      <div className="text-[10px] uppercase tracking-wide text-codex-muted mb-1">{t("toolOutput")}</div>
+                      <pre className="whitespace-pre-wrap break-words bg-codex-hover border border-codex-border rounded p-2 font-mono">{block.output}</pre>
                     </div>
                   )}
                   {!block.input?.trim() && !block.output?.trim() && (
-                    <div className="bg-gray-50 border rounded p-2 text-gray-400">{t("emptyContent")}</div>
+                    <div className="bg-codex-hover border border-codex-border rounded p-2 text-codex-muted">{t("emptyContent")}</div>
                   )}
                 </div>
               </details>
             ));
           })}
-          {!selected && <div className="text-gray-400 text-center mt-20">{t("selectHint")}</div>}
+          {!selected && <div className="text-codex-muted text-center mt-20">{t("selectHint")}</div>}
         </div>
-        {selected && turns.length > 0 && <details className="border-t pt-2 mt-2 text-xs">
-          <summary className="cursor-pointer text-gray-500">{t("turnLedger")}</summary>
+        {selected && turns.length > 0 && <details className="border-t border-codex-border pt-2 mt-2 text-xs">
+          <summary className="cursor-pointer text-codex-muted">{t("turnLedger")}</summary>
           <div className="mt-2 max-h-40 overflow-y-auto space-y-1">{turns.map((turn) =>
-            <div key={turn.event_id} className="flex gap-2 items-start bg-gray-50 rounded p-2">
-              <span className={`rounded px-1.5 ${turn.status === "completed" ? "bg-green-100 text-green-700" : turn.status === "failed" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{turn.status}</span>
+            <div key={turn.event_id} className="flex gap-2 items-start bg-codex-hover rounded p-2">
+              <span className={`rounded px-1.5 ${turn.status === "completed" ? "bg-codex-success/10 text-codex-success" : turn.status === "failed" ? "bg-codex-danger/10 text-codex-danger" : "bg-codex-accent/10 text-codex-accent"}`}>{turn.status}</span>
               <span className="flex-1 truncate">{turn.current_tool || turn.error || turn.event_id}</span>
-              <span className="text-gray-400 shrink-0">{dateTime(turn.created_at)}</span>
+              <span className="text-codex-muted shrink-0">{dateTime(turn.created_at)}</span>
             </div>)}</div>
         </details>}
       </div>
@@ -256,7 +256,7 @@ function MarkdownContent({ content }: { content: string }) {
   return <div className="space-y-2 break-words">{parts.filter(Boolean).map((part, index) => {
     if (part.startsWith("```") && part.endsWith("```")) {
       const body = part.slice(3, -3).replace(/^[^\n]*\n/, "");
-      return <pre key={index} className="overflow-x-auto rounded bg-gray-900 text-gray-100 p-3 text-xs"><code>{body}</code></pre>;
+      return <pre key={index} className="overflow-x-auto rounded bg-codex-panel text-codex-text p-3 text-xs"><code>{body}</code></pre>;
     }
     return <div key={index} className="whitespace-pre-wrap">{part}</div>;
   })}</div>;

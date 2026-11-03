@@ -92,41 +92,41 @@ export function Skills() {
           onClick={() => setShowImport(!showImport)}
           disabled={!canAdmin}
           title={canAdmin ? undefined : t("common:adminOnly")}
-          className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1 bg-codex-accent text-white px-3 py-1.5 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-codex-accent-hover"
         >
           <Plus size={16} /> {t("import")}
         </button>
       </div>
 
       {!canAdmin && (
-        <div className="bg-amber-50 text-amber-700 rounded-lg px-4 py-2 text-sm">
+        <div className="bg-codex-warn/10 text-codex-warn rounded-lg px-4 py-2 text-sm">
           {t("common:adminOnly")}
         </div>
       )}
 
       {showImport && canAdmin && (
-        <form onSubmit={importSkill} className="bg-white border rounded p-4 space-y-3">
+        <form onSubmit={importSkill} className="bg-codex-surface border border-codex-border rounded p-4 space-y-3">
           <h2 className="text-sm font-medium">{t("importTitle")}</h2>
           <button type="button" onClick={() => uploadRef.current?.click()}
-            className="w-full border-2 border-dashed rounded-lg p-5 text-sm text-gray-600 hover:border-blue-400 hover:bg-blue-50 flex flex-col items-center gap-2">
-            <Upload size={22} className="text-blue-600" />
-            <span>{t("uploadZip")}</span><span className="text-xs text-gray-400">{t("uploadHint")}</span>
+            className="w-full border-2 border-dashed border-codex-border rounded-lg p-5 text-sm text-codex-text-secondary hover:border-codex-accent hover:bg-codex-accent/10 flex flex-col items-center gap-2">
+            <Upload size={22} className="text-codex-accent" />
+            <span>{t("uploadZip")}</span><span className="text-xs text-codex-muted">{t("uploadHint")}</span>
           </button>
           <input ref={uploadRef} type="file" accept=".zip,application/zip" className="hidden"
             onChange={(event) => event.target.files?.[0] && uploadSkill(event.target.files[0])} />
-          <div className="flex items-center gap-3 text-xs text-gray-400"><span className="h-px bg-gray-200 flex-1" />{t("orServerPath")}<span className="h-px bg-gray-200 flex-1" /></div>
+          <div className="flex items-center gap-3 text-xs text-codex-muted"><span className="h-px bg-codex-border flex-1" />{t("orServerPath")}<span className="h-px bg-codex-border flex-1" /></div>
           <input
             value={importPath}
             onChange={(e) => setImportPath(e.target.value)}
             placeholder={t("importPathLabel")}
             aria-label={t("importPathLabel")}
-            className="border rounded px-3 py-1.5 w-full font-mono text-xs"
+            className="border border-codex-border rounded px-3 py-1.5 w-full font-mono text-xs bg-codex-bg"
           />
-          <p className="text-xs text-gray-400">{t("importPathHint")}</p>
+          <p className="text-xs text-codex-muted">{t("importPathHint")}</p>
           <button
             type="submit"
             disabled={!importPath.trim()}
-            className="bg-green-600 text-white px-3 py-1.5 rounded text-sm disabled:opacity-50"
+            className="bg-codex-success text-white px-3 py-1.5 rounded text-sm disabled:opacity-50 hover:bg-codex-success/90"
           >
             {t("importSubmit")}
           </button>
@@ -143,10 +143,10 @@ export function Skills() {
         {(d) => (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {d.skills.map((skill) => (
-              <div key={skill.name} className="bg-white border rounded-lg p-4">
+              <div key={skill.name} className="bg-codex-surface border border-codex-border rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2 gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <Zap size={16} className="text-yellow-500 shrink-0" />
+                    <Zap size={16} className="text-codex-warn shrink-0" />
                     <span className="font-medium text-sm truncate">{skill.name}</span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -154,7 +154,7 @@ export function Skills() {
                       onClick={() => setSelected(skill.name)}
                       aria-label={t("detailAria", { name: skill.name })}
                       title={t("detailTitle")}
-                      className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                      className="p-1 rounded text-codex-muted hover:text-codex-text hover:bg-codex-hover"
                     >
                       <Info size={14} />
                     </button>
@@ -163,7 +163,7 @@ export function Skills() {
                       disabled={!canAdmin}
                       aria-label={t("deleteAria", { name: skill.name })}
                       title={canAdmin ? t("common:delete") : t("common:adminOnly")}
-                      className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-red-400 disabled:hover:bg-transparent"
+                      className="p-1 rounded text-codex-danger hover:text-codex-danger hover:bg-codex-danger/10 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-codex-danger disabled:hover:bg-transparent"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -174,13 +174,13 @@ export function Skills() {
                       onClick={() => toggle(skill.name)}
                       disabled={!canAdmin}
                       title={canAdmin ? undefined : t("common:adminOnly")}
-                      className={`w-10 h-5 rounded-full transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${skill.enabled ? "bg-blue-600" : "bg-gray-300"}`}
+                      className={`w-10 h-5 rounded-full transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${skill.enabled ? "bg-codex-accent" : "bg-codex-border-strong"}`}
                     >
                       <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${skill.enabled ? "translate-x-5" : "translate-x-0.5"}`} />
                     </button>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500">{skill.description || t("noDescription")}</p>
+                <p className="text-xs text-codex-muted">{skill.description || t("noDescription")}</p>
               </div>
             ))}
           </div>

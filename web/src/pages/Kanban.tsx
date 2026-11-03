@@ -126,11 +126,11 @@ export function Kanban() {
 
   // 只有首屏(还没成功拉取过)才整页显示加载态。此前 loading 一置位就 return,
   // 会卸载整个 DndContext——任何一次 refetch 都让看板闪一下,拖拽状态也随之丢失。
-  if (!loaded && loading) return <div className="p-8 text-center text-gray-500">{t("loading")}</div>;
+  if (!loaded && loading) return <div className="p-8 text-center text-codex-muted">{t("loading")}</div>;
   if (!loaded && !loading && fetchError) return (
     <div className="p-8 text-center space-y-3">
-      <p className="text-red-600 text-sm">{fetchError}</p>
-      <button onClick={fetchTasks} className="text-blue-600 hover:underline text-sm">{t("common:retry")}</button>
+      <p className="text-codex-danger text-sm">{fetchError}</p>
+      <button onClick={fetchTasks} className="text-codex-accent hover:underline text-sm">{t("common:retry")}</button>
     </div>
   );
 
@@ -142,25 +142,25 @@ export function Kanban() {
           onChange={(e) => setNewTitle(e.target.value)}
           placeholder={t("newPlaceholder")}
           disabled={!canWrite}
-          className="border rounded px-3 py-1.5 flex-1 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="border border-codex-border rounded px-3 py-1.5 flex-1 bg-codex-surface disabled:bg-codex-active disabled:cursor-not-allowed"
         />
         <button
           type="submit"
           disabled={!canWrite}
           title={canWrite ? undefined : t("common:adminOnly")}
-          className="bg-blue-600 text-white px-3 py-1.5 rounded flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-codex-accent text-white px-3 py-1.5 rounded flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-codex-accent-hover"
         >
           <Plus size={16} /> {t("create")}
         </button>
       </form>
 
       {!canWrite && (
-        <div className="bg-amber-50 text-amber-700 rounded-lg px-4 py-2 text-sm mb-2">
+        <div className="bg-codex-warn/10 text-codex-warn rounded-lg px-4 py-2 text-sm mb-2">
           {t("common:adminOnly")}
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-3 text-xs text-gray-500">
+      <div className="flex items-center justify-between mb-3 text-xs text-codex-muted">
         <span>{t("autoClaimHint")}</span>
         <label className="flex items-center gap-1 cursor-pointer select-none">
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
@@ -215,10 +215,10 @@ function KanbanColumn({
     [tasks],
   );
 
-  let bg = "bg-gray-100";
-  if (isOver && isValidTarget) bg = "bg-blue-50 ring-2 ring-blue-300";
-  else if (isValidTarget) bg = "bg-blue-50/50";
-  else if (isInvalidTarget) bg = "bg-gray-100 opacity-40";
+  let bg = "bg-codex-surface";
+  if (isOver && isValidTarget) bg = "bg-codex-accent/10 ring-2 ring-codex-accent";
+  else if (isValidTarget) bg = "bg-codex-accent/5";
+  else if (isInvalidTarget) bg = "bg-codex-surface opacity-40";
 
   return (
     <div
@@ -230,7 +230,7 @@ function KanbanColumn({
         <span className={`text-xs rounded-full px-2 ${meta.chip}`}>{tasks.length}</span>
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto">
-        {sorted.length === 0 && <div className="text-xs text-gray-400 py-2 text-center">{t("emptyColumn")}</div>}
+        {sorted.length === 0 && <div className="text-xs text-codex-muted py-2 text-center">{t("emptyColumn")}</div>}
         {sorted.map((task) => (
           <KanbanCard key={task.id} task={task} onOpenDetail={onOpenDetail} />
         ))}
@@ -308,7 +308,7 @@ function KanbanCard({ task, onOpenDetail }: { task: TaskCard; onOpenDetail: (id:
     <div
       ref={setNodeRef}
       style={style}
-      className={`group bg-white rounded-md border p-3 shadow-sm ${isDragging ? "opacity-50" : ""}`}
+      className={`group bg-codex-surface rounded-md border border-codex-border p-3 shadow-sm ${isDragging ? "opacity-50" : ""}`}
     >
       {/* 拖拽把手区域:标题栏可拖,操作按钮不带 listeners 以免误触发拖拽。
           同一区域点击(未达 8px 拖拽阈值)打开详情抽屉——卡片上只能放两行截断文本,
@@ -331,46 +331,46 @@ function KanbanCard({ task, onOpenDetail }: { task: TaskCard; onOpenDetail: (id:
       >
         <div className="flex items-start justify-between gap-2">
           <div className="text-sm font-medium flex-1">{task.title}</div>
-          <span className="text-[10px] text-gray-400 shrink-0 mt-0.5" title={t("priorityTitle")}>P{task.priority}</span>
+          <span className="text-[10px] text-codex-muted shrink-0 mt-0.5" title={t("priorityTitle")}>P{task.priority}</span>
         </div>
-        {detail && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{detail}</div>}
-        {task.assignee && <div className="text-xs text-gray-500 mt-1">@{task.assignee}</div>}
+        {detail && <div className="text-xs text-codex-muted mt-1 line-clamp-2">{detail}</div>}
+        {task.assignee && <div className="text-xs text-codex-muted mt-1">@{task.assignee}</div>}
         {task.labels.length > 0 && (
           <div className="flex gap-1 mt-1 flex-wrap">
             {task.labels.map((l) => (
-              <span key={l} className="text-xs bg-blue-100 text-blue-700 px-1.5 rounded">{l}</span>
+              <span key={l} className="text-xs bg-codex-accent/10 text-codex-accent px-1.5 rounded">{l}</span>
             ))}
           </div>
         )}
         {task.status === "failed" && task.retry_count > 0 && (
-          <div className="text-[10px] text-gray-400 mt-1">{t("retried", { count: task.retry_count, max: task.max_retries })}</div>
+          <div className="text-[10px] text-codex-muted mt-1">{t("retried", { count: task.retry_count, max: task.max_retries })}</div>
         )}
       </div>
 
       {/* 鼠标、键盘聚焦、触屏都能到达操作条。 */}
       <div className="flex gap-1 mt-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
         {canStart && (
-          <button onClick={actions.start} aria-label={t("action.start")} className="p-1 hover:bg-blue-50 rounded text-blue-600" title={t("action.start")}>
+          <button onClick={actions.start} aria-label={t("action.start")} className="p-1 hover:bg-codex-accent/10 rounded text-codex-accent" title={t("action.start")}>
             <Play size={14} />
           </button>
         )}
         {inReview && (
           <>
-            <button onClick={actions.approve} aria-label={t("action.approve")} className="p-1 hover:bg-green-50 rounded text-green-600" title={t("action.approve")}>
+            <button onClick={actions.approve} aria-label={t("action.approve")} className="p-1 hover:bg-codex-success/10 rounded text-codex-success" title={t("action.approve")}>
               <Check size={14} />
             </button>
-            <button onClick={actions.reject} aria-label={t("action.reject")} className="p-1 hover:bg-gray-100 rounded text-gray-500" title={t("action.reject")}>
+            <button onClick={actions.reject} aria-label={t("action.reject")} className="p-1 hover:bg-codex-hover rounded text-codex-muted" title={t("action.reject")}>
               <Undo2 size={14} />
             </button>
           </>
         )}
         {canRetry && (
-          <button onClick={actions.retry} aria-label={t("action.retry")} className="p-1 hover:bg-blue-50 rounded text-blue-600" title={t("action.retry")}>
+          <button onClick={actions.retry} aria-label={t("action.retry")} className="p-1 hover:bg-codex-accent/10 rounded text-codex-accent" title={t("action.retry")}>
             <RotateCcw size={14} />
           </button>
         )}
         {canCancel && (
-          <button onClick={actions.cancel} aria-label={t("action.cancel")} className="p-1 hover:bg-red-50 rounded text-red-500" title={t("action.cancel")}>
+          <button onClick={actions.cancel} aria-label={t("action.cancel")} className="p-1 hover:bg-codex-danger/10 rounded text-codex-danger" title={t("action.cancel")}>
             <X size={14} />
           </button>
         )}

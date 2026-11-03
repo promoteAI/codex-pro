@@ -128,17 +128,17 @@ export function Memory() {
 
   const renderEntries = (entries: MemoryEntry[]) => (
     <div className="space-y-2">
-      {entries.length === 0 && <div className="text-gray-400 text-center py-8">{t("empty")}</div>}
+      {entries.length === 0 && <div className="text-codex-muted text-center py-8">{t("empty")}</div>}
       {entries.map((entry) => (
-        <div key={entry.id} className="bg-white border rounded-lg p-4 flex justify-between items-start gap-3">
+        <div key={entry.id} className="bg-codex-surface border border-codex-border rounded-lg p-4 flex justify-between items-start gap-3">
           <div className="flex-1">
             {editingId === entry.id ? <div className="space-y-2">
               <textarea value={editContent} onChange={(event) => setEditContent(event.target.value)} rows={4}
-                className="w-full border rounded p-2 text-sm" aria-label={t("editContent")} />
+                className="w-full border border-codex-border rounded p-2 text-sm bg-codex-bg" aria-label={t("editContent")} />
               <input value={editTags} onChange={(event) => setEditTags(event.target.value)}
-                className="w-full border rounded px-2 py-1 text-xs" placeholder={t("tagsPlaceholder")} />
+                className="w-full border border-codex-border rounded px-2 py-1 text-xs bg-codex-bg" placeholder={t("tagsPlaceholder")} />
             </div> : <div className="text-sm whitespace-pre-wrap break-words">{entry.content}</div>}
-            <div className="text-xs text-gray-400 mt-1">
+            <div className="text-xs text-codex-muted mt-1">
               {entry.type} · {t("importance")}: {entry.importance?.toFixed(2) ?? "-"} ·{" "}
               {relativeTime(entry.created_at, t("unknownTime"))}
               {searching && entry.tier && <> · {t(`tier.${entry.tier}`, { defaultValue: entry.tier })}</>}
@@ -147,12 +147,12 @@ export function Memory() {
           <div className="flex gap-1">
             {editingId === entry.id ? <>
               <button onClick={() => saveEdit(entry)} disabled={!editContent.trim()}
-                aria-label={t("saveEdit")} className="p-1 text-blue-600 disabled:opacity-40"><Save size={16} /></button>
-              <button onClick={() => setEditingId(null)} aria-label={t("common:cancel")} className="p-1 text-gray-500"><X size={16} /></button>
+                aria-label={t("saveEdit")} className="p-1 text-codex-accent disabled:opacity-40"><Save size={16} /></button>
+              <button onClick={() => setEditingId(null)} aria-label={t("common:cancel")} className="p-1 text-codex-muted"><X size={16} /></button>
             </> : <button onClick={() => startEdit(entry)} aria-label={t("editEntryAria")}
-              className="p-1 text-gray-400 hover:text-blue-600"><Pencil size={16} /></button>}
+              className="p-1 text-codex-muted hover:text-codex-accent"><Pencil size={16} /></button>}
             <button onClick={() => handleDelete(entry)} aria-label={t("deleteEntryAria")}
-              className="p-1 text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
+              className="p-1 text-codex-danger hover:text-codex-danger"><Trash2 size={16} /></button>
           </div>
         </div>
       ))}
@@ -164,10 +164,10 @@ export function Memory() {
       {!canReadAll && (
         <div
           role="status"
-          className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded px-3 py-2"
+          className="flex items-start gap-2 text-sm bg-codex-warn/10 border border-codex-warn/20 rounded px-3 py-2"
         >
-          <ShieldAlert size={16} className="mt-0.5 shrink-0 text-amber-700" />
-          <span className="text-amber-900">{t("adminRequired")}</span>
+          <ShieldAlert size={16} className="mt-0.5 shrink-0 text-codex-warn" />
+          <span className="text-codex-warn">{t("adminRequired")}</span>
         </div>
       )}
       <div className="flex gap-2 items-center">
@@ -178,20 +178,20 @@ export function Memory() {
           placeholder={t("searchPlaceholder")}
           aria-label={t("searchPlaceholder")}
           disabled={!canReadAll}
-          className="border rounded px-3 py-1.5 flex-1 disabled:bg-gray-50 disabled:cursor-not-allowed"
+          className="border border-codex-border rounded px-3 py-1.5 flex-1 bg-codex-surface disabled:bg-codex-active disabled:cursor-not-allowed"
         />
         <button
           onClick={handleSearch}
           aria-label={t("searchAria")}
           disabled={!canReadAll}
           title={canReadAll ? undefined : t("adminRequired")}
-          className="p-2 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-2 bg-codex-active rounded hover:bg-codex-hover disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Search size={18} />
         </button>
       </div>
 
-      <div className="flex gap-1 border-b items-center">
+      <div className="flex gap-1 border-b border-codex-border items-center">
         {TIERS.map((tierKey) => (
           <button
             key={tierKey}
@@ -199,7 +199,7 @@ export function Memory() {
             disabled={searching}
             title={searching ? t("tierDisabledHint") : undefined}
             className={`px-4 py-2 text-sm border-b-2 disabled:opacity-40 disabled:cursor-not-allowed ${
-              tier === tierKey ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500"
+              tier === tierKey ? "border-codex-accent text-codex-accent" : "border-transparent text-codex-muted"
             }`}
           >
             {t(`tier.${tierKey}`)}
@@ -208,13 +208,13 @@ export function Memory() {
       </div>
 
       {searching && (
-        <div className="flex items-center gap-2 text-sm bg-blue-50 border border-blue-200 rounded px-3 py-2">
-          <span className="flex-1 text-blue-800">
+        <div className="flex items-center gap-2 text-sm bg-codex-accent/10 border border-codex-accent/20 rounded px-3 py-2">
+          <span className="flex-1 text-codex-accent">
             {t("searchResultCount", { count: searchResults.length })}
           </span>
           <button
             onClick={clearSearch}
-            className="flex items-center gap-1 text-blue-700 hover:text-blue-900"
+            className="flex items-center gap-1 text-codex-accent hover:text-codex-accent-hover"
           >
             <X size={14} /> {t("clearSearch")}
           </button>
@@ -229,12 +229,12 @@ export function Memory() {
         </Loadable>
       )}
       {!searching && data && data.total > 50 && (
-        <div className="flex justify-end items-center gap-2 text-xs text-gray-500">
+        <div className="flex justify-end items-center gap-2 text-xs text-codex-muted">
           <span>{offset + 1}-{Math.min(offset + data.entries.length, data.total)} / {data.total}</span>
           <button onClick={() => setOffset(Math.max(0, offset - 50))} disabled={offset === 0}
-            className="border rounded p-1 disabled:opacity-40" aria-label={t("common:previous")}><ChevronLeft size={15} /></button>
+            className="border border-codex-border rounded p-1 disabled:opacity-40" aria-label={t("common:previous")}><ChevronLeft size={15} /></button>
           <button onClick={() => setOffset(offset + 50)} disabled={offset + data.entries.length >= data.total}
-            className="border rounded p-1 disabled:opacity-40" aria-label={t("common:next")}><ChevronRight size={15} /></button>
+            className="border border-codex-border rounded p-1 disabled:opacity-40" aria-label={t("common:next")}><ChevronRight size={15} /></button>
         </div>
       )}
     </div>

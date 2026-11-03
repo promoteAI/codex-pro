@@ -98,16 +98,16 @@ export function Config() {
     }
   };
 
-  if (isAdmin === false) return <div className="bg-amber-50 text-amber-700 rounded-lg p-4 text-sm">{t("common:adminOnly")}</div>;
-  if (error) return <div className="bg-red-50 text-red-600 rounded-lg p-4 text-sm">{t("common:loadFailed", { error })}</div>;
-  if (isAdmin === null || loading || !data) return <div className="text-gray-400 text-sm">{t("common:loading")}</div>;
+  if (isAdmin === false) return <div className="bg-codex-warn/10 text-codex-warn rounded-lg p-4 text-sm">{t("common:adminOnly")}</div>;
+  if (error) return <div className="bg-codex-danger/10 text-codex-danger rounded-lg p-4 text-sm">{t("common:loadFailed", { error })}</div>;
+  if (isAdmin === null || loading || !data) return <div className="text-codex-muted text-sm">{t("common:loading")}</div>;
 
   return <div className="space-y-4 max-w-4xl">
     <div className="flex items-start justify-between gap-3">
       <div><h1 className="text-lg font-bold">{t("title")}</h1>
-        <p className="text-xs text-gray-500 font-mono break-all">{data._meta?.config_path}</p></div>
+        <p className="text-xs text-codex-muted font-mono break-all">{data._meta?.config_path}</p></div>
     </div>
-    {restartRequired && <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm" role="status">
+    {restartRequired && <div className="flex items-start gap-2 bg-codex-warn/10 border border-codex-warn/20 text-codex-warn rounded-lg p-3 text-sm" role="status">
       <RotateCw size={16} className="mt-0.5 shrink-0" /><span>{t("restartRequired")}</span>
     </div>}
     <form onSubmit={save} className="space-y-4">
@@ -132,41 +132,41 @@ export function Config() {
         <Select label={t("fields.unattendedPolicy")} value={draft.unattendedPolicy} onChange={(value) => set("unattendedPolicy", value)} options={["deny", "allow_safe"]} />
         <Toggle label={t("fields.cliAutoApprove")} checked={draft.cliAutoApprove} onChange={(value) => set("cliAutoApprove", value)} />
       </Section>
-      <button type="submit" className="flex items-center gap-1.5 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700">
+      <button type="submit" className="flex items-center gap-1.5 bg-codex-accent text-white rounded px-4 py-2 text-sm hover:bg-codex-accent-hover">
         <Save size={15} /> {t("save")}
       </button>
     </form>
-    <details className="border rounded-lg bg-white">
-      <summary className="cursor-pointer p-3 text-sm text-gray-600">{t("advancedReadonly")}</summary>
-      <pre className="border-t bg-gray-950 text-green-300 p-4 text-xs overflow-auto max-h-96">{JSON.stringify(data, null, 2)}</pre>
+    <details className="border border-codex-border rounded-lg bg-codex-surface">
+      <summary className="cursor-pointer p-3 text-sm text-codex-text-secondary">{t("advancedReadonly")}</summary>
+      <pre className="border-t border-codex-border bg-codex-panel text-codex-success p-4 text-xs overflow-auto max-h-96">{JSON.stringify(data, null, 2)}</pre>
     </details>
   </div>;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return <fieldset className="bg-white border rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+  return <fieldset className="bg-codex-surface border border-codex-border rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
     <legend className="font-medium text-sm px-1">{title}</legend>{children}
   </fieldset>;
 }
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return <label className="flex items-center justify-between gap-3 text-sm"><span>{label}</span>
     <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)}
-      className={`w-10 h-5 rounded-full ${checked ? "bg-blue-600" : "bg-gray-300"}`}>
+      className={`w-10 h-5 rounded-full ${checked ? "bg-codex-accent" : "bg-codex-border-strong"}`}>
       <span className={`block w-4 h-4 bg-white rounded-full shadow transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
     </button></label>;
 }
 function Select({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
-  return <label className="text-sm"><span className="block text-gray-600 mb-1">{label}</span>
-    <select value={value} onChange={(event) => onChange(event.target.value)} className="border rounded px-2 py-1.5 w-full">{options.map((option) => <option key={option}>{option}</option>)}</select>
+  return <label className="text-sm"><span className="block text-codex-text-secondary mb-1">{label}</span>
+    <select value={value} onChange={(event) => onChange(event.target.value)} className="border border-codex-border rounded px-2 py-1.5 w-full bg-codex-surface">{options.map((option) => <option key={option}>{option}</option>)}</select>
   </label>;
 }
 function NumberField({ label, value, onChange, ...props }: { label: string; value: string; onChange: (value: string) => void; min?: string; max?: string; step?: string }) {
-  return <label className="text-sm"><span className="block text-gray-600 mb-1">{label}</span>
-    <input type="number" value={value} onChange={(event) => onChange(event.target.value)} {...props} className="border rounded px-2 py-1.5 w-full" />
+  return <label className="text-sm"><span className="block text-codex-text-secondary mb-1">{label}</span>
+    <input type="number" value={value} onChange={(event) => onChange(event.target.value)} {...props} className="border border-codex-border rounded px-2 py-1.5 w-full bg-codex-surface" />
   </label>;
 }
 function TextField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
-  return <label className="text-sm"><span className="block text-gray-600 mb-1">{label}</span>
-    <input type="text" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="border rounded px-2 py-1.5 w-full" />
+  return <label className="text-sm"><span className="block text-codex-text-secondary mb-1">{label}</span>
+    <input type="text" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="border border-codex-border rounded px-2 py-1.5 w-full bg-codex-surface" />
   </label>;
 }

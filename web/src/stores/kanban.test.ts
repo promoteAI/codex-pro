@@ -14,7 +14,7 @@ describe("statusMeta 随语言切换", () => {
   });
   it("配色不随语言变", async () => {
     const zhChip = statusMeta("running").chip;
-    expect(zhChip).toContain("indigo");
+    expect(zhChip).toContain("codex-");
     await i18n.changeLanguage("en");
     expect(statusMeta("running").chip).toBe(zhChip);
   });

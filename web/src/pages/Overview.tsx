@@ -25,9 +25,9 @@ interface ChannelItem {
 }
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
-  healthy: <CheckCircle className="text-green-500" size={20} />,
-  degraded: <AlertTriangle className="text-yellow-500" size={20} />,
-  unhealthy: <AlertCircle className="text-red-500" size={20} />,
+  healthy: <CheckCircle className="text-codex-success" size={20} />,
+  degraded: <AlertTriangle className="text-codex-warn" size={20} />,
+  unhealthy: <AlertCircle className="text-codex-danger" size={20} />,
 };
 
 /** 概览页轮询间隔。这是首屏“当前状态”视图,此前打开后数字就冻结了,不刷新页面
@@ -81,7 +81,7 @@ export function Overview() {
       </div>
 
       {(healthErr || channelsErr || tasksErr || memoryErr) && (
-        <div className="bg-amber-50 text-amber-700 border border-amber-200 rounded-lg p-3 text-sm">
+        <div className="bg-codex-warn/10 text-codex-warn border border-codex-warn/20 rounded-lg p-3 text-sm">
           {t("common:loadFailed", { error: healthErr || channelsErr || tasksErr || memoryErr })}
         </div>
       )}
@@ -100,7 +100,7 @@ export function Overview() {
           <h2 className="font-semibold mb-2">{t("kanbanSummary")}</h2>
           <div className="flex gap-2 flex-wrap">
             {["pending", "queued", "running", "blocked", "review", "success"].map((s) => (
-              <span key={s} className="px-2 py-1 bg-gray-100 rounded text-sm">
+              <span key={s} className="px-2 py-1 bg-codex-active rounded text-sm">
                 {statusLabel(s)}: {statusCounts[s] ?? 0}
               </span>
             ))}
@@ -111,9 +111,9 @@ export function Overview() {
           <div className="space-y-1">
             {channels?.channels?.map((ch) => (
               <div key={ch.name} className="flex items-center gap-2 text-sm">
-                <span className={`w-2 h-2 rounded-full ${ch.running ? "bg-green-500" : "bg-gray-300"}`} />
+                <span className={`w-2 h-2 rounded-full ${ch.running ? "bg-codex-success" : "bg-codex-border-strong"}`} />
                 <span>{ch.name}</span>
-                <span className="text-gray-400">{ch.running ? t("common:online") : t("common:offline")}</span>
+                <span className="text-codex-muted">{ch.running ? t("common:online") : t("common:offline")}</span>
               </div>
             ))}
           </div>
@@ -125,11 +125,11 @@ export function Overview() {
 
 function MetricCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
   return (
-    <div className="bg-white rounded-lg border p-4 flex items-center gap-3">
-      <div className="text-gray-500">{icon}</div>
+    <div className="bg-codex-surface rounded-lg border border-codex-border p-4 flex items-center gap-3">
+      <div className="text-codex-muted">{icon}</div>
       <div>
         <div className="text-2xl font-bold">{value}</div>
-        <div className="text-sm text-gray-500">{label}</div>
+        <div className="text-sm text-codex-muted">{label}</div>
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ set "PY=%~dp0..\.venv\Scripts\python.exe"
 if not exist "%PY%" set "PY=python"
 
 set "PORT=5173"
-set "GATEWAY_PORT=58123"
+set "GATEWAY_PORT=19000"
 set "HEALTH_URL=http://127.0.0.1:%GATEWAY_PORT%/api/v1/health"
 
 rem --- Kill existing processes on target ports --------------------------------

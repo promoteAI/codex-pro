@@ -4,15 +4,15 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig(({ mode }) => {
-  // Prefer an explicit origin so Windows Hyper-V excluded ranges (often
-  // including the default 58123) can be overridden without editing this file.
+  // Prefer an explicit origin so Windows Hyper-V excluded ranges can be
+  // overridden without editing this file.
   // Example web/.env.development.local:
   //   CODEX_PRO_GATEWAY_ORIGIN=http://127.0.0.1:18789
   const env = loadEnv(mode, process.cwd(), "");
   const gatewayOrigin =
     env.CODEX_PRO_GATEWAY_ORIGIN ||
     process.env.CODEX_PRO_GATEWAY_ORIGIN ||
-    "http://127.0.0.1:58123";
+    "http://127.0.0.1:19000";
   const gatewayWs = gatewayOrigin.replace(/^http/i, "ws");
 
   return {

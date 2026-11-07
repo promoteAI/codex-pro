@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Codex Pro 一键启动(开发模式):同时拉起后端 gateway 与前端 vite dev server。
 # 用法:
-#   bash scripts/dev.sh            # 前端 5173,后端 58123(默认)
+#   bash scripts/dev.sh            # 前端 5173,后端 19000(默认)
 #   PORT=3000 bash scripts/dev.sh  # 覆盖前端端口
 #
 # 行为:
-#   * 后端以 .venv 里的 python 启动 `codex-pro gateway`(后台),监听 58123,
+#   * 后端以 .venv 里的 python 启动 `codex-pro gateway`(后台),监听 19000,
 #     同时托管已构建的 web UI;
 #   * 等后端健康检查(/api/v1/health)通过后,才启动前端 Vite dev server(5173),
 #     并把 /api 与 /ws 代理到后端;
@@ -43,7 +43,7 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 
 PORT="${PORT:-5173}"
-GATEWAY_PORT="${GATEWAY_PORT:-58123}"
+GATEWAY_PORT="${GATEWAY_PORT:-19000}"
 HEALTH_URL="http://127.0.0.1:${GATEWAY_PORT}/api/v1/health"
 
 kill_port() {

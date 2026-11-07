@@ -1,10 +1,10 @@
 # Codex Pro 一键启动 (Windows / PowerShell)
 # 用法:
-#   .\scripts\dev-windows.ps1                          # 前端 :5173, 后端 :58123 (默认)
+#   .\scripts\dev-windows.ps1                          # 前端 :5173, 后端 :19000 (默认)
 #   $env:PORT=3000; .\scripts\dev-windows.ps1          # 覆盖前端端口
 #
 # 行为:
-#   * 后端以项目 .venv 里的 python 启动 `codex-pro gateway`, 监听 58123
+#   * 后端以项目 .venv 里的 python 启动 `codex-pro gateway`, 监听 19000
 #     (同时托管已构建的 web UI);
 #   * 等后端健康检查 (/api/v1/health) 通过后, 才启动前端 Vite dev server (:5173),
 #     并把 /api 与 /ws 代理到后端;
@@ -14,7 +14,7 @@
 
 param(
     [int]$Port = 5173,
-    [int]$GatewayPort = 58123
+    [int]$GatewayPort = 19000
 )
 
 $ErrorActionPreference = 'Stop'

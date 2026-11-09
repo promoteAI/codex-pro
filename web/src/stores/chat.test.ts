@@ -524,7 +524,9 @@ describe("chat store interactive /ws path", () => {
     expect(sendSpy).not.toHaveBeenCalled();
   });
 
-  it("streaming frames accumulate into a live bubble keyed by inbound event", () => {
+  it("streaming frames accumulate into a live bubble keyed by inbound event", async () => {
+    // Tokens are buffered and flushed once per animation frame (streaming
+    // coalescing), so the accumulated text only appears after a frame.
     useChatStore.getState()._handleWsFrame({
       type: "message",
       message_kind: "streaming",
@@ -539,6 +541,10 @@ describe("chat store interactive /ws path", () => {
       text: "lo",
       metadata: { _token_stream: true, _inbound_event_id: "evt-1" },
     });
+    // Tokens are buffered and flushed once per animation frame (streaming
+    // coalescing). The suite uses fake timers, so advance past the 50ms
+    // fallback flush (jsdom has no real rAF).
+    await vi.advanceTimersByTimeAsync(100);
     expect(useChatStore.getState().streaming).toEqual({ eventId: "evt-1", text: "Hello" });
   });
 

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams } from "react-router";
 import { useChatStore } from "../stores/chat";
 import { HomeHero } from "../components/home/HomeHero";
@@ -7,6 +7,9 @@ import { Composer } from "../components/home/Composer";
 
 export function HomeView() {
   const { sessionId: routeSession } = useParams();
+  // Select each slice individually so a streaming-token update to `streaming`
+  // does not re-render this component for unrelated slices, and memoize the
+  // selectors object so ChatThread's memoized children keep their identity.
   const chatting = useChatStore((s) => s.chatting);
   const messages = useChatStore((s) => s.messages);
   const loadingHistory = useChatStore((s) => s.loadingHistory);
@@ -24,23 +27,42 @@ export function HomeView() {
   const loadSessionHistory = useChatStore((s) => s.loadSessionHistory);
   const wsReloadHistory = useChatStore((s) => s._wsReloadHistory);
 
-  const selectors: ChatThreadSelectors = {
-    messages,
-    loadingHistory,
-    historyError,
-    typing,
-    activeTool,
-    sessionId,
-    streamStopped,
-    streaming,
-    thinkingBlocks,
-    pendingApprovals,
-    pendingClarify,
-    decideApproval,
-    answerClarify,
-    loadSessionHistory,
-    wsReloadHistory,
-  };
+  const selectors: ChatThreadSelectors = useMemo(
+    () => ({
+      messages,
+      loadingHistory,
+      historyError,
+      typing,
+      activeTool,
+      sessionId,
+      streamStopped,
+      streaming,
+      thinkingBlocks,
+      pendingApprovals,
+      pendingClarify,
+      decideApproval,
+      answerClarify,
+      loadSessionHistory,
+      wsReloadHistory,
+    }),
+    [
+      messages,
+      loadingHistory,
+      historyError,
+      typing,
+      activeTool,
+      sessionId,
+      streamStopped,
+      streaming,
+      thinkingBlocks,
+      pendingApprovals,
+      pendingClarify,
+      decideApproval,
+      answerClarify,
+      loadSessionHistory,
+      wsReloadHistory,
+    ],
+  );
 
   useEffect(() => {
     if (routeSession) {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** SVG icons matching the prototype (doc / chevron / check / spin). */
@@ -86,8 +86,9 @@ export interface TaskActivityItemProps {
  * Beautiful UI "task-rows" style activity row: a capsule with a running /
  * failed / done badge, an expandable detail body, and a semantic status pill.
  * Adapted from beautifului.dev task-rows.tsx to our tool-activity data shape.
+ * Memoized so historical rows are not re-rendered on every streaming flush.
  */
-export function TaskActivityItem({
+export const TaskActivityItem = memo(function TaskActivityItem({
   title,
   toolName,
   input,
@@ -184,4 +185,4 @@ export function TaskActivityItem({
       )}
     </div>
   );
-}
+});

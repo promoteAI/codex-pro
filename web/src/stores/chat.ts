@@ -250,6 +250,71 @@ interface ChatState {
   _wsReloadHistory: (sessionId: string) => Promise<void>;
 }
 
+/**
+ * Coalesce streaming token frames into one store update per animation frame.
+ *
+ * Token frames can arrive far faster than the display refreshes (dozens per
+ * frame on fast models). Committing each one re-renders the whole chat thread
+ * per token; buffering and flushing on rAF keeps the visible update rate at
+ * the display's cadence while the text itself stays lossless. The buffer is
+ * module-level so it survives across frames without touching store state.
+ *
+ * A setTimeout safety net guarantees a flush even where rAF never fires
+ * (headless/jsdom test environments have no rendering pipeline); in a real
+ * browser rAF always wins the race and the timer is cleared.
+ */
+const streamBuffer = {
+  eventId: "",
+  text: "",
+  scheduled: false,
+  frame: 0,
+  timer: 0,
+};
+
+function flushStreamBuffer() {
+  streamBuffer.scheduled = false;
+  clearTimeout(streamBuffer.timer);
+  if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(streamBuffer.frame);
+  if (!streamBuffer.text) return;
+  const { eventId, text } = streamBuffer;
+  streamBuffer.text = "";
+  useChatStore.setState((s) => {
+    // Drop buffered text when the turn already ended (error / stop / final
+    // committed) — streaming is null or belongs to a different event.
+    if (s.streaming && s.streaming.eventId !== eventId) return {};
+    return { streaming: { eventId, text: (s.streaming?.text ?? "") + text } };
+  });
+}
+
+function cancelScheduledFlush() {
+  if (!streamBuffer.scheduled) return;
+  streamBuffer.scheduled = false;
+  clearTimeout(streamBuffer.timer);
+  if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(streamBuffer.frame);
+}
+
+function queueStreamText(eventId: string, text: string) {
+  if (streamBuffer.eventId !== eventId) {
+    // A new turn (or a reset) started: flush any pending text for the old
+    // event synchronously so ordering is preserved, then switch buffers.
+    cancelScheduledFlush();
+    flushStreamBuffer();
+    streamBuffer.eventId = eventId;
+  }
+  streamBuffer.text += text;
+  if (!streamBuffer.scheduled) {
+    streamBuffer.scheduled = true;
+    // rAF aligns the flush with the next paint. The timeout is a safety net
+    // for environments where rAF never fires (headless/jsdom tests have no
+    // rendering pipeline); in a real browser rAF always wins and the timer
+    // is cleared inside flushStreamBuffer.
+    streamBuffer.timer = window.setTimeout(flushStreamBuffer, 50);
+    if (typeof requestAnimationFrame === "function") {
+      streamBuffer.frame = requestAnimationFrame(flushStreamBuffer);
+    }
+  }
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   project: "",
   projectPath: "",
@@ -385,6 +450,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Disconnect the interactive socket so a stale /ws socket does not keep
     // delivering frames for a session we have abandoned.
     get().chatWS.disconnect();
+    streamBuffer.text = "";
     set({
       messages: [],
       sessionId: null,
@@ -696,22 +762,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // and was retracted server-side. Clear the accumulated text (keep the
       // bubble) so the next iteration's tokens don't splice onto the draft.
       if (meta._stream_reset) {
+        // Drop buffered-but-unflushed tokens for this turn too, or they would
+        // splice the retracted draft back in on the next frame flush.
+        streamBuffer.text = "";
         set((s) => (s.streaming ? { streaming: { ...s.streaming, text: "" } } : {}));
         return;
       }
       const text = frame.text ?? "";
-      set((s) => {
-        if (s.streaming?.eventId === inboundId) {
-          return { streaming: { ...s.streaming, text: s.streaming.text + text } };
-        }
-        return { streaming: { eventId: inboundId, text } };
-      });
+      queueStreamText(inboundId, text);
       return;
     }
 
     if (isFinal) {
       const text = frame.text ?? "";
       const done = get().streaming?.eventId === inboundId;
+      // Flush any tokens still in the buffer so the committed final text
+      // cannot race ahead of (and visually duplicate) buffered streaming text.
+      cancelScheduledFlush();
+      flushStreamBuffer();
       // Commit the answer, then reload the persisted transcript. The session is
       // saved (with interleaved `thinking` rows per round) BEFORE the final
       // frame is published, so /history is the authoritative, correctly-ordered
@@ -748,6 +816,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // processed server-side. Freeze the current messages instead so they
     // don't get cleared.
     set({ typing: false, activeTool: null, pendingEventId: null, streamStopped: true });
+    // Drop tokens still buffered for this turn — the stream is being stopped.
+    streamBuffer.text = "";
     if (!sent) toast.error("停止失败：连接未就绪");
   },
 

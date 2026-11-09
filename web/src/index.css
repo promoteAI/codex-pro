@@ -226,6 +226,10 @@ body {
 [data-theme="light"] .bg-\[\#1e1e1e\]{background:#f7f7f8 !important}
 
 /* ── Chat thread (aligned to prototype .chat-*) ── */
+/* Layout/style containment keeps each turn's internal layout from invalidating
+   the whole thread during streaming repaints (the live bubble re-renders many
+   times a second). Safe: turns are independent flex columns. */
+.chat-turn{contain:layout style}
 .chat-msg{display:flex;flex-direction:column;gap:4px;max-width:100%;padding:4px 0}
 .chat-msg.is-user{align-items:flex-end;margin:8px 0 14px}
 .chat-msg.is-assistant{align-items:stretch}

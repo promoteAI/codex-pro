@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, memo, type ReactNode } from "react";
 
 /**
  * Dependency-free markdown-to-React renderer for the chat thread.
@@ -201,8 +201,10 @@ function parseBlocks(src: string): Block[] {
   return blocks;
 }
 
-/** Render markdown string to React nodes wrapped for `.chat-md`. */
-export function Markdown({ children }: { children: string }) {
+/** Render markdown string to React nodes wrapped for `.chat-md`.
+ *  Memoized: parsing is O(content) and runs for every row on every thread
+ *  render; memo skips it when the markdown text is unchanged. */
+export const Markdown = memo(function Markdown({ children }: { children: string }) {
   const blocks = parseBlocks(children ?? "");
   return (
     <div className="chat-md">
@@ -276,4 +278,4 @@ export function Markdown({ children }: { children: string }) {
       })}
     </div>
   );
-}
+});

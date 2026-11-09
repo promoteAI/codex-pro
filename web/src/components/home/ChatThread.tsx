@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { type ChatMessage, type ToolCallFn, type ApprovalTicket, type ClarifyTicket } from "../../stores/chat";
 import { type ThinkingBlocks } from "../../lib/chat-ws-frame";
@@ -42,6 +42,85 @@ function renderActivity(
   }
   return null;
 }
+
+/**
+ * The persisted message list, memoized so streaming token flushes (which
+ * re-render ChatThread many times a second) do not rebuild every historical
+ * row. `messages` only changes when history loads or a turn commits, so the
+ * whole list is skipped while tokens stream into the live bubble below.
+ */
+const MessageList = memo(function MessageList({
+  messages,
+  activeTool,
+  typing,
+  t,
+}: {
+  messages: ChatMessage[];
+  activeTool: string | null;
+  typing: boolean;
+  t: (k: string, o?: Record<string, string>) => string;
+}) {
+  const nodes: React.ReactNode[] = [];
+  let turn: React.ReactNode[] = [];
+  const pushTurn = () => {
+    if (!turn.length) return;
+    nodes.push(<div className="chat-turn" key={`turn-${nodes.length}`}>{turn}</div>);
+    turn = [];
+  };
+  messages.forEach((m, idx) => {
+    // A persisted thinking span from history renders as a collapsed
+    // reasoning block and belongs to the SAME turn-group as the tool
+    // activity around it (it interleaves: think → toolcall → tool →
+    // think → …). Push it into the current `turn` rather than calling
+    // pushTurn(), which would split the turn at every thinking row.
+    if (m.thinking) {
+      turn.push(
+        <ThinkingBlock
+          key={`${m.id}-think`}
+          block={{
+            thinkingId: m.thinking.thinkingId,
+            text: m.thinking.text,
+            streaming: false,
+            durationMs: m.thinking.durationMs,
+            retracted: false,
+            cogEventId: m.id,
+          }}
+        />,
+      );
+      return;
+    }
+    const isActivity =
+      m.role === "tool" || m.internal || (m.tool_calls && m.tool_calls.length > 0);
+    if (isActivity) {
+      const acts = renderActivity(m, t, activeTool, typing);
+      if (acts) {
+        if (Array.isArray(acts)) turn.push(...acts);
+        else turn.push(acts);
+      }
+      return;
+    }
+    if (m.role === "user" || (m.role === "assistant" && m.content?.trim())) {
+      pushTurn();
+      if (m.role === "user") {
+        nodes.push(
+          <div className="chat-msg is-user" key={idx}>
+            <div className="chat-msg-bubble">{m.content}</div>
+          </div>,
+        );
+      } else {
+        nodes.push(
+          <div className="chat-msg is-assistant" key={idx}>
+            <div className="chat-msg-bubble">
+              <Markdown>{m.content}</Markdown>
+            </div>
+          </div>,
+        );
+      }
+    }
+  });
+  if (typing && turn.length > 0) pushTurn();
+  return <>{nodes}</>;
+});
 
 export interface ChatThreadSelectors {
   messages: ChatMessage[];
@@ -100,10 +179,31 @@ export function ChatThread({ selectors }: ChatThreadProps) {
     ["session_message"],
   );
 
-  useEffect(() => {
+  const scrollToBottom = (behavior: ScrollBehavior) => {
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-    bottomRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth" });
-  }, [messages.length, typing, activeTool, streaming?.text.length, Object.keys(thinkingBlocks).length, pendingApprovals.length, pendingClarify]);
+    if (reduce) behavior = "auto";
+    // Stick-to-bottom only while the user is already at (or near) the tail —
+    // never yank the viewport when they scrolled up to read earlier turns.
+    const el = containerRef.current;
+    if (el) {
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (distance > 160) return;
+    }
+    bottomRef.current?.scrollIntoView({ behavior });
+  };
+
+  // Discrete events (new message, tool change, approvals) get a smooth scroll.
+  useEffect(() => {
+    scrollToBottom("smooth");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, typing, activeTool, pendingApprovals.length, pendingClarify]);
+
+  // Streaming text grows many times per second; queued smooth animations
+  // compound into jank, so tail-following during a stream is instant.
+  useEffect(() => {
+    scrollToBottom("auto");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streaming?.text.length, Object.keys(thinkingBlocks).length]);
 
   return (
     <div ref={containerRef} className="flex-1 min-h-0 overflow-y-auto px-[clamp(16px,4vw,48px)] pb-8 pt-5 scrollbar-gutter-stable" aria-label="chat">
@@ -117,68 +217,7 @@ export function ChatThread({ selectors }: ChatThreadProps) {
           </div>
         )}
 
-        {(() => {
-          const nodes: React.ReactNode[] = [];
-          let turn: React.ReactNode[] = [];
-          const pushTurn = () => {
-            if (!turn.length) return;
-            nodes.push(<div className="chat-turn" key={`turn-${nodes.length}`}>{turn}</div>);
-            turn = [];
-          };
-          messages.forEach((m, idx) => {
-            // A persisted thinking span from history renders as a collapsed
-            // reasoning block and belongs to the SAME turn-group as the tool
-            // activity around it (it interleaves: think → toolcall → tool →
-            // think → …). Push it into the current `turn` rather than calling
-            // pushTurn(), which would split the turn at every thinking row.
-            if (m.thinking) {
-              turn.push(
-                <ThinkingBlock
-                  key={`${m.id}-think`}
-                  block={{
-                    thinkingId: m.thinking.thinkingId,
-                    text: m.thinking.text,
-                    streaming: false,
-                    durationMs: m.thinking.durationMs,
-                    retracted: false,
-                    cogEventId: m.id,
-                  }}
-                />,
-              );
-              return;
-            }
-            const isActivity =
-              m.role === "tool" || m.internal || (m.tool_calls && m.tool_calls.length > 0);
-            if (isActivity) {
-              const acts = renderActivity(m, t, activeTool, typing);
-              if (acts) {
-                if (Array.isArray(acts)) turn.push(...acts);
-                else turn.push(acts);
-              }
-              return;
-            }
-            if (m.role === "user" || (m.role === "assistant" && m.content?.trim())) {
-              pushTurn();
-              if (m.role === "user") {
-                nodes.push(
-                  <div className="chat-msg is-user" key={idx}>
-                    <div className="chat-msg-bubble">{m.content}</div>
-                  </div>,
-                );
-              } else {
-                nodes.push(
-                  <div className="chat-msg is-assistant" key={idx}>
-                    <div className="chat-msg-bubble">
-                      <Markdown>{m.content}</Markdown>
-                    </div>
-                  </div>,
-                );
-              }
-            }
-          });
-          if (typing && turn.length > 0) pushTurn();
-          return nodes;
-        })()}
+        <MessageList messages={messages} activeTool={activeTool} typing={typing} t={t} />
 
         {Object.values(thinkingBlocks).map((b) => (
           <ThinkingBlock key={b.thinkingId} block={b} />

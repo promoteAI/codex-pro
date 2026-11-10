@@ -32,5 +32,12 @@
   "approveOnce": "This time only",
   "approveSession": "This session",
   "deny": "Deny",
-  "riskLevel": "Risk: {{level}}"
+  "riskLevel": "Risk: {{level}}",
+  "clarifyNoteLabel": "Add a note",
+  "clarifyFreeInput": "Or enter your own…",
+  "clarifySkip": "Skip",
+  "clarifySubmit": "Submit",
+  "clarifySkipped": "User skipped this question; please proceed with your own judgment",
+  "clarifyCustom": "Custom answer: {{text}}",
+  "clarifyNoted": "{{answer}} (note: {{note}})"
 }

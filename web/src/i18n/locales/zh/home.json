@@ -32,5 +32,12 @@
   "approveOnce": "仅本次",
   "approveSession": "本会话同类",
   "deny": "拒绝",
-  "riskLevel": "风险: {{level}}"
+  "riskLevel": "风险: {{level}}",
+  "clarifyNoteLabel": "补充说明",
+  "clarifyFreeInput": "或自己输入…",
+  "clarifySkip": "跳过",
+  "clarifySubmit": "提交",
+  "clarifySkipped": "用户未作答，请你自行决定",
+  "clarifyCustom": "自定义回答: {{text}}",
+  "clarifyNoted": "{{answer}}（补充说明: {{note}}）"
 }

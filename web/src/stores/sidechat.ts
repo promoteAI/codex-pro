@@ -269,6 +269,12 @@ export const useSidechatStore = create<SidechatState>((set, get) => ({
     }
 
     if (isFinal) {
+      // Control acks (/approve /deny /clarify replies) arrive as plain-is_final
+      // text frames stamped _control_turn by the backend's lock-free path. They
+      // MUST NOT end the primary turn lifecycle — the parked agent is still
+      // running. TurnRegistry on the TUI classifies these by send-order; the web
+      // client only sees frames, so the stamp is the lightweight contract.
+      if (meta._control_turn) return;
       const text = frame.text ?? "";
       const done = get().streaming?.eventId === inboundId;
       // Commit the answer, then reload the persisted transcript. The session is

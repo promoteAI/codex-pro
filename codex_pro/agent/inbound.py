@@ -200,6 +200,11 @@ class InboundHandler:
                 )
                 out.metadata = dict(event.metadata)
                 out.metadata["_inbound_event_id"] = event.event_id
+                # Control ack, not a turn terminal: this frame ends the control
+                # event, but the primary turn it released is still running.
+                # Interactive clients key their turn-lifecycle off this flag
+                # instead of every is_final text frame (see cli.tui.turns.TurnRegistry).
+                out.metadata["_control_turn"] = True
                 await loop.bus.publish_outbound(out)
                 await loop._mark_turn_terminal(
                     event.event_id,
@@ -222,6 +227,11 @@ class InboundHandler:
                 )
                 out.metadata = dict(event.metadata)
                 out.metadata["_inbound_event_id"] = event.event_id
+                # Control ack, not a turn terminal: this frame ends the control
+                # event, but the parked primary turn that asked the clarify is
+                # still running — interactive clients must not end their turn
+                # lifecycle on it (see cli.tui.turns.TurnRegistry).
+                out.metadata["_control_turn"] = True
                 await loop.bus.publish_outbound(out)
                 await loop._mark_turn_terminal(
                     event.event_id,

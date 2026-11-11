@@ -53,11 +53,16 @@ const MessageList = memo(function MessageList({
   messages,
   activeTool,
   typing,
+  pending,
   t,
 }: {
   messages: ChatMessage[];
   activeTool: string | null;
   typing: boolean;
+  /** True while an approval/clarify card is parked: the tail activity group
+   *  belongs to that still-running turn and must stay visible even when the
+   *  typing flag is transiently false (final-frame timing / HTTP fallback). */
+  pending: boolean;
   t: (k: string, o?: Record<string, string>) => string;
 }) {
   const nodes: React.ReactNode[] = [];
@@ -118,7 +123,7 @@ const MessageList = memo(function MessageList({
       }
     }
   });
-  if (typing && turn.length > 0) pushTurn();
+  if ((typing || pending) && turn.length > 0) pushTurn();
   return <>{nodes}</>;
 });
 
@@ -217,7 +222,13 @@ export function ChatThread({ selectors }: ChatThreadProps) {
           </div>
         )}
 
-        <MessageList messages={messages} activeTool={activeTool} typing={typing} t={t} />
+        <MessageList
+          messages={messages}
+          activeTool={activeTool}
+          typing={typing}
+          pending={pendingApprovals.length > 0 || pendingClarify !== null}
+          t={t}
+        />
 
         {Object.values(thinkingBlocks).map((b) => (
           <ThinkingBlock key={b.thinkingId} block={b} />

@@ -774,6 +774,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     if (isFinal) {
+      // Control acks (/approve /deny /clarify replies) arrive as plain-is_final
+      // text frames stamped _control_turn by the backend's lock-free path.
+      // They MUST NOT end the primary turn lifecycle — the parked agent is still
+      // running. TurnRegistry on the TUI classifies these by send-order; the web
+      // client only sees frames, so the stamp is the lightweight contract. See
+      // codex_pro/agent/inbound.py InboundHandler._on_inbound.
+      if (meta._control_turn) return;
       const text = frame.text ?? "";
       const done = get().streaming?.eventId === inboundId;
       // Flush any tokens still in the buffer so the committed final text

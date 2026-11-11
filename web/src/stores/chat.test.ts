@@ -645,6 +645,73 @@ describe("chat store interactive /ws path", () => {
     expect(useChatStore.getState().messages.filter((m) => m.role === "assistant")).toHaveLength(0);
   });
 
+  it("a _control_turn clarify ack does not end the primary turn lifecycle", () => {
+    // The parked turn asked a clarify; the user answered. The backend confirms
+    // with an is_final text frame ("已回复澄清请求 …") stamped _control_turn. That
+    // ack must NOT reset typing / activeTool / thinkingBlocks / add an assistant
+    // message — the agent is still running behind it. Only the real final frame
+    // ends the turn.
+    useChatStore.setState({
+      sessionId: "cli:web-1",
+      typing: true,
+      activeTool: "exec",
+      thinkingBlocks: { 'th-1': { thinkingId: "th-1", text: "checking", streaming: true, durationMs: 0, retracted: false, cogEventId: "cog-1" } },
+    });
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "final",
+      is_final: true,
+      text: "已回复澄清请求 c1。",
+      metadata: { _inbound_event_id: "evt-ctl", _control_turn: true },
+    });
+    const s = useChatStore.getState();
+    expect(s.typing).toBe(true);
+    expect(s.activeTool).toBe("exec");
+    expect(s.thinkingBlocks['th-1']).toBeTruthy();
+    expect(s.messages.filter((m) => m.role === "assistant")).toHaveLength(0);
+  });
+
+  it("a plain final frame still ends the turn lifecycle after a control ack", async () => {
+    // Sequence: control ack (must not end the turn) → genuine final frame
+    // (commits the answer and ends it).
+    useChatStore.setState({
+      sessionId: "cli:web-1",
+      typing: true,
+      activeTool: "exec",
+      thinkingBlocks: { 'th-1': { thinkingId: "th-1", text: "checking", streaming: true, durationMs: 0, retracted: false, cogEventId: "cog-1" } },
+    });
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "final",
+      is_final: true,
+      text: "已回复澄清请求 c1。",
+      metadata: { _inbound_event_id: "evt-ctl", _control_turn: true },
+    });
+    expect(useChatStore.getState().typing).toBe(true);
+
+    // The turn's real final frame → /history reload rewrites messages with the
+    // persisted transcript (authoritative view), which carries the answer.
+    vi.spyOn(api, "apiFetch").mockImplementation(async (path: string) => {
+      if (String(path).includes("/history")) {
+        return { messages: [{ role: "assistant", content: "最终答案" }] };
+      }
+      return {};
+    });
+    useChatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "final",
+      is_final: true,
+      text: "最终答案",
+      metadata: { _inbound_event_id: "evt-1" },
+    });
+    // The reload fetch is fire-and-forget; flush the microtask.
+    await Promise.resolve();
+    await Promise.resolve();
+    const s = useChatStore.getState();
+    expect(s.typing).toBe(false);
+    expect(s.messages.some((m) => m.role === "assistant" && m.content === "最终答案")).toBe(true);
+  });
+
   it("cognitive thinking frames populate thinkingBlocks and a retracted frame removes", () => {
     useChatStore.getState()._handleWsFrame({
       type: "message",

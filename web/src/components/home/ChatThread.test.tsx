@@ -90,4 +90,56 @@ describe("ChatThread thinking history rows", () => {
     expect(container.querySelectorAll(".tr-row[data-thinking]")).toHaveLength(2);
     expect(container.querySelectorAll(".tr-row")).toHaveLength(4); // 2 thinking + 2 tool
   });
+
+  it("keeps the trailing tool/thinking group visible while a clarify card is pending", () => {
+    // The turn is parked in wait_for_answer: the tail group (last tool round
+    // before the clarify) has no persisted answer row yet. Even when the
+    // typing flag happens to be false (terminal-frame timing, HTTP fallback),
+    // the pending clarify card must keep the accumulated activity on screen
+    // instead of dropping it.
+    const messages: ChatMessage[] = [
+      { id: "0", role: "user", content: "修一下" },
+      { id: "1", role: "assistant", content: "", tool_calls: [{ id: "c1", type: "function", function: { name: "read_file", arguments: "{}" } }] },
+      { id: "2", role: "tool", content: "file content", tool_call_id: "c1", name: "read_file" },
+      {
+        id: "3",
+        role: "assistant",
+        content: "",
+        internal: true,
+        thinking: { thinkingId: "t-1", text: "需要补充上下文。", durationMs: 300 },
+      },
+    ];
+    const { container } = render(
+      <ChatThread
+        selectors={baseSelectors({
+          messages,
+          typing: false,
+          pendingClarify: { id: "c1q", question: "改哪个?", options: ["A", "B"] },
+        })}
+      />,
+    );
+
+    // All three activity rows survive the parked turn.
+    expect(container.querySelectorAll(".tr-row")).toHaveLength(3);
+    // And the clarify card is rendered alongside them.
+    expect(container.textContent).toContain("改哪个?");
+  });
+
+  it("keeps the trailing tool group visible while an approval card is pending", () => {
+    const messages: ChatMessage[] = [
+      { id: "0", role: "user", content: "跑一下" },
+      { id: "1", role: "assistant", content: "", tool_calls: [{ id: "c2", type: "function", function: { name: "exec", arguments: "{}" } }] },
+    ];
+    const { container } = render(
+      <ChatThread
+        selectors={baseSelectors({
+          messages,
+          typing: false,
+          pendingApprovals: [{ id: "a1", tool: "exec", params: {}, risk: "exec" }],
+        })}
+      />,
+    );
+
+    expect(container.querySelectorAll(".tr-row")).toHaveLength(1);
+  });
 });

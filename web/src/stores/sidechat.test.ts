@@ -170,6 +170,30 @@ describe("sidechat store", () => {
     expect(useSidechatStore.getState().pendingClarify).toBe(null);
   });
 
+  it("a _control_turn clarify ack does not end the sidechat primary turn lifecycle", () => {
+    // Same contract as main chat: the backend's is_final confirm text for a
+    // /clarify answer is stamped _control_turn and must NOT reset the parked
+    // turn's typing / activeTool / thinkingBlocks.
+    useSidechatStore.setState({
+      sessionId: "cli:web-side-1",
+      typing: true,
+      activeTool: "exec",
+      thinkingBlocks: { 'th-1': { thinkingId: "th-1", text: "checking", streaming: true, durationMs: 0, retracted: false, cogEventId: "cog-1" } },
+    });
+    useSidechatStore.getState()._handleWsFrame({
+      type: "message",
+      message_kind: "final",
+      is_final: true,
+      text: "已回复澄清请求 c1。",
+      metadata: { _inbound_event_id: "evt-ctl", _control_turn: true },
+    });
+    const s = useSidechatStore.getState();
+    expect(s.typing).toBe(true);
+    expect(s.activeTool).toBe("exec");
+    expect(s.thinkingBlocks["th-1"]).toBeTruthy();
+    expect(s.messages.filter((m) => m.role === "assistant")).toHaveLength(0);
+  });
+
   it("_refreshInteractions loads approvals and clarify into state", async () => {
     useSidechatStore.setState({ sessionId: "cli:web-side-10" });
     const fetchSpy = vi.spyOn(api, "apiFetch").mockImplementation(async (path) => {

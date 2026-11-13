@@ -217,7 +217,7 @@ export function ModelsPage() {
                             : "border-transparent text-codex-muted hover:bg-codex-surface"
                         }`}
                       >
-                        <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${p.disabled ? "bg-[#444]" : "bg-codex-success"}`} />
+                        <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${p.disabled ? "bg-codex-border-strong" : "bg-codex-success"}`} />
                         <span className="flex-1 truncate">{p.name}</span>
                       </button>
                     );

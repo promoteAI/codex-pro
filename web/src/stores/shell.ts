@@ -21,15 +21,9 @@ export type SettingsSection =
   | "environment"
   | "worktrees"
   | "archived"
-  | "config"
-  | "overview"
   | "memory"
-  | "channels"
-  | "kanban"
-  | "logs"
   | "analytics"
-  | "knowledge"
-  | "sessions";
+  | "knowledge";
 
 export interface SessionTab {
   id: string;

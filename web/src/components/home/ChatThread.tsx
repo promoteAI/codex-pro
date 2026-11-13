@@ -236,7 +236,9 @@ export function ChatThread({ selectors }: ChatThreadProps) {
 
         {streaming ? (
           <div className="chat-msg is-assistant">
-            <div className="chat-msg-bubble">
+            {/* aria-live="polite" announces streamed assistant text to screen
+                readers without interrupting the current reading position. */}
+            <div className="chat-msg-bubble" aria-live="polite">
               {streaming.text}
               <span className="chat-cursor" aria-hidden />
             </div>

@@ -115,7 +115,7 @@ export function PrView() {
             )}
             {active.url && (
               <div className="pr-detail-actions">
-                <a href={active.url} target="_blank" rel="noreferrer" style={{ color: "#8b9cff", fontSize: 13 }}>{t("viewOnGithub")}</a>
+                <a href={active.url} target="_blank" rel="noreferrer" style={{ color: "var(--color-codex-accent)", fontSize: 13 }}>{t("viewOnGithub")}</a>
               </div>
             )}
           </div>

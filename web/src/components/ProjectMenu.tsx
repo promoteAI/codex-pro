@@ -158,7 +158,7 @@ export function ProjectMenu({
       </div>
       <div className="proj-menu-list" role="group" aria-label={t("workspaceList")}>
         {filtered.length === 0 && (
-          <div className="px-2.5 py-2 text-[13px] text-[#888]">{t("noRepos")}</div>
+          <div className="px-2.5 py-2 text-[13px] text-codex-muted">{t("noRepos")}</div>
         )}
         {filtered.map((p) => (
           <button

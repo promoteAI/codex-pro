@@ -79,9 +79,9 @@ function Hub() {
 }
 
 function colorDiffLine(line: string) {
-  if (line.startsWith("+") && !line.startsWith("+++")) return "text-[#2f7d3d]";
-  if (line.startsWith("-") && !line.startsWith("---")) return "text-[#c0392b]";
-  if (line.startsWith("@@")) return "text-[#2c5aa0]";
+  if (line.startsWith("+") && !line.startsWith("+++")) return "text-codex-success";
+  if (line.startsWith("-") && !line.startsWith("---")) return "text-codex-danger";
+  if (line.startsWith("@@")) return "text-codex-accent";
   return "text-codex-text-secondary";
 }
 
@@ -160,8 +160,8 @@ function ReviewPane() {
           {t("reviewBase")} <span className="text-codex-text font-medium">{data?.base ?? "—"}</span>
         </span>
         <span className="ml-auto text-[12px] font-mono">
-          <span className="text-[#3fb950]">+{totalAdd.toLocaleString()}</span>{" "}
-          <span className="text-[#f85149]">-{totalDel.toLocaleString()}</span>
+          <span className="text-codex-success">+{totalAdd.toLocaleString()}</span>{" "}
+          <span className="text-codex-danger">-{totalDel.toLocaleString()}</span>
         </span>
         <button
           type="button"
@@ -179,8 +179,8 @@ function ReviewPane() {
             <span className="truncate text-codex-text font-medium">{active?.path ?? "—"}</span>
             {active && (
               <span className="ml-auto font-mono text-[11.5px] shrink-0">
-                <span className="text-[#3fb950]">+{active.additions}</span>{" "}
-                <span className="text-[#f85149]">-{active.deletions}</span>
+                <span className="text-codex-success">+{active.additions}</span>{" "}
+                <span className="text-codex-danger">-{active.deletions}</span>
               </span>
             )}
           </div>
@@ -231,8 +231,8 @@ function ReviewPane() {
               >
                 <div className="truncate">{f.path.split("/").pop()}</div>
                 <div className="font-mono text-[10.5px] text-codex-muted">
-                  <span className="text-[#3fb950]">+{f.additions}</span>{" "}
-                  <span className="text-[#f85149]">-{f.deletions}</span>
+                  <span className="text-codex-success">+{f.additions}</span>{" "}
+                  <span className="text-codex-danger">-{f.deletions}</span>
                 </div>
               </button>
             ))}
@@ -411,11 +411,11 @@ function FilesPane() {
           <pre className="whitespace-pre-wrap font-sans">{fileContent.content}</pre>
         </div>
       ) : (
-        <div className="flex-1 overflow-auto min-h-0 font-mono text-[12.5px] leading-[1.6] bg-[#121212]">
+        <div className="flex-1 overflow-auto min-h-0 font-mono text-[12.5px] leading-[1.6] bg-codex-panel">
           {lines.map((line, i) => (
             <div key={i} className="flex min-w-max">
-              <span className="w-11 shrink-0 text-right pr-3 pl-2 text-[#555] select-none">{i + 1}</span>
-              <span className="pr-5 text-[#d4d4d4] whitespace-pre">{line || " "}</span>
+              <span className="w-11 shrink-0 text-right pr-3 pl-2 text-codex-muted select-none">{i + 1}</span>
+              <span className="pr-5 text-codex-text-secondary whitespace-pre">{line || " "}</span>
             </div>
           ))}
         </div>
@@ -671,7 +671,7 @@ function SidechatPane() {
           <div className="absolute left-3 bottom-[calc(100%-6px)] w-[min(520px,calc(100vw-24px))] max-h-[min(420px,55vh)] overflow-auto p-2 pl-2.5 bg-codex-elevated border border-codex-border-strong rounded-[14px] shadow-[0_16px_40px_rgba(0,0,0,.55)] z-30">
             {slashMatches.commands.length > 0 && (
               <>
-                <div className="px-2.5 py-1.5 text-[12px] text-[#7dd3fc] font-medium">{tc("slashCommands")}</div>
+                <div className="px-2.5 py-1.5 text-[12px] text-codex-accent font-medium">{tc("slashCommands")}</div>
                 {slashMatches.commands.map((c) => (
                   <button
                     key={c.id}
@@ -690,7 +690,7 @@ function SidechatPane() {
             )}
             {slashMatches.skillItems.length > 0 && (
               <>
-                <div className="px-2.5 py-1.5 text-[12px] text-[#7dd3fc] font-medium">{tc("skillsSection")}</div>
+                <div className="px-2.5 py-1.5 text-[12px] text-codex-accent font-medium">{tc("skillsSection")}</div>
                 {slashMatches.skillItems.map((c) => (
                   <button
                     key={c.id}

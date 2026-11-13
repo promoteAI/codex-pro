@@ -6,3 +6,6 @@ package-lock.json
 pnpm-lock.yaml
 # Local gateway proxy origin (e.g. when 58123 is in a WinNAT excluded range).
 .env*.local
+# Playwright artifacts (regenerated on every run; never committed).
+test-results/
+playwright-report/

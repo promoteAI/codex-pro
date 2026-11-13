@@ -183,9 +183,9 @@ export function BranchMenu({
       <div className="branch-menu-section">{t("branchSection")}</div>
       <div className="branch-menu-list" role="group" aria-label={t("branchList")}>
         {loading ? (
-          <div className="px-2.5 py-2 text-[13px] text-[#888]">{t("loadingBranches")}</div>
+          <div className="px-2.5 py-2 text-[13px] text-codex-muted">{t("loadingBranches")}</div>
         ) : filtered.length === 0 ? (
-          <div className="px-2.5 py-2 text-[13px] text-[#888]">{t("noBranches")}</div>
+          <div className="px-2.5 py-2 text-[13px] text-codex-muted">{t("noBranches")}</div>
         ) : (
           filtered.map((b) => {
             const dirty = "dirty" in b ? (b as { dirty?: number }).dirty : undefined;

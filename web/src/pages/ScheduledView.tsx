@@ -8,7 +8,7 @@ import { runMutation } from "../stores/toast";
 import { useIsAdmin } from "../stores/capabilities";
 import { useConfirm } from "../components/ConfirmDialog";
 import { useProvidersStore } from "../stores/providers";
-import type { CronJob } from "./Cron";
+import type { CronJob } from "./cronTypes";
 import {
   cronToFreq,
   cronToLabelMeta,
@@ -541,7 +541,7 @@ export function ScheduledView() {
           <div className="sch-task-list" id="schTaskList">
             {loading && <div className="sch-task-meta" style={{ padding: "12px 10px" }}>{t("loading")}</div>}
             {!loading && error && (
-              <div className="sch-task-meta" style={{ padding: "12px 10px", color: "#e85d5d" }}>
+              <div className="sch-task-meta" style={{ padding: "12px 10px", color: "var(--color-codex-danger)" }}>
                 {t("loadFailed", { error })}
               </div>
             )}

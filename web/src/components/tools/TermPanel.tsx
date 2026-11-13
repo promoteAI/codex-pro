@@ -21,6 +21,16 @@ let termSeq = 1;
  * renderer row factory that touches one; loading it only on open keeps the
  * Layout tests (which render TermPanel with the panel closed) green.
  */
+/** Read a CSS custom property from the document root so the xterm theme
+ *  follows the active `data-theme` (dark/light) instead of hard-coding a
+ *  single dark palette. Falls back to the dark defaults when the variable is
+ *  unavailable (e.g. jsdom). */
+function readCssVar(name: string, fallback: string): string {
+  if (typeof window === "undefined" || typeof getComputedStyle !== "function") return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
 async function createTerminal(label: string): Promise<TermTab> {
   const [{ Terminal }, { FitAddon }] = await Promise.all([
     import("@xterm/xterm"),
@@ -31,7 +41,10 @@ async function createTerminal(label: string): Promise<TermTab> {
     cursorBlink: true,
     fontSize: 12.5,
     fontFamily: '"Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace',
-    theme: { background: "#121212", foreground: "#c8c8c8" },
+    theme: {
+      background: readCssVar("--codex-panel", "#141414"),
+      foreground: readCssVar("--codex-text-secondary", "#a0a0a0"),
+    },
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
@@ -145,8 +158,8 @@ export function TermPanel() {
               onClick={() => setActiveId(tab.id)}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] shrink-0 ${
                 activeId === tab.id
-                  ? "bg-[#2e2e2e] text-[#f0f0f0]"
-                  : "text-[#9a9a9a] hover:bg-[#252525]"
+                  ? "bg-codex-active text-codex-text"
+                  : "text-codex-muted hover:bg-codex-hover"
               }`}
             >
               <span>{tab.label}</span>
@@ -190,7 +203,7 @@ export function TermPanel() {
             <X size={14} />
           </button>
         </div>
-        <div className="flex-1 min-h-0 bg-[#121212]">
+        <div className="flex-1 min-h-0 bg-codex-panel">
           {tabs.map((tab) => (
             <div
               key={tab.id}

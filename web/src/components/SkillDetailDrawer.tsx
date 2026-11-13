@@ -105,19 +105,19 @@ export function SkillDetailDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-codex-overlay-bg backdrop-blur-sm" onClick={onClose}>
       <div
         role="dialog"
         aria-label={name}
-        className="relative w-full max-w-2xl mx-4 max-h-[90vh] bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        className="relative w-full max-w-2xl mx-4 max-h-[90vh] bg-codex-modal-bg border border-codex-modal-border rounded-2xl shadow-2xl overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
         {/* Header */}
-        <div className="flex items-start gap-4 p-5 border-b border-[#2a2a2a]">
+        <div className="flex items-start gap-4 p-5 border-b border-codex-border">
           {/* Icon */}
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-codex-accent to-codex-accent-hover flex items-center justify-center shrink-0">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 2L2 7l10 5 10-5-10-5z" />
               <path d="M2 17l10 5 10-5" />
@@ -127,8 +127,8 @@ export function SkillDetailDrawer({
 
           {/* Title & Description */}
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold text-white mb-2">{name}</h2>
-            <p className="text-sm text-gray-400 leading-relaxed line-clamp-3">
+            <h2 className="text-lg font-semibold text-codex-text mb-2">{name}</h2>
+            <p className="text-sm text-codex-text-secondary leading-relaxed line-clamp-3">
               {data?.description?.trim() || data?.content?.split("\n").filter(l => l.trim() && !l.startsWith("#") && !l.startsWith("```")).slice(0, 3).join(" ") || "—"}
             </p>
           </div>
@@ -148,7 +148,7 @@ export function SkillDetailDrawer({
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                  hovered ? "bg-[#2a2a2a] text-gray-400 hover:text-white" : "text-gray-500"
+                  hovered ? "bg-codex-active text-codex-text-secondary hover:text-codex-text" : "text-codex-muted"
                 }`}
                 aria-label="更多操作"
                 title="更多操作"
@@ -156,10 +156,10 @@ export function SkillDetailDrawer({
                 <MoreHorizontal size={16} />
               </button>
               {menuOpen && data && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-[#252525] border border-[#333] rounded-xl shadow-xl overflow-hidden z-10">
+                <div className="absolute right-0 top-full mt-2 w-48 bg-codex-popover-bg border border-codex-popover-border rounded-xl shadow-xl overflow-hidden z-10">
                   <button
                     onClick={() => { setMenuOpen(false); openInMarketplace(); }}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-[#333] transition-colors"
+                    className="w-full px-4 py-3 text-left text-sm text-codex-text-secondary hover:bg-codex-hover transition-colors"
                   >
                     打开
                   </button>
@@ -184,7 +184,7 @@ export function SkillDetailDrawer({
                         }
                       }
                     }}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-[#333] transition-colors border-t border-[#333]"
+                    className="w-full px-4 py-3 text-left text-sm text-codex-text-secondary hover:bg-codex-hover transition-colors border-t border-codex-border"
                   >
                     在文件资源管理器中显示
                   </button>
@@ -193,7 +193,7 @@ export function SkillDetailDrawer({
                       setMenuOpen(false);
                       await navigator.clipboard.writeText(data.content || "");
                     }}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-[#333] transition-colors border-t border-[#333]"
+                    className="w-full px-4 py-3 text-left text-sm text-codex-text-secondary hover:bg-codex-hover transition-colors border-t border-codex-border"
                   >
                     复制 Markdown
                   </button>
@@ -204,7 +204,7 @@ export function SkillDetailDrawer({
             {/* Close */}
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-[#2a2a2a] hover:text-white transition-colors"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-codex-muted hover:bg-codex-active hover:text-codex-text transition-colors"
               aria-label="关闭"
               title="关闭"
             >
@@ -217,15 +217,15 @@ export function SkillDetailDrawer({
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Description Section */}
           <section>
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">说明</h3>
-            <div className="bg-[#151515] rounded-xl p-4 border border-[#2a2a2a]">
-              <pre className="text-sm text-gray-300 whitespace-pre-wrap break-words font-sans leading-relaxed max-h-[30vh] overflow-auto">
+            <h3 className="text-xs font-medium text-codex-muted uppercase tracking-wider mb-3">说明</h3>
+            <div className="bg-codex-panel rounded-xl p-4 border border-codex-border">
+              <pre className="text-sm text-codex-text-secondary whitespace-pre-wrap break-words font-sans leading-relaxed max-h-[30vh] overflow-auto">
                 {loading ? (
-                  <span className="text-gray-500 animate-pulse">加载中...</span>
+                  <span className="text-codex-muted animate-pulse">加载中...</span>
                 ) : data?.content ? (
                   data.content
                 ) : (
-                  <span className="text-gray-500">暂无内容</span>
+                  <span className="text-codex-muted">暂无内容</span>
                 )}
               </pre>
             </div>
@@ -235,9 +235,9 @@ export function SkillDetailDrawer({
           {deps && (
             <section>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">依赖</h3>
+                <h3 className="text-xs font-medium text-codex-muted uppercase tracking-wider">依赖</h3>
                 {deps.satisfied && (
-                  <span className="text-xs text-green-500 flex items-center gap-1">
+                  <span className="text-xs text-codex-success flex items-center gap-1">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
@@ -246,32 +246,32 @@ export function SkillDetailDrawer({
                 )}
               </div>
               {deps.requires.length === 0 ? (
-                <p className="text-sm text-gray-500 bg-[#151515] rounded-xl p-3 border border-[#2a2a2a]">
+                <p className="text-sm text-codex-muted bg-codex-panel rounded-xl p-3 border border-codex-border">
                   无依赖
                 </p>
               ) : (
-                <div className="bg-[#151515] rounded-xl border border-[#2a2a2a] overflow-hidden">
-                  <ul className="divide-y divide-[#2a2a2a]">
+                <div className="bg-codex-panel rounded-xl border border-codex-border overflow-hidden">
+                  <ul className="divide-y divide-codex-border">
                     {deps.requires.map((spec) => (
                       <li
                         key={spec}
                         className={`px-4 py-3 text-xs font-mono flex items-center justify-between ${
-                          deps.missing.includes(spec) ? "text-amber-400" : "text-gray-400"
+                          deps.missing.includes(spec) ? "text-codex-warn" : "text-codex-text-secondary"
                         }`}
                       >
                         <span>{spec}</span>
                         {deps.missing.includes(spec) && (
-                          <span className="text-xs text-amber-500 ml-2">缺失</span>
+                          <span className="text-xs text-codex-warn ml-2">缺失</span>
                         )}
                       </li>
                     ))}
                   </ul>
                   {!deps.satisfied && (
-                    <div className="px-4 py-3 bg-[#1a1510] border-t border-[#2a2a2a]">
+                    <div className="px-4 py-3 bg-codex-warn/10 border-t border-codex-border">
                       <button
                         onClick={install}
                         disabled={!canAdmin}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:bg-gray-700 disabled:opacity-50 text-white text-xs rounded-lg transition-colors"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-codex-warn hover:bg-codex-warn disabled:bg-codex-btn-disabled-bg disabled:opacity-50 text-codex-bg text-xs rounded-lg transition-colors"
                         title={canAdmin ? undefined : "需要管理员权限"}
                       >
                         <Download size={12} />
@@ -287,12 +287,12 @@ export function SkillDetailDrawer({
           {/* Files Section */}
           {data && data.files.length > 0 && (
             <section>
-              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
+              <h3 className="text-xs font-medium text-codex-muted uppercase tracking-wider mb-3">
                 文件 ({data.files.length})
               </h3>
-              <ul className="bg-[#151515] rounded-xl border border-[#2a2a2a] divide-y divide-[#2a2a2a]">
+              <ul className="bg-codex-panel rounded-xl border border-codex-border divide-y divide-codex-border">
                 {data.files.map((f) => (
-                  <li key={f} className="px-4 py-3 text-xs font-mono text-gray-400 break-all hover:bg-[#1a1a1a]">
+                  <li key={f} className="px-4 py-3 text-xs font-mono text-codex-text-secondary break-all hover:bg-codex-hover">
                     {f}
                   </li>
                 ))}
@@ -303,7 +303,7 @@ export function SkillDetailDrawer({
 
         {/* Error State */}
         {error && (
-          <div className="mx-5 mb-5 p-3 bg-red-900/20 border border-red-800 rounded-xl text-xs text-red-400">
+          <div className="mx-5 mb-5 p-3 bg-codex-danger-tint border border-codex-danger rounded-xl text-xs text-codex-danger">
             加载失败：{error}
           </div>
         )}

@@ -3,10 +3,10 @@ import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { axe } from "jest-axe";
 import { Login } from "../pages/Login";
-import { Overview } from "../pages/Overview";
-import { Sessions } from "../pages/Sessions";
+import { Skills } from "../pages/Skills";
 import { ConfirmProvider } from "../components/ConfirmDialog";
 import { useAuthStore } from "../stores/auth";
+import { useCapabilitiesStore } from "../stores/capabilities";
 import * as api from "../lib/api";
 
 /**
@@ -22,22 +22,17 @@ import * as api from "../lib/api";
  * require a real browser (e.g. actual pixel rendering) are out of scope here.
  */
 
-const HEALTH = { status: "healthy", active_sessions: 4, ws_clients: 2 };
-const CHANNELS = {
-  channels: [
-    { name: "feishu", enabled: true, running: true },
-    { name: "wecom", enabled: true, running: false },
+const SKILLS = {
+  skills: [
+    { name: "web search", description: "搜索网页", enabled: true },
+    { name: "shell", description: "", enabled: false },
   ],
 };
-const TASKS = { tasks: [{ status: "running" }, { status: "queued" }], total: 2 };
 
 function mockApi() {
   return vi.spyOn(api, "apiFetch").mockImplementation(async (path: string) => {
-    if (path === "/health") return HEALTH as never;
-    if (path === "/channels") return CHANNELS as never;
-    if (path.startsWith("/tasks")) return TASKS as never;
-    if (path === "/memory/stats") return { total: 42 } as never;
-    if (path.startsWith("/sessions")) return { sessions: [], total: 0 } as never;
+    if (path === "/capabilities") return { admin: true } as never;
+    if (path === "/skills") return SKILLS as never;
     return {} as never;
   });
 }
@@ -45,6 +40,7 @@ function mockApi() {
 beforeEach(() => {
   // 不给 token,useWsSubscribe 就不会真的建连接。
   useAuthStore.setState({ token: "" });
+  useCapabilitiesStore.setState({ admin: true, authRequired: null, inflight: null, generation: 0 });
 });
 
 afterEach(() => {
@@ -64,24 +60,12 @@ describe("可访问性扫描 (axe-core)", () => {
     expect(results.violations).toEqual([]);
   });
 
-  it("概览页无 WCAG 违规", async () => {
-    mockApi();
-    const { container } = render(
-      <MemoryRouter>
-        <Overview />
-      </MemoryRouter>,
-    );
-
-    const results = await axe(container);
-    expect(results.violations).toEqual([]);
-  });
-
-  it("会话页无 WCAG 违规", async () => {
+  it("技能页无 WCAG 违规", async () => {
     mockApi();
     const { container } = render(
       <MemoryRouter>
         <ConfirmProvider>
-          <Sessions />
+          <Skills />
         </ConfirmProvider>
       </MemoryRouter>,
     );

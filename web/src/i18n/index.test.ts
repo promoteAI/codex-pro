@@ -9,8 +9,8 @@ describe("i18n 初始化", () => {
 
   it("切到 en 后 nav 文案变英文", async () => {
     await i18n.changeLanguage("en");
-    expect(i18n.t("nav:overview")).toBe("Overview");
+    expect(i18n.t("nav:newChat")).toBe("New chat");
     await i18n.changeLanguage("zh");
-    expect(i18n.t("nav:overview")).toBe("概览");
+    expect(i18n.t("nav:newChat")).toBe("新对话");
   });
 });

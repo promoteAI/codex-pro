@@ -119,7 +119,7 @@ export function RemoteConnectModal() {
                   </div>
                 )}
               </div>
-              <p style={{ marginTop: 16, fontSize: 12.5, color: "#8a8a8a" }}>
+              <p style={{ marginTop: 16, fontSize: 12.5, color: "var(--color-codex-muted)" }}>
                 {t("remoteConnect.unsupported")}
               </p>
             </div>

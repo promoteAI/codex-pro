@@ -40,7 +40,7 @@ function NotFound() {
   return (
     <div className="h-full grid place-items-center text-center">
       <div>
-        <div className="text-5xl font-bold text-[#2a2a2a]">404</div>
+        <div className="text-5xl font-bold text-codex-text">404</div>
         <p className="mt-2 text-codex-muted">{t("notFound")}</p>
         <Link to="/" className="inline-block mt-3 text-sm text-codex-accent hover:underline">
           {t("backHome")}

@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { Sidebar } from "./Sidebar";
-import * as api from "../lib/api";
-import { useChatStore } from "../stores/chat";
-import { useToastStore } from "../stores/toast";
+import { CodexSidebar } from "./CodexSidebar";
+import * as api from "../../lib/api";
+import { useChatStore } from "../../stores/chat";
+import { useToastStore } from "../../stores/toast";
 
-describe("Sidebar", () => {
+describe("CodexSidebar", () => {
   beforeEach(() => {
     useToastStore.setState({ toasts: [] });
   });
@@ -17,7 +17,7 @@ describe("Sidebar", () => {
   it("默认中文渲染菜单", () => {
     render(
       <MemoryRouter>
-        <Sidebar />
+        <CodexSidebar />
       </MemoryRouter>,
     );
     expect(screen.getByText("新对话")).toBeInTheDocument();
@@ -27,7 +27,7 @@ describe("Sidebar", () => {
     useChatStore.setState({ workspaceKey: "ws1", workspacePath: "/ws1" });
     render(
       <MemoryRouter>
-        <Sidebar />
+        <CodexSidebar />
       </MemoryRouter>,
     );
     // workspaceKey label is no longer rendered in the sidebar
@@ -51,7 +51,7 @@ describe("Sidebar", () => {
 
     render(
       <MemoryRouter>
-        <Sidebar />
+        <CodexSidebar />
       </MemoryRouter>,
     );
 
@@ -63,7 +63,7 @@ describe("Sidebar", () => {
   it("账户菜单可打开并包含使用统计/设置", async () => {
     render(
       <MemoryRouter>
-        <Sidebar />
+        <CodexSidebar />
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByLabelText("账户"));
@@ -75,7 +75,7 @@ describe("Sidebar", () => {
   it("使用统计与设置带快捷键标注", async () => {
     render(
       <MemoryRouter>
-        <Sidebar />
+        <CodexSidebar />
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByLabelText("账户"));
@@ -113,7 +113,7 @@ describe("Sidebar", () => {
 
     render(
       <MemoryRouter>
-        <Sidebar />
+        <CodexSidebar />
       </MemoryRouter>,
     );
 
@@ -150,7 +150,7 @@ describe("Sidebar", () => {
 
     render(
       <MemoryRouter>
-        <Sidebar />
+        <CodexSidebar />
       </MemoryRouter>,
     );
 
@@ -184,7 +184,7 @@ describe("Sidebar", () => {
 
     render(
       <MemoryRouter>
-        <Sidebar />
+        <CodexSidebar />
       </MemoryRouter>,
     );
 
@@ -224,7 +224,7 @@ describe("Sidebar", () => {
 
     render(
       <MemoryRouter>
-        <Sidebar />
+        <CodexSidebar />
       </MemoryRouter>,
     );
 
@@ -272,7 +272,7 @@ describe("Sidebar", () => {
 
     render(
       <MemoryRouter>
-        <Sidebar />
+        <CodexSidebar />
       </MemoryRouter>,
     );
 

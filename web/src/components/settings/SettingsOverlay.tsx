@@ -21,19 +21,15 @@ import {
   ArchivedPage,
 } from "./pages/MorePages";
 
-const Overview = lazy(() => import("../../pages/Overview").then((m) => ({ default: m.Overview })));
 const Memory = lazy(() => import("../../pages/Memory").then((m) => ({ default: m.Memory })));
-const Channels = lazy(() => import("../../pages/Channels").then((m) => ({ default: m.Channels })));
-const KanbanPage = lazy(() => import("../../pages/Kanban").then((m) => ({ default: m.Kanban })));
-const Logs = lazy(() => import("../../pages/Logs").then((m) => ({ default: m.Logs })));
 const Analytics = lazy(() => import("../../pages/Analytics").then((m) => ({ default: m.Analytics })));
 const Knowledge = lazy(() => import("../../pages/Knowledge").then((m) => ({ default: m.Knowledge })));
-const Sessions = lazy(() => import("../../pages/Sessions").then((m) => ({ default: m.Sessions })));
-const Config = lazy(() => import("../../pages/Config").then((m) => ({ default: m.Config })));
 
 type NavGroup = "personal" | "integrations" | "coding" | "archived" | "admin";
 
-/** Prototype settings-nav only (19 items). Extra admin pages stay reachable via deep link. */
+/** Settings navigation. The "数据与统计" group keeps just memory/knowledge/
+ *  analytics; the removed admin pages (config/overview/sessions/channels/
+ *  kanban/logs) are no longer reachable from the settings UI. */
 const SECTIONS: Array<{ id: SettingsSection; group: NavGroup }> = [
   { id: "general", group: "personal" },
   { id: "models", group: "personal" },
@@ -83,36 +79,17 @@ const ADMIN_PAGES: Partial<Record<SettingsSection, ComponentType>> = {
   memory: Memory,
   knowledge: Knowledge,
   analytics: Analytics,
-  // Deep-link only (not in prototype settings-nav)
-  config: Config,
-  overview: Overview,
-  sessions: Sessions,
-  channels: Channels,
-  kanban: KanbanPage,
-  logs: Logs,
 };
 
 const ADMIN_SUB: Partial<Record<SettingsSection, string>> = {
   memory: "adminMemoryDesc",
   knowledge: "adminKnowledgeDesc",
   analytics: "adminAnalyticsDesc",
-  config: "adminConfigDesc",
-  overview: "adminOverviewDesc",
-  sessions: "adminSessionsDesc",
-  channels: "adminChannelsDesc",
-  kanban: "adminKanbanDesc",
-  logs: "adminLogsDesc",
 };
 
 const NAV_IDS = new Set(SECTIONS.map((s) => s.id));
 const SECTION_IDS = new Set<SettingsSection>([
   ...SECTIONS.map((s) => s.id),
-  "config",
-  "overview",
-  "sessions",
-  "channels",
-  "kanban",
-  "logs",
   "environment",
   "connections",
 ]);

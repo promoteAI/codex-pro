@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import { useApi } from "../hooks/use-api";
 import { dateTime } from "../lib/datetime";
-import type { CronJob } from "../pages/Cron";
+import type { CronJob } from "../pages/cronTypes";
 
 interface CronRun {
   ts: number;
